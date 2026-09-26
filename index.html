@@ -457,13 +457,13 @@ function gSky(x,y){var t=skyXF(x,y);return gravityPos(t[0],t[1]);}
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
 var SW=null,swP=0;
-var AMB=mkAudio('constellation.opus',.5,true);
-var GARG=mkAudio('collapsars.opus',0,true);
-var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true);
-var SFX={rigel:mkAudio('rigel.opus',.85,false),spica:mkAudio('spica.opus',.85,false),betel:mkAudio('betelgeuse.opus',.85,false),sirius:mkAudio('sirius.opus',.85,false),pleione:mkAudio('pleione.opus',.85,false),aldebaran:mkAudio('aldebaran.opus',.85,false)};
-SFX.arcturus=mkAudio('arcturus.opus',.85,false);
-SFX.antares=mkAudio('antares.opus',.85,false);
-function mkAudio(name,vol,loop){var a=new Audio(encodeURIComponent(name));a.preload='auto';a.loop=!!loop;a.volume=vol;return a;}
+var AMB=mkAudio('constellation.opus',.5,true,'auto');
+var GARG=mkAudio('collapsars.opus',0,true,'metadata');
+var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');
+var SFX={rigel:mkAudio('rigel.opus',.85,false,'metadata'),spica:mkAudio('spica.opus',.85,false,'metadata'),betel:mkAudio('betelgeuse.opus',.85,false,'metadata'),sirius:mkAudio('sirius.opus',.85,false,'metadata'),pleione:mkAudio('pleione.opus',.85,false,'metadata'),aldebaran:mkAudio('aldebaran.opus',.85,false,'metadata')};
+SFX.arcturus=mkAudio('arcturus.opus',.85,false,'metadata');
+SFX.antares=mkAudio('antares.opus',.85,false,'metadata');
+function mkAudio(name,vol,loop,preloadMode){var a=new Audio(encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;return a;}
 function safePlay(a){
   if(!a)return false;
   try{
@@ -844,6 +844,8 @@ function pauseMusicForSfx(){
 }
 function playSfx(a){
   /* Star SFX no longer warms, loads, or auto-resumes constellation music. */
+  if(!a)return;
+  if(a.preload!=='auto'){a.preload='auto';}
   if(activeSfx===a){
     if(a.paused){
       pauseMusicForSfx();
@@ -3794,8 +3796,8 @@ window.addEventListener('pageshow',function(e){
   var choicesEl=document.getElementById('boot-choices');
   var capBlue=document.getElementById('boot-cap-blue');
   var capRed=document.getElementById('boot-cap-red');
-  stars.forEach(function(a){try{a.preload='auto';a.load();}catch(e){}});
-  function readyCount(){var n=0;for(var i=0;i<stars.length;i++)if(stars[i].readyState>=2)n++;return n;}
+  stars.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
+  function readyCount(){var n=0;for(var i=0;i<stars.length;i++)if(stars[i].readyState>=1)n++;return n;}
   function enterObservatory(){
     if(bs.classList.contains('off'))return;
     bs.classList.add('off');
