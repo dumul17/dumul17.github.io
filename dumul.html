@@ -400,8 +400,13 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
 
   var GARG=new Audio(encodeURIComponent('collapsars.opus'));GARG.loop=true;GARG.volume=.5;GARG.preload='auto';
   var gargTimer=0;
+  var gargFromSwallow=false;
   function gargCancel(){if(gargTimer){clearTimeout(gargTimer);gargTimer=0;}}
-  /* Resume collapsars where Observatory left off during the Gargantua swallow. */
+  /* Resume collapsars where Observatory left off during the Gargantua swallow.
+     Observatory warp is now ~6.5s total (900ms swallow lead-in + 5600ms tesseract),
+     so the handoff time is typically 5–7s into collapsars.opus. Seek must be
+     reliable across the longer transition, and volume ramps in so the page-cut
+     after the extended warp is not a hard hit. */
   (function restoreCollapsars(){
     try{
       var t=parseFloat(sessionStorage.getItem('dm_collapsars_t')||'');
@@ -409,11 +414,31 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       sessionStorage.removeItem('dm_collapsars_t');
       sessionStorage.removeItem('dm_collapsars_from');
       if(from!=='swallow'||!isFinite(t)||t<=0)return;
-      var apply=function(){try{if(Math.abs((GARG.currentTime||0)-t)>0.25)GARG.currentTime=t;}catch(e){}};
+      gargFromSwallow=true;
+      var apply=function(){
+        try{
+          if(Math.abs((GARG.currentTime||0)-t)>0.15)GARG.currentTime=t;
+        }catch(e){}
+      };
+      /* Retry seek: after a long warp the first canplay can fire before the
+         decoder is ready to honour currentTime on some mobile WebViews. */
       GARG.addEventListener('loadedmetadata',apply,{once:true});
       GARG.addEventListener('canplay',apply,{once:true});
+      GARG.addEventListener('playing',function onPlay(){
+        apply();
+        GARG.removeEventListener('playing',onPlay);
+      });
       try{GARG.load();}catch(e){}
       apply();
+      /* Soft volume ramp matching Observatory fade target (~0.55 → settle 0.5). */
+      GARG.volume=0.28;
+      var v0=performance.now(),vDur=700,vFrom=0.28,vTo=0.5;
+      function rampVol(now){
+        var u=Math.min(1,(now-v0)/vDur);
+        GARG.volume=vFrom+(vTo-vFrom)*u;
+        if(u<1)requestAnimationFrame(rampVol);
+      }
+      requestAnimationFrame(rampVol);
     }catch(e){}
   })();
   function gTry(){
@@ -422,16 +447,26 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var p=GARG.play();if(p&&p.catch)p.catch(function(){});
   }
   /* Idle resume is intentionally slow so brief pause / seek / track-change
-     never thrash: pause track → start collapsars → pause again. */
+     never thrash: pause track → start collapsars → pause again.
+     After a swallow handoff, resume a bit sooner (900ms) so the longer
+     Observatory transition does not leave a silent gap if autoplay was blocked
+     on first paint and the user taps shortly after landing. */
   function gargSchedule(){
     gargCancel();
+    var delay=gargFromSwallow?900:1800;
     gargTimer=setTimeout(function(){
       gargTimer=0;
       if(!audio.paused&&!audio.ended)return;
       gTry();
-    },1800);
+    },delay);
   }
   gTry();
+  /* Extra play attempts right after swallow land — first gesture + short retries. */
+  if(gargFromSwallow){
+    setTimeout(gTry,120);
+    setTimeout(gTry,400);
+    setTimeout(gTry,900);
+  }
   document.addEventListener('pointerdown',gTry,{once:true});
   document.addEventListener('keydown',gTry,{once:true});
 
@@ -696,6 +731,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 <!-- BGM transisi = collapsars.opus via GARG.
      Handoff posisi playback sudah di-handle oleh sessionStorage
      (dm_collapsars_t / dm_collapsars_from) di restoreCollapsars() di atas.
+     Observatory warp ≈ 6.5s (900ms + 5600ms tesseract) → seek ke currentTime handoff.
      Tidak perlu <audio id="bgm"> terpisah. -->
 </body>
 </html>
