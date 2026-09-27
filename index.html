@@ -2282,6 +2282,238 @@ function drawBg(now){
     g.beginPath();g.arc(l[0],l[1],b.r*(1-.5*k),0,6.283);g.fill();
   }
 }
+/* ---------- [FITUR 2] Synthesizer Chime untuk Bintang Biasa (Web Audio) ---------- */
+function playStarChime(s){
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AV.ctx && AC) AV.ctx = new AC();
+    if(!AV.ctx) return;
+    if(AV.ctx.state === 'suspended' && AV.ctx.resume) AV.ctx.resume();
+
+    var osc = AV.ctx.createOscillator();
+    var gain = AV.ctx.createGain();
+    osc.type = 'sine'; // Nada murni kosmik Bell/Chime
+
+    // Frekuensi pitch mengikuti warna bintang (merah = bass, biru = nada tinggi)
+    var freq = 520;
+    if(s.c){
+      if(s.c.includes('ff8e')||s.c.includes('ff45')||s.c.includes('ffb2')||s.c.includes('ffb4')) freq = 261.63; // C4 (Merah/Hingga)
+      else if(s.c.includes('ffe9')||s.c.includes('ffe0')) freq = 329.63; // E4 (Kuning)
+      else if(s.c.includes('bfe0')||s.c.includes('cfeeff')||s.c.includes('7dd8')) freq = 659.25; // E5 (Biru Muda)
+      else if(s.c.includes('eaf6')||s.c.includes('f0f6')) freq = 783.99; // G5 (Putih/Biru)
+    }
+    freq *= (1 + ((s.r||1.5)-1.5)*0.08); // Bintang lebih besar sedikit lebih dalam
+
+    var nowTime = AV.ctx.currentTime;
+    osc.frequency.setValueAtTime(freq, nowTime);
+    gain.gain.setValueAtTime(0.12, nowTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, nowTime + 0.55); // Decay halus
+
+    osc.connect(gain);
+    gain.connect(AV.ctx.destination);
+    osc.start(nowTime);
+    osc.stop(nowTime + 0.55);
+  } catch(e){}
+}
+
+/* ---------- [FITUR 3] Gravitational Wave / Shockwave Gargantua ---------- */
+var BH_SHOCKWAVES = [];
+function createBHShockwave(x, y){
+  if(reduce || IS_POTATO) return;
+  BH_SHOCKWAVES.push({x: x, y: y, r: BH.R * 1.1, maxR: Math.min(W, H) * 0.4, t0: performance.now(), dur: 580});
+}
+function drawBHShockwaves(now){
+  if(!BH_SHOCKWAVES.length) return;
+  for(var i = BH_SHOCKWAVES.length - 1; i >= 0; i--){
+    var sw = BH_SHOCKWAVES[i];
+    var u = (now - sw.t0) / sw.dur;
+    if(u >= 1){ BH_SHOCKWAVES.splice(i, 1); continue; }
+    var currR = sw.r + (sw.maxR - sw.r) * Math.sin(u * Math.PI * 0.5); // Ease Out
+    var alpha = (1 - u) * 0.45;
+
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.strokeStyle = 'rgba(110, 229, 255, ' + alpha + ')';
+    g.lineWidth = Math.max(1, 3.5 * (1 - u));
+    g.beginPath();g.arc(sw.x, sw.y, currR, 0, 6.283);g.stroke();
+
+    g.strokeStyle = 'rgba(255, 122, 217, ' + (alpha * 0.4) + ')';
+    g.lineWidth = 1;
+    g.beginPath();g.arc(sw.x, sw.y, currR * 1.12, 0, 6.283);g.stroke();
+    g.restore();
+  }
+}
+
+/* ---------- [FITUR 4] Hyperspace Warp Lines ---------- */
+var WARP_STREAKS = [];
+function triggerHyperspaceWarp(targetX, targetY){
+  if(reduce || IS_POTATO) return;
+  WARP_STREAKS.length = 0;
+  var count = IS_POTATO ? 10 : 20;
+  var t0 = performance.now();
+  for(var i = 0; i < count; i++){
+    var ang = Math.random() * 6.283;
+    var dist = 90 + Math.random() * (Math.max(W, H) * 0.45);
+    WARP_STREAKS.push({
+      x: targetX + Math.cos(ang) * dist,
+      y: targetY + Math.sin(ang) * dist,
+      tx: targetX,
+      ty: targetY,
+      t0: t0,
+      dur: 360 + Math.random() * 120
+    });
+  }
+}
+function drawHyperspaceWarp(now){
+  if(!WARP_STREAKS.length) return;
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  for(var i = WARP_STREAKS.length - 1; i >= 0; i--){
+    var s = WARP_STREAKS[i];
+    var u = (now - s.t0) / s.dur;
+    if(u >= 1){ WARP_STREAKS.splice(i, 1); continue; }
+
+    var hx = s.x + (s.tx - s.x) * u;
+    var hy = s.y + (s.ty - s.y) * u;
+    var p0 = Math.max(0, u - 0.35);
+    var tx = s.x + (s.tx - s.x) * p0;
+    var ty = s.y + (s.ty - s.y) * p0;
+
+    var alpha = Math.sin(u * Math.PI) * 0.75;
+    var grad = g.createLinearGradient(hx, hy, tx, ty);
+    grad.addColorStop(0, 'rgba(234, 246, 255, ' + alpha + ')');
+    grad.addColorStop(1, 'rgba(110, 229, 255, 0)');
+
+    g.strokeStyle = grad;
+    g.lineWidth = 1.4;
+    g.beginPath();g.moveTo(hx, hy);g.lineTo(tx, ty);g.stroke();
+  }
+  g.restore();
+}
+
+/* ---------- [FITUR 4] Tactical Target Lock Reticle + Data Astronomi ---------- */
+var STAR_DATA = {
+  betel: { name: "BETELGEUSE", dist: "642 LY", spec: "M1-M2Ia", mag: "0.50", ra: "05h 55m", dec: "+07°24′" },
+  rigel: { name: "RIGEL", dist: "860 LY", spec: "B8Ia", mag: "0.13", ra: "05h 14m", dec: "-08°12′" },
+  sirius: { name: "SIRIUS", dist: "8.6 LY", spec: "A1V", mag: "-1.46", ra: "06h 45m", dec: "-16°42′" },
+  spica: { name: "SPICA", dist: "250 LY", spec: "B1III", mag: "0.98", ra: "13h 25m", dec: "-11°10′" },
+  pleione: { name: "PLEIONE", dist: "380 LY", spec: "B8ne", mag: "5.05", ra: "03h 49m", dec: "+24°08′" },
+  aldebaran: { name: "ALDEBARAN", dist: "65 LY", spec: "K5III", mag: "0.85", ra: "04h 35m", dec: "+16°30′" },
+  arcturus: { name: "ARCTURUS", dist: "36.7 LY", spec: "K1.5III", mag: "-0.05", ra: "14h 15m", dec: "+19°10′" },
+  antares: { name: "ANTARES", dist: "550 LY", spec: "M1.5Iab", mag: "1.06", ra: "16h 29m", dec: "-26°25′" }
+};
+
+function drawTargetLock(now){
+  if(reduce || SW) return;
+  var activeKey = null;
+  if(activeSfx && !activeSfx.paused && !activeSfx.ended){
+    if(activeSfx === SFX.betel) activeKey = 'betel';
+    else if(activeSfx === SFX.rigel) activeKey = 'rigel';
+    else if(activeSfx === SFX.sirius) activeKey = 'sirius';
+    else if(activeSfx === SFX.spica) activeKey = 'spica';
+    else if(activeSfx === SFX.pleione) activeKey = 'pleione';
+    else if(activeSfx === SFX.aldebaran) activeKey = 'aldebaran';
+    else if(activeSfx === SFX.arcturus) activeKey = 'arcturus';
+    else if(activeSfx === SFX.antares) activeKey = 'antares';
+  } else if(hot && STAR_DATA[hot]){
+    activeKey = hot;
+  }
+
+  if(!activeKey || !STAR_DATA[activeKey]) return;
+  var d = STAR_DATA[activeKey];
+  var tr = TRIGGERS[activeKey];
+  if(!tr) return;
+
+  var c = tr.cons === 'pleiades' ? PLEIADES : cons(tr.cons);
+  var s = tr.cons === 'pleiades' 
+    ? PLEIADES.bright.filter(function(z){ return z.name === tr.star; })[0] 
+    : (c && c.stars && c.stars[tr.star]);
+  if(!s) return;
+
+  var sx = tr.cons === 'pleiades' 
+    ? (PLEIADES.x + s.x * PLEIADES.scale + mouse.x * 1.4 + skyPan.x) 
+    : (s.x + c.ox);
+  var sy = tr.cons === 'pleiades' 
+    ? (PLEIADES.y + s.y * PLEIADES.scale + mouse.y * 1.0 + skyPan.y) 
+    : (s.y + c.oy);
+
+  var q = gSky(sx, sy);
+  if(!q || q[2] >= 1) return;
+
+  var x = q[0], y = q[1];
+  var sz = 17 + Math.sin(now * 0.003) * 1.5;
+  var rot = now * 0.0006;
+
+  g.save();
+  g.translate(x, y);
+
+  // Circle Reticle Dotted
+  g.strokeStyle = 'rgba(' + tr.rgb + ', 0.6)';
+  g.lineWidth = 1;
+  g.setLineDash([3, 3]);
+  g.beginPath();g.arc(0, 0, sz + 5, 0, 6.283);g.stroke();
+  g.setLineDash([]);
+
+  // Corner Brackets [ ]
+  g.rotate(rot);
+  var clen = 5;
+  g.strokeStyle = 'rgba(234, 246, 255, 0.85)';
+  g.lineWidth = 1.2;
+
+  g.beginPath(); g.moveTo(-sz, -sz + clen); g.lineTo(-sz, -sz); g.lineTo(-sz + clen, -sz); g.stroke();
+  g.beginPath(); g.moveTo(sz - clen, -sz); g.lineTo(sz, -sz); g.lineTo(sz, -sz + clen); g.stroke();
+  g.beginPath(); g.moveTo(sz, sz - clen); g.lineTo(sz, sz); g.lineTo(sz - clen, sz); g.stroke();
+  g.beginPath(); g.moveTo(-sz + clen, sz); g.lineTo(-sz, sz); g.lineTo(-sz, sz - clen); g.stroke();
+
+  g.restore();
+
+  // Telemetry HUD Text — Smart Adaptive Offset
+  g.save();
+  var isMobile = (W < 600 || H < 520);
+  var labelOnRight = (s.nx && s.nx > 0);
+  var tx, ty;
+
+  if(isMobile){
+    // Pada tampilan mobile (Portrait/Landscape), posisikan telemetri di bawah bintang
+    // agar jalur horizontal aman untuk Nama Bintang + Visualizer Spectrogram
+    tx = x - 40;
+    ty = y + sz + 20;
+
+    // Proteksi agar tidak terpotong tepi layar HP
+    if(tx < 10) tx = 10;
+    if(tx + 110 > W) tx = W - 115;
+    if(ty + 26 > H - 35) ty = y - sz - 30; // Lempar ke atas jika terlalu dekat dengan footer/bawah
+  } else {
+    // Pada Desktop: Posisikan di arah berlawanan dari nama bintang (s.nx)
+    if(labelOnRight){
+      tx = x - sz - 118; // Pindah ke kiri jika nama bintang di kanan
+    } else {
+      tx = x + sz + 12;  // Pindah ke kanan jika nama bintang di kiri
+    }
+    ty = y - 10;
+
+    // Proteksi batas layar Desktop
+    if(tx < 10) tx = x + sz + 12;
+    if(tx + 115 > W) tx = x - sz - 118;
+    if(ty - 8 < 0) ty = y + sz + 10;
+  }
+
+  g.font = '600 8.5px "Courier New", monospace';
+  g.fillStyle = 'rgba(' + tr.rgb + ', 0.95)';
+  g.fillText('LOCK: ' + d.name, tx, ty);
+
+  g.font = '500 7.5px "Courier New", monospace';
+  g.fillStyle = 'rgba(184, 224, 238, 0.8)';
+  g.fillText('DIST: ' + d.dist, tx, ty + 10);
+  g.fillText('SPEC: ' + d.spec + ' (MAG ' + d.mag + ')', tx, ty + 19);
+
+  g.strokeStyle = 'rgba(' + tr.rgb + ', 0.35)';
+  g.lineWidth = 0.8;
+  g.beginPath();g.moveTo(tx - 4, ty - 8);g.lineTo(tx - 4, ty + 23);g.stroke();
+
+  g.restore();
+}
+
 function drawShooting(now){
   if(reduce||IS_POTATO)return;
   if(!idleMode&&(now-lastActivity)>IDLE_MS)idleMode=true;
@@ -2470,9 +2702,18 @@ function drawCons(c,age,now){
     if(visible<2)continue;
     var doGlow=!IS_POTATO&&!audioFocus&&(lineHot||nearBH);
     var pass,drawing2;
+    // Hitung efek dentuman audio bass pada garis rasi
+    var audioPulse = (AV.beat * 0.45 + AV.bass * 0.35) * ((activeSfx && !activeSfx.paused) ? 1 : 0);
+
     for(pass=doGlow?0:1;pass<2;pass++){
-      if(pass===0){g.strokeStyle='rgba(110,229,255,'+((lineHot?.14:.07)*focus)+')';g.lineWidth=lineHot?6:4;}
-      else{g.strokeStyle='rgba(150,212,255,'+((lineHot?.72:.42)+(reduce?0:.1*Math.sin(now*.0014+i)))*focus+')';g.lineWidth=lineHot?1.8:1.1;}
+      if(pass===0){
+        g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus)+')';
+        g.lineWidth=(lineHot?6:4) + audioPulse * 2.0;
+      }
+      else{
+        g.strokeStyle='rgba(150,212,255,'+(((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*Math.sin(now*.0014+i)))*focus)+')';
+        g.lineWidth=(lineHot?1.8:1.1) + audioPulse * 1.2;
+      }
       g.globalAlpha=kk;g.beginPath();drawing2=false;
       for(var sj=0;sj<=samples;sj++){
         if(!alive[sj]){drawing2=false;continue;}
@@ -2810,6 +3051,12 @@ function frame(now){
     drawPleiades(age,now);
     drawTriggerVisuals(now);
     drawSupernovaBursts(now);
+
+    // RENDER EFEK KOSMIK BARU:
+    drawBHShockwaves(now);
+    drawHyperspaceWarp(now);
+    drawTargetLock(now);
+
     /* Isolate late-stage canvas effects so one mobile/WebView compatibility
        issue cannot abort the frame before Gargantua is rendered. */
     try{drawAsteroids(now);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);}
@@ -3119,6 +3366,9 @@ function triggerSupernova(key){
   if(SN_BURSTS.length>=1)SN_BURSTS.length=0;
   SN_BURSTS.push({key:key,t:t0,d:busy?620:760});
 
+  // Trigger efek kilatan garis hyperspace ke arah bintang target
+  triggerHyperspaceWarp(sx, sy);
+
   /* 2. Warp telescope to the star; SFX + haptic fire on arrival. */
   TELESCOPE.mode='warp';
   TELESCOPE.targetX=sx;
@@ -3214,6 +3464,9 @@ document.addEventListener('pointerdown',function(e){
     else if(hit.star==='arcturus'){triggerSupernova('arcturus');}
     else if(hit.star==='antares'){triggerSupernova('antares');}
     else {
+      // Mainkan chime synthesizer kosmik untuk bintang biasa
+      playStarChime(hit.c.stars[hit.star]);
+
       /* Toggle portal DUMUL jika pengguna nge-tap bintang Sabuk Orion (Mintaka/Alnilam/Alnitak) */
       if(hit.c.id==='orion'&&(hit.star==='mintaka'||hit.star==='alnilam'||hit.star==='alnitak')){
         var bandP=PORTALS[0];
@@ -3305,6 +3558,7 @@ function endBHDrag(e){
   try{cv.releasePointerCapture(e.pointerId);}catch(err){}
   if(was){
     haptic(8);
+    createBHShockwave(BH.x, BH.y); // Buat gelombang kejut gravitasi saat Gargantua dilepas
   }else if(drag.tapEligible){
     e.preventDefault();
     startSwallow(bhA.getAttribute('href'));
