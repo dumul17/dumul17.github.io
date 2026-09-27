@@ -2013,21 +2013,21 @@ function drawHole(now,age){
   }
 }
 /* ---------- Tesseract 4D warp overlay (lapisan atas transisi Gargantua->DUMUL) ----------
-   Cyberpunk multi-layer hypercube (V10): outer/mid tesseracts + particle web.
-   Prefix tess/TESS_ so nothing collides with the sky IIFE. Overlay is visual-only.
-   Duration 5600ms (was 2600 + 3s). UI panel sits at the bottom of the viewport. */
+   Near-literal port of cyberpunk_x5f_tesseract_x5f_v10.html.
+   Sequence: swallow sky/UI finishes first (~2800ms), THEN this overlay runs 5600ms,
+   then redirect. Opaque black canvas would otherwise cut the swallow mid-swirl. */
 var TESS_VERTS=(function(){
-  var v=[];
-  for(var i=0;i<16;i++){
+  var v=[],i;
+  for(i=0;i<16;i++){
     v.push([(i&1)?0.5:-0.5,(i&2)?0.5:-0.5,(i&4)?0.5:-0.5,(i&8)?0.5:-0.5]);
   }
   return v;
 })();
 var TESS_EDGES=(function(){
-  var e=[];
-  for(var i=0;i<16;i++){
-    for(var j=i+1;j<16;j++){
-      var a=TESS_VERTS[i],b=TESS_VERTS[j],diff=0;
+  var e=[],i,j,diff,a,b;
+  for(i=0;i<16;i++){
+    for(j=i+1;j<16;j++){
+      a=TESS_VERTS[i];b=TESS_VERTS[j];diff=0;
       if(a[0]!==b[0])diff++;
       if(a[1]!==b[1])diff++;
       if(a[2]!==b[2])diff++;
@@ -2036,31 +2036,6 @@ var TESS_EDGES=(function(){
     }
   }
   return e;
-})();
-var TESS_EDGE_TW=TESS_EDGES.map(function(){
-  return {
-    phase:Math.random()*Math.PI*2,
-    speed:0.0008+Math.random()*0.0025
-  };
-});
-var TESS_PARTS=(function(){
-  var p=[],i,r,th,ph;
-  for(i=0;i<46;i++){
-    r=Math.random()*0.85;
-    th=Math.random()*Math.PI*2;
-    ph=Math.acos(2*Math.random()-1);
-    p.push({
-      x:r*Math.sin(ph)*Math.cos(th),
-      y:r*Math.sin(ph)*Math.sin(th),
-      z:r*Math.cos(ph),
-      vx:(Math.random()-0.5)*0.006,
-      vy:(Math.random()-0.5)*0.006,
-      vz:(Math.random()-0.5)*0.006,
-      twPhase:Math.random()*Math.PI*2,
-      twSpeed:0.0008+Math.random()*0.0022
-    });
-  }
-  return p;
 })();
 function tessRotY(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0]*c+p[2]*s,p[1],-p[0]*s+p[2]*c];}
 function tessRotX(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0],p[1]*c-p[2]*s,p[1]*s+p[2]*c];}
@@ -2088,9 +2063,8 @@ function tessDrawNode(tctx,x,y,r,core,glow,bright){
   tctx.restore();
 }
 /* targetUrl: tujuan redirect.
-   Dipanggil dari startSwallow() 900ms setelah klik, berjalan 5.6 detik, lalu
-   redirect — ini SATU-SATUNYA titik redirect untuk seluruh urutan swallow+warp.
-   BGM = GARG (collapsars.opus), sudah di-fade-in dari startSwallow. */
+   Dipanggil dari startSwallow() SETELAH swirl sky/UI selesai (~2800ms),
+   berjalan 5600ms, lalu redirect. */
 function startTesseractWarp(targetUrl){
   var warpOverlay=document.getElementById('tesseract-warp');
   if(!warpOverlay){location.href=targetUrl;return;}
@@ -2101,11 +2075,11 @@ function startTesseractWarp(targetUrl){
   warpOverlay.classList.add('active');
 
   var dpr=Math.min(window.devicePixelRatio||1,2);
-  var tw,th,CX,CY;
+  var W,H,CX,CY;
   function resizeTess(){
-    tw=window.innerWidth;th=window.innerHeight;CX=tw/2;CY=th/2;
-    canvas.width=Math.max(1,Math.round(tw*dpr));
-    canvas.height=Math.max(1,Math.round(th*dpr));
+    W=window.innerWidth;H=window.innerHeight;CX=W/2;CY=H/2;
+    canvas.width=Math.max(1,Math.round(W*dpr));
+    canvas.height=Math.max(1,Math.round(H*dpr));
     tctx.setTransform(dpr,0,0,dpr,0,0);
   }
   resizeTess();
@@ -2113,7 +2087,6 @@ function startTesseractWarp(targetUrl){
   window.addEventListener('resize',onResize);
 
   var startTime=performance.now();
-  /* Was 2600ms; +3s → 5600ms so the multi-layer hypercube can read. */
   var duration=5600;
   var statusMessages=[
     '> WARMING UP AUDIO ENGINE...',
@@ -2125,6 +2098,30 @@ function startTesseractWarp(targetUrl){
   ];
   try{if(GARG){GARG.play().catch(function(){});}}catch(e){}
 
+  /* Fresh per-run state (same defaults as V10) so a second visit is not polluted. */
+  var edgeTw=TESS_EDGES.map(function(){
+    return {phase:Math.random()*Math.PI*2,speed:0.0008+Math.random()*0.0025};
+  });
+  var parts=[];
+  (function(){
+    var i,r,th,ph;
+    for(i=0;i<46;i++){
+      r=Math.random()*0.85;
+      th=Math.random()*Math.PI*2;
+      ph=Math.acos(2*Math.random()-1);
+      parts.push({
+        x:r*Math.sin(ph)*Math.cos(th),
+        y:r*Math.sin(ph)*Math.sin(th),
+        z:r*Math.cos(ph),
+        vx:(Math.random()-0.5)*0.006,
+        vy:(Math.random()-0.5)*0.006,
+        vz:(Math.random()-0.5)*0.006,
+        twPhase:Math.random()*Math.PI*2,
+        twSpeed:0.0008+Math.random()*0.0022
+      });
+    }
+  })();
+
   var SPEED_A=0.005,SPEED_C=0.012,SPEED_B=0.020;
   var angA=0,angB=0,angC=0;
   var glitchA=0,glitchB=0,glitchC=0;
@@ -2135,32 +2132,32 @@ function startTesseractWarp(targetUrl){
   var MAGENTA=[255,42,109],CYAN=[5,217,232];
   var finished=false;
 
-  function R(){return Math.min(tw,th)*0.21;}
+  function R(){return Math.min(W,H)*0.21;}
 
-  function render(now){
+  function render(time){
     if(finished)return;
-    var elapsed=now-startTime,progress=Math.min(1,elapsed/duration);
-    progressBar.style.width=(progress*100)+'%';
-    var msgIdx=Math.min(statusMessages.length-1,Math.floor(progress*statusMessages.length));
-    statusText.textContent=statusMessages[msgIdx];
+    var elapsed=time-startTime,progress=Math.min(1,elapsed/duration);
+    if(progressBar)progressBar.style.width=(progress*100)+'%';
+    if(statusText){
+      var msgIdx=Math.min(statusMessages.length-1,Math.floor(progress*statusMessages.length));
+      statusText.textContent=statusMessages[msgIdx];
+    }
 
-    /* Near the end, ramp overall intensity slightly so exit feels sharper. */
-    var endBoost=progress>0.82?1+(progress-0.82)*1.4:1;
-
+    /* === V10 frame body (unmodified motion math) === */
     tctx.fillStyle='#000';
-    tctx.fillRect(0,0,tw,th);
+    tctx.fillRect(0,0,W,H);
 
-    var r=R(),bob=Math.sin(now/900)*9,tilt=0.35;
+    var r=R(),bob=Math.sin(time/900)*9,tilt=0.35;
 
-    angA+=SPEED_A*endBoost;accA+=SPEED_A*endBoost;
+    angA+=SPEED_A;accA+=SPEED_A;
     if(angA>=Math.PI*2)angA-=Math.PI*2;
     if(accA>=nextGlitchA){glitchA=1;accA=0;nextGlitchA=randGlitchDist();}
 
-    angB-=SPEED_B*endBoost;accB+=SPEED_B*endBoost;
+    angB-=SPEED_B;accB+=SPEED_B;
     if(angB<=-Math.PI*2)angB+=Math.PI*2;
     if(accB>=nextGlitchB){glitchB=1;accB=0;nextGlitchB=randGlitchDist();}
 
-    angC-=SPEED_C*endBoost;accC+=SPEED_C*endBoost;
+    angC-=SPEED_C;accC+=SPEED_C;
     if(angC<=-Math.PI*2)angC+=Math.PI*2;
     if(accC>=nextGlitchC){glitchC=1;accC=0;nextGlitchC=randGlitchDist();}
 
@@ -2168,53 +2165,54 @@ function startTesseractWarp(targetUrl){
     glitchB=Math.max(0,glitchB-0.04);
     glitchC=Math.max(0,glitchC-0.04);
 
-    /* Keep the hypercube visually above the bottom UI panel. */
+    /* V10 project: CX + p[0]*sc, CY - r*0.15 + p[1]*sc + bob */
     var project=function(p){
       var dist=3.4,sc=r*dist/(dist-p[2]);
-      return [CX+p[0]*sc,CY-r*0.22+p[1]*sc+bob,p[2]];
+      return [CX+p[0]*sc,CY-r*0.15+p[1]*sc+bob,p[2]];
     };
 
     var VA=TESS_VERTS.map(function(v){
-      var q=tessRotXY4(v,angA*1.1+now*0.00008);
+      var q=tessRotXY4(v,angA*1.1+time*0.00008);
       q=tessRotXZ4(q,angA*0.73);
       q=tessRotXW(q,angA*1.41);
-      q=tessRotYW(q,-angA*0.93+Math.sin(now*0.0003)*0.4);
+      q=tessRotYW(q,-angA*0.93+Math.sin(time*0.0003)*0.4);
       q=tessRotZW(q,angA*1.17);
-      q=tessRotYZ4(q,angA*0.62+Math.cos(now*0.00022)*0.3);
+      q=tessRotYZ4(q,angA*0.62+Math.cos(time*0.00022)*0.3);
       var p3=tessProj4to3(q);
       p3=tessRotY(p3,angA*1.25);
       p3=tessRotZ(p3,angA*0.48);
-      p3=tessRotX(p3,tilt+angA*0.55+Math.sin(now*0.0004)*0.15);
+      p3=tessRotX(p3,tilt+angA*0.55+Math.sin(time*0.0004)*0.15);
       return project(p3);
     });
     var VC=TESS_VERTS.map(function(v){
       var q=tessRotXY4(v,angC*1.32+1.1);
       q=tessRotXZ4(q,-angC*0.89);
-      q=tessRotXW(q,angC*1.13+Math.sin(now*0.00027)*0.5);
+      q=tessRotXW(q,angC*1.13+Math.sin(time*0.00027)*0.5);
       q=tessRotYW(q,angC*1.47);
       q=tessRotZW(q,-angC*0.78);
       q=tessRotYZ4(q,angC*1.05+0.7);
       var p3=tessProj4to3(q);
       p3=tessRotY(p3,angC*0.92);
-      p3=tessRotZ(p3,-angC*1.15+Math.cos(now*0.00031)*0.2);
+      p3=tessRotZ(p3,-angC*1.15+Math.cos(time*0.00031)*0.2);
       p3=tessRotX(p3,tilt*0.7+angC*0.83);
       return project(p3);
     });
-    var PB=TESS_PARTS.map(function(p,idx){
+    var PB=parts.map(function(p,idx){
       p.x+=p.vx;p.y+=p.vy;p.z+=p.vz;
       if(Math.hypot(p.x,p.y,p.z)>0.9){p.vx*=-1;p.vy*=-1;p.vz*=-1;}
       var q=[p.x,p.y,p.z];
       q=tessRotY(q,angB*1.4+idx*0.01);
-      q=tessRotX(q,angB*0.9+tilt*0.4+Math.sin(now*0.0005+idx)*0.3);
-      q=tessRotZ(q,-angB*1.1+Math.cos(now*0.00035+idx*0.7)*0.25);
+      q=tessRotX(q,angB*0.9+tilt*0.4+Math.sin(time*0.0005+idx)*0.3);
+      q=tessRotZ(q,-angB*1.1+Math.cos(time*0.00035+idx*0.7)*0.25);
       return project(q);
     });
 
     var e,i,j,tw,twinkle,z,t,c,baseA,ox,oy,col,dx,dy,d,a,tw2,twk,bi,bd;
+    /* Layer A — outer tesseract edges */
     for(e=0;e<TESS_EDGES.length;e++){
       i=TESS_EDGES[e][0];j=TESS_EDGES[e][1];
-      tw=TESS_EDGE_TW[e];
-      twinkle=0.3+0.7*(0.5+0.5*Math.sin(now*tw.speed*2+tw.phase));
+      tw=edgeTw[e];
+      twinkle=0.3+0.7*(0.5+0.5*Math.sin(time*tw.speed*2+tw.phase));
       if(Math.random()<0.015)continue;
       z=(VA[i][2]+VA[j][2])/2;
       t=(z+1)/2;
@@ -2239,13 +2237,14 @@ function startTesseractWarp(targetUrl){
       tctx.setLineDash([]);
     }
 
+    /* Layer B — particle web */
     for(i=0;i<PB.length;i++){
       for(j=i+1;j<PB.length;j++){
         dx=PB[i][0]-PB[j][0];dy=PB[i][1]-PB[j][1];
         d=Math.hypot(dx,dy);
         if(d<r*0.55){
-          tw=0.5+0.5*Math.sin(now*TESS_PARTS[i].twSpeed*2+TESS_PARTS[i].twPhase);
-          tw2=0.5+0.5*Math.sin(now*TESS_PARTS[j].twSpeed*2+TESS_PARTS[j].twPhase);
+          tw=0.5+0.5*Math.sin(time*parts[i].twSpeed*2+parts[i].twPhase);
+          tw2=0.5+0.5*Math.sin(time*parts[j].twSpeed*2+parts[j].twPhase);
           twk=(tw+tw2)/2;
           if(Math.random()<0.02)continue;
           a=0.28*(1-d/(r*0.55))*(0.25+0.75*twk);
@@ -2265,13 +2264,14 @@ function startTesseractWarp(targetUrl){
       }
     }
 
+    /* Layer C — connectors */
     for(i=0;i<PB.length;i+=3){
       bi=0;bd=1e9;
       for(j=0;j<VC.length;j++){
         d=Math.hypot(PB[i][0]-VC[j][0],PB[i][1]-VC[j][1]);
         if(d<bd){bd=d;bi=j;}
       }
-      twk=0.5+0.5*Math.sin(now*TESS_PARTS[i].twSpeed*2+TESS_PARTS[i].twPhase+1.7);
+      twk=0.5+0.5*Math.sin(time*parts[i].twSpeed*2+parts[i].twPhase+1.7);
       a=0.16*(0.3+0.7*twk);
       ox=0;
       col='rgba(5,217,232,'+a.toFixed(3)+')';
@@ -2288,33 +2288,28 @@ function startTesseractWarp(targetUrl){
       tctx.stroke();
     }
 
+    /* Nodes — same sizes as V10 */
     VA.forEach(function(v,idx){
       var isMag=idx%2===0;
-      var core=isMag?'#ff2a6d':'#05d9e8';
-      var glow=isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)';
-      var bright=0.7+0.3*Math.sin(now/400+idx);
-      tessDrawNode(tctx,v[0],v[1],3.8,core,glow,bright);
+      tessDrawNode(tctx,v[0],v[1],3.8,
+        isMag?'#ff2a6d':'#05d9e8',
+        isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)',
+        0.7+0.3*Math.sin(time/400+idx));
     });
     VC.forEach(function(v,idx){
       var isMag=(idx+1)%2===0;
-      var core=isMag?'#ff2a6d':'#05d9e8';
-      var glow=isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)';
-      var bright=0.6+0.3*Math.sin(now/450+idx*1.3);
-      tessDrawNode(tctx,v[0],v[1],1.8,core,glow,bright*0.85);
+      tessDrawNode(tctx,v[0],v[1],1.8,
+        isMag?'#ff2a6d':'#05d9e8',
+        isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)',
+        (0.6+0.3*Math.sin(time/450+idx*1.3))*0.85);
     });
     PB.forEach(function(p,idx){
       var isMag=idx%2===0;
-      var core=isMag?'#ff2a6d':'#05d9e8';
-      var glow=isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)';
-      var bright=0.5+0.5*Math.sin(now/500+TESS_PARTS[idx].twPhase);
-      tessDrawNode(tctx,p[0],p[1],0.9,core,glow,0.3+0.7*bright);
+      tessDrawNode(tctx,p[0],p[1],0.9,
+        isMag?'#ff2a6d':'#05d9e8',
+        isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)',
+        0.3+0.7*(0.5+0.5*Math.sin(time/500+parts[idx].twPhase)));
     });
-
-    if(progress>0.88){
-      var fade=(progress-0.88)/0.12;
-      tctx.fillStyle='rgba(0,0,0,'+(fade*0.55).toFixed(3)+')';
-      tctx.fillRect(0,0,tw,th);
-    }
 
     if(progress<1){
       requestAnimationFrame(render);
@@ -2337,10 +2332,14 @@ function startSwallow(href){
      Audio object, pause it first so collapsars.opus can never double-play.
      GARG itself IS the transition BGM — same track continues into dumul.html. */
   safePause(MUSIC_COLLAP);
-  SW={t0:performance.now(),dur:6500};
-  /* BGM transisi = collapsars.opus (GARG). Start in the same user gesture so
-     autoplay rules are satisfied; Tesseract overlay takes over visually at 900ms. */
-  setTimeout(function(){startTesseractWarp(href);},900);
+  /* Sky/UI swirl needs ~2.8s (delay≤940 + duration≤2000). Opaque tesseract
+     canvas must NOT start earlier or the swallow is visually cut off.
+     SW.dur tracks the sky pull only; redirect is owned by startTesseractWarp. */
+  var SWALLOW_MS=2800;
+  var TESS_MS=5600;
+  SW={t0:performance.now(),dur:SWALLOW_MS};
+  /* BGM starts on the same user gesture (autoplay). Tesseract starts AFTER swallow. */
+  setTimeout(function(){startTesseractWarp(href);},SWALLOW_MS);
   document.body.classList.add('sw');
   fadeTo(AMB,0,900);
   GARG.currentTime=0;GARG.volume=0;fadeTo(GARG,.55,1800);
@@ -2372,7 +2371,7 @@ function startSwallow(href){
   setTimeout(function(){
     /* Hand off collapsars playback position so dumul.html can continue
        instead of restarting the bed from 0 after the page load. Redirect
-       aktual sekarang dilakukan oleh startTesseractWarp() di ~6500ms, supaya
+       aktual sekarang dilakukan oleh startTesseractWarp() di ~8400ms (2800 swallow + 5600 tess), supaya
        overlay warp sempat selesai dulu sebelum halaman benar-benar pindah. */
     try{
       sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));

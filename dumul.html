@@ -403,7 +403,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   var gargFromSwallow=false;
   function gargCancel(){if(gargTimer){clearTimeout(gargTimer);gargTimer=0;}}
   /* Resume collapsars where Observatory left off during the Gargantua swallow.
-     Observatory warp is now ~6.5s total (900ms swallow lead-in + 5600ms tesseract),
+     Observatory warp is now ~8.4s total (2800ms swallow + 5600ms tesseract),
      so the handoff time is typically 5–7s into collapsars.opus. Seek must be
      reliable across the longer transition, and volume ramps in so the page-cut
      after the extended warp is not a hard hit. */
@@ -731,7 +731,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 <!-- BGM transisi = collapsars.opus via GARG.
      Handoff posisi playback sudah di-handle oleh sessionStorage
      (dm_collapsars_t / dm_collapsars_from) di restoreCollapsars() di atas.
-     Observatory warp ≈ 6.5s (900ms + 5600ms tesseract) → seek ke currentTime handoff.
+     Observatory warp ≈ 8.4s (2800ms swallow + 5600ms tesseract) → seek ke currentTime handoff.
      Tidak perlu <audio id="bgm"> terpisah. -->
 </body>
 </html>
