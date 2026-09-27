@@ -692,5 +692,10 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
   update();
 })();
 </script>
+
+<!-- BGM transisi = collapsars.opus via GARG.
+     Handoff posisi playback sudah di-handle oleh sessionStorage
+     (dm_collapsars_t / dm_collapsars_from) di restoreCollapsars() di atas.
+     Tidak perlu <audio id="bgm"> terpisah. -->
 </body>
 </html>

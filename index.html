@@ -324,6 +324,88 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   }
 }
 
+/* Isolated Style untuk Tesseract Warp Overlay (transisi Gargantua -> DUMUL) */
+#tesseract-warp {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #04080d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+#tesseract-warp.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+#tesseract-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.tesseract-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 122, 217, 0.05) 0px,
+    rgba(255, 122, 217, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 2;
+}
+.tesseract-ui {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(4, 8, 13, 0.8);
+  padding: 20px 30px;
+  border: 1px solid rgba(110, 229, 255, 0.3);
+  box-shadow: 0 0 30px rgba(110, 229, 255, 0.2);
+  backdrop-filter: blur(6px);
+  max-width: 90vw;
+}
+.tesseract-title {
+  font-size: clamp(14px, 4vw, 20px);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #eafcff;
+  text-shadow: 0 0 10px rgba(110, 229, 255, 0.8), 2px 0 #ff7ad9, -2px 0 #6ee5ff;
+  margin-bottom: 10px;
+}
+.tesseract-status {
+  font-size: clamp(10px, 2.5vw, 12px);
+  letter-spacing: 0.12em;
+  color: #8eeeff;
+  text-shadow: 0 0 6px rgba(110, 229, 255, 0.5);
+}
+.tesseract-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(110, 229, 255, 0.1);
+  border: 1px solid rgba(110, 229, 255, 0.3);
+  margin-top: 14px;
+  overflow: hidden;
+}
+#tesseract-progress {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #6ee5ff, #ff7ad9);
+  box-shadow: 0 0 12px #ff7ad9;
+  transition: width 0.1s linear;
+}
+
 </style>
 <meta name="gimmick-revision" content="v41.10: perf baseline — matrix ring buffer, galaxy sprite cache, fitTitle proportional, visualViewport hybrid">
 </head>
@@ -1916,13 +1998,137 @@ function drawHole(now,age){
     }
   }
 }
+/* ---------- Tesseract 4D warp overlay (lapisan atas transisi Gargantua->DUMUL) ----------
+   Nama-nama var/fn diberi prefix "tess"/"TESS_" khusus supaya tidak bentrok dengan
+   variabel gravitasi/canvas utama (angle, vertices, edges, dst) yang sudah dipakai
+   di scope IIFE ini. Overlay ini murni visual, tidak menyentuh render loop #sky. */
+var TESS_VERTS=(function(){
+  var v=[];
+  for(var i=0;i<16;i++){v.push([(i&1)?1:-1,(i&2)?1:-1,(i&4)?1:-1,(i&8)?1:-1]);}
+  return v;
+})();
+var TESS_EDGES=(function(){
+  var e=[];
+  for(var i=0;i<16;i++){
+    for(var j=i+1;j<16;j++){
+      var diff=0;
+      for(var k=0;k<4;k++){if(TESS_VERTS[i][k]!==TESS_VERTS[j][k])diff++;}
+      if(diff===1)e.push([i,j]);
+    }
+  }
+  return e;
+})();
+var tessAngle=0;
+function tessRotate4D(point,a){
+  var x=point[0],y=point[1],z=point[2],w=point[3];
+  var cosA=Math.cos(a),sinA=Math.sin(a);
+  var x1=x*cosA-w*sinA,w1=x*sinA+w*cosA;
+  var cosB=Math.cos(a*0.7),sinB=Math.sin(a*0.7);
+  var y1=y*cosB-z*sinB,z1=y*sinB+z*cosB;
+  return [x1,y1,z1,w1];
+}
+function tessProject4Dto2D(point4D,width,height,glitchIntensity){
+  var distance4D=2.5,distance3D=3.0;
+  var x=point4D[0],y=point4D[1],z=point4D[2],w=point4D[3];
+  var wScale=1/(distance4D-w),x3D=x*wScale,y3D=y*wScale,z3D=z*wScale;
+  var zScale=1/(distance3D-z3D);
+  var x2D=x3D*zScale*(Math.min(width,height)*0.8)+width/2;
+  var y2D=y3D*zScale*(Math.min(width,height)*0.8)+height/2;
+  if(Math.random()<glitchIntensity){
+    x2D+=(Math.random()-0.5)*35*glitchIntensity;
+    y2D+=(Math.random()-0.5)*35*glitchIntensity;
+  }
+  return [x2D,y2D];
+}
+/* targetUrl: tujuan redirect.
+   Dipanggil dari startSwallow() 900ms setelah klik, berjalan 2.6 detik, lalu
+   redirect — ini SATU-SATUNYA titik redirect untuk seluruh urutan swallow+warp.
+   BGM = GARG (collapsars.opus), sudah di-fade-in dari startSwallow. */
+function startTesseractWarp(targetUrl){
+  var warpOverlay=document.getElementById('tesseract-warp');
+  if(!warpOverlay){location.href=targetUrl;return;}
+  var canvas=document.getElementById('tesseract-canvas');
+  var tctx=canvas.getContext('2d');
+  var statusText=document.getElementById('tesseract-status');
+  var progressBar=document.getElementById('tesseract-progress');
+  warpOverlay.classList.add('active');
+  var tw=canvas.width=window.innerWidth;
+  var th=canvas.height=window.innerHeight;
+  var startTime=performance.now();
+  var duration=2600;
+  var statusMessages=["> WARMING UP AUDIO ENGINE...","> PRE-BUFFERING COLLAPSARS...","> COLLAPSING EVENT HORIZON...","> QUANTUM FREQUENCY SYNCED!"];
+  /* BGM transisi = GARG (collapsars.opus) yang sudah di-fade-in dari startSwallow().
+     Jaga-jaga tetap play; jangan .load() — itu mereset currentTime ke 0. */
+  try{if(GARG){GARG.play().catch(function(){});}}catch(e){}
+  function render(now){
+    var elapsed=now-startTime,progress=Math.min(1,elapsed/duration);
+    progressBar.style.width=(progress*100)+'%';
+    var msgIdx=Math.min(statusMessages.length-1,Math.floor(progress*statusMessages.length));
+    statusText.textContent=statusMessages[msgIdx];
+    var glitchIntensity=Math.pow(progress,2.5),speedMult=1+progress*8;
+    tessAngle+=0.015*speedMult;
+    tctx.fillStyle='rgba(4, 8, 13, '+(0.25-progress*0.15)+')';
+    tctx.fillRect(0,0,tw,th);
+    var pts=TESS_VERTS.map(function(v){return tessProject4Dto2D(tessRotate4D(v,tessAngle),tw,th,glitchIntensity);});
+    if(Math.random()<0.6+glitchIntensity){
+      tctx.beginPath();tctx.strokeStyle='#6ee5ff';tctx.lineWidth=1.2;tctx.globalAlpha=0.6;
+      TESS_EDGES.forEach(function(e){
+        var off=(Math.random()-0.5)*8*glitchIntensity;
+        tctx.moveTo(pts[e[0]][0]+off,pts[e[0]][1]);
+        tctx.lineTo(pts[e[1]][0]+off,pts[e[1]][1]);
+      });
+      tctx.stroke();
+    }
+    if(Math.random()<0.6+glitchIntensity){
+      tctx.beginPath();tctx.strokeStyle='#ff7ad9';tctx.lineWidth=1.2;tctx.globalAlpha=0.6;
+      TESS_EDGES.forEach(function(e){
+        var off=(Math.random()-0.5)*8*glitchIntensity;
+        tctx.moveTo(pts[e[0]][0],pts[e[0]][1]+off);
+        tctx.lineTo(pts[e[1]][0],pts[e[1]][1]+off);
+      });
+      tctx.stroke();
+    }
+    tctx.beginPath();
+    tctx.strokeStyle=progress>0.8?'#ffffff':'#6ee5ff';
+    tctx.lineWidth=2;tctx.globalAlpha=0.9;tctx.shadowBlur=15;tctx.shadowColor='#6ee5ff';
+    TESS_EDGES.forEach(function(e){
+      tctx.moveTo(pts[e[0]][0],pts[e[0]][1]);
+      tctx.lineTo(pts[e[1]][0],pts[e[1]][1]);
+    });
+    tctx.stroke();tctx.shadowBlur=0;
+    pts.forEach(function(p){
+      tctx.beginPath();tctx.fillStyle=Math.random()>0.5?'#ff7ad9':'#ffffff';
+      tctx.arc(p[0],p[1],3+glitchIntensity*3,0,Math.PI*2);tctx.fill();
+    });
+    if(Math.random()<0.3+glitchIntensity*0.5){
+      var sliceY=Math.random()*th,sliceH=5+Math.random()*25,sliceX=(Math.random()-0.5)*40*glitchIntensity;
+      tctx.drawImage(canvas,0,sliceY,tw,sliceH,sliceX,sliceY,tw,sliceH);
+    }
+    if(progress<1){
+      requestAnimationFrame(render);
+    }else{
+      /* Refresh collapsars handoff at the exact redirect moment so dumul.html
+         continues from where the warp left off (same track, seamless). */
+      try{
+        sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));
+        sessionStorage.setItem('dm_collapsars_from','swallow');
+      }catch(e){}
+      location.href=targetUrl;
+    }
+  }
+  requestAnimationFrame(render);
+}
 function startSwallow(href){
   if(SW)return;
   /* Gargantua owns the collapsars track while the swallow sequence runs.
      If the mini player is already playing the same file through its separate
-     Audio object, pause it first so collapsars.opus can never double-play. */
+     Audio object, pause it first so collapsars.opus can never double-play.
+     GARG itself IS the transition BGM — same track continues into dumul.html. */
   safePause(MUSIC_COLLAP);
   SW={t0:performance.now(),dur:3000};
+  /* BGM transisi = collapsars.opus (GARG). Start in the same user gesture so
+     autoplay rules are satisfied; Tesseract overlay takes over visually at 900ms. */
+  setTimeout(function(){startTesseractWarp(href);},900);
   document.body.classList.add('sw');
   fadeTo(AMB,0,900);
   GARG.currentTime=0;GARG.volume=0;fadeTo(GARG,.55,1800);
@@ -1953,12 +2159,13 @@ function startSwallow(href){
   setTimeout(function(){$('#veil').classList.add('on');},SW.dur-600);
   setTimeout(function(){
     /* Hand off collapsars playback position so dumul.html can continue
-       instead of restarting the bed from 0 after the page load. */
+       instead of restarting the bed from 0 after the page load. Redirect
+       aktual sekarang dilakukan oleh startTesseractWarp() di ~3500ms, supaya
+       overlay warp sempat selesai dulu sebelum halaman benar-benar pindah. */
     try{
       sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));
       sessionStorage.setItem('dm_collapsars_from','swallow');
     }catch(e){}
-    location.href=href;
   },SW.dur);
 }
 
@@ -4157,5 +4364,16 @@ function boot(){
 if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTimeout(function(){if(!W)boot();},1500);}else{boot();}
 })();
 </script>
+
+<!-- GLITCH TESSERACT WARP OVERLAY -->
+<div id="tesseract-warp" aria-hidden="true">
+  <canvas id="tesseract-canvas"></canvas>
+  <div class="tesseract-scan"></div>
+  <div class="tesseract-ui">
+    <div class="tesseract-title">SINGULARITY // TESSERACT WARP</div>
+    <div class="tesseract-status" id="tesseract-status">&gt; INITIALIZING QUANTUM FOLD...</div>
+    <div class="tesseract-bar"><div id="tesseract-progress"></div></div>
+  </div>
+</div>
 </body>
 </html>
