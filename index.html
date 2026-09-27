@@ -1310,14 +1310,12 @@ function layout(){
     return{dx:rect.minX-minX,dy:rect.minY-minY};
   }
   function safePush(minX,maxX,minY,maxY,skipId){
-    /* Beyond ~5.5x BH.R the lens warp is negligible — keep shapes clear
-       of the strong-lensing zone around Gargantua. */
-    var safeR=BH.R*5.5;
+    /* Mencegah dorongan berlebihan di layar portrait HP */
+    var safeR=BH.R*(portrait?4.2:5.2);
     var d=rectDistToPoint(minX,maxX,minY,maxY,BH.hx,BH.hy);
     if(d>=safeR)return{dx:0,dy:0};
     var cx=(minX+maxX)/2,cy=(minY+maxY)/2,vx=cx-BH.hx,vy=cy-BH.hy,vl=Math.hypot(vx,vy)||1;
     var ux=vx/vl,uy=vy/vl,need=safeR-d+6,dx=ux*need,dy=uy*need;
-    /* Cap the correction so it never flings the shape across the screen. */
     var cap=Math.min(W,ah)*.28,len=Math.hypot(dx,dy);
     if(len>cap){var k=cap/len;dx*=k;dy*=k;}
     var tries=0;
@@ -1361,35 +1359,40 @@ function layout(){
     var cy0=Math.max(0,top+8-sc.minY),cy1=Math.min(0,bot-8-sc.maxY);
     shiftCons('scorpius',cx0||cx1,cy0||cy1);
   })();
-  /* Pleiades: compact cluster above/right of Taurus (EarthSky chart).
-     Anchor on cluster centre; Pleione stays interactive on the right.
-     Portrait: nudge further right of Aldebaran, but keep left of screen centre. */
+  /* Pleiades: Presisi di atas Taurus/Aldebaran sesuai petunjuk */
   (function(){
-    var ad=cons('taurus').stars.aldebaran;
-    /* Smaller footprint so it never crowds the BH or other rasies. */
-    var ps=Math.min(W,H)*(portrait ? .090 : .080);
-    var rightPad=portrait ? Math.min(96,W*.20) : Math.min(80,W*.13);
-    var targetX=ad.x+rightPad;
-    /* Portrait: never push past ~42% width so cluster stays off-centre. */
-    if(portrait) targetX=Math.min(targetX,W*.42);
-    var targetY=ad.y-Math.min(portrait ? 100 : 115,H*.17);
-    PLEIADES.scale=ps;
-    PLEIADES.x=targetX-.52*ps;
-    PLEIADES.y=targetY-.48*ps;
-    PLEIADES.ready=true;
-    var minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    var ad = cons('taurus').stars.aldebaran;
+    
+    // Skala cluster diperkecil sedikit agar pas di ceruk Taurus
+    var ps = Math.min(W, H) * (portrait ? .042 : .052);
+    
+    // Posisi relatif terhadap Aldebaran (geser ke kanan-bawah dikit)
+    var targetX = ad.x + (portrait ? W * 0.11 : W * 0.12);
+    var targetY = ad.y - (portrait ? Math.min(34, H * 0.05) : Math.min(45, H * 0.065));
+    
+    PLEIADES.scale = ps;
+    PLEIADES.x = targetX - .5 * ps;
+    PLEIADES.y = targetY - .5 * ps;
+    PLEIADES.ready = true;
+
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
     PLEIADES.bright.concat(PLEIADES.dim).forEach(function(st){
-      var x=PLEIADES.x+st.x*ps,y=PLEIADES.y+st.y*ps;
-      minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+      var x = PLEIADES.x + st.x * ps, y = PLEIADES.y + st.y * ps;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
     });
-    /* Taurus exempt (cluster is meant to sit near Aldebaran). */
-    var push=safePush(minX,maxX,minY,maxY,'taurus');
-    PLEIADES.x+=push.dx;PLEIADES.y+=push.dy;minX+=push.dx;maxX+=push.dx;minY+=push.dy;maxY+=push.dy;
-    var coll=resolveCollisions(minX,maxX,minY,maxY,['taurus']);
-    PLEIADES.x+=coll.dx;PLEIADES.y+=coll.dy;minX+=coll.dx;maxX+=coll.dx;minY+=coll.dy;maxY+=coll.dy;
-    var m=10,cx0=Math.max(0,m-minX),cx1=Math.min(0,W-m-maxX);
-    var cy0=Math.max(0,top+8-minY),cy1=Math.min(0,bot-8-maxY);
-    PLEIADES.x+=cx0||cx1;PLEIADES.y+=cy0||cy1;
+
+    // Mendorong hanya jika terbentur Black Hole (mengabaikan Taurus agar bisa menempel)
+    var push = safePush(minX, maxX, minY, maxY, 'taurus');
+    PLEIADES.x += push.dx; PLEIADES.y += push.dy; 
+    minX += push.dx; maxX += push.dx; minY += push.dy; maxY += push.dy;
+
+    // Batas tepi layar (viewport margin)
+    var m = 10;
+    var cx0 = Math.max(0, m - minX), cx1 = Math.min(0, W - m - maxX);
+    var cy0 = Math.max(0, top + 8 - minY), cy1 = Math.min(0, bot - 8 - maxY);
+    PLEIADES.x += cx0 || cx1; 
+    PLEIADES.y += cy0 || cy1;
   })();
   var clk=$('#bh-clock'),ft2=$('#footer').getBoundingClientRect();
   clk.style.transform='translate(calc(14px + env(safe-area-inset-left,0px)),'+Math.round(ft2.top-26)+'px)';
