@@ -892,7 +892,7 @@ var CONS=[
    meissa:{fx:230,fy:198,r:1.7,c:'#eaf6ff'},meissa2:{fx:311,fy:175,r:1.5,c:'#eaf6ff'},
    baham1:{fx:248,fy:306,r:1.35,c:'#dcefff'},baham2:{fx:285,fy:282,r:1.35,c:'#dcefff'},
    siku:{fx:315,fy:404,r:1.35,c:'#dcefff'},
-   betel:{fx:365,fy:455,r:3.5,c:'#ffb27a',name:'Betelgeuse',nx:1,dy:-9},
+   betel:{fx:365,fy:455,r:3.5,c:'#ff8e66',name:'Betelgeuse',nx:1,dy:-9},
    bella2:{fx:501,fy:392,r:1.55,c:'#dcefff'},bella:{fx:559,fy:479,r:2.5,c:'#dcefff'},
    bow1:{fx:781,fy:389,r:1.35,c:'#dcefff'},bow2:{fx:805,fy:407,r:1.25,c:'#dcefff'},bow3:{fx:807,fy:459,r:1.25,c:'#dcefff'},
    bow4:{fx:806,fy:507,r:1.25,c:'#dcefff'},bow5:{fx:789,fy:564,r:1.25,c:'#dcefff'},bow6:{fx:750,fy:597,r:1.25,c:'#dcefff'},
@@ -1008,7 +1008,7 @@ var PORTALS=[
 var TRIGGERS={
  betel:{id:'betel',cons:'orion',star:'betel',rgb:'255,72,64'},
  rigel:{id:'rigel',cons:'orion',star:'rigel',rgb:'74,165,255'},
- spica:{id:'spica',cons:'virgo',star:'spica',rgb:'235,92,255'},
+ spica:{id:'spica',cons:'virgo',star:'spica',rgb:'140,200,255'},
  sirius:{id:'sirius',cons:'canis',star:'sirius',rgb:'180,220,255'},
  pleione:{id:'pleione',cons:'pleiades',star:'Pleione',rgb:'145,170,255'},
  aldebaran:{id:'aldebaran',cons:'taurus',star:'aldebaran',rgb:'255,160,90'},
@@ -1245,20 +1245,19 @@ function layout(){
   /* Taurus: mid-left lower (horns left, tail right) — Hyades LOCK coords scaled into box. */
   /* 4-Zone Landscape Layout Optimization */
   var boxes=portrait
-    ?{canis:[W*.04,top+ah*.14,W*.28,top+ah*.40],
+    ?{canis:[W*.04,top+ah*.14,W*.18,top+ah*.32],
       virgo:[W*.52,top+ah*.72,W*.82,bot-34],
-      orion:[W*.40,top-ah*.02,W*.72,top+ah*.32],
+      orion:[W*.32,top-ah*.02,W*.64,top+ah*.32],
       taurus:[W*.12,top+ah*.64,W*.42,top+ah*.92],
-      /* Scorpius top-right of Orion. Boötes = smaller kite, far right of
-         centre so Gargantua lensing stays mild. */
-      bootes:[W*.78,top+ah*.38,W*.94,top+ah*.56],
+      /* Scorpius top-right of Orion. Boötes = smaller kite, shifted further down. */
+      bootes:[W*.78,top+ah*.52,W*.90,top+ah*.66],
       scorpius:[W*.76,top+ah*.05,W*.88,top+ah*.28]}
-    :{canis:[W*.02,top+ah*.04,W*.14,top+ah*.42],
+    :{canis:[W*.02,top+ah*.08,W*.10,top+ah*.34],
       taurus:[W*.02,top+ah*.48,W*.15,bot-28],
-      orion:[W*.15,top+ah*.02,W*.30,bot-12],
+      orion:[W*.22,top+ah*.02,W*.37,bot-12],
       virgo:[W*.72,top+ah*.08,W*.96,bot-12],
-      /* Boötes smaller, upper-right, clear of BH column and Virgo. */
-      bootes:[W*.62,top+ah*.02,W*.70,top+ah*.26],
+      /* Boötes smaller + shifted further down, clear of BH column and Virgo. */
+      bootes:[W*.62,top+ah*.18,W*.70,top+ah*.38],
       /* Scorpius left of centre but outside strong BH lens zone. */
       scorpius:[W*.34,top+ah*.12,W*.42,top+ah*.44]};
   CONS.forEach(function(c){
@@ -2422,7 +2421,7 @@ function drawTriggerVisuals(now){
       g.fillStyle=rg;g.beginPath();g.arc(x,y,outerR+3,0,6.283);g.fill();
     }
     g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
-    g.beginPath();g.moveTo(x-base-3,y);g.lineTo(x-base+1.5,y);g.moveTo(x+base-1.5,y);g.lineTo(x+base+3,y);g.moveTo(x,y-base-3);g.lineTo(x,y-base+1.5);g.moveTo(x,y+base-1.5);g.lineTo(x,y+base+3);g.stroke();
+    g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
     g.restore();
   });
 }
@@ -2507,7 +2506,7 @@ function drawStars(c,age,now){
        and other anonymous bright points so the sting doesn't show a "+". */
     if(s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath')){
       g.strokeStyle='rgba('+s.rgb+','+(.4*a*tw)+')';g.lineWidth=.8;
-      g.beginPath();g.moveTo(x-r*4.2,y);g.lineTo(x+r*4.2,y);g.moveTo(x,y-r*4.2);g.lineTo(x,y+r*4.2);g.stroke();
+      g.beginPath();g.moveTo(x-r*2.2,y);g.lineTo(x+r*2.2,y);g.moveTo(x,y-r*2.2);g.lineTo(x,y+r*2.2);g.stroke();
     }
     if(s.name&&age>3.5&&kq<.25){
       /* Audio-trigger labels: each one inherits its own pulse color. */
@@ -2610,7 +2609,7 @@ function drawPleiades(age,now){
         g.fillStyle=rg;g.beginPath();g.arc(x,y,outerR+3,0,6.283);g.fill();
       }
       g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
-      g.beginPath();g.moveTo(x-base-3,y);g.lineTo(x-base+1.5,y);g.moveTo(x+base-1.5,y);g.lineTo(x+base+3,y);g.moveTo(x,y-base-3);g.lineTo(x,y-base+1.5);g.moveTo(x,y+base-1.5);g.lineTo(x,y+base+3);g.stroke();
+      g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
       g.restore();
       if(age>3.5&&q[2]<.25){
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
