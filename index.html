@@ -2789,7 +2789,17 @@ function frame(now){
       }
     }
     g.clearRect(0,0,W,H);
-    if(bgCanvas)g.drawImage(bgCanvas,0,0,W,H);
+    if(bgCanvas){
+      // 1. Warna dasar ruang angkasa agar pinggiran layar tidak bocor saat background bergeser
+      g.fillStyle='#050b12';
+      g.fillRect(0,0,W,H);
+
+      // 2. Efek Parallax 3D: Background bergerak lebih lambat (35% dari kecepatan rasi bintang)
+      var bgX = skyPan.x * 0.35;
+      var bgY = skyPan.y * 0.35;
+
+      g.drawImage(bgCanvas, bgX, bgY, W, H);
+    }
     drawFloatingTelescope(now);
     var msgEl=$('#secret-msg');
     if(msgEl&&msgEl.classList.contains('on')&&msgEl.dataset.type==='telescope')placeSecretMsg();
@@ -3374,7 +3384,7 @@ function skyTwoAngle(){
   return Math.atan2(pts[1].y-pts[0].y,pts[1].x-pts[0].x);
 }
 function beginSkyPan(e){
-  if(!touchMode||(e.pointerType==='mouse'))return false;
+  // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
   if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#title,#footer,#boot-screen'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
