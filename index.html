@@ -1926,7 +1926,11 @@ function startSwallow(href){
   var pf=document.createElement('link');pf.rel='prefetch';pf.href=href;document.head.appendChild(pf);
   /* Include music toggle/HUD + side chrome so YT/IG aren't the only icons
      that fly into Gargantua — previously #music-toggle was left out. */
-  var els=[].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock'));
+  var els=[].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock')).filter(function(el){
+    // Jangan ikutkan panel music-player ke animasi jika panel sedang tidak terbuka (.open)
+    if(el.id === 'music-player' && !el.classList.contains('open')) return false;
+    return true;
+  });
   var maxD=Math.sqrt(W*W+H*H)*.6;
   els.forEach(function(el){
     var r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
