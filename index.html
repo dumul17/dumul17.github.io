@@ -2776,6 +2776,7 @@ function dmHeroRect(){
   return{x:0,y:0,w:W,h:Math.round(h*10)/10};
 }
 var DM_NN_DUR=5600;
+var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_Y=0;
 function dmNeuralBuild(W,H){
   /* Mesh neural horizontal (referensi og.jpg): pita di antara dua siluet,
      node mengambang, garis menyambung seperti koneksi di gambar. */
@@ -3058,23 +3059,24 @@ function dmTransitionSpectrum(g,W,H,t,fade){
   g.globalAlpha=1;
   g.globalCompositeOperation='source-over';
   var lev=DM_TR_LEVEL,beat=(DM_TR_BEAT&&performance.now()-DM_TR_BEAT<150)?1:0;
-  if(!DM_TR_NET)DM_TR_NET=dmSpectrumMeshBuild(W,H);
-  /* Exact hero-spectrum mesh first; the existing transition spectrum stays additive on top. */
+  /* Hero canvas is h-[132px] — keep transition mesh in that exact space. */
+  var meshH=(typeof DM_MESH_H==='number'?DM_MESH_H:132);
+  var meshY=(typeof DM_TR_MESH_Y==='number'?DM_TR_MESH_Y:Math.max(0,Math.round((H-meshH)*0.42)));
+  if(!DM_TR_NET||!DM_TR_NET.length)DM_TR_NET=dmSpectrumMeshBuild(W,meshH);
   var phase=(typeof GARG!=='undefined'&&GARG&&!isNaN(GARG.currentTime))?GARG.currentTime:0;
-  /* Reveal timing is tied to the actual 5.6s transition, not audio buffering.
-     Audio still controls the mesh's motion/glow once available. */
-  dmSpectrumMeshDraw(g,W,H,DM_TR_NET,phase,lev,beat,performance.now(),t);
-  /* Ambient center glow — deliberately matches the DUMUL hero palette. */
-  var glow=g.createRadialGradient(W*.5,H*.49,0,W*.5,H*.49,Math.max(W,H)*.46);
+  g.save();
+  g.translate(0,meshY);
+  dmSpectrumMeshDraw(g,W,meshH,DM_TR_NET,phase,lev,beat,performance.now(),t);
+  var glow=g.createRadialGradient(W*.5,meshH*.49,0,W*.5,meshH*.49,Math.max(W,meshH)*.46);
   glow.addColorStop(0,'rgba(110,229,255,'+(0.07*fade+lev*.06*fade).toFixed(3)+')');
   glow.addColorStop(.52,'rgba(255,122,217,'+(0.035*fade).toFixed(3)+')');
   glow.addColorStop(1,'rgba(10,18,24,0)');
-  g.fillStyle=glow;g.fillRect(0,0,W,H);
+  g.fillStyle=glow;g.fillRect(0,0,W,meshH);
 
   var bands=3,pts=Math.max(44,Math.min(92,Math.floor(W/8))),i,b,y,x,amp,sp,u;
   for(b=0;b<bands;b++){
     g.beginPath();
-    var base=H*(.43+b*.075),phase2=t*(.00105+b*.00018)+b*1.7;
+    var base=meshH*(.43+b*.075),phase2=t*(.00105+b*.00018)+b*1.7;
     for(i=0;i<=pts;i++){
       u=i/pts;x=u*W;
       var idx=1+Math.min(DM_TR_SPEC?DM_TR_SPEC.length-1:1,Math.floor(Math.pow(Math.abs(u-.5)*2,1.7)*150));
@@ -3092,13 +3094,14 @@ function dmTransitionSpectrum(g,W,H,t,fade){
     u=(i+.5)/count;
     var j=1+Math.min(DM_TR_SPEC?DM_TR_SPEC.length-1:1,Math.floor(Math.pow(Math.abs(u-.5)*2,1.8)*130));
     var sv=DM_TR_SPEC?DM_TR_SPEC[j]/255:0;
-    var px=u*W,py=H*.5+Math.sin(t*.0013+i*1.73)*H*.17,rr=.8+sv*2.4+lev*1.6;
+    var px=u*W,py=meshH*.5+Math.sin(t*.0013+i*1.73)*meshH*.17,rr=.8+sv*2.4+lev*1.6;
     if(beat&&i%3===0)px+=(i%2?-1:1)*(5+lev*14);
     g.globalAlpha=(.24+sv*.5+lev*.22)*fade;g.fillStyle=i%4===0?'#ff7ad9':'#6ee5ff';g.shadowBlur=8+sv*8;g.shadowColor=g.fillStyle;
     g.fillRect(px-rr*.5,py-rr*.5,rr*(1+sv*2),Math.max(1,rr*.55));
   }
   g.globalAlpha=1;
-  if(beat){for(i=0;i<4;i++){y=Math.random()*H;g.fillStyle=(i&1)?'rgba(255,122,217,.16)':'rgba(110,229,255,.16)';g.fillRect(0,y,W,1+Math.random()*4);}}
+  if(beat){for(i=0;i<4;i++){y=Math.random()*meshH;g.fillStyle=(i&1)?'rgba(255,122,217,.16)':'rgba(110,229,255,.16)';g.fillRect(0,y,W,1+Math.random()*4);}}
+  g.restore();
 }
 function dmTransitionStart(){
   if(DM_TR_RAF)return;
@@ -3148,16 +3151,29 @@ function startTesseractWarp(targetUrl) {
   var W, H, net;
   DM_TR_NET=null; DM_TR_MESH_LAST=0;
   function resizeNeural() {
-    /* og.jpg + neural network hanya menutupi kotak hero dumul.html (bukan layar penuh) → posisi & ukuran simetris */
+    /* Stage = full hero section (og.jpg). Mesh lives in the 132px band = dumul hero canvas. */
     var hr = dmHeroRect();
-    W = hr.w; H = hr.h;
+    var newW = hr.w, newH = hr.h;
+    var meshH = (typeof DM_MESH_H==='number'?DM_MESH_H:132);
+    var prevW = DM_TR_MESH_W || 0;
+    W = newW; H = newH;
+    DM_TR_MESH_Y = Math.max(0, Math.round((H - meshH) * 0.42));
     stage.style.width = W + 'px'; stage.style.height = H + 'px';
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     canvas.width = Math.max(1, Math.round(W * dpr));
     canvas.height = Math.max(1, Math.round(H * dpr));
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    net = dmSpectrumMeshBuild(W, H); /* SAME 22-node mesh as DUMUL hero spectrum */
-    DM_TR_NET = net;
+    if(!DM_TR_NET || !DM_TR_NET.length){
+      DM_TR_NET = dmSpectrumMeshBuild(W, meshH);
+    } else if(prevW > 0 && Math.abs(prevW - W) > 1){
+      var sx = W / prevW, mi, n;
+      for(mi=0;mi<DM_TR_NET.length;mi++){
+        n=DM_TR_NET[mi];
+        n.x*=sx; n.ox*=sx; n.vx*=sx;
+      }
+    }
+    DM_TR_MESH_W = W; DM_TR_MESH_H = meshH;
+    net = DM_TR_NET;
   }
   resizeNeural();
   var onResize = function() { resizeNeural(); };
@@ -3198,7 +3214,8 @@ function startTesseractWarp(targetUrl) {
       try {
         try{
           var _meshNodes=(DM_TR_NET||[]).map(function(n){return{x:n.x,y:n.y,ox:n.ox,oy:n.oy,vx:n.vx,vy:n.vy,r:n.r,color:n.color,glow:n.glow,phase:n.phase};});
-          sessionStorage.setItem('dm_spectrum_mesh',JSON.stringify({w:W,h:H,nodes:_meshNodes,level:DM_TR_LEVEL||0,beatAge:(DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999)}));
+          /* Save in hero-canvas space (W x 132), not full stage height — so dumul restores 1:1. */
+          sessionStorage.setItem('dm_spectrum_mesh',JSON.stringify({w:W,h:DM_MESH_H||132,nodes:_meshNodes,level:DM_TR_LEVEL||0,beatAge:(DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999)}));
         }catch(e){}
         sessionStorage.setItem('dm_collapsars_t', String(typeof GARG !== 'undefined' && GARG && GARG.currentTime || 0));
         sessionStorage.setItem('dm_collapsars_from', 'swallow');
