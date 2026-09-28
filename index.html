@@ -2776,7 +2776,7 @@ function dmHeroRect(){
   return{x:0,y:0,w:W,h:Math.round(h*10)/10};
 }
 var DM_NN_DUR=5600;
-var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_Y=0;
+var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_Y=0,DM_TR_GLITCH_V=0,DM_TR_GLITCH_S=0,DM_TR_GLITCH_SEEN=0;
 function dmNeuralBuild(W,H){
   /* Mesh neural horizontal (referensi og.jpg): pita di antara dua siluet,
      node mengambang, garis menyambung seperti koneksi di gambar. */
@@ -2992,13 +2992,17 @@ function dmSpectrumMeshBuild(W,H){
     p.push({x:x,y:y,ox:x,oy:y,vx:(R()-.5)*.8,vy:(R()-.5)*.5,r:R()*2.2+.6,
       color:c?'#ff7ad9':'#6ee5ff',glow:c?'rgba(255,122,217,0.9)':'rgba(110,229,255,0.95)',phase:R()*Math.PI*2,birth:0,reveal:0});
   }
-  /* Cinematic reveal order: the same 22 nodes as DUMUL, but materialize
-     from left → right with a tiny deterministic stagger. The final geometry
-     is unchanged; only its visibility is staged during the transition. */
+  /* Cinematic reveal: materialize from CENTER → left & right (radial).
+     Final geometry unchanged; only visibility is staged. */
+  var cx=W*.5, cy=H*.5;
   var order=p.map(function(_,idx){return idx;});
-  order.sort(function(a,b){return p[a].x-p[b].x || a-b;});
+  order.sort(function(a,b){
+    var da=Math.hypot(p[a].ox-cx,p[a].oy-cy), db=Math.hypot(p[b].ox-cx,p[b].oy-cy);
+    return da-db || a-b;
+  });
   for(i=0;i<order.length;i++){
-    p[order[i]].birth=240+i*142+(p[order[i]].phase%1)*70;
+    /* Tighter stagger so the bloom reads as one expanding pulse, not a crawl. */
+    p[order[i]].birth=180+i*95+(p[order[i]].phase%1)*50;
   }
   return p;
 }
@@ -3006,49 +3010,76 @@ function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now,revealMs){
   if(!p)return;
   var dt=DM_TR_MESH_LAST?Math.min(32,Math.max(0,now-DM_TR_MESH_LAST))/16.666:1;
   DM_TR_MESH_LAST=now;
-  /* Audio phase drives the organic motion, but mesh formation itself uses the
-     transition clock. This keeps the cinematic reveal deterministic even when
-     GARG is still buffering / currentTime is temporarily 0 on mobile. */
-  var s=phase>0?phase:now*.001,f=.7+.3*Math.sin(s*2.7)+.15*Math.sin(s*7.3+1.2),gg=Math.max(.4,Math.min(1,f));
-  var v=beat?(3+level*9):0,K=v?(Math.random()-.5)*24:0,i,j;
-  p.forEach(function(h){
+  var s=phase>0?phase:now*.001;
+  var f=.7+.3*Math.sin(s*2.7)+.15*Math.sin(s*7.3+1.2);
+  /* Hero-style glitch: alpha flicker + burst jitter timers */
+  var gg=Math.max(.35,Math.min(1,f+(Math.random()-.5)*.18));
+  if(beat){DM_TR_GLITCH_V=3+level*9;DM_TR_GLITCH_SEEN=now;}
+  DM_TR_GLITCH_S-=dt;
+  if(DM_TR_GLITCH_S<=0){
+    if(Math.random()>.55)DM_TR_GLITCH_V=2+Math.random()*6;
+    DM_TR_GLITCH_S=15+Math.random()*90;
+  }
+  var v=DM_TR_GLITCH_V>0?DM_TR_GLITCH_V:0;
+  if(DM_TR_GLITCH_V>0)DM_TR_GLITCH_V=Math.max(0,DM_TR_GLITCH_V-dt);
+  var K=v?(Math.random()-.5)*24:0;
+  var i,j,h,raw,rev;
+  /* Motion */
+  for(i=0;i<p.length;i++){
+    h=p[i];
     h.x+=h.vx*dt+Math.sin(s+h.phase)*.2*dt;
     h.y+=h.vy*dt+Math.cos(s*.7+h.phase)*.18*dt;
     var dx=h.ox-h.x,dy=h.oy-h.y;
     h.vx+=dx*.008*dt;h.vy+=dy*.008*dt;h.vx*=Math.pow(.985,dt);h.vy*=Math.pow(.985,dt);
     if(h.x<0)h.x=0;if(h.x>W)h.x=W;
-  });
+    if(h.y<0)h.y=0;if(h.y>H)h.y=H;
+    /* Reveal BEFORE edges so center→out links light up the same frame */
+    raw=((typeof revealMs==='number'?revealMs:phase*1000)-h.birth)/420;
+    rev=Math.max(0,Math.min(1,raw));
+    h.reveal=rev*rev*(3-2*rev);
+  }
   g.save();g.globalAlpha=gg;g.lineWidth=.6;
-  /* Mesh formation: links only become visible after both endpoints have
-     materialized. The draw point also travels along each link, giving a
-     subtle 'signal is building the network' effect without extra objects. */
+  /* Edges: both endpoints must be born — blooms from center outward */
   for(i=0;i<p.length;i++)for(j=i+1;j<p.length;j++){
     var a=p[i],b=p[j],d=Math.hypot(a.x-b.x,a.y-b.y);
-    if(d<110){
-      var edgeReveal=Math.min(a.reveal||0,b.reveal||0);
-      var al=(1-d/110)*.35*gg*edgeReveal;if(al<.012)continue;
-      g.beginPath();g.globalAlpha=al;g.strokeStyle=d<50?'#e6f9ff':a.color===b.color?a.color:'#8cf0ff';
-      g.moveTo(a.x+K*.2,a.y);g.lineTo(b.x+K*.2,b.y);g.stroke();
-      if(edgeReveal>0.08&&edgeReveal<.98){
-        var q=edgeReveal,px=a.x+(b.x-a.x)*q+K*.2,py=a.y+(b.y-a.y)*q;
-        g.globalAlpha=Math.min(.85,al*3.2);g.fillStyle=a.color;g.shadowBlur=8;g.shadowColor=a.glow;
-        g.beginPath();g.arc(px,py,1.35,0,Math.PI*2);g.fill();g.shadowBlur=0;
-      }
+    if(d>=110)continue;
+    var edgeReveal=Math.min(a.reveal||0,b.reveal||0);
+    var al=(1-d/110)*.35*gg*edgeReveal;if(al<.012)continue;
+    if(v>0&&Math.random()<.08)continue; /* glitch: drop edge */
+    g.beginPath();g.globalAlpha=al*(v?(.7+Math.random()*.4):1);
+    g.strokeStyle=d<50?'#e6f9ff':a.color===b.color?a.color:'#8cf0ff';
+    var jx=K*.2+(v&&Math.random()>.6?(Math.random()-.5)*6:0);
+    g.moveTo(a.x+jx,a.y);g.lineTo(b.x+jx,b.y);g.stroke();
+    if(edgeReveal>0.08&&edgeReveal<.98){
+      var q=edgeReveal,px=a.x+(b.x-a.x)*q+jx,py=a.y+(b.y-a.y)*q;
+      g.globalAlpha=Math.min(.85,al*3.2);g.fillStyle=a.color;g.shadowBlur=8;g.shadowColor=a.glow;
+      g.beginPath();g.arc(px,py,1.35,0,Math.PI*2);g.fill();g.shadowBlur=0;
     }
   }
-  p.forEach(function(h){
-    /* 420ms birth ramp: tiny spark → solid node. */
-    var raw=((typeof revealMs==='number'?revealMs:phase*1000)-h.birth)/420;
-    var rev=Math.max(0,Math.min(1,raw));
-    rev=rev*rev*(3-2*rev);
-    h.reveal=rev;
-    if(rev<=.002)return;
-    var y=.7+.3*Math.sin(s*3+h.phase),xx=h.x+(v&&Math.random()>.7?K:0);
-    var pulse=1+level*1.6*rev,flash=(rev<.35?(1-rev)*3.2:0);
-    g.beginPath();g.globalAlpha=gg*y*rev;g.fillStyle=h.color;g.shadowBlur=10*rev+flash;g.shadowColor=h.glow;
-    g.arc(xx,h.y,(h.r+flash*.18)*y*pulse,0,Math.PI*2);g.fill();g.shadowBlur=0;
+  /* Nodes */
+  for(i=0;i<p.length;i++){
+    h=p[i];rev=h.reveal||0;
+    if(rev<=.002)continue;
+    var pulse=.7+.3*Math.sin(s*3+h.phase);
+    var xx=h.x+(v&&Math.random()>.7?K:0)+(v&&Math.random()>.85?(Math.random()-.5)*10:0);
+    var flash=(rev<.35?(1-rev)*3.2:0);
+    g.beginPath();g.globalAlpha=gg*pulse*rev;g.fillStyle=h.color;g.shadowBlur=10*rev+flash;g.shadowColor=h.glow;
+    g.arc(xx,h.y,(h.r+flash*.18)*pulse*(1+level*1.6*rev)*(1+(v?level*.3:0)),0,Math.PI*2);g.fill();g.shadowBlur=0;
     g.beginPath();g.globalAlpha=gg*rev;g.fillStyle='#ffffff';g.arc(h.x,h.y,h.r*.35*rev,0,Math.PI*2);g.fill();
-  });
+  }
+  /* Hero-style scanline / slice glitches */
+  if(v>0||Math.random()>.82){
+    g.globalAlpha=gg*.18;
+    for(i=0;i<3;i++){
+      if(Math.random()>.55)continue;
+      g.fillStyle=Math.random()>.5?'#6ee5ff':'#ff7ad9';
+      g.fillRect(K,Math.random()*H,W*(.2+Math.random()*.6),1+Math.random()*2);
+    }
+  }
+  if(v>1.5&&Math.random()>.5){
+    g.globalAlpha=gg*.35;g.fillStyle=Math.random()>.5?'#6ee5ff':'#ff7ad9';
+    g.fillRect(0,Math.random()*H,W,2+Math.random()*8);
+  }
   g.restore();
 }
 function dmTransitionSpectrum(g,W,H,t,fade){
@@ -3084,7 +3115,11 @@ function dmTransitionSpectrum(g,W,H,t,fade){
       amp=(5+b*2)+(sp*24)*(b===0?1:.72)+lev*(b===0?12:7);
       y=base+Math.sin(u*10.5+phase2)*amp*.34+Math.sin(u*25-phase2*1.4+b)*amp*.16;
       if(beat)y+=Math.sin(u*Math.PI*10+t*.008)*(7+lev*12);
-      if(i===0)g.moveTo(x,y);else g.lineTo(x,y);
+      /* Hero-style wave glitch: micro horizontal tears + occasional gap */
+      var wx=x+(DM_TR_GLITCH_V>0&&Math.random()>.5?(Math.random()-.5)*8:0);
+      if(i===0)g.moveTo(wx,y);
+      else if(Math.random()<(0.10+b*0.04))g.moveTo(wx,y); /* gap = broken waveform */
+      else g.lineTo(wx,y);
     }
     g.strokeStyle=b===1?'rgba(255,122,217,'+(0.62*fade).toFixed(3)+')':'rgba(110,229,255,'+((.58+b*.06)*fade).toFixed(3)+')';
     g.lineWidth=b===0?1.7:1.0;g.shadowBlur=12+lev*10;g.shadowColor=b===1?'rgba(255,122,217,.5)':'rgba(110,229,255,.5)';g.stroke();g.shadowBlur=0;
