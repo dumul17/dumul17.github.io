@@ -2901,7 +2901,7 @@ function dmNeuralDraw(g,W,H,net,t){
    Visualizer yang sama dipakai sebagai foreground transition. Audio timeline
    tetap milik GARG; tidak ada audio kedua dan tidak ada seek manual berbasis timer.
 */
-var DM_TR_CTX=null,DM_TR_AN=null,DM_TR_SPEC=null,DM_TR_PREV=null,DM_TR_LEVEL=0,DM_TR_FLUX=0,DM_TR_BEAT=0,DM_TR_RAF=0;
+var DM_TR_CTX=null,DM_TR_AN=null,DM_TR_SPEC=null,DM_TR_PREV=null,DM_TR_LEVEL=0,DM_TR_FLUX=0,DM_TR_BEAT=0,DM_TR_RAF=0,DM_TR_NET=null;
 function dmTransitionGraph(){
   if(DM_TR_CTX){try{if(DM_TR_CTX.state!=='running'&&DM_TR_CTX.resume)DM_TR_CTX.resume();}catch(e){}return true;}
   var AC=window.AudioContext||window.webkitAudioContext;
@@ -2946,7 +2946,12 @@ function dmTransitionAnalyse(now){
 }
 function dmTransitionSpectrum(g,W,H,t,fade){
   var lev=DM_TR_LEVEL,beat=(DM_TR_BEAT&&performance.now()-DM_TR_BEAT<150)?1:0;
-  g.clearRect(0,0,W,H);
+  /* Mesh continuity layer: the neural network must be visible DURING the
+     Gargantua handoff, not only exist as an unused builder. Render it first,
+     then lay the beat-reactive spectrum on top. */
+  if(!DM_TR_NET)DM_TR_NET=dmNeuralBuild(W,H);
+  dmNeuralDraw(g,W,H,DM_TR_NET,t);
+  /* The mesh renderer clears the canvas. Everything below is additive. */
   /* Ambient center glow — deliberately matches the DUMUL hero palette. */
   var glow=g.createRadialGradient(W*.5,H*.49,0,W*.5,H*.49,Math.max(W,H)*.46);
   glow.addColorStop(0,'rgba(110,229,255,'+(0.07*fade+lev*.06*fade).toFixed(3)+')');
@@ -3020,6 +3025,7 @@ function startTesseractWarp(targetUrl) {
 
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var W, H, net;
+  DM_TR_NET=null;
   function resizeNeural() {
     /* og.jpg + neural network hanya menutupi kotak hero dumul.html (bukan layar penuh) → posisi & ukuran simetris */
     var hr = dmHeroRect();
@@ -3030,6 +3036,7 @@ function startTesseractWarp(targetUrl) {
     canvas.height = Math.max(1, Math.round(H * dpr));
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     net = dmNeuralBuild(W, H); /* deterministik: sama persis dengan dumul.html */
+    DM_TR_NET = net;
   }
   resizeNeural();
   var onResize = function() { resizeNeural(); };
@@ -3081,11 +3088,26 @@ function startTesseractWarp(targetUrl) {
 function startSwallow(href){
   if(SW)return;
   if(typeof markWentToDumul==='function')markWentToDumul();
-  /* Gargantua's swallow SFX/BGM is glitch-instrumental.opus (GARG). The mini
-     player's own collapsars track (MUSIC_COLLAP) is paused first so the two
-     never overlap. GARG IS the transition BGM — dumul.html resumes the same
-     track (Limerence album, track 1) from the handed-off position. */
-  safePause(MUSIC_COLLAP);
+  /* Gargantua's swallow SFX/BGM is glitch-instrumental.opus (GARG). Kill every
+     other audio channel first (star SFX, collapsars HUD, ambient) so GARG never
+     stacks on top of a playing stellar track. GARG IS the transition BGM —
+     dumul.html resumes the same track (Limerence album, track 1) from the
+     handed-off position. */
+  try{
+    if(typeof activeSfx!=='undefined'&&activeSfx){
+      try{activeSfx.onended=null;}catch(e){}
+      safePause(activeSfx);
+      try{activeSfx.currentTime=0;}catch(e){}
+      activeSfx=null;
+    }
+    if(typeof SFX!=='undefined'){
+      Object.keys(SFX).forEach(function(k){try{safePause(SFX[k]);}catch(e){}});
+    }
+    safePause(MUSIC_COLLAP);
+    if(typeof audioVizOff==='function')audioVizOff();
+    if(typeof setAVColor==='function')setAVColor(null,true);
+    if(typeof musicForceStop==='function'){try{musicForceStop();}catch(e){}}
+  }catch(e){}
   /* Sky/UI swirl needs ~2.8s (delay≤940 + duration≤2000). Opaque tesseract
      canvas must NOT start earlier or the swallow is visually cut off.
      SW.dur tracks the sky pull only; redirect is owned by startTesseractWarp. */

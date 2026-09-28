@@ -345,7 +345,9 @@ function dmNeuralDraw(g,W,H,net,t){
     if(!ov)return;
     if(!document.documentElement.classList.contains('dm-from-swallow')){ov.parentNode.removeChild(ov);return;}
     /* Visualizer sekarang menjadi continuity layer utama. Jangan tutup hero dengan
-       neural overlay lama; renderer hero langsung terlihat sejak halaman tiba. */
+       neural overlay lama; renderer hero langsung terlihat sejak halaman tiba.
+       Mesh transition sudah dirender di index.html; halaman ini hanya menerima
+       audio time/phase yang sama agar visualizer hero melanjutkan ritmenya. */
     ov.parentNode.removeChild(ov);
     return;
     var cv=document.getElementById('tesseract-canvas'),stage=document.getElementById('tesseract-stage'),g=cv.getContext('2d'),dpr=Math.min(window.devicePixelRatio||1,2),W,H,net;
