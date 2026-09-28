@@ -157,6 +157,9 @@
 <script>
   /* Sedini mungkin (sebelum paint pertama): tandai kalau ini kedatangan dari swallow. Nilainya dibaca (tidak dihapus) di sini. */
   try{if(sessionStorage.getItem('dm_collapsars_from')==='swallow')document.documentElement.classList.add('dm-from-swallow');}catch(e){}
+  /* Lock scroll at top on arrival — block browser scroll restoration + mid-page land. */
+  try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}
+  try{window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body)document.body.scrollTop=0;}catch(e){}
 </script>
 </head>
 <body>
@@ -736,6 +739,13 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     st.panel.classList.add('dm-open');
   }
   function ensureVisible(panel){
+    /* Skip auto-scroll during Gargantua→DUMUL handoff so landing stays at top. */
+    if(gargFromSwallow||handoffT){
+      var limit0=window.innerHeight-(bar.offsetHeight||66)-10;
+      var top0=panel.getBoundingClientRect().top;
+      panel.style.maxHeight=Math.max(110,Math.min(210,limit0-top0))+'px';
+      return;
+    }
     /* panel lirik dipas-in supaya nggak ketutup player bawah; kalau kurang, halaman digeser sedikit */
     var limit=window.innerHeight-(bar.offsetHeight||66)-10;
     var top=panel.getBoundingClientRect().top;
@@ -842,6 +852,15 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       if(handoffVisual&&isFinite(+handoffVisual.t)&&+handoffVisual.t>0&&Math.abs((+handoffVisual.t)-t)<1.5)handoffT=+handoffVisual.t;
       /* Phase locked to handoff time so mesh motion continues before audio metadata loads. */
       if(handoffT>0)A.phase=handoffT;
+      if(gargFromSwallow||handoffT>0){
+        try{
+          var _root=document.documentElement,_prev=_root.style.scrollBehavior;
+          _root.style.scrollBehavior='auto';
+          window.scrollTo(0,0);_root.scrollTop=0;
+          if(document.body)document.body.scrollTop=0;
+          _root.style.scrollBehavior=_prev;
+        }catch(e3){}
+      }
     }catch(e){}
   })();
   function applyHandoffSeek(){
@@ -923,7 +942,8 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     clear();
     if(current){current.classList.add('dm-playing');showLyrics(current);}
     showBar();setPP(true);
-    if(active)ensureVisible(active.panel);
+    /* Handoff from index: stay pinned at top. Manual track taps still scroll lyrics into view. */
+    if(active&&!gargFromSwallow&&!handoffT)ensureVisible(active.panel);
     kick();
   });
   audio.addEventListener('pause',function(){
@@ -1184,8 +1204,18 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 <script>
   // Aktifkan fade-in ketika halaman dumul.html selesai dimuat
   window.addEventListener('DOMContentLoaded', function() {
+    try{
+      if(document.documentElement.classList.contains('dm-from-swallow')){
+        var root=document.documentElement,prev=root.style.scrollBehavior;
+        root.style.scrollBehavior='auto';
+        window.scrollTo(0,0);root.scrollTop=0;
+        if(document.body)document.body.scrollTop=0;
+        root.style.scrollBehavior=prev;
+      }
+    }catch(e){}
     requestAnimationFrame(function() {
       document.body.classList.add('dm-loaded');
+      try{if(document.documentElement.classList.contains('dm-from-swallow'))window.scrollTo(0,0);}catch(e){}
     });
   });
 </script>
