@@ -38,7 +38,8 @@
   /* Datang dari swallow Gargantua: overlay neural network yang sama menutup layar, lalu memudar. */
   html.dm-from-swallow { background: #0a1218; }
   html.dm-from-swallow body { opacity: 1; transition: none; }
-  html:not(.dm-from-swallow) #tesseract-warp { display: none; }
+  /* Overlay path retired — spectrum mesh owns continuity; never flash warp */
+  #tesseract-warp { display: none !important; }
   #tesseract-warp { opacity: 1; pointer-events: auto; }
   #tesseract-warp.leaving { opacity: 0; pointer-events: none; transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
   #tesseract-warp.leaving .tesseract-ui { opacity: 0; transition: opacity 0.5s ease-out; }
@@ -159,12 +160,34 @@
   try{if(sessionStorage.getItem('dm_collapsars_from')==='swallow')document.documentElement.classList.add('dm-from-swallow');}catch(e){}
   /* Lock scroll at top on arrival — block browser scroll restoration + mid-page land. */
   try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}
+  try{document.documentElement.style.scrollBehavior='auto';}catch(e){}
   try{window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body)document.body.scrollTop=0;}catch(e){}
+  /* Fight any late scroll restoration / layout scroll for a short window.
+     Longer when arriving from Gargantua handoff. Does not touch audio/mesh. */
+  (function(){
+    var from=false;
+    try{from=sessionStorage.getItem('dm_collapsars_from')==='swallow'||document.documentElement.classList.contains('dm-from-swallow');}catch(e){}
+    var until=performance.now()+(from?3200:600);
+    function pin(){
+      if(performance.now()>until)return;
+      var y=window.scrollY||document.documentElement.scrollTop||(document.body&&document.body.scrollTop)||0;
+      if(y>1){
+        try{document.documentElement.style.scrollBehavior='auto';}catch(e){}
+        try{window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body)document.body.scrollTop=0;}catch(e){}
+      }
+    }
+    window.addEventListener('scroll',pin,{passive:true});
+    window.addEventListener('load',function(){pin();setTimeout(pin,50);setTimeout(pin,200);});
+    var id=setInterval(function(){
+      pin();
+      if(performance.now()>until)clearInterval(id);
+    },50);
+  })();
 </script>
 </head>
 <body>
   <!-- NEURAL NETWORK OVERLAY: lanjutan persis dari index.html (jaringan sudah lengkap), lalu memudar -->
-  <div id="tesseract-warp" class="active" aria-hidden="true">
+  <div id="tesseract-warp" style="display:none" aria-hidden="true">
     <div class="tesseract-stage" id="tesseract-stage">
     <div class="tesseract-shade s1"></div>
     <div class="tesseract-shade s2"></div>
@@ -739,20 +762,14 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     st.panel.classList.add('dm-open');
   }
   function ensureVisible(panel){
-    /* Skip auto-scroll during Gargantua→DUMUL handoff so landing stays at top. */
-    if(gargFromSwallow||handoffT){
-      var limit0=window.innerHeight-(bar.offsetHeight||66)-10;
-      var top0=panel.getBoundingClientRect().top;
-      panel.style.maxHeight=Math.max(110,Math.min(210,limit0-top0))+'px';
-      return;
-    }
-    /* panel lirik dipas-in supaya nggak ketutup player bawah; kalau kurang, halaman digeser sedikit */
+    if(!panel)return;
+    /* Only size the lyrics panel so it fits above the player bar.
+       NEVER window.scrollBy — that was yanking the page to mid-track on handoff. */
     var limit=window.innerHeight-(bar.offsetHeight||66)-10;
     var top=panel.getBoundingClientRect().top;
     panel.style.maxHeight=Math.max(110,Math.min(210,limit-top))+'px';
-    var r=panel.getBoundingClientRect();
-    if(r.bottom>limit)window.scrollBy({top:r.bottom-limit,behavior:'smooth'});
   }
+
   function closeLyrics(){
     var o=document.querySelectorAll('.dm-lyrics.dm-open');
     for(var i=0;i<o.length;i++)o[i].classList.remove('dm-open');
@@ -942,8 +959,8 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     clear();
     if(current){current.classList.add('dm-playing');showLyrics(current);}
     showBar();setPP(true);
-    /* Handoff from index: stay pinned at top. Manual track taps still scroll lyrics into view. */
-    if(active&&!gargFromSwallow&&!handoffT)ensureVisible(active.panel);
+    /* maxHeight only — ensureVisible no longer scrolls the page */
+    if(active)ensureVisible(active.panel);
     kick();
   });
   audio.addEventListener('pause',function(){
@@ -1056,6 +1073,7 @@ h1.display{
   box-sizing:border-box;
 }
 html{scroll-behavior:smooth}
+html.dm-from-swallow{scroll-behavior:auto!important}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   #dm-home{transition-duration:.01s!important}
@@ -1202,21 +1220,36 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
      Tidak perlu <audio id="bgm"> terpisah. -->
 
 <script>
-  // Aktifkan fade-in ketika halaman dumul.html selesai dimuat
+  // Aktifkan fade-in + always pin scroll to top (no mid-page land).
   window.addEventListener('DOMContentLoaded', function() {
-    try{
-      if(document.documentElement.classList.contains('dm-from-swallow')){
-        var root=document.documentElement,prev=root.style.scrollBehavior;
-        root.style.scrollBehavior='auto';
-        window.scrollTo(0,0);root.scrollTop=0;
-        if(document.body)document.body.scrollTop=0;
-        root.style.scrollBehavior=prev;
-      }
-    }catch(e){}
+    try {
+      var root = document.documentElement, prev = root.style.scrollBehavior;
+      root.style.scrollBehavior = 'auto';
+      window.scrollTo(0, 0);
+      root.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+      root.style.scrollBehavior = prev;
+    } catch(e){}
     requestAnimationFrame(function() {
       document.body.classList.add('dm-loaded');
-      try{if(document.documentElement.classList.contains('dm-from-swallow'))window.scrollTo(0,0);}catch(e){}
+      try {
+        var root = document.documentElement, prev = root.style.scrollBehavior;
+        root.style.scrollBehavior = 'auto';
+        window.scrollTo(0, 0);
+        root.style.scrollBehavior = prev;
+      } catch(e){}
     });
+  });
+  // Catch late browser scroll restoration after load
+  window.addEventListener('load', function() {
+    try {
+      if ((window.scrollY || document.documentElement.scrollTop || 0) > 8) {
+        var root = document.documentElement, prev = root.style.scrollBehavior;
+        root.style.scrollBehavior = 'auto';
+        window.scrollTo(0, 0);
+        root.style.scrollBehavior = prev;
+      }
+    } catch(e){}
   });
 </script>
 </body>
