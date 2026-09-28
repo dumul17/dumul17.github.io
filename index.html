@@ -2970,10 +2970,13 @@ function dmSpectrumMeshBuild(W,H){
   }
   return p;
 }
-function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now){
+function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now,revealMs){
   if(!p)return;
   var dt=DM_TR_MESH_LAST?Math.min(32,Math.max(0,now-DM_TR_MESH_LAST))/16.666:1;
   DM_TR_MESH_LAST=now;
+  /* Audio phase drives the organic motion, but mesh formation itself uses the
+     transition clock. This keeps the cinematic reveal deterministic even when
+     GARG is still buffering / currentTime is temporarily 0 on mobile. */
   var s=phase>0?phase:now*.001,f=.7+.3*Math.sin(s*2.7)+.15*Math.sin(s*7.3+1.2),gg=Math.max(.4,Math.min(1,f));
   var v=beat?(3+level*9):0,K=v?(Math.random()-.5)*24:0,i,j;
   p.forEach(function(h){
@@ -3003,7 +3006,7 @@ function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now){
   }
   p.forEach(function(h){
     /* 420ms birth ramp: tiny spark → solid node. */
-    var raw=(phase*1000-h.birth)/420;
+    var raw=((typeof revealMs==='number'?revealMs:phase*1000)-h.birth)/420;
     var rev=Math.max(0,Math.min(1,raw));
     rev=rev*rev*(3-2*rev);
     h.reveal=rev;
@@ -3021,7 +3024,9 @@ function dmTransitionSpectrum(g,W,H,t,fade){
   if(!DM_TR_NET)DM_TR_NET=dmSpectrumMeshBuild(W,H);
   /* Exact hero-spectrum mesh first; the existing transition spectrum stays additive on top. */
   var phase=(typeof GARG!=='undefined'&&GARG&&!isNaN(GARG.currentTime))?GARG.currentTime:0;
-  dmSpectrumMeshDraw(g,W,H,DM_TR_NET,phase,lev,beat,performance.now());
+  /* Reveal timing is tied to the actual 5.6s transition, not audio buffering.
+     Audio still controls the mesh's motion/glow once available. */
+  dmSpectrumMeshDraw(g,W,H,DM_TR_NET,phase,lev,beat,performance.now(),t);
   /* Ambient center glow — deliberately matches the DUMUL hero palette. */
   var glow=g.createRadialGradient(W*.5,H*.49,0,W*.5,H*.49,Math.max(W,H)*.46);
   glow.addColorStop(0,'rgba(110,229,255,'+(0.07*fade+lev*.06*fade).toFixed(3)+')');
