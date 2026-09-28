@@ -587,7 +587,7 @@ body.tesseract-running { background:#0a1218 !important; }
   position:fixed;right:calc(12px + 32px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;
   display:flex;flex-direction:row-reverse;align-items:center;gap:6px;
 }
-#mode-observe,#mode-silence{
+#mode-observe,#mode-silence,#mode-camera{
   width:32px;height:32px;padding:0;
   display:grid;place-items:center;
   border:1px solid rgba(110,229,255,.17);border-radius:5px;
@@ -596,11 +596,13 @@ body.tesseract-running { background:#0a1218 !important; }
   cursor:pointer;-webkit-tap-highlight-color:transparent;
   transition:color .25s,border-color .25s,background .25s,box-shadow .25s,transform .15s;
 }
+#mode-camera{display:none;font-size:14px}
 #mode-observe:hover,#mode-observe:focus-visible,
-#mode-silence:hover,#mode-silence:focus-visible{
+#mode-silence:hover,#mode-silence:focus-visible,
+#mode-camera:hover,#mode-camera:focus-visible{
   color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.08);
 }
-#mode-observe:active,#mode-silence:active{transform:translateY(1px)}
+#mode-observe:active,#mode-silence:active,#mode-camera:active{transform:translateY(1px)}
 #mode-observe.on{
   color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);
   box-shadow:0 0 12px rgba(110,229,255,.15);
@@ -609,6 +611,28 @@ body.tesseract-running { background:#0a1218 !important; }
   color:#ff9ad9;border-color:rgba(255,122,217,.5);background:rgba(255,122,217,.1);
   box-shadow:0 0 12px rgba(255,122,217,.14);
 }
+#mode-camera.on{
+  color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);
+  box-shadow:0 0 12px rgba(110,229,255,.15);
+}
+/* Zoom readout — sky-layer camera only, fixed UI chrome */
+#cam-zoom{
+  position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:6;
+  transform:translateX(-50%) translateY(6px);
+  padding:6px 12px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
+  background:rgba(2,7,12,.88);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  font:600 10px/1 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;
+  color:#8eeeff;text-shadow:0 0 8px rgba(110,229,255,.35);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .3s ease,transform .35s ease,visibility 0s linear .35s;
+}
+#cam-zoom.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;
+  transition:opacity .3s ease,transform .35s ease,visibility 0s;
+}
+#cam-zoom .cz-val{color:#eafcff;letter-spacing:.08em}
+#cam-zoom .cz-hint{display:block;margin-top:4px;font-size:7px;letter-spacing:.1em;color:rgba(184,224,238,.45);font-weight:500}
+
 /* Now-playing title sits left of the mode cluster + music button */
 #mp-now-playing{right:calc(12px + 32px + 6px + 32px + 6px + 32px + 8px)!important}
 
@@ -633,6 +657,8 @@ body.observe-mode #sr-badge{
 body.observe-mode #mode-cluster{right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 body.observe-mode #mode-observe{opacity:1!important;visibility:visible!important;pointer-events:auto!important}
 body.observe-mode #mode-silence{display:none!important}
+body.observe-mode #mode-camera{display:grid!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important}
+body.observe-mode #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
 
 /* Mode status toast (radio silence / observe) */
 #mode-toast{
@@ -653,7 +679,8 @@ body.observe-mode #mode-silence{display:none!important}
 
 @media (max-width:520px){
   #mode-cluster{right:calc(10px + 31px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-  #mode-observe,#mode-silence{width:31px;height:31px;padding:0;font-size:14px}
+  #mode-observe,#mode-silence,#mode-camera{width:31px;height:31px;padding:0;font-size:14px}
+  #cam-zoom{font-size:9px;padding:5px 10px}
   body.observe-mode #mode-cluster{right:10px}
   #mp-now-playing{right:calc(10px + 31px + 6px + 31px + 6px + 31px + 8px)!important}
   #last-signal{top:max(48px,env(safe-area-inset-top,0px) + 40px);padding:10px 12px}
@@ -661,13 +688,14 @@ body.observe-mode #mode-silence{display:none!important}
 }
 @media (orientation:landscape) and (max-height:520px){
   #mode-cluster{right:calc(8px + 28px + 5px);bottom:calc(6px + env(safe-area-inset-bottom,0px))}
-  #mode-observe,#mode-silence{width:28px;height:28px;padding:0;font-size:13px}
+  #mode-observe,#mode-silence,#mode-camera{width:28px;height:28px;padding:0;font-size:13px}
+  #cam-zoom{bottom:calc(42px + env(safe-area-inset-bottom,0px));font-size:8px}
   body.observe-mode #mode-cluster{right:8px;bottom:calc(6px + env(safe-area-inset-bottom,0px))}
   #last-signal{top:max(36px,env(safe-area-inset-top,0px) + 28px)}
   #mode-toast{bottom:calc(42px + env(safe-area-inset-bottom,0px))}
 }
 @media (prefers-reduced-motion:reduce){
-  #last-signal,#mode-toast,#mode-observe,#mode-silence{transition-duration:.01s!important}
+  #last-signal,#mode-toast,#mode-observe,#mode-silence,#mode-camera,#cam-zoom{transition-duration:.01s!important}
 }
 
 </style>
@@ -785,6 +813,11 @@ body.observe-mode #mode-silence{display:none!important}
 <div id="mode-cluster">
   <button type="button" id="mode-silence" aria-pressed="false" aria-label="Radio Silence" title="Radio Silence">🔊</button>
   <button type="button" id="mode-observe" aria-pressed="false" aria-label="Observation Mode" title="Observation Mode">👁️</button>
+  <button type="button" id="mode-camera" aria-pressed="false" aria-label="Constellation Camera" title="Constellation Camera (Observation only)" hidden>📷</button>
+</div>
+<div id="cam-zoom" aria-live="polite" aria-hidden="true">
+  <span class="cz-label">CAM </span><span class="cz-val" id="cam-zoom-val">1×</span>
+  <span class="cz-hint">PINCH / WHEEL · 1×–3×</span>
 </div>
 <div id="mode-toast" aria-live="polite" aria-hidden="true"></div>
 <button id="music-toggle" type="button" aria-label="Buka music player" aria-expanded="false" title="Music">
@@ -826,18 +859,108 @@ var drag={on:false,moved:false,pid:null,x0:0,y0:0,bx:0,by:0};
 /* Mobile sky-pan + rotate: swipe to slide, 2-finger twist ±180°, both spring back. */
 var skyPan={x:0,y:0};
 var skyRot=0;
+var skyZoom=1;
+var CAMERA_MODE=false;
+var ZOOM_LEVELS=[1,1.5,2,3];
 var skyDrag={on:false,moved:false,pid:null,x0:0,y0:0,px:0,py:0};
 var skyPtrs={};
 var skyRotDrag={on:false,a0:0,r0:0};
+var skyPinch={on:false,d0:0,z0:1};
 var tapFlash={until:0,cons:null};
 var _skyT=[0,0];
 function skyXF(x,y){
-  /* Rotate constellation space around screen center (pan already in x/y via ox). */
-  if(skyRot*skyRot<1e-8){_skyT[0]=x;_skyT[1]=y;return _skyT;}
-  var cx=W*.5,cy=H*.5,dx=x-cx,dy=y-cy,c=Math.cos(skyRot),s=Math.sin(skyRot);
-  _skyT[0]=cx+dx*c-dy*s;_skyT[1]=cy+dx*s+dy*c;return _skyT;
+  /* Rotate + zoom constellation space around screen center (pan already in x/y via ox).
+     Zoom only affects the sky layer via this transform — UI chrome stays fixed. */
+  var cx=W*.5,cy=H*.5,dx=x-cx,dy=y-cy;
+  if(skyRot*skyRot>=1e-8){
+    var c=Math.cos(skyRot),s=Math.sin(skyRot);
+    var rx=dx*c-dy*s,ry=dx*s+dy*c;
+    dx=rx;dy=ry;
+  }
+  if(skyZoom!==1){dx*=skyZoom;dy*=skyZoom;}
+  _skyT[0]=cx+dx;_skyT[1]=cy+dy;return _skyT;
 }
 function gSky(x,y){var t=skyXF(x,y);return gravityPos(t[0],t[1]);}
+function camBH(){
+  if(skyZoom===1)return [BH.x,BH.y];
+  var cx=W*.5,cy=H*.5;
+  return [cx+(BH.x-cx)*skyZoom,cy+(BH.y-cy)*skyZoom];
+}
+function formatZoom(z){
+  if(Math.abs(z-1)<.01)return '1×';
+  if(Math.abs(z-1.5)<.01)return '1.5×';
+  if(Math.abs(z-2)<.01)return '2×';
+  if(Math.abs(z-3)<.01)return '3×';
+  return (Math.round(z*10)/10)+'×';
+}
+function snapZoom(z){
+  var best=ZOOM_LEVELS[0],bd=1e9;
+  for(var i=0;i<ZOOM_LEVELS.length;i++){
+    var d=Math.abs(ZOOM_LEVELS[i]-z);
+    if(d<bd){bd=d;best=ZOOM_LEVELS[i];}
+  }
+  return best;
+}
+function nearestZoomIndex(z){
+  var best=0,bd=1e9;
+  for(var i=0;i<ZOOM_LEVELS.length;i++){
+    var d=Math.abs(ZOOM_LEVELS[i]-z);
+    if(d<bd){bd=d;best=i;}
+  }
+  return best;
+}
+function setSkyZoom(z,snap){
+  z=Math.max(1,Math.min(3,+z||1));
+  if(snap)z=snapZoom(z);
+  if(Math.abs(z-skyZoom)<1e-4){updateCamZoomUI();return;}
+  skyZoom=z;
+  updateCamZoomUI();
+  try{syncSkyPanHits();}catch(e){}
+  try{
+    var bhEl=document.getElementById('bh');
+    if(bhEl&&typeof BH!=='undefined'&&W){
+      var p=camBH();
+      bhEl.style.width=Math.round(BH.R*16)+'px';
+      bhEl.style.height=Math.round(BH.R*10)+'px';
+      bhEl.style.transform='translate('+Math.round(p[0]-BH.R*8)+'px,'+Math.round(p[1]-BH.R*5)+'px)';
+    }
+  }catch(e2){}
+}
+function stepSkyZoom(dir){
+  var i=nearestZoomIndex(skyZoom);
+  var ni=Math.max(0,Math.min(ZOOM_LEVELS.length-1,i+(dir>0?1:-1)));
+  setSkyZoom(ZOOM_LEVELS[ni],false);
+  haptic(8);
+}
+function updateCamZoomUI(){
+  var el=document.getElementById('cam-zoom');
+  var val=document.getElementById('cam-zoom-val');
+  if(val)val.textContent=formatZoom(skyZoom);
+  if(el){
+    var show=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
+    el.classList.toggle('on',show);
+    el.setAttribute('aria-hidden',show?'false':'true');
+  }
+}
+function setCameraMode(on){
+  if(on&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE))return;
+  CAMERA_MODE=!!on;
+  document.body.classList.toggle('camera-mode',CAMERA_MODE);
+  var btn=document.getElementById('mode-camera');
+  if(btn){
+    btn.classList.toggle('on',CAMERA_MODE);
+    btn.setAttribute('aria-pressed',CAMERA_MODE?'true':'false');
+    btn.title=CAMERA_MODE?'Exit Constellation Camera':'Constellation Camera';
+    btn.setAttribute('aria-label',CAMERA_MODE?'Exit Constellation Camera':'Constellation Camera');
+    btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
+  }
+  if(!CAMERA_MODE)setSkyZoom(1,false);
+  updateCamZoomUI();
+  if(typeof showModeToast==='function'){
+    if(CAMERA_MODE)showModeToast('CONSTELLATION CAMERA\nZOOM 1×–3× · PINCH / WHEEL',null,2200);
+    else if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)showModeToast('CAMERA OFF',null,1400);
+  }
+}
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
 var SW=null,swP=0;
@@ -1814,6 +1937,20 @@ function setObserveMode(on){
     btn.title=OBSERVE_MODE?'Exit Observation':'Observation Mode';
     btn.setAttribute('aria-label',OBSERVE_MODE?'Exit Observation':'Observation Mode');
   }
+  var camBtn=document.getElementById('mode-camera');
+  if(camBtn){
+    camBtn.hidden=!OBSERVE_MODE;
+    if(!OBSERVE_MODE){
+      CAMERA_MODE=false;
+      document.body.classList.remove('camera-mode');
+      camBtn.classList.remove('on');
+      camBtn.setAttribute('aria-pressed','false');
+      camBtn.title='Constellation Camera';
+      camBtn.setAttribute('aria-label','Constellation Camera');
+      setSkyZoom(1,false);
+    }
+  }
+  updateCamZoomUI();
   /* Close music HUD if open */
   if(OBSERVE_MODE){
     var panel=document.getElementById('music-player');
@@ -1868,6 +2005,14 @@ function setRadioSilence(on){
   var sil=document.getElementById('mode-silence');
   if(obs)obs.addEventListener('click',function(){setObserveMode(!OBSERVE_MODE);haptic(10);});
   if(sil)sil.addEventListener('click',function(){setRadioSilence(!RADIO_SILENCE);haptic(10);});
+  var cam=document.getElementById('mode-camera');
+  if(cam){
+    cam.hidden=true;
+    cam.addEventListener('click',function(){
+      if(!OBSERVE_MODE){showModeToast('CAMERA REQUIRES\nOBSERVATION MODE',null,1800);return;}
+      setCameraMode(!CAMERA_MODE);haptic(10);
+    });
+  }
   maybeShowLastSignalOnReturn();
   /* pageshow: back from dumul via BFCache */
   window.addEventListener('pageshow',function(e){
@@ -2251,8 +2396,9 @@ function layout(){
   if(tau&&CAPS.taurus)CAPS.taurus.style.transform='translate('+Math.round((tau.minX+tau.maxX)/2-28)+'px,'+Math.round(tau.maxY+18)+'px)';
   if(!drag.on){BH.x=BH.hx;BH.y=BH.hy;}
   var bhEl=$('#bh');bhEl.style.width=Math.round(BH.R*16)+'px';bhEl.style.height=Math.round(BH.R*10)+'px';
-  bhEl.style.transform='translate('+Math.round(BH.x-BH.R*8)+'px,'+Math.round(BH.y-BH.R*5)+'px)';
-  CAPS.bh.style.transform='translate('+Math.round(BH.x-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(BH.y+BH.R*1.7)+'px)';
+  var bhp=camBH();
+  bhEl.style.transform='translate('+Math.round(bhp[0]-BH.R*8)+'px,'+Math.round(bhp[1]-BH.R*5)+'px)';
+  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*skyZoom)+'px)';
   var rg=cons('orion').stars.rigel,rfx=$('#rigel-fx');
   rfx.style.width=rfx.style.height='52px';rfx.style.marginLeft=rfx.style.marginTop='-26px';
   rfx.style.transform='translate('+Math.round(rg.x+skyPan.x)+'px,'+Math.round(rg.y+skyPan.y)+'px)';
@@ -2435,15 +2581,17 @@ function layout(){
 function ease(u){return u*u*(3-2*u);}
 function pull(x,y){                       /* posisi benda saat disedot: berputar spiral ke lubang hitam */
   if(!SW)return [x,y,0];
-  var dx=x-BH.x,dy=y-BH.y,r=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
+  var bp=camBH(),bx=bp[0],by=bp[1];
+  var dx=x-bx,dy=y-by,r=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
   var rmax=Math.sqrt(W*W+H*H)*.6,delay=.4*Math.min(1,r/rmax);
   var P=clamp((swP-.05)/.82),k=clamp((P-delay)/(1-delay));k=k*k;
   var r2=r*Math.pow(1-k,1.5),t2=th+k*3.4;
-  return [BH.x+Math.cos(t2)*r2,BH.y+Math.sin(t2)*r2,k];
+  return [bx+Math.cos(t2)*r2,by+Math.sin(t2)*r2,k];
 }
 function lens(x,y){                       /* smooth gravitational lens: bounded, continuous, no visual explosions */
-  var R=BH.Rr;if(R<1)return [x,y];
-  var dx=x-BH.x,dy=y-BH.y,d2=dx*dx+dy*dy;
+  var R=BH.Rr*(skyZoom||1);if(R<1)return [x,y];
+  var bp=camBH(),bx=bp[0],by=bp[1];
+  var dx=x-bx,dy=y-by,d2=dx*dx+dy*dy;
   var inner=R*1.08,outer=R*9.5,i2=inner*inner,o2=outer*outer;
   /* Far-field / swallowed checks use d² — skip sqrt for the majority of
      background stars that sit outside the lens influence. */
@@ -2467,7 +2615,7 @@ function lens(x,y){                       /* smooth gravitational lens: bounded,
     var wx=dx*cs-dy*sn,wy=dx*sn+dy*cs;
     dx=wx;dy=wy;
   }
-  return [BH.x+dx*f,BH.y+dy*f];
+  return [bx+dx*f,by+dy*f];
 }
 function gravityPos(x,y){
   /* Gargantua continuously lenses the galaxy; during the swallow transition,
@@ -2584,9 +2732,10 @@ function drawHoleFallback(now,age){
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
      primitives so one unsupported effect cannot make the whole scene vanish. */
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  var R=Math.max(.1,BH.R*sc*(1+1.6*e));
+  var R=Math.max(.1,BH.R*sc*(1+1.6*e)*skyZoom);
   if(R<.5)return;
-  g.save();g.translate(BH.x,BH.y);
+  var bp=camBH();
+  g.save();g.translate(bp[0],bp[1]);
   g.globalCompositeOperation='source-over';
   /* accretion disk */
   g.save();g.rotate(-.48);
@@ -2617,10 +2766,11 @@ function drawHole(now,age){
   if(BH.Rr<1||!BH.sprite)return;
 
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
-  var R=BH.Rr,k=(R/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016))),S=BH.S*k;
+  var R=BH.Rr*skyZoom,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016))),S=BH.S*k*skyZoom;
+  var bp=camBH();
 
   g.save();
-  g.translate(BH.x,BH.y);
+  g.translate(bp[0],bp[1]);
 
   /* Core + static portal artwork */
   g.globalAlpha=Math.min(1,.86+.14*BH.h+.5*e);
@@ -2723,7 +2873,7 @@ function drawHole(now,age){
     var vx2=(BH.x-drag.bx)*.0025,vy2=(BH.y-drag.by)*.0025;
     var wobS2=Math.min(1,Math.hypot(vx2,vy2)*8);
     g.save();
-    g.translate(BH.x,BH.y);
+    g.translate(bp[0],bp[1]);
     g.rotate(-.48);
     g.strokeStyle='rgba(180,210,240,'+(.10+.08*wobS2)+')';
     g.lineWidth=Math.max(.7,R*.02);
@@ -2741,14 +2891,14 @@ function drawHole(now,age){
     for(var di=1;di<=ringN;di++){
       var dr=R*(2.2+di*(66.6/ringN)), da2=.34*(1-di/(ringN+2));
       g.strokeStyle='rgba(130,170,205,'+(da2*.42)+')';g.lineWidth=.8+(di===1?.5:0);
-      g.beginPath();g.arc(BH.x,BH.y,dr,0,6.283);g.stroke();
+      g.beginPath();g.arc(bp[0],bp[1],dr,0,6.283);g.stroke();
     }
-    var grd=g.createRadialGradient(BH.x,BH.y,R*.8,BH.x,BH.y,R*28);
+    var grd=g.createRadialGradient(bp[0],bp[1],R*.8,bp[0],bp[1],R*28);
     grd.addColorStop(0,'rgba(175,205,230,.10)');
     grd.addColorStop(.22,'rgba(210,220,225,.035)');
     grd.addColorStop(.5,'rgba(110,145,180,.018)');
     grd.addColorStop(1,'rgba(90,120,155,0)');
-    g.fillStyle=grd;g.beginPath();g.arc(BH.x,BH.y,R*11,0,6.283);g.fill();
+    g.fillStyle=grd;g.beginPath();g.arc(bp[0],bp[1],R*11,0,6.283);g.fill();
     g.restore();
   }
 
@@ -2756,7 +2906,7 @@ function drawHole(now,age){
     var f=clamp((swP-.80)/.18);
     if(f>0){
       var fr=Math.sqrt(W*W+H*H)*(.12+.75*f),
-          gr=g.createRadialGradient(BH.x,BH.y,0,BH.x,BH.y,fr);
+          gr=g.createRadialGradient(bp[0],bp[1],0,bp[0],bp[1],fr);
       gr.addColorStop(0,'rgba(232,250,255,'+(.95*f)+')');
       gr.addColorStop(.4,'rgba(110,229,255,'+(.55*f)+')');
       gr.addColorStop(1,'rgba(110,229,255,0)');
@@ -3943,10 +4093,11 @@ function drawShooting(now){
 function asteroidScreenAt(x,y){
   if(!AST.length)return -1;
   var best=-1,bd=Infinity,now=performance.now();
+  var bp=camBH();
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
-    var ax=BH.x+Math.cos(t)*rr,ay=BH.y+Math.sin(t)*rr*a.e;
-    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z;
+    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom;
+    var ax=bp[0]+Math.cos(t)*rr,ay=bp[1]+Math.sin(t)*rr*a.e;
+    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*skyZoom;
     if(SW){var q=pull(ax,ay);ax=q[0];ay=q[1];sz*=1-.45*q[2];}
     ax+=a.ox;ay+=a.oy;
     var d=Math.hypot(x-ax,y-ay);
@@ -4022,8 +4173,9 @@ function drawAsteroids(now){
   var invR=1/AST_SPRITE_R;
   for(var i=0;i<AST.length;i++){
     var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
-    var x=BH.x+Math.cos(t)*rr;
-    var y=BH.y+Math.sin(t)*rr*a.e;
+    var bp=camBH();
+    var x=bp[0]+Math.cos(t)*rr*skyZoom;
+    var y=bp[1]+Math.sin(t)*rr*a.e*skyZoom;
     var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z;
     if(SW){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
     /* Damped spring: the rock gets one impulse, flies a little, then settles back. */
@@ -4493,8 +4645,9 @@ function frame(now){
     if(!drag.on&&(Math.abs(BH.x-BH.hx)>.05||Math.abs(BH.y-BH.hy)>.05)){
       BH.x+=(BH.hx-BH.x)*.065;BH.y+=(BH.hy-BH.y)*.065;
     }
-    /* Sky pan + rot springback when fingers are up. */
-    if(!skyDrag.on&&!skyRotDrag.on){
+    /* Sky pan + rot springback when fingers are up.
+       Disabled in Constellation Camera so the observer can explore freely. */
+    if(!CAMERA_MODE&&!skyDrag.on&&!skyRotDrag.on&&!skyPinch.on){
       if(skyPan.x*skyPan.x+skyPan.y*skyPan.y>0.25){
         skyPan.x+=-skyPan.x*.065;skyPan.y+=-skyPan.y*.065;
         if(skyPan.x*skyPan.x+skyPan.y*skyPan.y<0.25){skyPan.x=0;skyPan.y=0;}
@@ -4512,11 +4665,20 @@ function frame(now){
       g.fillStyle='#050b12';
       g.fillRect(0,0,W,H);
 
-      // 2. Efek Parallax 3D: Background bergerak lebih lambat (35% dari kecepatan rasi bintang)
+      // 2. Efek Parallax 3D + constellation camera zoom (sky layer only)
       var bgX = skyPan.x * 0.35;
       var bgY = skyPan.y * 0.35;
-
-      g.drawImage(bgCanvas, bgX, bgY, W, H);
+      if(skyZoom!==1){
+        var cx=W*.5,cy=H*.5;
+        g.save();
+        g.translate(cx,cy);
+        g.scale(skyZoom,skyZoom);
+        g.translate(-cx+bgX,-cy+bgY);
+        g.drawImage(bgCanvas,0,0,W,H);
+        g.restore();
+      }else{
+        g.drawImage(bgCanvas, bgX, bgY, W, H);
+      }
     }
     drawFloatingTelescope(now);
     var msgEl=$('#secret-msg');
@@ -5087,9 +5249,10 @@ function beginBHDrag(e){
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
   if(constellationTargetAt(e.clientX,e.clientY))return false;
-  var d=Math.hypot(e.clientX-BH.x,e.clientY-BH.y);
-  if(d>bhGrabRadius())return false;
-  drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;drag.tapEligible=(d<=Math.max(BH.R*1.9,42));
+  var bp=camBH();
+  var d=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]);
+  if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
+  drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;drag.tapEligible=(d<=Math.max(BH.R*1.9*skyZoom,42));
   try{cv.setPointerCapture(e.pointerId);}catch(err){}
   haptic(15);e.preventDefault();e.stopPropagation();
   return true;
@@ -5114,7 +5277,7 @@ function endBHDrag(e){
   try{cv.releasePointerCapture(e.pointerId);}catch(err){}
   if(was){
     haptic(8);
-    createBHShockwave(BH.x, BH.y); // Buat gelombang kejut gravitasi saat Gargantua dilepas
+    var bpSw=camBH();createBHShockwave(bpSw[0], bpSw[1]); // Buat gelombang kejut gravitasi saat Gargantua dilepas
   }else if(drag.tapEligible){
     e.preventDefault();
     startSwallow(bhA.getAttribute('href'));
@@ -5129,7 +5292,8 @@ document.addEventListener('pointercancel',endBHDrag,{passive:false});
 
 /* ---------- mobile constellation pan + 2-finger rotate (±180°) ---------- */
 function skyPanLimits(){
-  return {x:Math.max(80,W*.38),y:Math.max(70,H*.32)};
+  var z=skyZoom||1;
+  return {x:Math.max(80,W*.38)*z,y:Math.max(70,H*.32)*z};
 }
 function skyHitXY(x,y){
   /* Base star pos + pan, then through gSky - same rotation AND gravity-lens
@@ -5193,21 +5357,31 @@ function skyTwoAngle(){
   if(pts.length<2)return null;
   return Math.atan2(pts[1].y-pts[0].y,pts[1].x-pts[0].x);
 }
+function skyTwoDist(){
+  var pts=skyPtrList();
+  if(pts.length<2)return 0;
+  var dx=pts[1].x-pts[0].x,dy=pts[1].y-pts[0].y;
+  return Math.sqrt(dx*dx+dy*dy)||1;
+}
 function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
   if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
-  var dBH=Math.hypot(e.clientX-BH.x,e.clientY-BH.y);
-  if(dBH<=bhGrabRadius())return false;
+  var bpSky=camBH();
+  var dBH=Math.hypot(e.clientX-bpSky[0],e.clientY-bpSky[1]);
+  if(dBH<=bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   skyPtrs[e.pointerId]={x:e.clientX,y:e.clientY};
   var n=Object.keys(skyPtrs).length;
   if(n>=2){
-    /* 2-finger: rotate mode, drop single-finger pan. */
+    /* 2-finger: rotate (+ pinch-zoom when Constellation Camera is on). */
     if(skyDrag.on){skyDrag.on=false;try{cv.releasePointerCapture(skyDrag.pid);}catch(err){}}
     var a=skyTwoAngle();
     if(a!=null){skyRotDrag.on=true;skyRotDrag.a0=a;skyRotDrag.r0=skyRot;}
+    if(CAMERA_MODE&&OBSERVE_MODE){
+      skyPinch.on=true;skyPinch.d0=skyTwoDist();skyPinch.z0=skyZoom;
+    }
     try{cv.setPointerCapture(e.pointerId);}catch(err){}
     return true;
   }
@@ -5228,6 +5402,14 @@ function moveSkyPan(e){
     while(d>Math.PI)d-=Math.PI*2;
     while(d<-Math.PI)d+=Math.PI*2;
     skyRot=Math.max(-Math.PI,Math.min(Math.PI,skyRotDrag.r0+d));
+    /* Pinch zoom — Constellation Camera only (sky layer). */
+    if(skyPinch.on&&CAMERA_MODE&&OBSERVE_MODE){
+      var dist=skyTwoDist();
+      if(skyPinch.d0>12&&dist>12){
+        var ratio=dist/skyPinch.d0;
+        setSkyZoom(skyPinch.z0*ratio,false);
+      }
+    }
     syncSkyPanHits();
     return;
   }
@@ -5243,7 +5425,13 @@ function moveSkyPan(e){
 function endSkyPan(e){
   if(skyPtrs[e.pointerId])delete skyPtrs[e.pointerId];
   var n=Object.keys(skyPtrs).length;
-  if(n<2)skyRotDrag.on=false;
+  if(n<2){
+    skyRotDrag.on=false;
+    if(skyPinch.on){
+      skyPinch.on=false;
+      if(CAMERA_MODE)setSkyZoom(skyZoom,true);
+    }
+  }
   if(skyDrag.on&&e.pointerId===skyDrag.pid){
     var was=skyDrag.moved;skyDrag.on=false;
     try{cv.releasePointerCapture(e.pointerId);}catch(err){}
@@ -5260,6 +5448,14 @@ document.addEventListener('pointerdown',function(e){
 document.addEventListener('pointermove',moveSkyPan,{passive:true});
 document.addEventListener('pointerup',endSkyPan,{passive:true});
 document.addEventListener('pointercancel',endSkyPan,{passive:true});
+
+/* Constellation Camera: mouse wheel / trackpad zoom (sky layer only). */
+document.addEventListener('wheel',function(e){
+  if(!CAMERA_MODE||!OBSERVE_MODE||SW)return;
+  if(e.target&&e.target.closest&&e.target.closest('#music-player,#boot-screen,#terminal,#signal-fragment'))return;
+  e.preventDefault();
+  stepSkyZoom(e.deltaY<0?1:-1);
+},{passive:false});
 
 var rgFx=$('#rigel-fx');
 rgFx.addEventListener('mouseenter',function(){hot='rigel';});
