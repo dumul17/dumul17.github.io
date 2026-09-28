@@ -567,19 +567,28 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   var wctx=elWave.getContext('2d');
   var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* seek bar bergelombang: bagian yang udah diputar "squiggly", sisanya lurus */
-  function drawSeek(now){
+  /* seek bar bergelombang: played line + sine + dot.
+     Canvas resize hanya saat ukuran berubah; paint foreground ~30fps (bukan 60). */
+  var seekDrawLast=0,seekForce=false,seekW=0,seekH=0,seekDpr=0;
+  function drawSeek(now,force){
+    now=now||performance.now();
+    if(!force&&!seekForce&&!dragging&&(now-seekDrawLast)<32)return;
+    seekDrawLast=now;seekForce=false;
     var w=elWave.clientWidth,h=elWave.clientHeight;
     if(!w||!h)return;
     var dpr=Math.min(window.devicePixelRatio||1,2);
-    if(elWave.width!==Math.round(w*dpr)||elWave.height!==Math.round(h*dpr)){elWave.width=Math.round(w*dpr);elWave.height=Math.round(h*dpr);}
-    wctx.setTransform(dpr,0,0,dpr,0,0);
+    if(w!==seekW||h!==seekH||dpr!==seekDpr||elWave.width!==Math.round(w*dpr)||elWave.height!==Math.round(h*dpr)){
+      seekW=w;seekH=h;seekDpr=dpr;
+      elWave.width=Math.round(w*dpr);elWave.height=Math.round(h*dpr);
+      wctx.setTransform(dpr,0,0,dpr,0,0);
+    }
     wctx.clearRect(0,0,w,h);
     var y=h/2,x0=PAD,x1=w-PAD,xe=x0+(x1-x0)*seekPct/100;
     wctx.lineCap='round';wctx.lineJoin='round';
+    /* background: sisa track (statis relatif; digambar ulang bareng foreground karena 1 canvas) */
     wctx.beginPath();wctx.moveTo(xe,y);wctx.lineTo(x1,y);
     wctx.strokeStyle='rgba(184,198,214,.22)';wctx.lineWidth=3;wctx.stroke();
-    var amp=3.4*seekAmp,k=2*Math.PI/20,ph=reduceMotion?0:(now||performance.now())/1000*7;
+    var amp=3.4*seekAmp,k=2*Math.PI/20,ph=reduceMotion?0:now/1000*7;
     wctx.beginPath();wctx.moveTo(x0,y);
     for(var x=x0;x<=xe;x+=1.5){
       var tp=Math.min(1,(x-x0)/12,(xe-x)/12);
@@ -596,12 +605,12 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var txt=fmt(t)+' / '+fmt(d);
     if(txt!==lastTime){lastTime=txt;elTime.textContent=txt;}
     var pct=(isFinite(d)&&d>0)?Math.min(100,t/d*100):0;
-    if(Math.abs(pct-seekPct)>.02){seekPct=pct;if(!raf)drawSeek();}
+    if(Math.abs(pct-seekPct)>.02){seekPct=pct;if(!raf){seekForce=true;drawSeek();}}
   }
   function showBar(){
     bar.classList.add('dm-show');document.body.classList.add('dm-has-bar');
     elTitle.textContent=current?titleOf(current):'';
-    lastTime='';seekPct=0;uiStep();drawSeek();
+    lastTime='';seekPct=0;uiStep();seekForce=true;drawSeek(undefined,true);
   }
   function hideBar(){bar.classList.remove('dm-show');document.body.classList.remove('dm-has-bar');}
   function setPP(on){elPP.classList.toggle('dm-on',on);}
@@ -609,7 +618,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var d=audio.duration;if(!isFinite(d)||!d)return;
     var r=elSeek.getBoundingClientRect();
     var p=Math.min(1,Math.max(0,(e.clientX-r.left-PAD)/(r.width-2*PAD)));
-    audio.currentTime=p*d;uiStep();
+    audio.currentTime=p*d;uiStep();seekForce=true;drawSeek(undefined,true);
   }
   elPP.addEventListener('click',function(){if(current)toggle(current);});
   function go(delta){
@@ -797,8 +806,8 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   function loop(now){
     raf=0;
     var playing=!audio.paused&&!audio.ended;
-    /* Analyser every other frame — spectrum motion is slower than 60fps and
-       this roughly halves FFT cost while the seek wave still paints every frame. */
+    /* Analyser every other frame — spectrum motion is slower than 60fps.
+       seek bar di-throttle ~30fps di dalam drawSeek (bukan full 60). */
     if(an&&playing){anSkip^=1;if(!anSkip)analyse(now);}
     else{anSkip=0;level*=.9;}
     /* During handoff buffer, hold mix so spectrum/mesh stay lit. */
