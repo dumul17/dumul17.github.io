@@ -3196,10 +3196,28 @@ function startTesseractWarp(targetUrl) {
       dmTransitionStop();
       window.removeEventListener('resize', onResize);
       try {
-        try{sessionStorage.setItem('dm_spectrum_mesh',JSON.stringify({w:W,h:H,nodes:DM_TR_NET.map(function(n){return{x:n.x,y:n.y,ox:n.ox,oy:n.oy,vx:n.vx,vy:n.vy,r:n.r,color:n.color,glow:n.glow,phase:n.phase};})}));}catch(e){}
+        try{
+          var _meshNodes=(DM_TR_NET||[]).map(function(n){return{x:n.x,y:n.y,ox:n.ox,oy:n.oy,vx:n.vx,vy:n.vy,r:n.r,color:n.color,glow:n.glow,phase:n.phase};});
+          sessionStorage.setItem('dm_spectrum_mesh',JSON.stringify({w:W,h:H,nodes:_meshNodes,level:DM_TR_LEVEL||0,beatAge:(DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999)}));
+        }catch(e){}
         sessionStorage.setItem('dm_collapsars_t', String(typeof GARG !== 'undefined' && GARG && GARG.currentTime || 0));
         sessionStorage.setItem('dm_collapsars_from', 'swallow');
-        sessionStorage.setItem('dm_visual_state', JSON.stringify({t:(typeof GARG!=='undefined'&&GARG)?GARG.currentTime:0, phase:(typeof GARG!=='undefined'&&GARG)?GARG.currentTime:0, from:'dumul-transition'}));
+        try{
+          var _specSnap=null;
+          if(DM_TR_SPEC&&DM_TR_SPEC.length){
+            _specSnap=Array.prototype.slice.call(DM_TR_SPEC,0,Math.min(DM_TR_SPEC.length,256));
+          }
+          var _t=(typeof GARG!=='undefined'&&GARG)?(GARG.currentTime||0):0;
+          sessionStorage.setItem('dm_visual_state', JSON.stringify({
+            t:_t, phase:_t, from:'dumul-transition',
+            level:DM_TR_LEVEL||0,
+            beatAge:(DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999),
+            mix:1,
+            spec:_specSnap
+          }));
+        }catch(e){
+          sessionStorage.setItem('dm_visual_state', JSON.stringify({t:(typeof GARG!=='undefined'&&GARG)?GARG.currentTime:0, phase:(typeof GARG!=='undefined'&&GARG)?GARG.currentTime:0, from:'dumul-transition'}));
+        }
       } catch (e) {}
       location.href = targetUrl;
     }
@@ -3279,7 +3297,21 @@ function startSwallow(href){
     try{
       sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));
       sessionStorage.setItem('dm_collapsars_from','swallow');
-      sessionStorage.setItem('dm_visual_state',JSON.stringify({t:GARG&&GARG.currentTime||0,phase:GARG&&GARG.currentTime||0,from:'dumul-transition'}));
+      try{
+        var _t2=GARG&&GARG.currentTime||0;
+        var _spec2=null;
+        if(typeof DM_TR_SPEC!=='undefined'&&DM_TR_SPEC&&DM_TR_SPEC.length){
+          _spec2=Array.prototype.slice.call(DM_TR_SPEC,0,Math.min(DM_TR_SPEC.length,256));
+        }
+        sessionStorage.setItem('dm_visual_state',JSON.stringify({
+          t:_t2,phase:_t2,from:'dumul-transition',
+          level:(typeof DM_TR_LEVEL!=='undefined'?DM_TR_LEVEL:0)||0,
+          beatAge:(typeof DM_TR_BEAT!=='undefined'&&DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999),
+          mix:1,spec:_spec2
+        }));
+      }catch(e2){
+        sessionStorage.setItem('dm_visual_state',JSON.stringify({t:GARG&&GARG.currentTime||0,phase:GARG&&GARG.currentTime||0,from:'dumul-transition'}));
+      }
     }catch(e){}
   },SW.dur);
 }
