@@ -20,6 +20,7 @@
 <meta name="twitter:title" content="Dumul's Observatory">
 <meta name="twitter:description" content="A modder and music composer's little universe: original soundtracks, gameplay, mods, and the music project DUMUL.">
 <meta name="twitter:image" content="https://dumul17.github.io/og-constellation.jpg">
+<link rel="preload" as="image" href="og.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -332,8 +333,9 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
 #tesseract-warp {
   position: fixed;
   inset: 0;
-  z-index: 99999;
-  background: #0a1218;
+  z-index: 2147483000;
+  isolation: isolate;
+  background: #0a1218 !important;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
@@ -349,7 +351,18 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   width: 100%;
   height: 314px;
   overflow: hidden;
-  background: #0a1218 url('og.jpg') center/cover no-repeat;
+  background: #0a1218 url('./og.jpg') center/cover no-repeat;
+  z-index: 0;
+}
+.tesseract-og {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  object-position:center;
+  z-index:0;
 }
 .tesseract-shade { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .tesseract-shade.s1 { background: rgba(10, 18, 24, 0.6); }
@@ -359,6 +372,24 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   opacity: 1;
   pointer-events: auto;
 }
+/* Hard cut the old Gargantua renderer behind the transition. The transition owns the screen now. */
+body.tesseract-running > #sky,
+body.tesseract-running > .scan,
+body.tesseract-running > #header,
+body.tesseract-running > footer,
+body.tesseract-running > #bh,
+body.tesseract-running > #bh-clock,
+body.tesseract-running > .portal,
+body.tesseract-running > .hit,
+body.tesseract-running > #owl-source,
+body.tesseract-running > #music-toggle,
+body.tesseract-running > #mp-now-playing,
+body.tesseract-running > #music-player,
+body.tesseract-running > #veil,
+body.tesseract-running > #terminal,
+body.tesseract-running > #secret-msg,
+body.tesseract-running > .supernova-flash { visibility:hidden !important; }
+body.tesseract-running { background:#0a1218 !important; }
 #tesseract-canvas {
   position: absolute;
   left: 0;
@@ -3088,6 +3119,7 @@ function startTesseractWarp(targetUrl) {
   var statusText = document.getElementById('tesseract-status');
   var progressBar = document.getElementById('tesseract-progress');
   warpOverlay.classList.add('active');
+  document.body.classList.add('tesseract-running');
 
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var W, H, net;
@@ -5575,6 +5607,7 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
   <div class="tesseract-stage" id="tesseract-stage">
+    <img class="tesseract-og" src="./og.jpg" alt="" aria-hidden="true" decoding="async">
     <div class="tesseract-shade s1"></div>
     <div class="tesseract-shade s2"></div>
     <div class="tesseract-shade s3"></div>
