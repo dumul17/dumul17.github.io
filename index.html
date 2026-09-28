@@ -328,18 +328,24 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   }
 }
 
-/* Isolated Style untuk Tesseract Warp Overlay (transisi Gargantua -> DUMUL)
-   UI panel pinned to bottom so the centered 4D hypercube is not covered. */
+/* Isolated Style untuk Neural Network Overlay (Transisi Gargantua -> DUMUL) */
 #tesseract-warp {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: #000;
+  background: #0a1218 url('og.jpg') center/cover no-repeat;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   font-family: 'Courier New', monospace;
+}
+#tesseract-warp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(10, 18, 24, 0.65) 0%, rgba(10, 18, 24, 0.92) 100%);
+  z-index: 1;
 }
 #tesseract-warp.active {
   opacity: 1;
@@ -351,6 +357,7 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   width: 100%;
   height: 100%;
   display: block;
+  z-index: 2;
 }
 .tesseract-scan {
   position: absolute;
@@ -358,22 +365,22 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   pointer-events: none;
   background: repeating-linear-gradient(
     0deg,
-    rgba(255, 122, 217, 0.05) 0px,
-    rgba(255, 122, 217, 0.05) 1px,
+    rgba(110, 229, 255, 0.04) 0px,
+    rgba(110, 229, 255, 0.04) 1px,
     transparent 1px,
     transparent 3px
   );
-  z-index: 2;
+  z-index: 3;
 }
 .tesseract-ui {
   position: absolute;
   left: 50%;
   bottom: max(20px, env(safe-area-inset-bottom, 0px) + 14px);
   transform: translateX(-50%);
-  z-index: 3;
+  z-index: 4;
   text-align: center;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(10, 18, 24, 0.82);
   padding: 12px 22px 14px;
   border: 1px solid rgba(110, 229, 255, 0.28);
   box-shadow: 0 0 24px rgba(110, 229, 255, 0.14), 0 8px 28px rgba(0, 0, 0, 0.45);
@@ -423,7 +430,6 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   .tesseract-title { letter-spacing: 0.12em; }
   .tesseract-status { letter-spacing: 0.06em; }
 }
-
 
 /* ---------- Stellar Memory / Discovery Log / Signal Fragments ---------- */
 /* Compact constellation log inside music HUD (star progress lives on track rows). */
@@ -769,7 +775,7 @@ var $=function(s){return document.querySelector(s);};
 var cv=$('#sky'),g=cv.getContext('2d');
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
-var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,pageHidden=false,hiddenAt=0;
+var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
 var lastActivity=performance.now(),idleMode=false,IDLE_MS=60000;
 function markActivity(){lastActivity=performance.now();if(idleMode)idleMode=false;}
@@ -2029,6 +2035,8 @@ function fitTitle(){
 }
 /* ---------- layout ---------- */
 var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
+/* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
+var AST_SPRITES=null,AST_SPRITE_R=24;
 var bgCanvas=null,bgCtx=null,bgDirty=true;
 var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null};
 function layout(){
@@ -2282,7 +2290,7 @@ function layout(){
   var ac=IS_POTATO?14:Math.max(22,Math.min(42,Math.round(W*H/15000)));
   for(var j=0;j<ac;j++){
     var ang=Math.random()*Math.PI*2,rad=Math.min(W,H)*(.12+Math.random()*.22);
-    AST.push({a:ang,r:rad,e:.72+Math.random()*.28,spd:(.000045+Math.random()*.000075)*(Math.random()<.5?1:-1),sz:2.0+Math.random()*5.8,rot:Math.random()*6.28,rs:(Math.random()-.5)*.0018,al:.96+Math.random()*.04,seed:Math.random()*6.28,ox:0,oy:0,vx:0,vy:0,kick:0,kickUntil:0,_lastNow:performance.now()});
+    AST.push({a:ang,r:rad,e:.72+Math.random()*.28,spd:(.000045+Math.random()*.000075)*(Math.random()<.5?1:-1),sz:2.0+Math.random()*5.8,rot:Math.random()*6.28,rs:(Math.random()-.5)*.0018,al:.96+Math.random()*.04,seed:Math.random()*6.28,sprite:j%8,ox:0,oy:0,vx:0,vy:0,kick:0,kickUntil:0,_lastNow:performance.now()});
   }  if(!GAL.length){
     var spots=[[.08,.18,.72,.18,1.0],[.84,.13,.42,.72,.8],[.18,.42,.58,.38,1.1],[.76,.47,.66,.32,.9],[.10,.72,.48,.22,.75],[.88,.78,.55,.55,1.15],[.48,.24,.34,.44,.65],[.54,.82,.72,.26,.9]];
     var galCols=[
@@ -2718,319 +2726,126 @@ function drawHole(now,age){
     }
   }
 }
-/* ---------- Tesseract 4D warp overlay (lapisan atas transisi Gargantua->DUMUL) ----------
-   Near-literal port of cyberpunk_x5f_tesseract_x5f_v10.html.
-   Sequence: swallow sky/UI finishes first (~2800ms), THEN this overlay runs 5600ms,
-   then redirect. Opaque black canvas would otherwise cut the swallow mid-swirl. */
-var TESS_VERTS=(function(){
-  var v=[],i;
-  for(i=0;i<16;i++){
-    v.push([(i&1)?0.5:-0.5,(i&2)?0.5:-0.5,(i&4)?0.5:-0.5,(i&8)?0.5:-0.5]);
-  }
-  return v;
-})();
-var TESS_EDGES=(function(){
-  var e=[],i,j,diff,a,b;
-  for(i=0;i<16;i++){
-    for(j=i+1;j<16;j++){
-      a=TESS_VERTS[i];b=TESS_VERTS[j];diff=0;
-      if(a[0]!==b[0])diff++;
-      if(a[1]!==b[1])diff++;
-      if(a[2]!==b[2])diff++;
-      if(a[3]!==b[3])diff++;
-      if(diff===1)e.push([i,j]);
-    }
-  }
-  return e;
-})();
-function tessRotY(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0]*c+p[2]*s,p[1],-p[0]*s+p[2]*c];}
-function tessRotX(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0],p[1]*c-p[2]*s,p[1]*s+p[2]*c];}
-function tessRotZ(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0]*c-p[1]*s,p[0]*s+p[1]*c,p[2]];}
-function tessRotXW(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0]*c-p[3]*s,p[1],p[2],p[0]*s+p[3]*c];}
-function tessRotYW(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0],p[1]*c-p[3]*s,p[2],p[1]*s+p[3]*c];}
-function tessRotZW(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0],p[1],p[2]*c-p[3]*s,p[2]*s+p[3]*c];}
-function tessRotXY4(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0]*c-p[1]*s,p[0]*s+p[1]*c,p[2],p[3]];}
-function tessRotXZ4(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0]*c-p[2]*s,p[1],p[0]*s+p[2]*c,p[3]];}
-function tessRotYZ4(p,a){var c=Math.cos(a),s=Math.sin(a);return [p[0],p[1]*c-p[2]*s,p[1]*s+p[2]*c,p[3]];}
-function tessProj4to3(p){var d=2.2,s=d/(d-p[3]);return [p[0]*s,p[1]*s,p[2]*s];}
-function tessLerpRGB(c1,c2,t){
-  return [
-    Math.round(c1[0]+(c2[0]-c1[0])*t),
-    Math.round(c1[1]+(c2[1]-c1[1])*t),
-    Math.round(c1[2]+(c2[2]-c1[2])*t)
-  ];
-}
-function tessDrawNode(tctx,x,y,r,core,glow,bright){
-  tctx.save();
-  tctx.shadowBlur=16*bright;
-  tctx.shadowColor=glow;
-  tctx.fillStyle=core;
-  tctx.beginPath();tctx.arc(x,y,r,0,Math.PI*2);tctx.fill();
-  tctx.restore();
-}
-/* targetUrl: tujuan redirect.
-   Dipanggil dari startSwallow() SETELAH swirl sky/UI selesai (~2800ms),
-   berjalan 5600ms, lalu redirect. */
-function startTesseractWarp(targetUrl){
-  var warpOverlay=document.getElementById('tesseract-warp');
-  if(!warpOverlay){location.href=targetUrl;return;}
-  var canvas=document.getElementById('tesseract-canvas');
-  var tctx=canvas.getContext('2d');
-  var statusText=document.getElementById('tesseract-status');
-  var progressBar=document.getElementById('tesseract-progress');
+/* ---------- Neural Network Overlay (Garis Terhubung Bertahap) ---------- */
+function startTesseractWarp(targetUrl) {
+  var warpOverlay = document.getElementById('tesseract-warp');
+  if (!warpOverlay) { location.href = targetUrl; return; }
+  var canvas = document.getElementById('tesseract-canvas');
+  var tctx = canvas.getContext('2d');
+  var statusText = document.getElementById('tesseract-status');
+  var progressBar = document.getElementById('tesseract-progress');
   warpOverlay.classList.add('active');
 
-  var dpr=Math.min(window.devicePixelRatio||1,2);
-  var W,H,CX,CY;
-  function resizeTess(){
-    W=window.innerWidth;H=window.innerHeight;CX=W/2;CY=H/2;
-    canvas.width=Math.max(1,Math.round(W*dpr));
-    canvas.height=Math.max(1,Math.round(H*dpr));
-    tctx.setTransform(dpr,0,0,dpr,0,0);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var W, H;
+  function resizeNeural() {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.max(1, Math.round(W * dpr));
+    canvas.height = Math.max(1, Math.round(H * dpr));
+    tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  resizeTess();
-  var onResize=function(){resizeTess();};
-  window.addEventListener('resize',onResize);
+  resizeNeural();
+  var onResize = function() { resizeNeural(); };
+  window.addEventListener('resize', onResize);
 
-  var startTime=performance.now();
-  var duration=5600;
-  var statusMessages=[
-    '> WARMING UP AUDIO ENGINE...',
-    '> PRE-BUFFERING COLLAPSARS...',
-    '> ALIGNING 4D HYPERCUBE...',
-    '> COLLAPSING EVENT HORIZON...',
-    '> QUANTUM FREQUENCY SYNCED!',
-    '> FOLD COMPLETE // EXIT'
+  var startTime = performance.now();
+  var duration = 5600;
+  var statusMessages = [
+    '> INITIALIZING NEURAL CORE...',
+    '> SYNAPSE FREQUENCY ALIGNED...',
+    '> PROCESSING SIGNAL INTERFERENCE...',
+    '> TRANSMITTING MEMORY NODES...',
+    '> NEURAL SYNC COMPLETE!',
+    '> ENTERING DUMUL PROJECT...'
   ];
-  try{if(GARG){GARG.play().catch(function(){});}}catch(e){}
 
-  /* Fresh per-run state (same defaults as V10) so a second visit is not polluted. */
-  var edgeTw=TESS_EDGES.map(function(){
-    return {phase:Math.random()*Math.PI*2,speed:0.0008+Math.random()*0.0025};
-  });
-  var parts=[];
-  (function(){
-    var i,r,th,ph;
-    for(i=0;i<46;i++){
-      r=Math.random()*0.85;
-      th=Math.random()*Math.PI*2;
-      ph=Math.acos(2*Math.random()-1);
-      parts.push({
-        x:r*Math.sin(ph)*Math.cos(th),
-        y:r*Math.sin(ph)*Math.sin(th),
-        z:r*Math.cos(ph),
-        vx:(Math.random()-0.5)*0.006,
-        vy:(Math.random()-0.5)*0.006,
-        vz:(Math.random()-0.5)*0.006,
-        twPhase:Math.random()*Math.PI*2,
-        twSpeed:0.0008+Math.random()*0.0022
-      });
-    }
-  })();
+  try { if (typeof GARG !== 'undefined' && GARG) { GARG.play().catch(function(){}); } } catch (e) {}
 
-  var SPEED_A=0.005,SPEED_C=0.012,SPEED_B=0.020;
-  var angA=0,angB=0,angC=0;
-  var glitchA=0,glitchB=0,glitchC=0;
-  var GLITCH_ANGLE=23.5*Math.PI/180;
-  function randGlitchDist(){return GLITCH_ANGLE*(0.85+Math.random()*0.3);}
-  var accA=0,accB=0,accC=0;
-  var nextGlitchA=randGlitchDist(),nextGlitchB=randGlitchDist(),nextGlitchC=randGlitchDist();
-  var MAGENTA=[255,42,109],CYAN=[5,217,232];
-  var finished=false;
+  // Inisialisasi Titik Neuron (Nodes)
+  var nodeCount = Math.min(65, Math.max(30, Math.floor((W * H) / 15000)));
+  var nodes = [];
+  for (var i = 0; i < nodeCount; i++) {
+    nodes.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 1.2,
+      vy: (Math.random() - 0.5) * 1.2,
+      r: Math.random() * 2.2 + 1.2,
+      pulse: Math.random() * Math.PI * 2,
+      color: Math.random() < 0.6 ? '110, 229, 255' : '255, 122, 217'
+    });
+  }
 
-  function R(){return Math.min(W,H)*0.21;}
+  var finished = false;
 
-  function render(time){
-    if(finished)return;
-    var elapsed=time-startTime,progress=Math.min(1,elapsed/duration);
-    if(progressBar)progressBar.style.width=(progress*100)+'%';
-    if(statusText){
-      var msgIdx=Math.min(statusMessages.length-1,Math.floor(progress*statusMessages.length));
-      statusText.textContent=statusMessages[msgIdx];
+  function render(time) {
+    if (finished) return;
+    var elapsed = time - startTime, progress = Math.min(1, elapsed / duration);
+    if (progressBar) progressBar.style.width = (progress * 100) + '%';
+    if (statusText) {
+      var msgIdx = Math.min(statusMessages.length - 1, Math.floor(progress * statusMessages.length));
+      statusText.textContent = statusMessages[msgIdx];
     }
 
-    /* === V10 frame body (unmodified motion math) === */
-    tctx.fillStyle='#000';
-    tctx.fillRect(0,0,W,H);
+    // Clear canvas transparan agar og.jpg di latar belakang terlihat
+    tctx.clearRect(0, 0, W, H);
 
-    var r=R(),bob=Math.sin(time/900)*9,tilt=0.35;
+    // Jangkauan garis koneksi diperluas secara bertahap seiring bertambahnya progress
+    var currentMaxDist = Math.min(W, H) * 0.22 * Math.min(1, progress * 1.3);
 
-    angA+=SPEED_A;accA+=SPEED_A;
-    if(angA>=Math.PI*2)angA-=Math.PI*2;
-    if(accA>=nextGlitchA){glitchA=1;accA=0;nextGlitchA=randGlitchDist();}
+    for (var i = 0; i < nodes.length; i++) {
+      var n1 = nodes[i];
+      n1.x += n1.vx;
+      n1.y += n1.vy;
 
-    angB-=SPEED_B;accB+=SPEED_B;
-    if(angB<=-Math.PI*2)angB+=Math.PI*2;
-    if(accB>=nextGlitchB){glitchB=1;accB=0;nextGlitchB=randGlitchDist();}
+      if (n1.x < 0 || n1.x > W) n1.vx *= -1;
+      if (n1.y < 0 || n1.y > H) n1.vy *= -1;
 
-    angC-=SPEED_C;accC+=SPEED_C;
-    if(angC<=-Math.PI*2)angC+=Math.PI*2;
-    if(accC>=nextGlitchC){glitchC=1;accC=0;nextGlitchC=randGlitchDist();}
+      n1.pulse += 0.03;
 
-    glitchA=Math.max(0,glitchA-0.04);
-    glitchB=Math.max(0,glitchB-0.04);
-    glitchC=Math.max(0,glitchC-0.04);
+      // Hubungkan garis antar node terdekat (Jaringan terhubung bertahap)
+      for (var j = i + 1; j < nodes.length; j++) {
+        var n2 = nodes[j];
+        var dx = n1.x - n2.x, dy = n1.y - n2.y;
+        var dist = Math.hypot(dx, dy);
 
-    /* V10 project: CX + p[0]*sc, CY - r*0.15 + p[1]*sc + bob */
-    var project=function(p){
-      var dist=3.4,sc=r*dist/(dist-p[2]);
-      return [CX+p[0]*sc,CY-r*0.15+p[1]*sc+bob,p[2]];
-    };
-
-    var VA=TESS_VERTS.map(function(v){
-      var q=tessRotXY4(v,angA*1.1+time*0.00008);
-      q=tessRotXZ4(q,angA*0.73);
-      q=tessRotXW(q,angA*1.41);
-      q=tessRotYW(q,-angA*0.93+Math.sin(time*0.0003)*0.4);
-      q=tessRotZW(q,angA*1.17);
-      q=tessRotYZ4(q,angA*0.62+Math.cos(time*0.00022)*0.3);
-      var p3=tessProj4to3(q);
-      p3=tessRotY(p3,angA*1.25);
-      p3=tessRotZ(p3,angA*0.48);
-      p3=tessRotX(p3,tilt+angA*0.55+Math.sin(time*0.0004)*0.15);
-      return project(p3);
-    });
-    var VC=TESS_VERTS.map(function(v){
-      var q=tessRotXY4(v,angC*1.32+1.1);
-      q=tessRotXZ4(q,-angC*0.89);
-      q=tessRotXW(q,angC*1.13+Math.sin(time*0.00027)*0.5);
-      q=tessRotYW(q,angC*1.47);
-      q=tessRotZW(q,-angC*0.78);
-      q=tessRotYZ4(q,angC*1.05+0.7);
-      var p3=tessProj4to3(q);
-      p3=tessRotY(p3,angC*0.92);
-      p3=tessRotZ(p3,-angC*1.15+Math.cos(time*0.00031)*0.2);
-      p3=tessRotX(p3,tilt*0.7+angC*0.83);
-      return project(p3);
-    });
-    var PB=parts.map(function(p,idx){
-      p.x+=p.vx;p.y+=p.vy;p.z+=p.vz;
-      if(Math.hypot(p.x,p.y,p.z)>0.9){p.vx*=-1;p.vy*=-1;p.vz*=-1;}
-      var q=[p.x,p.y,p.z];
-      q=tessRotY(q,angB*1.4+idx*0.01);
-      q=tessRotX(q,angB*0.9+tilt*0.4+Math.sin(time*0.0005+idx)*0.3);
-      q=tessRotZ(q,-angB*1.1+Math.cos(time*0.00035+idx*0.7)*0.25);
-      return project(q);
-    });
-
-    var e,i,j,tw,twinkle,z,t,c,baseA,ox,oy,col,dx,dy,d,a,tw2,twk,bi,bd;
-    /* Layer A — outer tesseract edges */
-    for(e=0;e<TESS_EDGES.length;e++){
-      i=TESS_EDGES[e][0];j=TESS_EDGES[e][1];
-      tw=edgeTw[e];
-      twinkle=0.3+0.7*(0.5+0.5*Math.sin(time*tw.speed*2+tw.phase));
-      if(Math.random()<0.015)continue;
-      z=(VA[i][2]+VA[j][2])/2;
-      t=(z+1)/2;
-      c=tessLerpRGB(MAGENTA,CYAN,t);
-      baseA=0.22+t*0.38;
-      ox=0;oy=0;
-      col='rgba('+c[0]+','+c[1]+','+c[2]+','+(baseA*twinkle).toFixed(3)+')';
-      tctx.setLineDash([]);
-      if(glitchA>0.02){
-        ox=(Math.random()-0.5)*26*glitchA;
-        oy=(Math.random()-0.5)*10*glitchA;
-        if(Math.random()<0.5)col='rgba(255,42,109,'+(baseA*twinkle*1.4*glitchA+0.15).toFixed(3)+')';
-        else col='rgba(5,217,232,'+(baseA*twinkle*1.4*glitchA+0.15).toFixed(3)+')';
-        if(Math.random()<0.25*glitchA)tctx.setLineDash([4,6]);
-      }
-      tctx.strokeStyle=col;
-      tctx.lineWidth=2.4;
-      tctx.beginPath();
-      tctx.moveTo(VA[i][0]+ox,VA[i][1]+oy);
-      tctx.lineTo(VA[j][0]+ox,VA[j][1]+oy);
-      tctx.stroke();
-      tctx.setLineDash([]);
-    }
-
-    /* Layer B — particle web */
-    for(i=0;i<PB.length;i++){
-      for(j=i+1;j<PB.length;j++){
-        dx=PB[i][0]-PB[j][0];dy=PB[i][1]-PB[j][1];
-        d=Math.hypot(dx,dy);
-        if(d<r*0.55){
-          tw=0.5+0.5*Math.sin(time*parts[i].twSpeed*2+parts[i].twPhase);
-          tw2=0.5+0.5*Math.sin(time*parts[j].twSpeed*2+parts[j].twPhase);
-          twk=(tw+tw2)/2;
-          if(Math.random()<0.02)continue;
-          a=0.28*(1-d/(r*0.55))*(0.25+0.75*twk);
-          ox=0;
-          col='rgba(181,55,242,'+a.toFixed(3)+')';
-          if(glitchB>0.02){
-            ox=(Math.random()-0.5)*22*glitchB;
-            if(Math.random()<0.3)col='rgba(249,240,2,'+(a+0.25*glitchB).toFixed(3)+')';
-          }
-          tctx.strokeStyle=col;
-          tctx.lineWidth=1;
+        if (dist < currentMaxDist) {
+          var alpha = (1 - dist / currentMaxDist) * 0.5 * progress * (0.8 + 0.2 * Math.sin(n1.pulse));
+          tctx.strokeStyle = 'rgba(' + n1.color + ', ' + alpha.toFixed(3) + ')';
+          tctx.lineWidth = 1;
           tctx.beginPath();
-          tctx.moveTo(PB[i][0]+ox,PB[i][1]);
-          tctx.lineTo(PB[j][0]+ox,PB[j][1]);
+          tctx.moveTo(n1.x, n1.y);
+          tctx.lineTo(n2.x, n2.y);
           tctx.stroke();
         }
       }
-    }
 
-    /* Layer C — connectors */
-    for(i=0;i<PB.length;i+=3){
-      bi=0;bd=1e9;
-      for(j=0;j<VC.length;j++){
-        d=Math.hypot(PB[i][0]-VC[j][0],PB[i][1]-VC[j][1]);
-        if(d<bd){bd=d;bi=j;}
-      }
-      twk=0.5+0.5*Math.sin(time*parts[i].twSpeed*2+parts[i].twPhase+1.7);
-      a=0.16*(0.3+0.7*twk);
-      ox=0;
-      col='rgba(5,217,232,'+a.toFixed(3)+')';
-      if(glitchC>0.02){
-        ox=(Math.random()-0.5)*18*glitchC;
-        col='rgba(255,42,109,'+(a+0.2*glitchC).toFixed(3)+')';
-        if(Math.random()<0.2*glitchC)continue;
-      }
-      tctx.strokeStyle=col;
-      tctx.lineWidth=0.5;
+      // Titik Neuron
+      var glow = n1.r + Math.sin(n1.pulse) * 0.8;
+      tctx.fillStyle = 'rgba(' + n1.color + ', 0.9)';
+      tctx.shadowBlur = 10;
+      tctx.shadowColor = 'rgba(' + n1.color + ', 0.8)';
       tctx.beginPath();
-      tctx.moveTo(PB[i][0]+ox,PB[i][1]);
-      tctx.lineTo(VC[bi][0]+ox,VC[bi][1]);
-      tctx.stroke();
+      tctx.arc(n1.x, n1.y, Math.max(0.8, glow), 0, Math.PI * 2);
+      tctx.fill();
+      tctx.shadowBlur = 0;
     }
 
-    /* Nodes — same sizes as V10 */
-    VA.forEach(function(v,idx){
-      var isMag=idx%2===0;
-      tessDrawNode(tctx,v[0],v[1],3.8,
-        isMag?'#ff2a6d':'#05d9e8',
-        isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)',
-        0.7+0.3*Math.sin(time/400+idx));
-    });
-    VC.forEach(function(v,idx){
-      var isMag=(idx+1)%2===0;
-      tessDrawNode(tctx,v[0],v[1],1.8,
-        isMag?'#ff2a6d':'#05d9e8',
-        isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)',
-        (0.6+0.3*Math.sin(time/450+idx*1.3))*0.85);
-    });
-    PB.forEach(function(p,idx){
-      var isMag=idx%2===0;
-      tessDrawNode(tctx,p[0],p[1],0.9,
-        isMag?'#ff2a6d':'#05d9e8',
-        isMag?'rgba(255,42,109,0.9)':'rgba(5,217,232,0.9)',
-        0.3+0.7*(0.5+0.5*Math.sin(time/500+parts[idx].twPhase)));
-    });
-
-    if(progress<1){
+    if (progress < 1) {
       requestAnimationFrame(render);
-    }else{
-      finished=true;
-      window.removeEventListener('resize',onResize);
-      try{
-        sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));
-        sessionStorage.setItem('dm_collapsars_from','swallow');
-      }catch(e){}
-      location.href=targetUrl;
+    } else {
+      finished = true;
+      window.removeEventListener('resize', onResize);
+      try {
+        sessionStorage.setItem('dm_collapsars_t', String(typeof GARG !== 'undefined' && GARG && GARG.currentTime || 0));
+        sessionStorage.setItem('dm_collapsars_from', 'swallow');
+      } catch (e) {}
+      location.href = targetUrl;
     }
   }
   requestAnimationFrame(render);
 }
+
 function startSwallow(href){
   if(SW)return;
   if(typeof markWentToDumul==='function')markWentToDumul();
@@ -3693,8 +3508,54 @@ function scatterAsteroid(i,x,y){
   haptic(6);
   return true;
 }
+/* Bake a small set of rocky asteroid sprites once. Per-frame cost is then only
+   translate/rotate/drawImage (+ the cheap spring for kick/scatter). Visual
+   matches the previous live polygon+gradient path. */
+function ensureAsteroidSprites(){
+  if(AST_SPRITES&&AST_SPRITES.length)return AST_SPRITES;
+  var R=AST_SPRITE_R,pad=Math.ceil(R*1.55+6),size=pad*2,n=8,list=[];
+  for(var si=0;si<n;si++){
+    var sides=6+(si%5),seed=si*1.618+0.37,sc=document.createElement('canvas');
+    sc.width=sc.height=size;
+    var sg=sc.getContext('2d');
+    sg.translate(pad,pad);
+    /* Soft contact shadow baked into the sprite (was live shadowBlur). */
+    sg.shadowColor='rgba(0,0,0,.95)';
+    sg.shadowBlur=Math.max(1.5,R*1.15);
+    var rock=sg.createLinearGradient(-R,-R,R,R);
+    rock.addColorStop(0,'rgba(78,82,82,1)');
+    rock.addColorStop(.28,'rgba(38,40,40,1)');
+    rock.addColorStop(.68,'rgba(15,16,17,1)');
+    rock.addColorStop(1,'rgba(4,5,6,1)');
+    sg.fillStyle=rock;
+    sg.strokeStyle='rgba(3,4,5,1)';
+    sg.lineWidth=Math.max(.7,R*.10);
+    sg.beginPath();
+    for(var k=0;k<sides;k++){
+      var aa=k*Math.PI*2/sides;
+      var rr2=R*(.70+.38*Math.sin(k*9.71+seed)+.10*Math.cos(k*4.17+seed*1.7));
+      var px=Math.cos(aa)*rr2,py=Math.sin(aa)*rr2*.72;
+      if(k===0)sg.moveTo(px,py);else sg.lineTo(px,py);
+    }
+    sg.closePath();sg.fill();sg.stroke();
+    sg.shadowBlur=0;
+    /* Mineral facet + craters (same relative geometry as the old live path). */
+    sg.fillStyle='rgba(150,154,151,.18)';
+    sg.beginPath();sg.moveTo(-R*.58,-R*.08);sg.lineTo(-R*.12,-R*.55);sg.lineTo(R*.18,-R*.26);sg.lineTo(-R*.08,R*.02);sg.closePath();sg.fill();
+    sg.fillStyle='rgba(0,0,0,.88)';
+    sg.beginPath();sg.arc(R*.18,-R*.12,Math.max(.35,R*.15),0,6.283);sg.fill();
+    sg.beginPath();sg.arc(-R*.27,R*.18,Math.max(.28,R*.10),0,6.283);sg.fill();
+    sg.strokeStyle='rgba(180,185,182,.24)';sg.lineWidth=Math.max(.3,R*.045);
+    sg.beginPath();sg.moveTo(-R*.35,-R*.34);sg.lineTo(R*.22,-R*.48);sg.stroke();
+    list.push({c:sc,pad:pad,R:R});
+  }
+  AST_SPRITES=list;
+  return list;
+}
 function drawAsteroids(now){
   if(!AST.length)return;
+  var sprites=ensureAsteroidSprites();
+  var invR=1/AST_SPRITE_R;
   for(var i=0;i<AST.length;i++){
     var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
     var x=BH.x+Math.cos(t)*rr;
@@ -3711,38 +3572,14 @@ function drawAsteroids(now){
     if(a.kick&&now>a.kickUntil)a.kick=0;
     if(Math.abs(a.ox)+Math.abs(a.oy)<.12&&Math.abs(a.vx)+Math.abs(a.vy)<1.2){a.ox=a.oy=a.vx=a.vy=0;a.kick=0;}
     x+=a.ox;y+=a.oy;
-    var sides=6+(i%5),rot=a.rot+now*a.rs;
-    g.save();g.translate(x,y);g.rotate(rot);
-    g.globalAlpha=1;
-    /* Dense, opaque rocky debris: dark silhouette first, then restrained mineral highlights. */
-    g.shadowColor='rgba(0,0,0,.95)';g.shadowBlur=Math.max(1.5,sz*1.15);
-    var rock=g.createLinearGradient(-sz,-sz,sz,sz);
-    rock.addColorStop(0,'rgba(78,82,82,1)');
-    rock.addColorStop(.28,'rgba(38,40,40,1)');
-    rock.addColorStop(.68,'rgba(15,16,17,1)');
-    rock.addColorStop(1,'rgba(4,5,6,1)');
-    g.fillStyle=rock;
-    g.strokeStyle='rgba(3,4,5,1)';g.lineWidth=Math.max(.7,sz*.10);
-    g.beginPath();
-    for(var k=0;k<sides;k++){
-      var aa=k*Math.PI*2/sides;
-      var rr2=sz*(.70+.38*Math.sin(k*9.71+a.seed)+.10*Math.cos(k*4.17+a.seed*1.7));
-      var px=Math.cos(aa)*rr2,py=Math.sin(aa)*rr2*.72;
-      if(k===0)g.moveTo(px,py);else g.lineTo(px,py);
-    }
-    g.closePath();g.fill();g.stroke();
-    g.shadowBlur=0;
-
-    /* Uneven mineral facets and small craters make the rocks read as solid debris. */
-    g.fillStyle='rgba(150,154,151,.18)';
-    g.beginPath();g.moveTo(-sz*.58,-sz*.08);g.lineTo(-sz*.12,-sz*.55);g.lineTo(sz*.18,-sz*.26);g.lineTo(-sz*.08,sz*.02);g.closePath();g.fill();
-    g.fillStyle='rgba(0,0,0,.88)';
-    g.beginPath();g.arc(sz*.18,-sz*.12,Math.max(.35,sz*.15),0,6.283);g.fill();
-    if(sz>1.7){
-      g.beginPath();g.arc(-sz*.27,sz*.18,Math.max(.28,sz*.10),0,6.283);g.fill();
-    }
-    g.strokeStyle='rgba(180,185,182,.24)';g.lineWidth=Math.max(.3,sz*.045);
-    g.beginPath();g.moveTo(-sz*.35,-sz*.34);g.lineTo(sz*.22,-sz*.48);g.stroke();
+    var sp=sprites[(a.sprite|0)%sprites.length];
+    var scale=sz*invR;
+    var half=sp.pad*scale;
+    var rot=a.rot+now*a.rs;
+    g.save();
+    g.translate(x,y);
+    g.rotate(rot);
+    g.drawImage(sp.c,-half,-half,half*2,half*2);
     g.restore();
   }
 }
@@ -4169,8 +4006,12 @@ var lastFrameOK=performance.now();
 /* bootDone stays false until warm-up finishes. */
 var bootDone=false;
 function frame(now){
+  /* Capture generation at entry. If a watchdog/visibility restart bumped
+     renderGeneration while this callback was already queued, bail out so
+     we never run two concurrent loops. */
+  var gen=renderGeneration;
   renderRAF=0;
-  if(pageHidden)return;
+  if(pageHidden||gen!==renderGeneration)return;
   /* The whole frame is now one safety net: whatever throws, wherever, the
      loop always reschedules itself in the finally block below. A single
      bad frame can no longer freeze the page until a manual reload - at
@@ -4241,7 +4082,14 @@ function frame(now){
        repeating the same crash every frame forever. */
     PU.length=0;SN_BURSTS.length=0;
   }finally{
-    renderRAF=requestAnimationFrame(frame);
+    /* Only reschedule if this generation is still current and the tab is
+       visible. Stale RAF callbacks (after watchdog cancel + restart) exit
+       without queuing another frame. */
+    if(!pageHidden&&gen===renderGeneration){
+      renderRAF=requestAnimationFrame(frame);
+    }else{
+      renderRAF=0;
+    }
   }
 }
 
@@ -4251,34 +4099,89 @@ function startRenderLoop(){
   renderRAF=requestAnimationFrame(frame);
   if(window.__hub)window.__hub.ready=true;
 }
-/* Watchdog skipped while boot overlay is up. */
+/* Watchdog: if no frame completed for 1.5s, cancel any pending RAF and
+   bump generation so a stale callback cannot re-arm a second loop. */
 setInterval(function(){
   if(pageHidden||!bootDone)return;
   if(performance.now()-lastFrameOK>1500){
     try{buildSprite();}catch(e){}
-    renderRAF=0;
+    if(renderRAF){cancelAnimationFrame(renderRAF);renderRAF=0;}
+    renderGeneration++;
     startRenderLoop();
   }
 },1000);
 
 /* Stop only the visual render loop when the tab/page is hidden.
    Audio is intentionally NOT paused: the browser may choose to suspend
-   background media on its own, but this page never calls pause() here. */
+   background media on its own, but this page never calls pause() here.
+   On resume, shift every absolute performance.now()-based deadline/timestamp
+   by the hidden duration so transient FX (shockwaves, hyperspace streaks,
+   particles, cooldowns, telescope schedule) pick up where they left off. */
 document.addEventListener('visibilitychange',function(){
   var now=performance.now();
   pageHidden=!!document.hidden;
   if(pageHidden){
     hiddenAt=now;
     if(renderRAF){cancelAnimationFrame(renderRAF);renderRAF=0;}
+    renderGeneration++;
     return;
   }
   var pause=hiddenAt?Math.max(0,now-hiddenAt):0;
   if(pause){
+    /* Core animation clock + swallow transition */
     START+=pause;
     if(SW)SW.t0+=pause;
+
+    /* Particle / pulse / supernova burst timestamps */
     for(var i=0;i<PU.length;i++)PU[i].t+=pause;
     for(var j=0;j<SN_BURSTS.length;j++)SN_BURSTS[j].t+=pause;
+    for(var k=0;k<SS.length;k++)SS[k].t+=pause;
+
+    /* Transient FX introduced later: gravitational shockwaves + hyperspace streaks */
+    if(typeof BH_SHOCKWAVES!=='undefined'){
+      for(var bi=0;bi<BH_SHOCKWAVES.length;bi++)BH_SHOCKWAVES[bi].t0+=pause;
+    }
+    if(typeof WARP_STREAKS!=='undefined'){
+      for(var wi=0;wi<WARP_STREAKS.length;wi++)WARP_STREAKS[wi].t0+=pause;
+    }
+
+    /* Absolute "until / next" deadlines */
     if(glitchUntil)glitchUntil+=pause;
+    if(tapFlash&&tapFlash.until)tapFlash.until+=pause;
+    if(typeof lastSignalGlowUntil!=='undefined'&&lastSignalGlowUntil)lastSignalGlowUntil+=pause;
+    if(nextSS)nextSS+=pause;
+    if(nextPU)nextPU+=pause;
+    if(typeof TELESCOPE!=='undefined'){
+      if(TELESCOPE.next)TELESCOPE.next+=pause;
+      if(TELESCOPE.last)TELESCOPE.last+=pause;
+    }
+
+    /* Asteroid scatter spring: keep kick window + integration clock aligned */
+    if(typeof AST!=='undefined'){
+      for(var ai=0;ai<AST.length;ai++){
+        if(AST[ai].kickUntil)AST[ai].kickUntil+=pause;
+        if(AST[ai]._lastNow)AST[ai]._lastNow+=pause;
+      }
+    }
+
+    /* Supernova per-star cooldown map */
+    if(typeof SN_COOLDOWN!=='undefined'){
+      for(var ck in SN_COOLDOWN){
+        if(Object.prototype.hasOwnProperty.call(SN_COOLDOWN,ck))SN_COOLDOWN[ck]+=pause;
+      }
+    }
+
+    /* Audio-viz beat/glitch windows (visual only; playback continues) */
+    if(typeof AV!=='undefined'){
+      if(AV.glitchUntil)AV.glitchUntil+=pause;
+      if(AV.lastBeatT)AV.lastBeatT+=pause;
+    }
+
+    /* Delta-time baselines so first visible frame does not jump */
+    if(typeof CF!=='undefined'&&CF.lastNow)CF.lastNow+=pause;
+    if(lastHoverAt)lastHoverAt+=pause;
+    if(lastActivity)lastActivity+=pause;
+    if(lastFrameOK)lastFrameOK+=pause;
   }
   hiddenAt=0;
   startRenderLoop();
@@ -5344,13 +5247,13 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
 })();
 </script>
 
-<!-- GLITCH TESSERACT WARP OVERLAY -->
+<!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
   <canvas id="tesseract-canvas"></canvas>
   <div class="tesseract-scan"></div>
   <div class="tesseract-ui">
-    <div class="tesseract-title">SINGULARITY // TESSERACT WARP</div>
-    <div class="tesseract-status" id="tesseract-status">&gt; INITIALIZING QUANTUM FOLD...</div>
+    <div class="tesseract-title">DUMUL // NEURAL INTERFERENCE</div>
+    <div class="tesseract-status" id="tesseract-status">&gt; INITIALIZING NEURAL CORE...</div>
     <div class="tesseract-bar"><div id="tesseract-progress"></div></div>
   </div>
 </div>
