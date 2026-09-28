@@ -123,8 +123,9 @@ body.sw{pointer-events:none}
 #owl-source{position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;width:34px;height:34px;display:grid;place-items:center;color:rgba(184,198,214,.46);text-decoration:none;border:1px solid rgba(110,229,255,.12);border-radius:50%;background:rgba(6,11,17,.32);backdrop-filter:blur(4px);transition:color .2s,border-color .2s,transform .2s,box-shadow .2s}
 #owl-source:hover,#owl-source:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);box-shadow:0 0 16px rgba(110,229,255,.16);transform:translateY(-1px)}
 #owl-source svg{width:19px;height:19px}
-#secret-msg{position:fixed;left:50%;top:50%;z-index:30;transform:translate(-50%,-50%);font:600 9px/1 'Courier New',monospace;letter-spacing:.08em;color:#eafcff;text-shadow:0 0 3px #fff,0 0 8px rgba(110,229,255,.9),0 0 16px rgba(110,229,255,.55);opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;padding:5px 7px;border:1px solid rgba(110,229,255,.28);border-radius:3px;background:rgba(2,7,12,.72);box-shadow:0 0 12px rgba(110,229,255,.12),inset 0 0 9px rgba(110,229,255,.04)}
+#secret-msg{position:fixed;left:50%;top:50%;z-index:30;transform:translate(-50%,-50%);font:600 9px/1.45 'Courier New',monospace;letter-spacing:.06em;color:#eafcff;text-shadow:0 0 3px #fff,0 0 8px rgba(110,229,255,.9),0 0 16px rgba(110,229,255,.55);opacity:0;pointer-events:none;transition:opacity .25s;white-space:normal;max-width:min(88vw,320px);text-align:center;padding:6px 9px;border:1px solid rgba(110,229,255,.28);border-radius:3px;background:rgba(2,7,12,.72);box-shadow:0 0 12px rgba(110,229,255,.12),inset 0 0 9px rgba(110,229,255,.04)}
 #secret-msg.on{opacity:1}
+#secret-msg.tele-short{white-space:nowrap;max-width:none}
 #terminal{position:fixed;left:50%;bottom:74px;z-index:10;width:min(88vw,430px);padding:14px 16px;border:1px solid rgba(110,229,255,.38);background:rgba(3,8,12,.92);box-shadow:0 0 30px rgba(110,229,255,.12),inset 0 0 22px rgba(110,229,255,.035);font:11px/1.65 'Courier New',monospace;color:#8eeeff;opacity:0;transform:translate(-50%,18px);pointer-events:none;transition:opacity .35s,transform .35s}
 #terminal.on{opacity:1;transform:translate(-50%,0)}
 #terminal .term-title{color:#eaf6ff;letter-spacing:.14em}
@@ -148,7 +149,7 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   /* Keep the transient Konami override inside narrow phone viewports.
      The desktop minimum font-size (15px) plus wide letter-spacing can make
      this one-line message exceed a 360px screen. */
-  #secret-msg{font-size:8px;letter-spacing:.06em;padding:4px 6px}
+  #secret-msg{font-size:8px;letter-spacing:.05em;padding:5px 7px;max-width:min(90vw,280px)}
   /* Compact portals so DUMUL never covers interactive stars (Sirius etc.) */
   .portal{margin-top:-16px}
   .portal .lab{padding:4px 7px}
@@ -649,11 +650,11 @@ body.observe-mode .portal,
 body.observe-mode .cap,
 body.observe-mode #signal-fragment,
 body.observe-mode #cons-archive,
-body.observe-mode #secret-msg,
 body.observe-mode #terminal,
 body.observe-mode #sr-badge{
   opacity:0!important;pointer-events:none!important;visibility:hidden!important;
 }
+/* Telescope voice stays visible in observation mode (sky interaction). */
 body.observe-mode #mode-cluster{right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 body.observe-mode #mode-observe{opacity:1!important;visibility:visible!important;pointer-events:auto!important}
 body.observe-mode #mode-silence{display:none!important}
@@ -1018,27 +1019,168 @@ function showSecret(text,ms){
   el.textContent=text;el.classList.add('on');
   el._t=setTimeout(function(){el.classList.remove('on');},ms||2000);
 }
-function showSecretSequence(){
-  var el=$('#secret-msg');if(!el)return;
-  clearTimeout(el._t);clearTimeout(el._type);
-  el.dataset.type='telescope'; /* Telescope voice — track with placeSecretMsg each frame */
-  el.classList.add('on');el.textContent='';
-  placeSecretMsg();
+/* ---------- Telescope voice: large message pool + anti-repeat ---------- */
+var TELE_SCOPE_MESSAGES=[
+  /* WARM / HUMAN */
+  "Hello, Friend...","You came back.","Still looking up?","I knew someone would find this.",
+  "Hey... you're still here.","Nice to see you again.","Someone is listening.","Thanks for staying.",
+  "Welcome back, observer.","I was wondering when you'd return.","Good to see you again.",
+  "You're still watching the sky.","The sky noticed you.","Don't mind me. Just watching.","It's quiet up here.",
+  /* COSMIC / MYSTERIOUS */
+  "Signal received.","Are you still out there?","Something moved between the stars.","The sky remembers.",
+  "There was a signal here once.","Distance is only a number.","We are closer than we look.",
+  "Do you hear the static?","The stars are not silent.","Transmission incomplete...","Searching for a response...",
+  "Signal strength: uncertain.","Something is transmitting.","I think something heard us.",
+  "The signal is getting weaker.","There's something beyond the noise.","The frequency is familiar.",
+  "Someone is broadcasting from somewhere.","The stars keep their secrets.","Maybe the universe is listening too.",
+  /* SLIGHTLY WEIRD */
+  "Oh. You found me.","Wrong telescope. Try again.","I wasn't expecting visitors.",
+  "You shouldn't be able to see this.","...did you hear that?","Please remain where you are.",
+  "Someone else is watching too.","This signal wasn't meant for you.","Don't look away yet.",
+  "Nothing happened. Probably.","Why are you still clicking?","I can see you looking.",
+  "That was not supposed to happen.","Please ignore that.","We're going to pretend that didn't happen.",
+  "Interesting...","That's new.","Huh.","I wasn't ready for that.","Okay. One more time.",
+  /* DUMUL / LYRICAL */
+  "Somewhere between noise and silence...","A little light survives the distance.",
+  "We leave pieces of ourselves in the static.","For a moment, the universe felt close.",
+  "Maybe being lost is another way of being found.","The signal fades. The feeling doesn't.",
+  "Not every transmission needs an answer.","Some things are meant to drift.","Stay a little longer.",
+  "Until the signal disappears.","Somewhere, something is still glowing.","The silence has its own frequency.",
+  "Maybe the distance was necessary.","A signal is just a memory traveling through space.",
+  "Somewhere between here and nowhere...","The light arrived late. But it arrived.",
+  "Even silence leaves a trace.","The universe is very good at keeping secrets.",
+  /* QUANTUM BRAINROT */
+  "Hmm... if a particle can be everywhere... why can't I find my keys?",
+  "Calculating probability... 73% chance I'm wrong.","I put the cat in the box. The cat filed a complaint.",
+  "Schrödinger's cat is both alive and asking for dinner.",
+  "According to quantum mechanics... I have no idea what I'm doing.",
+  "The wave function collapsed. So did my motivation.","Trying to solve the universe... please wait.",
+  "Quantum state: confused.","Superposition detected. Decision still pending.",
+  "I observed the particle. Now it knows I'm watching. Awkward.","The particle was here a second ago.",
+  "Quantum uncertainty detected.","Reality appears to be loading.","The universe refuses to pick a state.",
+  "Observation changed everything. Again.","I think the cat knows something.",
+  /* GÖDEL MODE */
+  "Gödel says this system cannot prove everything.","Unfortunately, I can't even prove I had breakfast.",
+  "Attempting to prove consistency...","Proof failed. The proof is questioning itself.",
+  "This statement is probably fine. Probably.","If this sentence is true, I'm still confused.",
+  "The theorem is incomplete. So is my sleep schedule.","Gödel has entered the chat.",
+  "There are things this telescope cannot prove.","There are also things this telescope forgot to prove.",
+  "Attempting self-reference...","This system contains statements it cannot prove.",
+  "I found the limit of the system.","The proof was valid until I started reading it.",
+  "Consistency check... emotionally unstable.","Mathematics has questions too.",
+  /* FORMULA MODE */
+  "E = mc²... therefore... snack?","∫(cosmic nonsense) dx = more cosmic nonsense.",
+  "Σ(stars) = too many to count.","lim(t→∞) motivation = 0",
+  "Δx · Δp ≥ ħ/2 ... Δsleep · Δdeadline ≥ ???","F = ma. I have F. Where is my a?",
+  "x = ?","Solving for x... x has left the universe.","Equation detected. Solution not detected.",
+  "ERROR: mathematics exceeded available brain cells.","Calculating...","Recalculating...",
+  "Equation unstable.","Formula accepted. Understanding pending.","Mathematical anomaly detected.",
+  "The numbers look suspicious.","I think I divided by zero.","Please don't ask what the equation means.",
+  "The answer is somewhere in here.","x appears to be emotionally unavailable.",
+  /* TELESCOPE DEEP THOUGHT */
+  "I looked into the universe. The universe looked back.",
+  "I asked the stars for an answer. They sent static.",
+  "Maybe the answer is 42. Maybe I just like 42.",
+  "If reality is simulated... who forgot to patch the bugs?",
+  "Calculating the meaning of existence...","...","Still calculating.",
+  "The universe has approximately 10⁸⁰ atoms. I have approximately 0 brain cells left.",
+  "Everything is relative. Except my confusion.","Time is an illusion. This loading animation isn't.",
+  "Maybe we're just someone's science project.","The universe is huge. My attention span isn't.",
+  "I have stared into the abyss. It needs better lighting.","The cosmos is complicated.",
+  "I understand approximately 4% of this.","The remaining 96% is probably important.",
+  "Reality seems oddly well-rendered.","I have several questions for the universe.",
+  "Unfortunately, the universe has no customer support.",
+  /* META / SELF-AWARE */
+  "Are you sure you want to observe this?","Observation logged.","Observer detected.",
+  "Observer has returned.","Signal logged.","Transmission logged.","Another observation...",
+  "You keep doing that.","That's the third time.","I noticed.","You really like this telescope.",
+  "I'm starting to recognize you.","This interaction has been recorded.","The telescope approves.",
+  "The telescope has no opinion.","Actually, it might have an opinion.","Please continue observing.",
+  "No further instructions.","Carry on.",
+  /* RARE / EASTER (still in pool; ultra sequence is separate) */
+  "I remember this frequency.","You came back too soon.","Transmission #02 detected.",
+  "Observer recognized.","...okay, now you're making me nervous.","Good night, little observer.",
+  "Schrödinger's cat has observed YOU.","Gödel couldn't prove this message shouldn't exist.",
+  "The equation was correct. The universe wasn't.","I solved the equation. Please don't ask me how.",
+  "Quantum mechanics makes sense. I don't.","I think I understand the universe now.","...never mind."
+];
+var teleRecent=[];
+var teleClicks=0;
+var teleNextUltra=12+((Math.random()*9)|0); /* first ultra after ~12–20 clicks */
+var TELE_RECENT_CAP=5;
+
+function telePickMessage(){
+  /* Anti-repeat: exclude the last TELE_RECENT_CAP messages. */
+  var pool=[],i,m;
+  for(i=0;i<TELE_SCOPE_MESSAGES.length;i++){
+    m=TELE_SCOPE_MESSAGES[i];
+    if(teleRecent.indexOf(m)<0)pool.push(m);
+  }
+  if(!pool.length){teleRecent.length=0;pool=TELE_SCOPE_MESSAGES.slice();}
+  m=pool[(Math.random()*pool.length)|0];
+  teleRecent.push(m);
+  if(teleRecent.length>TELE_RECENT_CAP)teleRecent.shift();
+  return m;
+}
+
+function teleTypeText(el,text,done,msPerChar){
+  var i=0,speed=msPerChar||(text.length>42?32:48);
+  el.textContent='';
+  function tick(){
+    if(i<text.length){
+      el.textContent+=text.charAt(i++);
+      el._type=setTimeout(tick,speed);
+      return;
+    }
+    if(typeof done==='function')done();
+  }
+  tick();
+}
+
+function showUltraLoveSequence(el){
+  /* Ultra-rare: original memory sequence — telescope remembers you. */
+  el.classList.remove('tele-short');
   var first='Hello, I love You...',finalText='Hello, Friend...';
-  var i=0,phase=0;
+  var i=0;
   function typeFirst(){
     if(i<first.length){el.textContent+=first.charAt(i++);el._type=setTimeout(typeFirst,58);return;}
     el._type=setTimeout(erase,520);
   }
   function erase(){
     if(el.textContent.length>6){el.textContent=el.textContent.slice(0,-1);el._type=setTimeout(erase,42);return;}
-    phase=1;i=6;el._type=setTimeout(typeFinal,280);
+    i=6;el._type=setTimeout(typeFinal,280);
   }
   function typeFinal(){
     if(i<finalText.length){el.textContent+=finalText.charAt(i++);el._type=setTimeout(typeFinal,58);return;}
     el._t=setTimeout(function(){el.classList.remove('on');},5200);
   }
+  el.textContent='';
   typeFirst();
+}
+
+function showSecretSequence(){
+  var el=$('#secret-msg');if(!el)return;
+  clearTimeout(el._t);clearTimeout(el._type);
+  el.dataset.type='telescope'; /* Telescope voice — track with placeSecretMsg each frame */
+  el.classList.add('on');
+  el.textContent='';
+  placeSecretMsg();
+
+  teleClicks++;
+  /* Ultra-rare love→friend sequence every ~12–20 clicks (feels like memory). */
+  if(teleClicks>=teleNextUltra){
+    teleNextUltra=teleClicks+12+((Math.random()*9)|0);
+    showUltraLoveSequence(el);
+    return;
+  }
+
+  var msg=telePickMessage();
+  var short=msg.length<=28;
+  el.classList.toggle('tele-short',short);
+  var hold=Math.min(7000,Math.max(2400,1800+msg.length*42));
+  teleTypeText(el,msg,function(){
+    el._t=setTimeout(function(){el.classList.remove('on');},hold);
+  }, short?52:34);
 }
 function fadeTo(a,vol,ms){
   clearInterval(a._f);var v0=a.volume,t0=performance.now();
@@ -2221,7 +2363,12 @@ var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
 /* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
 var AST_SPRITES=null,AST_SPRITE_R=24;
 var bgCanvas=null,bgCtx=null,bgDirty=true;
-var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null};
+var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null,sx:0,sy:0,hitR:40};
+function telescopeHitRadius(){
+  /* Generous mobile-friendly target; scales a bit with viewport. */
+  var base=(typeof touchMode!=='undefined'&&touchMode)?48:36;
+  return Math.max(base,Math.min(64,(W||360)*0.09));
+}
 function layout(){
   if(SW)return;
   W=innerWidth;H=innerHeight;DPR=IS_POTATO?1:Math.min(window.devicePixelRatio||1,2);
@@ -2395,6 +2542,12 @@ function layout(){
   CAPS.canis.style.transform='translate('+Math.round((cm.minX+cm.maxX)/2-48)+'px,'+Math.round(cm.maxY+18)+'px)';
   if(tau&&CAPS.taurus)CAPS.taurus.style.transform='translate('+Math.round((tau.minX+tau.maxX)/2-28)+'px,'+Math.round(tau.maxY+18)+'px)';
   if(!drag.on){BH.x=BH.hx;BH.y=BH.hy;}
+  /* Keep telescope inside the new viewport after rotation/URL-bar resize. */
+  if(TELESCOPE&&TELESCOPE.init){
+    var mX=Math.max(48,W*.08),mY=Math.max(56,H*.10);
+    TELESCOPE.x=Math.max(mX,Math.min(W-mX,TELESCOPE.x||W*.5));
+    TELESCOPE.y=Math.max(mY,Math.min(H-mY,TELESCOPE.y||H*.5));
+  }
   var bhEl=$('#bh');bhEl.style.width=Math.round(BH.R*16)+'px';bhEl.style.height=Math.round(BH.R*10)+'px';
   var bhp=camBH();
   bhEl.style.transform='translate('+Math.round(bhp[0]-BH.R*8)+'px,'+Math.round(bhp[1]-BH.R*5)+'px)';
@@ -3655,11 +3808,13 @@ function drawFloatingTelescope(now){
     TELESCOPE.y+=TELESCOPE.vy*dt;
     TELESCOPE.ang+=TELESCOPE.va*dt;
 
-    /* Toroidal wrap: the same object re-enters from the opposite edge. */
-    if(TELESCOPE.x<-110)TELESCOPE.x=W+110;
-    else if(TELESCOPE.x>W+110)TELESCOPE.x=-110;
-    if(TELESCOPE.y<-110)TELESCOPE.y=H+110;
-    else if(TELESCOPE.y>H+110)TELESCOPE.y=-110;
+    /* Soft bounce inside the viewport — avoids the old toroidal teleport that
+       made the telescope flicker/jump on mobile near the edges. */
+    var mX=Math.max(48,W*.08),mY=Math.max(56,H*.10);
+    if(TELESCOPE.x<mX){TELESCOPE.x=mX;TELESCOPE.vx=Math.abs(TELESCOPE.vx);TELESCOPE.tx=Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
+    else if(TELESCOPE.x>W-mX){TELESCOPE.x=W-mX;TELESCOPE.vx=-Math.abs(TELESCOPE.vx);TELESCOPE.tx=-Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
+    if(TELESCOPE.y<mY){TELESCOPE.y=mY;TELESCOPE.vy=Math.abs(TELESCOPE.vy);TELESCOPE.ty=Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
+    else if(TELESCOPE.y>H-mY){TELESCOPE.y=H-mY;TELESCOPE.vy=-Math.abs(TELESCOPE.vy);TELESCOPE.ty=-Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
   }
 
   /* margin used by edge-wrap ghost copies during draw (all modes). */
@@ -3688,6 +3843,16 @@ function drawFloatingTelescope(now){
     if(TELESCOPE.y>H-margin&&TELESCOPE.x<margin)copies.push([bx+W,by-H]);
     if(TELESCOPE.y>H-margin&&TELESCOPE.x>W-margin)copies.push([bx-W,by-H]);
   }
+
+  /* Cache the on-screen position of the primary body for hit-testing.
+     Must match what the user actually sees (lens + BH), not raw world coords. */
+  var primaryTQ=SW?swallowedTelescope:lens(TELESCOPE.x,TELESCOPE.y);
+  if(primaryTQ&&primaryTQ[0]!=null){
+    TELESCOPE.sx=primaryTQ[0];TELESCOPE.sy=primaryTQ[1];
+  }else{
+    TELESCOPE.sx=TELESCOPE.x;TELESCOPE.sy=TELESCOPE.y;
+  }
+  TELESCOPE.hitR=telescopeHitRadius();
 
   for(var ci=0;ci<copies.length;ci++){
     var tqx=TELESCOPE.x+copies[ci][0],tqy=TELESCOPE.y+copies[ci][1];
@@ -4519,17 +4684,28 @@ function pleiadesHitAt(px,py){
   return null;
 }
 function telescopeScreenPos(){
+  /* Prefer last drawn screen position (accounts for gravitational lens). */
+  if(TELESCOPE.sx||TELESCOPE.sy)return [TELESCOPE.sx,TELESCOPE.sy];
   var q=lens(TELESCOPE.x,TELESCOPE.y);
-  /* If heavily distorted by the lens/horizon, still return the physical telescope pos. */
   if(!q)return [TELESCOPE.x,TELESCOPE.y];
   return [q[0],q[1]];
+}
+function telescopeHitAt(px,py){
+  var r=TELESCOPE.hitR||telescopeHitRadius();
+  var tp=telescopeScreenPos();
+  if(tp&&Math.hypot(px-tp[0],py-tp[1])<r)return true;
+  return false;
 }
 function placeSecretMsg(){
   var el=$('#secret-msg'),p=telescopeScreenPos();
   if(!el||!p)return;
-  /* Position the message just above the telescope (24px offset upward). */
-  el.style.left=Math.round(p[0])+'px';
-  el.style.top=Math.round(p[1]-24)+'px';
+  /* Keep the bubble fully on-screen (especially near mobile edges). */
+  var pad=12,maxW=Math.min(320,(W||innerWidth||360)*0.88);
+  var x=p[0],y=p[1]-28;
+  x=Math.max(pad+maxW*0.5,Math.min((W||innerWidth)-pad-maxW*0.5,x));
+  y=Math.max(pad+18,Math.min((H||innerHeight)-pad-18,y));
+  el.style.left=Math.round(x)+'px';
+  el.style.top=Math.round(y)+'px';
 }
 function drawPulses(now,age){
   if(reduce||IS_POTATO||age<4||SW)return;
@@ -5236,8 +5412,7 @@ function constellationTargetAt(x,y){
       if(d<Math.max(14,s.r*4.5))found=true;
     });
   });
-  var tp=telescopeScreenPos();
-  if(tp&&Math.hypot(x-tp[0],y-tp[1])<24)found=true;
+  if(telescopeHitAt(x,y))found=true;
   return found;
 }
 function beginBHDrag(e){
@@ -5597,9 +5772,13 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
 },{passive:true});
 document.addEventListener('pointerdown',function(e){
   if(SW)return;
-  var tp=telescopeScreenPos();
-  if(tp&&Math.hypot(e.clientX-tp[0],e.clientY-tp[1])<24){
+  if(telescopeHitAt(e.clientX,e.clientY)){
     e.stopPropagation();
+    /* Cancel any sky-pan that capture-phase may have started on a near miss. */
+    if(skyDrag.on&&skyDrag.pid===e.pointerId){
+      skyDrag.on=false;
+      try{cv.releasePointerCapture(e.pointerId);}catch(err){}
+    }
     haptic(8);showSecretSequence();
     placeSecretMsg();
   }
