@@ -2901,7 +2901,7 @@ function dmNeuralDraw(g,W,H,net,t){
    Visualizer yang sama dipakai sebagai foreground transition. Audio timeline
    tetap milik GARG; tidak ada audio kedua dan tidak ada seek manual berbasis timer.
 */
-var DM_TR_CTX=null,DM_TR_AN=null,DM_TR_SPEC=null,DM_TR_PREV=null,DM_TR_LEVEL=0,DM_TR_FLUX=0,DM_TR_BEAT=0,DM_TR_RAF=0,DM_TR_NET=null;
+var DM_TR_CTX=null,DM_TR_AN=null,DM_TR_SPEC=null,DM_TR_PREV=null,DM_TR_LEVEL=0,DM_TR_FLUX=0,DM_TR_BEAT=0,DM_TR_RAF=0,DM_TR_NET=null,DM_TR_MESH_LAST=0;
 function dmTransitionGraph(){
   if(DM_TR_CTX){try{if(DM_TR_CTX.state!=='running'&&DM_TR_CTX.resume)DM_TR_CTX.resume();}catch(e){}return true;}
   var AC=window.AudioContext||window.webkitAudioContext;
@@ -2944,14 +2944,84 @@ function dmTransitionAnalyse(now){
   e/=Math.max(1,el)*255;
   DM_TR_LEVEL+=(Math.max(0,Math.min(1,(e-.22)*2.4))-DM_TR_LEVEL)*.35;
 }
+/* ---------- Shared hero spectrum mesh ----------
+   This is the SAME 22-node mesh used by the React spectrum visualizer in dumul.html.
+   During the swallow we run the identical motion model, then hand the live node state
+   to dumul.html through sessionStorage so the first DUMUL frame continues instead of
+   rebuilding a second/random network. */
+function dmSpectrumMeshBuild(W,H){
+  var p=[],i;
+  function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  var R=rng(230917);
+  for(i=0;i<22;i++){
+    var c=R()>.62;
+    var x=W*.15+R()*W*.7+(R()-.5)*20;
+    var y=H*.5+(R()-.5)*H*.7;
+    p.push({x:x,y:y,ox:x,oy:y,vx:(R()-.5)*.8,vy:(R()-.5)*.5,r:R()*2.2+.6,
+      color:c?'#ff7ad9':'#6ee5ff',glow:c?'rgba(255,122,217,0.9)':'rgba(110,229,255,0.95)',phase:R()*Math.PI*2,birth:0,reveal:0});
+  }
+  /* Cinematic reveal order: the same 22 nodes as DUMUL, but materialize
+     from left → right with a tiny deterministic stagger. The final geometry
+     is unchanged; only its visibility is staged during the transition. */
+  var order=p.map(function(_,idx){return idx;});
+  order.sort(function(a,b){return p[a].x-p[b].x || a-b;});
+  for(i=0;i<order.length;i++){
+    p[order[i]].birth=240+i*142+(p[order[i]].phase%1)*70;
+  }
+  return p;
+}
+function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now){
+  if(!p)return;
+  var dt=DM_TR_MESH_LAST?Math.min(32,Math.max(0,now-DM_TR_MESH_LAST))/16.666:1;
+  DM_TR_MESH_LAST=now;
+  var s=phase>0?phase:now*.001,f=.7+.3*Math.sin(s*2.7)+.15*Math.sin(s*7.3+1.2),gg=Math.max(.4,Math.min(1,f));
+  var v=beat?(3+level*9):0,K=v?(Math.random()-.5)*24:0,i,j;
+  p.forEach(function(h){
+    h.x+=h.vx*dt+Math.sin(s+h.phase)*.2*dt;
+    h.y+=h.vy*dt+Math.cos(s*.7+h.phase)*.18*dt;
+    var dx=h.ox-h.x,dy=h.oy-h.y;
+    h.vx+=dx*.008*dt;h.vy+=dy*.008*dt;h.vx*=Math.pow(.985,dt);h.vy*=Math.pow(.985,dt);
+    if(h.x<0)h.x=0;if(h.x>W)h.x=W;
+  });
+  g.save();g.globalAlpha=gg;g.lineWidth=.6;
+  /* Mesh formation: links only become visible after both endpoints have
+     materialized. The draw point also travels along each link, giving a
+     subtle 'signal is building the network' effect without extra objects. */
+  for(i=0;i<p.length;i++)for(j=i+1;j<p.length;j++){
+    var a=p[i],b=p[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(d<110){
+      var edgeReveal=Math.min(a.reveal||0,b.reveal||0);
+      var al=(1-d/110)*.35*gg*edgeReveal;if(al<.012)continue;
+      g.beginPath();g.globalAlpha=al;g.strokeStyle=d<50?'#e6f9ff':a.color===b.color?a.color:'#8cf0ff';
+      g.moveTo(a.x+K*.2,a.y);g.lineTo(b.x+K*.2,b.y);g.stroke();
+      if(edgeReveal>0.08&&edgeReveal<.98){
+        var q=edgeReveal,px=a.x+(b.x-a.x)*q+K*.2,py=a.y+(b.y-a.y)*q;
+        g.globalAlpha=Math.min(.85,al*3.2);g.fillStyle=a.color;g.shadowBlur=8;g.shadowColor=a.glow;
+        g.beginPath();g.arc(px,py,1.35,0,Math.PI*2);g.fill();g.shadowBlur=0;
+      }
+    }
+  }
+  p.forEach(function(h){
+    /* 420ms birth ramp: tiny spark → solid node. */
+    var raw=(phase*1000-h.birth)/420;
+    var rev=Math.max(0,Math.min(1,raw));
+    rev=rev*rev*(3-2*rev);
+    h.reveal=rev;
+    if(rev<=.002)return;
+    var y=.7+.3*Math.sin(s*3+h.phase),xx=h.x+(v&&Math.random()>.7?K:0);
+    var pulse=1+level*1.6*rev,flash=(rev<.35?(1-rev)*3.2:0);
+    g.beginPath();g.globalAlpha=gg*y*rev;g.fillStyle=h.color;g.shadowBlur=10*rev+flash;g.shadowColor=h.glow;
+    g.arc(xx,h.y,(h.r+flash*.18)*y*pulse,0,Math.PI*2);g.fill();g.shadowBlur=0;
+    g.beginPath();g.globalAlpha=gg*rev;g.fillStyle='#ffffff';g.arc(h.x,h.y,h.r*.35*rev,0,Math.PI*2);g.fill();
+  });
+  g.restore();
+}
 function dmTransitionSpectrum(g,W,H,t,fade){
   var lev=DM_TR_LEVEL,beat=(DM_TR_BEAT&&performance.now()-DM_TR_BEAT<150)?1:0;
-  /* Mesh continuity layer: the neural network must be visible DURING the
-     Gargantua handoff, not only exist as an unused builder. Render it first,
-     then lay the beat-reactive spectrum on top. */
-  if(!DM_TR_NET)DM_TR_NET=dmNeuralBuild(W,H);
-  dmNeuralDraw(g,W,H,DM_TR_NET,t);
-  /* The mesh renderer clears the canvas. Everything below is additive. */
+  if(!DM_TR_NET)DM_TR_NET=dmSpectrumMeshBuild(W,H);
+  /* Exact hero-spectrum mesh first; the existing transition spectrum stays additive on top. */
+  var phase=(typeof GARG!=='undefined'&&GARG&&!isNaN(GARG.currentTime))?GARG.currentTime:0;
+  dmSpectrumMeshDraw(g,W,H,DM_TR_NET,phase,lev,beat,performance.now());
   /* Ambient center glow — deliberately matches the DUMUL hero palette. */
   var glow=g.createRadialGradient(W*.5,H*.49,0,W*.5,H*.49,Math.max(W,H)*.46);
   glow.addColorStop(0,'rgba(110,229,255,'+(0.07*fade+lev*.06*fade).toFixed(3)+')');
@@ -2962,40 +3032,31 @@ function dmTransitionSpectrum(g,W,H,t,fade){
   var bands=3,pts=Math.max(44,Math.min(92,Math.floor(W/8))),i,b,y,x,amp,sp,u;
   for(b=0;b<bands;b++){
     g.beginPath();
-    var base=H*(.43+b*.075),phase=t*(.00105+b*.00018)+b*1.7;
+    var base=H*(.43+b*.075),phase2=t*(.00105+b*.00018)+b*1.7;
     for(i=0;i<=pts;i++){
       u=i/pts;x=u*W;
       var idx=1+Math.min(DM_TR_SPEC?DM_TR_SPEC.length-1:1,Math.floor(Math.pow(Math.abs(u-.5)*2,1.7)*150));
       sp=DM_TR_SPEC?DM_TR_SPEC[idx]/255:0;
       amp=(5+b*2)+(sp*24)*(b===0?1:.72)+lev*(b===0?12:7);
-      y=base+Math.sin(u*10.5+phase)*amp*.34+Math.sin(u*25-phase*1.4+b)*amp*.16;
+      y=base+Math.sin(u*10.5+phase2)*amp*.34+Math.sin(u*25-phase2*1.4+b)*amp*.16;
       if(beat)y+=Math.sin(u*Math.PI*10+t*.008)*(7+lev*12);
       if(i===0)g.moveTo(x,y);else g.lineTo(x,y);
     }
     g.strokeStyle=b===1?'rgba(255,122,217,'+(0.62*fade).toFixed(3)+')':'rgba(110,229,255,'+((.58+b*.06)*fade).toFixed(3)+')';
     g.lineWidth=b===0?1.7:1.0;g.shadowBlur=12+lev*10;g.shadowColor=b===1?'rgba(255,122,217,.5)':'rgba(110,229,255,.5)';g.stroke();g.shadowBlur=0;
   }
-  /* Frequency-driven particles / glitch shards. */
   var count=Math.min(42,Math.max(18,Math.floor(W/14)));
   for(i=0;i<count;i++){
     u=(i+.5)/count;
     var j=1+Math.min(DM_TR_SPEC?DM_TR_SPEC.length-1:1,Math.floor(Math.pow(Math.abs(u-.5)*2,1.8)*130));
     var sv=DM_TR_SPEC?DM_TR_SPEC[j]/255:0;
-    var px=u*W, py=H*.5+Math.sin(t*.0013+i*1.73)*H*.17;
-    var rr=.8+sv*2.4+lev*1.6;
+    var px=u*W,py=H*.5+Math.sin(t*.0013+i*1.73)*H*.17,rr=.8+sv*2.4+lev*1.6;
     if(beat&&i%3===0)px+=(i%2?-1:1)*(5+lev*14);
-    g.globalAlpha=(.24+sv*.5+lev*.22)*fade;
-    g.fillStyle=i%4===0?'#ff7ad9':'#6ee5ff';g.shadowBlur=8+sv*8;g.shadowColor=g.fillStyle;
+    g.globalAlpha=(.24+sv*.5+lev*.22)*fade;g.fillStyle=i%4===0?'#ff7ad9':'#6ee5ff';g.shadowBlur=8+sv*8;g.shadowColor=g.fillStyle;
     g.fillRect(px-rr*.5,py-rr*.5,rr*(1+sv*2),Math.max(1,rr*.55));
   }
   g.globalAlpha=1;
-  /* Scanline/glitch burst only on detected beat. */
-  if(beat){
-    for(i=0;i<4;i++){
-      y=Math.random()*H;g.fillStyle=(i&1)?'rgba(255,122,217,.16)':'rgba(110,229,255,.16)';
-      g.fillRect(0,y,W,1+Math.random()*4);
-    }
-  }
+  if(beat){for(i=0;i<4;i++){y=Math.random()*H;g.fillStyle=(i&1)?'rgba(255,122,217,.16)':'rgba(110,229,255,.16)';g.fillRect(0,y,W,1+Math.random()*4);}}
 }
 function dmTransitionStart(){
   if(DM_TR_RAF)return;
@@ -3025,7 +3086,7 @@ function startTesseractWarp(targetUrl) {
 
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var W, H, net;
-  DM_TR_NET=null;
+  DM_TR_NET=null; DM_TR_MESH_LAST=0;
   function resizeNeural() {
     /* og.jpg + neural network hanya menutupi kotak hero dumul.html (bukan layar penuh) → posisi & ukuran simetris */
     var hr = dmHeroRect();
@@ -3035,7 +3096,7 @@ function startTesseractWarp(targetUrl) {
     canvas.width = Math.max(1, Math.round(W * dpr));
     canvas.height = Math.max(1, Math.round(H * dpr));
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    net = dmNeuralBuild(W, H); /* deterministik: sama persis dengan dumul.html */
+    net = dmSpectrumMeshBuild(W, H); /* SAME 22-node mesh as DUMUL hero spectrum */
     DM_TR_NET = net;
   }
   resizeNeural();
@@ -3075,6 +3136,7 @@ function startTesseractWarp(targetUrl) {
       dmTransitionStop();
       window.removeEventListener('resize', onResize);
       try {
+        try{sessionStorage.setItem('dm_spectrum_mesh',JSON.stringify({w:W,h:H,nodes:DM_TR_NET.map(function(n){return{x:n.x,y:n.y,ox:n.ox,oy:n.oy,vx:n.vx,vy:n.vy,r:n.r,color:n.color,glow:n.glow,phase:n.phase};})}));}catch(e){}
         sessionStorage.setItem('dm_collapsars_t', String(typeof GARG !== 'undefined' && GARG && GARG.currentTime || 0));
         sessionStorage.setItem('dm_collapsars_from', 'swallow');
         sessionStorage.setItem('dm_visual_state', JSON.stringify({t:(typeof GARG!=='undefined'&&GARG)?GARG.currentTime:0, phase:(typeof GARG!=='undefined'&&GARG)?GARG.currentTime:0, from:'dumul-transition'}));
