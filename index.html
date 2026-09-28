@@ -769,7 +769,7 @@ var $=function(s){return document.querySelector(s);};
 var cv=$('#sky'),g=cv.getContext('2d');
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
-var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
+var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
 var lastActivity=performance.now(),idleMode=false,IDLE_MS=60000;
 function markActivity(){lastActivity=performance.now();if(idleMode)idleMode=false;}
@@ -2029,8 +2029,6 @@ function fitTitle(){
 }
 /* ---------- layout ---------- */
 var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
-/* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
-var AST_SPRITES=null,AST_SPRITE_R=24;
 var bgCanvas=null,bgCtx=null,bgDirty=true;
 var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null};
 function layout(){
@@ -2284,7 +2282,7 @@ function layout(){
   var ac=IS_POTATO?14:Math.max(22,Math.min(42,Math.round(W*H/15000)));
   for(var j=0;j<ac;j++){
     var ang=Math.random()*Math.PI*2,rad=Math.min(W,H)*(.12+Math.random()*.22);
-    AST.push({a:ang,r:rad,e:.72+Math.random()*.28,spd:(.000045+Math.random()*.000075)*(Math.random()<.5?1:-1),sz:2.0+Math.random()*5.8,rot:Math.random()*6.28,rs:(Math.random()-.5)*.0018,al:.96+Math.random()*.04,seed:Math.random()*6.28,sprite:j%8,ox:0,oy:0,vx:0,vy:0,kick:0,kickUntil:0,_lastNow:performance.now()});
+    AST.push({a:ang,r:rad,e:.72+Math.random()*.28,spd:(.000045+Math.random()*.000075)*(Math.random()<.5?1:-1),sz:2.0+Math.random()*5.8,rot:Math.random()*6.28,rs:(Math.random()-.5)*.0018,al:.96+Math.random()*.04,seed:Math.random()*6.28,ox:0,oy:0,vx:0,vy:0,kick:0,kickUntil:0,_lastNow:performance.now()});
   }  if(!GAL.length){
     var spots=[[.08,.18,.72,.18,1.0],[.84,.13,.42,.72,.8],[.18,.42,.58,.38,1.1],[.76,.47,.66,.32,.9],[.10,.72,.48,.22,.75],[.88,.78,.55,.55,1.15],[.48,.24,.34,.44,.65],[.54,.82,.72,.26,.9]];
     var galCols=[
@@ -3695,54 +3693,8 @@ function scatterAsteroid(i,x,y){
   haptic(6);
   return true;
 }
-/* Bake a small set of rocky asteroid sprites once. Per-frame cost is then only
-   translate/rotate/drawImage (+ the cheap spring for kick/scatter). Visual
-   matches the previous live polygon+gradient path. */
-function ensureAsteroidSprites(){
-  if(AST_SPRITES&&AST_SPRITES.length)return AST_SPRITES;
-  var R=AST_SPRITE_R,pad=Math.ceil(R*1.55+6),size=pad*2,n=8,list=[];
-  for(var si=0;si<n;si++){
-    var sides=6+(si%5),seed=si*1.618+0.37,sc=document.createElement('canvas');
-    sc.width=sc.height=size;
-    var sg=sc.getContext('2d');
-    sg.translate(pad,pad);
-    /* Soft contact shadow baked into the sprite (was live shadowBlur). */
-    sg.shadowColor='rgba(0,0,0,.95)';
-    sg.shadowBlur=Math.max(1.5,R*1.15);
-    var rock=sg.createLinearGradient(-R,-R,R,R);
-    rock.addColorStop(0,'rgba(78,82,82,1)');
-    rock.addColorStop(.28,'rgba(38,40,40,1)');
-    rock.addColorStop(.68,'rgba(15,16,17,1)');
-    rock.addColorStop(1,'rgba(4,5,6,1)');
-    sg.fillStyle=rock;
-    sg.strokeStyle='rgba(3,4,5,1)';
-    sg.lineWidth=Math.max(.7,R*.10);
-    sg.beginPath();
-    for(var k=0;k<sides;k++){
-      var aa=k*Math.PI*2/sides;
-      var rr2=R*(.70+.38*Math.sin(k*9.71+seed)+.10*Math.cos(k*4.17+seed*1.7));
-      var px=Math.cos(aa)*rr2,py=Math.sin(aa)*rr2*.72;
-      if(k===0)sg.moveTo(px,py);else sg.lineTo(px,py);
-    }
-    sg.closePath();sg.fill();sg.stroke();
-    sg.shadowBlur=0;
-    /* Mineral facet + craters (same relative geometry as the old live path). */
-    sg.fillStyle='rgba(150,154,151,.18)';
-    sg.beginPath();sg.moveTo(-R*.58,-R*.08);sg.lineTo(-R*.12,-R*.55);sg.lineTo(R*.18,-R*.26);sg.lineTo(-R*.08,R*.02);sg.closePath();sg.fill();
-    sg.fillStyle='rgba(0,0,0,.88)';
-    sg.beginPath();sg.arc(R*.18,-R*.12,Math.max(.35,R*.15),0,6.283);sg.fill();
-    sg.beginPath();sg.arc(-R*.27,R*.18,Math.max(.28,R*.10),0,6.283);sg.fill();
-    sg.strokeStyle='rgba(180,185,182,.24)';sg.lineWidth=Math.max(.3,R*.045);
-    sg.beginPath();sg.moveTo(-R*.35,-R*.34);sg.lineTo(R*.22,-R*.48);sg.stroke();
-    list.push({c:sc,pad:pad,R:R});
-  }
-  AST_SPRITES=list;
-  return list;
-}
 function drawAsteroids(now){
   if(!AST.length)return;
-  var sprites=ensureAsteroidSprites();
-  var invR=1/AST_SPRITE_R;
   for(var i=0;i<AST.length;i++){
     var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
     var x=BH.x+Math.cos(t)*rr;
@@ -3759,14 +3711,38 @@ function drawAsteroids(now){
     if(a.kick&&now>a.kickUntil)a.kick=0;
     if(Math.abs(a.ox)+Math.abs(a.oy)<.12&&Math.abs(a.vx)+Math.abs(a.vy)<1.2){a.ox=a.oy=a.vx=a.vy=0;a.kick=0;}
     x+=a.ox;y+=a.oy;
-    var sp=sprites[(a.sprite|0)%sprites.length];
-    var scale=sz*invR;
-    var half=sp.pad*scale;
-    var rot=a.rot+now*a.rs;
-    g.save();
-    g.translate(x,y);
-    g.rotate(rot);
-    g.drawImage(sp.c,-half,-half,half*2,half*2);
+    var sides=6+(i%5),rot=a.rot+now*a.rs;
+    g.save();g.translate(x,y);g.rotate(rot);
+    g.globalAlpha=1;
+    /* Dense, opaque rocky debris: dark silhouette first, then restrained mineral highlights. */
+    g.shadowColor='rgba(0,0,0,.95)';g.shadowBlur=Math.max(1.5,sz*1.15);
+    var rock=g.createLinearGradient(-sz,-sz,sz,sz);
+    rock.addColorStop(0,'rgba(78,82,82,1)');
+    rock.addColorStop(.28,'rgba(38,40,40,1)');
+    rock.addColorStop(.68,'rgba(15,16,17,1)');
+    rock.addColorStop(1,'rgba(4,5,6,1)');
+    g.fillStyle=rock;
+    g.strokeStyle='rgba(3,4,5,1)';g.lineWidth=Math.max(.7,sz*.10);
+    g.beginPath();
+    for(var k=0;k<sides;k++){
+      var aa=k*Math.PI*2/sides;
+      var rr2=sz*(.70+.38*Math.sin(k*9.71+a.seed)+.10*Math.cos(k*4.17+a.seed*1.7));
+      var px=Math.cos(aa)*rr2,py=Math.sin(aa)*rr2*.72;
+      if(k===0)g.moveTo(px,py);else g.lineTo(px,py);
+    }
+    g.closePath();g.fill();g.stroke();
+    g.shadowBlur=0;
+
+    /* Uneven mineral facets and small craters make the rocks read as solid debris. */
+    g.fillStyle='rgba(150,154,151,.18)';
+    g.beginPath();g.moveTo(-sz*.58,-sz*.08);g.lineTo(-sz*.12,-sz*.55);g.lineTo(sz*.18,-sz*.26);g.lineTo(-sz*.08,sz*.02);g.closePath();g.fill();
+    g.fillStyle='rgba(0,0,0,.88)';
+    g.beginPath();g.arc(sz*.18,-sz*.12,Math.max(.35,sz*.15),0,6.283);g.fill();
+    if(sz>1.7){
+      g.beginPath();g.arc(-sz*.27,sz*.18,Math.max(.28,sz*.10),0,6.283);g.fill();
+    }
+    g.strokeStyle='rgba(180,185,182,.24)';g.lineWidth=Math.max(.3,sz*.045);
+    g.beginPath();g.moveTo(-sz*.35,-sz*.34);g.lineTo(sz*.22,-sz*.48);g.stroke();
     g.restore();
   }
 }
@@ -4193,12 +4169,8 @@ var lastFrameOK=performance.now();
 /* bootDone stays false until warm-up finishes. */
 var bootDone=false;
 function frame(now){
-  /* Capture generation at entry. If a watchdog/visibility restart bumped
-     renderGeneration while this callback was already queued, bail out so
-     we never run two concurrent loops. */
-  var gen=renderGeneration;
   renderRAF=0;
-  if(pageHidden||gen!==renderGeneration)return;
+  if(pageHidden)return;
   /* The whole frame is now one safety net: whatever throws, wherever, the
      loop always reschedules itself in the finally block below. A single
      bad frame can no longer freeze the page until a manual reload - at
@@ -4269,14 +4241,7 @@ function frame(now){
        repeating the same crash every frame forever. */
     PU.length=0;SN_BURSTS.length=0;
   }finally{
-    /* Only reschedule if this generation is still current and the tab is
-       visible. Stale RAF callbacks (after watchdog cancel + restart) exit
-       without queuing another frame. */
-    if(!pageHidden&&gen===renderGeneration){
-      renderRAF=requestAnimationFrame(frame);
-    }else{
-      renderRAF=0;
-    }
+    renderRAF=requestAnimationFrame(frame);
   }
 }
 
@@ -4286,89 +4251,34 @@ function startRenderLoop(){
   renderRAF=requestAnimationFrame(frame);
   if(window.__hub)window.__hub.ready=true;
 }
-/* Watchdog: if no frame completed for 1.5s, cancel any pending RAF and
-   bump generation so a stale callback cannot re-arm a second loop. */
+/* Watchdog skipped while boot overlay is up. */
 setInterval(function(){
   if(pageHidden||!bootDone)return;
   if(performance.now()-lastFrameOK>1500){
     try{buildSprite();}catch(e){}
-    if(renderRAF){cancelAnimationFrame(renderRAF);renderRAF=0;}
-    renderGeneration++;
+    renderRAF=0;
     startRenderLoop();
   }
 },1000);
 
 /* Stop only the visual render loop when the tab/page is hidden.
    Audio is intentionally NOT paused: the browser may choose to suspend
-   background media on its own, but this page never calls pause() here.
-   On resume, shift every absolute performance.now()-based deadline/timestamp
-   by the hidden duration so transient FX (shockwaves, hyperspace streaks,
-   particles, cooldowns, telescope schedule) pick up where they left off. */
+   background media on its own, but this page never calls pause() here. */
 document.addEventListener('visibilitychange',function(){
   var now=performance.now();
   pageHidden=!!document.hidden;
   if(pageHidden){
     hiddenAt=now;
     if(renderRAF){cancelAnimationFrame(renderRAF);renderRAF=0;}
-    renderGeneration++;
     return;
   }
   var pause=hiddenAt?Math.max(0,now-hiddenAt):0;
   if(pause){
-    /* Core animation clock + swallow transition */
     START+=pause;
     if(SW)SW.t0+=pause;
-
-    /* Particle / pulse / supernova burst timestamps */
     for(var i=0;i<PU.length;i++)PU[i].t+=pause;
     for(var j=0;j<SN_BURSTS.length;j++)SN_BURSTS[j].t+=pause;
-    for(var k=0;k<SS.length;k++)SS[k].t+=pause;
-
-    /* Transient FX introduced later: gravitational shockwaves + hyperspace streaks */
-    if(typeof BH_SHOCKWAVES!=='undefined'){
-      for(var bi=0;bi<BH_SHOCKWAVES.length;bi++)BH_SHOCKWAVES[bi].t0+=pause;
-    }
-    if(typeof WARP_STREAKS!=='undefined'){
-      for(var wi=0;wi<WARP_STREAKS.length;wi++)WARP_STREAKS[wi].t0+=pause;
-    }
-
-    /* Absolute "until / next" deadlines */
     if(glitchUntil)glitchUntil+=pause;
-    if(tapFlash&&tapFlash.until)tapFlash.until+=pause;
-    if(typeof lastSignalGlowUntil!=='undefined'&&lastSignalGlowUntil)lastSignalGlowUntil+=pause;
-    if(nextSS)nextSS+=pause;
-    if(nextPU)nextPU+=pause;
-    if(typeof TELESCOPE!=='undefined'){
-      if(TELESCOPE.next)TELESCOPE.next+=pause;
-      if(TELESCOPE.last)TELESCOPE.last+=pause;
-    }
-
-    /* Asteroid scatter spring: keep kick window + integration clock aligned */
-    if(typeof AST!=='undefined'){
-      for(var ai=0;ai<AST.length;ai++){
-        if(AST[ai].kickUntil)AST[ai].kickUntil+=pause;
-        if(AST[ai]._lastNow)AST[ai]._lastNow+=pause;
-      }
-    }
-
-    /* Supernova per-star cooldown map */
-    if(typeof SN_COOLDOWN!=='undefined'){
-      for(var ck in SN_COOLDOWN){
-        if(Object.prototype.hasOwnProperty.call(SN_COOLDOWN,ck))SN_COOLDOWN[ck]+=pause;
-      }
-    }
-
-    /* Audio-viz beat/glitch windows (visual only; playback continues) */
-    if(typeof AV!=='undefined'){
-      if(AV.glitchUntil)AV.glitchUntil+=pause;
-      if(AV.lastBeatT)AV.lastBeatT+=pause;
-    }
-
-    /* Delta-time baselines so first visible frame does not jump */
-    if(typeof CF!=='undefined'&&CF.lastNow)CF.lastNow+=pause;
-    if(lastHoverAt)lastHoverAt+=pause;
-    if(lastActivity)lastActivity+=pause;
-    if(lastFrameOK)lastFrameOK+=pause;
   }
   hiddenAt=0;
   startRenderLoop();
