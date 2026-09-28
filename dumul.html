@@ -38,6 +38,15 @@
   /* Datang dari swallow Gargantua: overlay neural network yang sama menutup layar, lalu memudar. */
   html.dm-from-swallow { background: #0a1218; }
   html.dm-from-swallow body { opacity: 1; transition: none; }
+  /* Prevent mid-page flash on handoff: hard-lock scroll until layout settles at top.
+     Unlocked by JS adding .dm-scroll-ready (does not touch audio/mesh continuity). */
+  html.dm-from-swallow:not(.dm-scroll-ready),
+  html.dm-from-swallow:not(.dm-scroll-ready) body {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
   /* Overlay path retired — spectrum mesh owns continuity; never flash warp */
   #tesseract-warp { display: none !important; }
   #tesseract-warp { opacity: 1; pointer-events: auto; }
@@ -158,30 +167,62 @@
 <script>
   /* Sedini mungkin (sebelum paint pertama): tandai kalau ini kedatangan dari swallow. Nilainya dibaca (tidak dihapus) di sini. */
   try{if(sessionStorage.getItem('dm_collapsars_from')==='swallow')document.documentElement.classList.add('dm-from-swallow');}catch(e){}
-  /* Lock scroll at top on arrival — block browser scroll restoration + mid-page land. */
+  /* Lock scroll at top on arrival — block browser scroll restoration + mid-page land.
+     CSS overflow:hidden (via .dm-from-swallow:not(.dm-scroll-ready)) prevents the visible
+     mid-page flash; this JS keeps scrollTop=0 and unlocks after layout settles. */
   try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}
   try{document.documentElement.style.scrollBehavior='auto';}catch(e){}
   try{window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body)document.body.scrollTop=0;}catch(e){}
-  /* Fight any late scroll restoration / layout scroll for a short window.
-     Longer when arriving from Gargantua handoff. Does not touch audio/mesh. */
   (function(){
     var from=false;
     try{from=sessionStorage.getItem('dm_collapsars_from')==='swallow'||document.documentElement.classList.contains('dm-from-swallow');}catch(e){}
-    var until=performance.now()+(from?3200:600);
+    var root=document.documentElement;
+    var unlocked=false;
+    /* Pin window: longer on handoff so React root + player bar + lyrics can settle. */
+    var until=performance.now()+(from?2800:500);
+    function forceTop(){
+      try{root.style.scrollBehavior='auto';}catch(e){}
+      try{
+        window.scrollTo(0,0);
+        root.scrollTop=0;
+        if(document.body)document.body.scrollTop=0;
+      }catch(e){}
+    }
     function pin(){
-      if(performance.now()>until)return;
-      var y=window.scrollY||document.documentElement.scrollTop||(document.body&&document.body.scrollTop)||0;
-      if(y>1){
-        try{document.documentElement.style.scrollBehavior='auto';}catch(e){}
-        try{window.scrollTo(0,0);document.documentElement.scrollTop=0;if(document.body)document.body.scrollTop=0;}catch(e){}
-      }
+      if(unlocked)return;
+      forceTop();
+    }
+    function unlock(){
+      if(unlocked)return;
+      unlocked=true;
+      forceTop();
+      /* One more frame at top, then release overflow lock so user can scroll. */
+      requestAnimationFrame(function(){
+        forceTop();
+        root.classList.add('dm-scroll-ready');
+        requestAnimationFrame(forceTop);
+      });
+      try{window.removeEventListener('scroll',pin);}catch(e){}
     }
     window.addEventListener('scroll',pin,{passive:true});
-    window.addEventListener('load',function(){pin();setTimeout(pin,50);setTimeout(pin,200);});
-    var id=setInterval(function(){
+    /* Always pin on load path; unlock after window settles. */
+    window.addEventListener('load',function(){
       pin();
-      if(performance.now()>until)clearInterval(id);
-    },50);
+      setTimeout(pin,40);
+      setTimeout(pin,120);
+      /* Unlock shortly after load so handoff audio/player can open without mid-jump. */
+      setTimeout(unlock, from?900:200);
+    });
+    var id=setInterval(function(){
+      if(unlocked||performance.now()>until){
+        clearInterval(id);
+        if(!unlocked)unlock();
+        return;
+      }
+      pin();
+    },40);
+    /* Safety: never leave overflow locked if load is delayed. */
+    setTimeout(function(){if(!unlocked)unlock();},from?3200:800);
   })();
 </script>
 </head>
