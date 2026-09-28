@@ -3051,6 +3051,12 @@ function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now,revealMs){
   g.restore();
 }
 function dmTransitionSpectrum(g,W,H,t,fade){
+  /* IMPORTANT: this canvas is transparent over og.jpg. Clear every frame so
+     the radial glow/waveform cannot accumulate into the giant pink/cyan
+     'sphere' that was hiding the actual og.jpg on mobile. */
+  g.clearRect(0,0,W,H);
+  g.globalAlpha=1;
+  g.globalCompositeOperation='source-over';
   var lev=DM_TR_LEVEL,beat=(DM_TR_BEAT&&performance.now()-DM_TR_BEAT<150)?1:0;
   if(!DM_TR_NET)DM_TR_NET=dmSpectrumMeshBuild(W,H);
   /* Exact hero-spectrum mesh first; the existing transition spectrum stays additive on top. */
@@ -3118,8 +3124,25 @@ function startTesseractWarp(targetUrl) {
   var tctx = canvas.getContext('2d');
   var statusText = document.getElementById('tesseract-status');
   var progressBar = document.getElementById('tesseract-progress');
-  warpOverlay.classList.add('active');
+  /* HARD CUT: the old Gargantua canvas is the source of the giant sphere seen
+     on mobile. Do not rely on visibility/stacking alone; remove it from layout
+     while the DUMUL handoff owns the screen. */
+  try {
+    var oldSky = document.getElementById('sky');
+    if(oldSky) oldSky.style.setProperty('display','none','important');
+    var oldScan = document.querySelector('.scan');
+    if(oldScan) oldScan.style.setProperty('display','none','important');
+  } catch(e) {}
   document.body.classList.add('tesseract-running');
+  warpOverlay.classList.add('active');
+  warpOverlay.style.setProperty('display','block','important');
+  warpOverlay.style.setProperty('opacity','1','important');
+  warpOverlay.style.setProperty('visibility','visible','important');
+  warpOverlay.style.setProperty('background','#0a1218','important');
+  if(stage) {
+    stage.style.setProperty('display','block','important');
+    stage.style.setProperty('visibility','visible','important');
+  }
 
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
   var W, H, net;
