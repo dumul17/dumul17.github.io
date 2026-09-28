@@ -804,7 +804,7 @@ var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft'
 var utcClicks=0,utcReset=0;
 var SW=null,swP=0;
 var AMB=mkAudio('constellation.opus',.5,true,'auto');
-var GARG=mkAudio('collapsars.opus',0,true,'metadata');
+var GARG=mkAudio('glitch-instrumental.opus',0,true,'auto');
 var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');
 var SFX={rigel:mkAudio('rigel.opus',.85,false,'metadata'),spica:mkAudio('spica.opus',.85,false,'metadata'),betel:mkAudio('betelgeuse.opus',.85,false,'metadata'),sirius:mkAudio('sirius.opus',.85,false,'metadata'),pleione:mkAudio('pleione.opus',.85,false,'metadata'),aldebaran:mkAudio('aldebaran.opus',.85,false,'metadata')};
 SFX.arcturus=mkAudio('arcturus.opus',.85,false,'metadata');
@@ -2726,7 +2726,93 @@ function drawHole(now,age){
     }
   }
 }
-/* ---------- Neural Network Overlay (Garis Terhubung Bertahap) ---------- */
+/* ===== DUMUL neural network (kode SAMA di index.html & dumul.html — jangan diubah sebelah saja) =====
+   Layout deterministik (seed tetap, koordinat relatif ke viewport) → posisi node & garis
+   di index.html (saat masuk) identik dengan di dumul.html (saat tiba). */
+var DM_NN_DUR=5600;
+function dmNeuralBuild(W,H){
+  function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  var R=rng(1717),n=Math.min(65,Math.max(30,Math.floor((W*H)/15000))),pts=[],i,j,k,mg=.04;
+  for(i=0;i<n;i++){
+    var best=null,bd=-1,tries=i?14:1;
+    for(k=0;k<tries;k++){
+      var cx=mg+R()*(1-2*mg),cy=mg+R()*(1-2*mg),md=1e18;
+      for(j=0;j<pts.length;j++){var dx=(cx-pts[j].u)*W,dy=(cy-pts[j].v)*H,d=dx*dx+dy*dy;if(d<md)md=d;}
+      if(md>bd){bd=md;best={u:cx,v:cy};}
+    }
+    pts.push({u:best.u,v:best.v,x:best.u*W,y:best.v*H,r:R()*2.2+1.2,ph:R()*Math.PI*2,col:R()<.6?'110, 229, 255':'255, 122, 217',tc:1e9,link:0,a:0});
+  }
+  function dist(a,b){return Math.hypot(pts[a].x-pts[b].x,pts[a].y-pts[b].y);}
+  /* node awal = yang paling dekat pusat layar; lalu tumbuh satu per satu (Prim) */
+  var s=0,sd=1e18;
+  for(i=0;i<n;i++){var dd=Math.hypot(pts[i].x-W/2,pts[i].y-H/2);if(dd<sd){sd=dd;s=i;}}
+  var inSet=[],edges=[],used={};
+  for(i=0;i<n;i++)inSet.push(false);
+  inSet[s]=true;pts[s].tc=300;
+  for(var step=1;step<n;step++){
+    var bA=-1,bB=-1,bl=1e18;
+    for(i=0;i<n;i++){if(!inSet[i])continue;for(j=0;j<n;j++){if(inSet[j])continue;var l=dist(i,j);if(l<bl){bl=l;bA=i;bB=j;}}}
+    inSet[bB]=true;
+    var t0=500+Math.pow((step-1)/Math.max(1,n-2),.92)*3400,du=520;
+    edges.push({a:bA,b:bB,t0:t0,dur:du,al:.55,fail:(step%3===1)});
+    pts[bB].tc=t0+du*.75;
+    used[Math.min(bA,bB)+'_'+Math.max(bA,bB)]=1;
+  }
+  /* garis tambahan antar tetangga dekat setelah semua node terhubung */
+  var extra=[],maxL=Math.min(W,H)*.28;
+  for(i=0;i<n;i++){
+    var nb=[];for(j=0;j<n;j++){if(j!==i)nb.push({j:j,l:dist(i,j)});}
+    nb.sort(function(p,q){return p.l-q.l;});
+    for(k=0;k<2;k++){
+      var o=nb[k];if(!o||o.l>maxL)continue;
+      var key=Math.min(i,o.j)+'_'+Math.max(i,o.j);
+      if(used[key])continue;used[key]=1;extra.push({a:i,b:o.j,l:o.l});
+    }
+  }
+  extra.sort(function(p,q){return p.l-q.l;});
+  for(i=0;i<extra.length;i++){
+    edges.push({a:extra[i].a,b:extra[i].b,t0:3900+(i/Math.max(1,extra.length))*1000,dur:420,al:.32,fail:false});
+  }
+  return{nodes:pts,edges:edges};
+}
+function dmNeuralDraw(g,W,H,net,t){
+  g.clearRect(0,0,W,H);
+  var nodes=net.nodes,edges=net.edges,i,e,a,b;
+  function eo(u){return 1-Math.pow(1-u,3);}
+  for(i=0;i<edges.length;i++){
+    e=edges[i];var u=(t-e.t0)/e.dur;if(u<=0)continue;if(u>1)u=1;
+    var gf;
+    if(e.fail){ /* mencoba menyambung: maju, mundur sedikit, lalu tersambung */
+      if(u<.35)gf=.5*eo(u/.35);else if(u<.55)gf=.5-.3*((u-.35)/.2);else gf=.2+.8*eo((u-.55)/.45);
+    }else gf=eo(u);
+    a=nodes[e.a];b=nodes[e.b];
+    var x2=a.x+(b.x-a.x)*gf,y2=a.y+(b.y-a.y)*gf;
+    var pl=.8+.2*Math.sin(t*.0026+a.ph);
+    var al=e.al*pl*(u<1?(.55+.45*u):1);
+    g.strokeStyle='rgba('+a.col+', '+al.toFixed(3)+')';g.lineWidth=1;
+    g.beginPath();g.moveTo(a.x,a.y);g.lineTo(x2,y2);g.stroke();
+    if(u<1){
+      g.fillStyle='rgba('+a.col+', .95)';g.shadowBlur=12;g.shadowColor='rgba('+a.col+', .9)';
+      g.beginPath();g.arc(x2,y2,2,0,Math.PI*2);g.fill();g.shadowBlur=0;
+    }
+  }
+  for(i=0;i<nodes.length;i++){
+    var n=nodes[i];
+    var appear=Math.max(0,Math.min(1,(t-i*12)/500));
+    var c=Math.max(0,Math.min(1,(t-n.tc)/300));
+    var br=(.25+.75*(c*c*(3-2*c)))*appear;
+    var pu=Math.sin(t*.0026+n.ph);
+    var rad=Math.max(.8,n.r+pu*.8*c);
+    var flash=(c>0&&c<1)?(1-c)*7:0;
+    g.fillStyle='rgba('+n.col+', '+(.9*br).toFixed(3)+')';
+    g.shadowBlur=10*br+flash;g.shadowColor='rgba('+n.col+', '+(.8*br).toFixed(3)+')';
+    g.beginPath();g.arc(n.x,n.y,rad+flash*.15,0,Math.PI*2);g.fill();
+  }
+  g.shadowBlur=0;
+}
+/* ===== end shared neural network ===== */
+
+/* ---------- Neural Network Overlay: node menyambung satu per satu → lanjut di dumul.html ---------- */
 function startTesseractWarp(targetUrl) {
   var warpOverlay = document.getElementById('tesseract-warp');
   if (!warpOverlay) { location.href = targetUrl; return; }
@@ -2737,19 +2823,20 @@ function startTesseractWarp(targetUrl) {
   warpOverlay.classList.add('active');
 
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var W, H;
+  var W, H, net;
   function resizeNeural() {
     W = window.innerWidth; H = window.innerHeight;
     canvas.width = Math.max(1, Math.round(W * dpr));
     canvas.height = Math.max(1, Math.round(H * dpr));
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    net = dmNeuralBuild(W, H); /* deterministik: sama persis dengan dumul.html */
   }
   resizeNeural();
   var onResize = function() { resizeNeural(); };
   window.addEventListener('resize', onResize);
 
   var startTime = performance.now();
-  var duration = 5600;
+  var duration = DM_NN_DUR;
   var statusMessages = [
     '> INITIALIZING NEURAL CORE...',
     '> SYNAPSE FREQUENCY ALIGNED...',
@@ -2761,75 +2848,17 @@ function startTesseractWarp(targetUrl) {
 
   try { if (typeof GARG !== 'undefined' && GARG) { GARG.play().catch(function(){}); } } catch (e) {}
 
-  // Inisialisasi Titik Neuron (Nodes)
-  var nodeCount = Math.min(65, Math.max(30, Math.floor((W * H) / 15000)));
-  var nodes = [];
-  for (var i = 0; i < nodeCount; i++) {
-    nodes.push({
-      x: Math.random() * W,
-      y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 1.2,
-      vy: (Math.random() - 0.5) * 1.2,
-      r: Math.random() * 2.2 + 1.2,
-      pulse: Math.random() * Math.PI * 2,
-      color: Math.random() < 0.6 ? '110, 229, 255' : '255, 122, 217'
-    });
-  }
-
   var finished = false;
 
   function render(time) {
     if (finished) return;
-    var elapsed = time - startTime, progress = Math.min(1, elapsed / duration);
+    var elapsed = Math.max(0, time - startTime), progress = Math.min(1, elapsed / duration);
     if (progressBar) progressBar.style.width = (progress * 100) + '%';
     if (statusText) {
       var msgIdx = Math.min(statusMessages.length - 1, Math.floor(progress * statusMessages.length));
       statusText.textContent = statusMessages[msgIdx];
     }
-
-    // Clear canvas transparan agar og.jpg di latar belakang terlihat
-    tctx.clearRect(0, 0, W, H);
-
-    // Jangkauan garis koneksi diperluas secara bertahap seiring bertambahnya progress
-    var currentMaxDist = Math.min(W, H) * 0.22 * Math.min(1, progress * 1.3);
-
-    for (var i = 0; i < nodes.length; i++) {
-      var n1 = nodes[i];
-      n1.x += n1.vx;
-      n1.y += n1.vy;
-
-      if (n1.x < 0 || n1.x > W) n1.vx *= -1;
-      if (n1.y < 0 || n1.y > H) n1.vy *= -1;
-
-      n1.pulse += 0.03;
-
-      // Hubungkan garis antar node terdekat (Jaringan terhubung bertahap)
-      for (var j = i + 1; j < nodes.length; j++) {
-        var n2 = nodes[j];
-        var dx = n1.x - n2.x, dy = n1.y - n2.y;
-        var dist = Math.hypot(dx, dy);
-
-        if (dist < currentMaxDist) {
-          var alpha = (1 - dist / currentMaxDist) * 0.5 * progress * (0.8 + 0.2 * Math.sin(n1.pulse));
-          tctx.strokeStyle = 'rgba(' + n1.color + ', ' + alpha.toFixed(3) + ')';
-          tctx.lineWidth = 1;
-          tctx.beginPath();
-          tctx.moveTo(n1.x, n1.y);
-          tctx.lineTo(n2.x, n2.y);
-          tctx.stroke();
-        }
-      }
-
-      // Titik Neuron
-      var glow = n1.r + Math.sin(n1.pulse) * 0.8;
-      tctx.fillStyle = 'rgba(' + n1.color + ', 0.9)';
-      tctx.shadowBlur = 10;
-      tctx.shadowColor = 'rgba(' + n1.color + ', 0.8)';
-      tctx.beginPath();
-      tctx.arc(n1.x, n1.y, Math.max(0.8, glow), 0, Math.PI * 2);
-      tctx.fill();
-      tctx.shadowBlur = 0;
-    }
+    dmNeuralDraw(tctx, W, H, net, elapsed);
 
     if (progress < 1) {
       requestAnimationFrame(render);
@@ -2849,10 +2878,10 @@ function startTesseractWarp(targetUrl) {
 function startSwallow(href){
   if(SW)return;
   if(typeof markWentToDumul==='function')markWentToDumul();
-  /* Gargantua owns the collapsars track while the swallow sequence runs.
-     If the mini player is already playing the same file through its separate
-     Audio object, pause it first so collapsars.opus can never double-play.
-     GARG itself IS the transition BGM — same track continues into dumul.html. */
+  /* Gargantua's swallow SFX/BGM is glitch-instrumental.opus (GARG). The mini
+     player's own collapsars track (MUSIC_COLLAP) is paused first so the two
+     never overlap. GARG IS the transition BGM — dumul.html resumes the same
+     track (Limerence album, track 1) from the handed-off position. */
   safePause(MUSIC_COLLAP);
   /* Sky/UI swirl needs ~2.8s (delay≤940 + duration≤2000). Opaque tesseract
      canvas must NOT start earlier or the swallow is visually cut off.

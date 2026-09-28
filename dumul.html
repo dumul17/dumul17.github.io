@@ -35,9 +35,248 @@
   body.dm-loaded {
     opacity: 1;
   }
+  /* Datang dari swallow Gargantua: overlay neural network yang sama menutup layar, lalu memudar. */
+  html.dm-from-swallow { background: #0a1218; }
+  html.dm-from-swallow body { opacity: 1; transition: none; }
+  html:not(.dm-from-swallow) #tesseract-warp { display: none; }
+  #tesseract-warp { opacity: 1; pointer-events: auto; }
+  #tesseract-warp.leaving { opacity: 0; pointer-events: none; transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
+  #tesseract-warp.leaving .tesseract-ui { opacity: 0; transition: opacity 0.5s ease-out; }
 </style>
+<style>
+#tesseract-warp {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #0a1218 url('og.jpg') center/cover no-repeat;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+#tesseract-warp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(10, 18, 24, 0.65) 0%, rgba(10, 18, 24, 0.92) 100%);
+  z-index: 1;
+}
+#tesseract-warp.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+#tesseract-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 2;
+}
+.tesseract-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(110, 229, 255, 0.04) 0px,
+    rgba(110, 229, 255, 0.04) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 3;
+}
+.tesseract-ui {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom, 0px) + 14px);
+  transform: translateX(-50%);
+  z-index: 4;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(10, 18, 24, 0.82);
+  padding: 12px 22px 14px;
+  border: 1px solid rgba(110, 229, 255, 0.28);
+  box-shadow: 0 0 24px rgba(110, 229, 255, 0.14), 0 8px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: min(92vw, 420px);
+  width: min(92vw, 420px);
+  box-sizing: border-box;
+}
+.tesseract-title {
+  font-size: clamp(11px, 3.2vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #eafcff;
+  text-shadow: 0 0 10px rgba(110, 229, 255, 0.8), 2px 0 #ff7ad9, -2px 0 #6ee5ff;
+  margin-bottom: 6px;
+}
+.tesseract-status {
+  font-size: clamp(9px, 2.2vw, 11px);
+  letter-spacing: 0.1em;
+  color: #8eeeff;
+  text-shadow: 0 0 6px rgba(110, 229, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tesseract-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(110, 229, 255, 0.1);
+  border: 1px solid rgba(110, 229, 255, 0.28);
+  margin-top: 10px;
+  overflow: hidden;
+}
+#tesseract-progress {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #6ee5ff, #ff7ad9);
+  box-shadow: 0 0 12px #ff7ad9;
+  transition: width 0.1s linear;
+}
+@media (max-width: 520px) {
+  .tesseract-ui {
+    padding: 10px 14px 12px;
+    bottom: max(14px, env(safe-area-inset-bottom, 0px) + 10px);
+  }
+  .tesseract-title { letter-spacing: 0.12em; }
+  .tesseract-status { letter-spacing: 0.06em; }
+}
+
+</style>
+<script>
+  /* Sedini mungkin (sebelum paint pertama): tandai kalau ini kedatangan dari swallow. Nilainya dibaca (tidak dihapus) di sini. */
+  try{if(sessionStorage.getItem('dm_collapsars_from')==='swallow')document.documentElement.classList.add('dm-from-swallow');}catch(e){}
+</script>
 </head>
 <body>
+  <!-- NEURAL NETWORK OVERLAY: lanjutan persis dari index.html (jaringan sudah lengkap), lalu memudar -->
+  <div id="tesseract-warp" class="active" aria-hidden="true">
+    <canvas id="tesseract-canvas"></canvas>
+    <div class="tesseract-scan"></div>
+    <div class="tesseract-ui">
+      <div class="tesseract-title">DUMUL // NEURAL INTERFERENCE</div>
+      <div class="tesseract-status" id="tesseract-status">&gt; ENTERING DUMUL PROJECT...</div>
+      <div class="tesseract-bar"><div id="tesseract-progress" style="width:100%"></div></div>
+    </div>
+  </div>
+  <script>
+/* ===== DUMUL neural network (kode SAMA di index.html & dumul.html — jangan diubah sebelah saja) =====
+   Layout deterministik (seed tetap, koordinat relatif ke viewport) → posisi node & garis
+   di index.html (saat masuk) identik dengan di dumul.html (saat tiba). */
+var DM_NN_DUR=5600;
+function dmNeuralBuild(W,H){
+  function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  var R=rng(1717),n=Math.min(65,Math.max(30,Math.floor((W*H)/15000))),pts=[],i,j,k,mg=.04;
+  for(i=0;i<n;i++){
+    var best=null,bd=-1,tries=i?14:1;
+    for(k=0;k<tries;k++){
+      var cx=mg+R()*(1-2*mg),cy=mg+R()*(1-2*mg),md=1e18;
+      for(j=0;j<pts.length;j++){var dx=(cx-pts[j].u)*W,dy=(cy-pts[j].v)*H,d=dx*dx+dy*dy;if(d<md)md=d;}
+      if(md>bd){bd=md;best={u:cx,v:cy};}
+    }
+    pts.push({u:best.u,v:best.v,x:best.u*W,y:best.v*H,r:R()*2.2+1.2,ph:R()*Math.PI*2,col:R()<.6?'110, 229, 255':'255, 122, 217',tc:1e9,link:0,a:0});
+  }
+  function dist(a,b){return Math.hypot(pts[a].x-pts[b].x,pts[a].y-pts[b].y);}
+  /* node awal = yang paling dekat pusat layar; lalu tumbuh satu per satu (Prim) */
+  var s=0,sd=1e18;
+  for(i=0;i<n;i++){var dd=Math.hypot(pts[i].x-W/2,pts[i].y-H/2);if(dd<sd){sd=dd;s=i;}}
+  var inSet=[],edges=[],used={};
+  for(i=0;i<n;i++)inSet.push(false);
+  inSet[s]=true;pts[s].tc=300;
+  for(var step=1;step<n;step++){
+    var bA=-1,bB=-1,bl=1e18;
+    for(i=0;i<n;i++){if(!inSet[i])continue;for(j=0;j<n;j++){if(inSet[j])continue;var l=dist(i,j);if(l<bl){bl=l;bA=i;bB=j;}}}
+    inSet[bB]=true;
+    var t0=500+Math.pow((step-1)/Math.max(1,n-2),.92)*3400,du=520;
+    edges.push({a:bA,b:bB,t0:t0,dur:du,al:.55,fail:(step%3===1)});
+    pts[bB].tc=t0+du*.75;
+    used[Math.min(bA,bB)+'_'+Math.max(bA,bB)]=1;
+  }
+  /* garis tambahan antar tetangga dekat setelah semua node terhubung */
+  var extra=[],maxL=Math.min(W,H)*.28;
+  for(i=0;i<n;i++){
+    var nb=[];for(j=0;j<n;j++){if(j!==i)nb.push({j:j,l:dist(i,j)});}
+    nb.sort(function(p,q){return p.l-q.l;});
+    for(k=0;k<2;k++){
+      var o=nb[k];if(!o||o.l>maxL)continue;
+      var key=Math.min(i,o.j)+'_'+Math.max(i,o.j);
+      if(used[key])continue;used[key]=1;extra.push({a:i,b:o.j,l:o.l});
+    }
+  }
+  extra.sort(function(p,q){return p.l-q.l;});
+  for(i=0;i<extra.length;i++){
+    edges.push({a:extra[i].a,b:extra[i].b,t0:3900+(i/Math.max(1,extra.length))*1000,dur:420,al:.32,fail:false});
+  }
+  return{nodes:pts,edges:edges};
+}
+function dmNeuralDraw(g,W,H,net,t){
+  g.clearRect(0,0,W,H);
+  var nodes=net.nodes,edges=net.edges,i,e,a,b;
+  function eo(u){return 1-Math.pow(1-u,3);}
+  for(i=0;i<edges.length;i++){
+    e=edges[i];var u=(t-e.t0)/e.dur;if(u<=0)continue;if(u>1)u=1;
+    var gf;
+    if(e.fail){ /* mencoba menyambung: maju, mundur sedikit, lalu tersambung */
+      if(u<.35)gf=.5*eo(u/.35);else if(u<.55)gf=.5-.3*((u-.35)/.2);else gf=.2+.8*eo((u-.55)/.45);
+    }else gf=eo(u);
+    a=nodes[e.a];b=nodes[e.b];
+    var x2=a.x+(b.x-a.x)*gf,y2=a.y+(b.y-a.y)*gf;
+    var pl=.8+.2*Math.sin(t*.0026+a.ph);
+    var al=e.al*pl*(u<1?(.55+.45*u):1);
+    g.strokeStyle='rgba('+a.col+', '+al.toFixed(3)+')';g.lineWidth=1;
+    g.beginPath();g.moveTo(a.x,a.y);g.lineTo(x2,y2);g.stroke();
+    if(u<1){
+      g.fillStyle='rgba('+a.col+', .95)';g.shadowBlur=12;g.shadowColor='rgba('+a.col+', .9)';
+      g.beginPath();g.arc(x2,y2,2,0,Math.PI*2);g.fill();g.shadowBlur=0;
+    }
+  }
+  for(i=0;i<nodes.length;i++){
+    var n=nodes[i];
+    var appear=Math.max(0,Math.min(1,(t-i*12)/500));
+    var c=Math.max(0,Math.min(1,(t-n.tc)/300));
+    var br=(.25+.75*(c*c*(3-2*c)))*appear;
+    var pu=Math.sin(t*.0026+n.ph);
+    var rad=Math.max(.8,n.r+pu*.8*c);
+    var flash=(c>0&&c<1)?(1-c)*7:0;
+    g.fillStyle='rgba('+n.col+', '+(.9*br).toFixed(3)+')';
+    g.shadowBlur=10*br+flash;g.shadowColor='rgba('+n.col+', '+(.8*br).toFixed(3)+')';
+    g.beginPath();g.arc(n.x,n.y,rad+flash*.15,0,Math.PI*2);g.fill();
+  }
+  g.shadowBlur=0;
+}
+/* ===== end shared neural network ===== */
+
+  (function(){
+    var ov=document.getElementById('tesseract-warp');
+    if(!ov)return;
+    if(!document.documentElement.classList.contains('dm-from-swallow')){ov.parentNode.removeChild(ov);return;}
+    var cv=document.getElementById('tesseract-canvas'),g=cv.getContext('2d'),dpr=Math.min(window.devicePixelRatio||1,2),W,H,net;
+    function size(){
+      W=window.innerWidth;H=window.innerHeight;
+      cv.width=Math.max(1,Math.round(W*dpr));cv.height=Math.max(1,Math.round(H*dpr));
+      g.setTransform(dpr,0,0,dpr,0,0);
+      net=dmNeuralBuild(W,H); /* seed & rumus sama dengan index.html → node di posisi yang sama */
+    }
+    size();window.addEventListener('resize',size);
+    var t0=performance.now(),raf=0,gone=false,loaded=document.readyState==='complete';
+    /* waktu dilanjutkan dari titik akhir animasi index (jaringan lengkap), pulsa denyutnya menyambung */
+    function frame(now){raf=0;if(gone)return;dmNeuralDraw(g,W,H,net,DM_NN_DUR+(now-t0));raf=requestAnimationFrame(frame);}
+    raf=requestAnimationFrame(frame);
+    function leave(){
+      if(ov.classList.contains('leaving'))return;
+      ov.classList.add('leaving');
+      setTimeout(function(){gone=true;if(raf)cancelAnimationFrame(raf);window.removeEventListener('resize',size);if(ov.parentNode)ov.parentNode.removeChild(ov);},1700);
+    }
+    function maybeLeave(){if(loaded&&performance.now()-t0>=900)leave();else setTimeout(maybeLeave,80);}
+    window.addEventListener('load',function(){loaded=true;});
+    setTimeout(function(){loaded=true;},4000); /* pengaman kalau load lama */
+    maybeLeave();
+  })();
+  </script>
   <div id="root"></div>
   
   <script type="module">var jc=Object.create;var{getPrototypeOf:Wc,defineProperty:Tl,getOwnPropertyNames:Yc}=Object;var Vc=Object.prototype.hasOwnProperty;var gn=(e,n,t)=>{t=e!=null?jc(Wc(e)):{};let r=n||!e||!e.__esModule?Tl(t,"default",{value:e,enumerable:!0}):t;for(let l of Yc(e))if(!Vc.call(r,l))Tl(r,l,{get:()=>e[l],enumerable:!0});return r};var cr=(e,n)=>()=>(n||e((n={exports:{}}).exports,n),n.exports);var _c=(e,n)=>{for(var t in n)Tl(e,t,{get:n[t],enumerable:!0,configurable:!0,set:(r)=>n[t]=()=>r})};var Zc=(e,n)=>()=>(e&&(n=e(e=0)),n);var dt=cr((pp)=>{var ft=Symbol.for("react.element"),qc=Symbol.for("react.portal"),Xc=Symbol.for("react.fragment"),$c=Symbol.for("react.strict_mode"),bc=Symbol.for("react.profiler"),ep=Symbol.for("react.provider"),np=Symbol.for("react.context"),tp=Symbol.for("react.forward_ref"),rp=Symbol.for("react.suspense"),lp=Symbol.for("react.memo"),op=Symbol.for("react.lazy"),tu=Symbol.iterator;function ip(e){if(e===null||typeof e!=="object")return null;return e=tu&&e[tu]||e["@@iterator"],typeof e==="function"?e:null}var ou={isMounted:function(){return!1},enqueueForceUpdate:function(){},enqueueReplaceState:function(){},enqueueSetState:function(){}},iu=Object.assign,uu={};function xn(e,n,t){this.props=e,this.context=n,this.refs=uu,this.updater=t||ou}xn.prototype.isReactComponent={};xn.prototype.setState=function(e,n){if(typeof e!=="object"&&typeof e!=="function"&&e!=null)throw Error("setState(...): takes an object of state variables to update or a function which returns an object of state variables.");this.updater.enqueueSetState(this,e,n,"setState")};xn.prototype.forceUpdate=function(e){this.updater.enqueueForceUpdate(this,e,"forceUpdate")};function au(){}au.prototype=xn.prototype;function xl(e,n,t){this.props=e,this.context=n,this.refs=uu,this.updater=t||ou}var Dl=xl.prototype=new au;Dl.constructor=xl;iu(Dl,xn.prototype);Dl.isPureReactComponent=!0;var ru=Array.isArray,su=Object.prototype.hasOwnProperty,Pl={current:null},cu={key:!0,ref:!0,__self:!0,__source:!0};function pu(e,n,t){var r,l={},o=null,i=null;if(n!=null)for(r in n.ref!==void 0&&(i=n.ref),n.key!==void 0&&(o=""+n.key),n)su.call(n,r)&&!cu.hasOwnProperty(r)&&(l[r]=n[r]);var u=arguments.length-2;if(u===1)l.children=t;else if(1<u){for(var a=Array(u),p=0;p<u;p++)a[p]=arguments[p+2];l.children=a}if(e&&e.defaultProps)for(r in u=e.defaultProps,u)l[r]===void 0&&(l[r]=u[r]);return{$$typeof:ft,type:e,key:o,ref:i,props:l,_owner:Pl.current}}function up(e,n){return{$$typeof:ft,type:e.type,key:n,ref:e.ref,props:e.props,_owner:e._owner}}function Ol(e){return typeof e==="object"&&e!==null&&e.$$typeof===ft}function ap(e){var n={"=":"=0",":":"=2"};return"$"+e.replace(/[=:]/g,function(t){return n[t]})}var lu=/\/+/g;function Ml(e,n){return typeof e==="object"&&e!==null&&e.key!=null?ap(""+e.key):n.toString(36)}function fr(e,n,t,r,l){var o=typeof e;if(o==="undefined"||o==="boolean")e=null;var i=!1;if(e===null)i=!0;else switch(o){case"string":case"number":i=!0;break;case"object":switch(e.$$typeof){case ft:case qc:i=!0}}if(i)return i=e,l=l(i),e=r===""?"."+Ml(i,0):r,ru(l)?(t="",e!=null&&(t=e.replace(lu,"$&/")+"/"),fr(l,n,t,"",function(p){return p})):l!=null&&(Ol(l)&&(l=up(l,t+(!l.key||i&&i.key===l.key?"":(""+l.key).replace(lu,"$&/")+"/")+e)),n.push(l)),1;if(i=0,r=r===""?".":r+":",ru(e))for(var u=0;u<e.length;u++){o=e[u];var a=r+Ml(o,u);i+=fr(o,n,t,a,l)}else if(a=ip(e),typeof a==="function")for(e=a.call(e),u=0;!(o=e.next()).done;)o=o.value,a=r+Ml(o,u++),i+=fr(o,n,t,a,l);else if(o==="object")throw n=String(e),Error("Objects are not valid as a React child (found: "+(n==="[object Object]"?"object with keys {"+Object.keys(e).join(", ")+"}":n)+"). If you meant to render a collection of children, use an array instead.");return i}function pr(e,n,t){if(e==null)return e;var r=[],l=0;return fr(e,r,"","",function(o){return n.call(t,o,l++)}),r}function sp(e){if(e._status===-1){var n=e._result;n=n(),n.then(function(t){if(e._status===0||e._status===-1)e._status=1,e._result=t},function(t){if(e._status===0||e._status===-1)e._status=2,e._result=t}),e._status===-1&&(e._status=0,e._result=n)}if(e._status===1)return e._result.default;throw e._result}var te={current:null},dr={transition:null},cp={ReactCurrentDispatcher:te,ReactCurrentBatchConfig:dr,ReactCurrentOwner:Pl};function fu(){throw Error("act(...) is not supported in production builds of React.")}pp.Children={map:pr,forEach:function(e,n,t){pr(e,function(){n.apply(this,arguments)},t)},count:function(e){var n=0;return pr(e,function(){n++}),n},toArray:function(e){return pr(e,function(n){return n})||[]},only:function(e){if(!Ol(e))throw Error("React.Children.only expected to receive a single React element child.");return e}};pp.Component=xn;pp.Fragment=Xc;pp.Profiler=bc;pp.PureComponent=xl;pp.StrictMode=$c;pp.Suspense=rp;pp.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED=cp;pp.act=fu;pp.cloneElement=function(e,n,t){if(e===null||e===void 0)throw Error("React.cloneElement(...): The argument must be a React element, but you passed "+e+".");var r=iu({},e.props),l=e.key,o=e.ref,i=e._owner;if(n!=null){if(n.ref!==void 0&&(o=n.ref,i=Pl.current),n.key!==void 0&&(l=""+n.key),e.type&&e.type.defaultProps)var u=e.type.defaultProps;for(a in n)su.call(n,a)&&!cu.hasOwnProperty(a)&&(r[a]=n[a]===void 0&&u!==void 0?u[a]:n[a])}var a=arguments.length-2;if(a===1)r.children=t;else if(1<a){u=Array(a);for(var p=0;p<a;p++)u[p]=arguments[p+2];r.children=u}return{$$typeof:ft,type:e.type,key:l,ref:o,props:r,_owner:i}};pp.createContext=function(e){return e={$$typeof:np,_currentValue:e,_currentValue2:e,_threadCount:0,Provider:null,Consumer:null,_defaultValue:null,_globalName:null},e.Provider={$$typeof:ep,_context:e},e.Consumer=e};pp.createElement=pu;pp.createFactory=function(e){var n=pu.bind(null,e);return n.type=e,n};pp.createRef=function(){return{current:null}};pp.forwardRef=function(e){return{$$typeof:tp,render:e}};pp.isValidElement=Ol;pp.lazy=function(e){return{$$typeof:op,_payload:{_status:-1,_result:e},_init:sp}};pp.memo=function(e,n){return{$$typeof:lp,type:e,compare:n===void 0?null:n}};pp.startTransition=function(e){var n=dr.transition;dr.transition={};try{e()}finally{dr.transition=n}};pp.unstable_act=fu;pp.useCallback=function(e,n){return te.current.useCallback(e,n)};pp.useContext=function(e){return te.current.useContext(e)};pp.useDebugValue=function(){};pp.useDeferredValue=function(e){return te.current.useDeferredValue(e)};pp.useEffect=function(e,n){return te.current.useEffect(e,n)};pp.useId=function(){return te.current.useId()};pp.useImperativeHandle=function(e,n,t){return te.current.useImperativeHandle(e,n,t)};pp.useInsertionEffect=function(e,n){return te.current.useInsertionEffect(e,n)};pp.useLayoutEffect=function(e,n){return te.current.useLayoutEffect(e,n)};pp.useMemo=function(e,n){return te.current.useMemo(e,n)};pp.useReducer=function(e,n,t){return te.current.useReducer(e,n,t)};pp.useRef=function(e){return te.current.useRef(e)};pp.useState=function(e){return te.current.useState(e)};pp.useSyncExternalStore=function(e,n,t){return te.current.useSyncExternalStore(e,n,t)};pp.useTransition=function(){return te.current.useTransition()};pp.version="18.3.1"});var Su=cr((Zp)=>{function zl(e,n){var t=e.length;e.push(n);e:for(;0<t;){var r=t-1>>>1,l=e[r];if(0<Ar(l,n))e[r]=n,e[t]=l,t=r;else break e}}function ke(e){return e.length===0?null:e[0]}function Ur(e){if(e.length===0)return null;var n=e[0],t=e.pop();if(t!==n){e[0]=t;e:for(var r=0,l=e.length,o=l>>>1;r<o;){var i=2*(r+1)-1,u=e[i],a=i+1,p=e[a];if(0>Ar(u,t))a<l&&0>Ar(p,u)?(e[r]=p,e[a]=t,r=a):(e[r]=u,e[i]=t,r=i);else if(a<l&&0>Ar(p,t))e[r]=p,e[a]=t,r=a;else break e}}return n}function Ar(e,n){var t=e.sortIndex-n.sortIndex;return t!==0?t:e.id-n.id}if(typeof performance==="object"&&typeof performance.now==="function")Ll=performance,Zp.unstable_now=function(){return Ll.now()};else mr=Date,Hl=mr.now(),Zp.unstable_now=function(){return mr.now()-Hl};var Ll,mr,Hl,Te=[],_e=[],_p=1,he=null,X=3,Sr=!1,hn=!1,mt=!1,Au=typeof setTimeout==="function"?setTimeout:null,mu=typeof clearTimeout==="function"?clearTimeout:null,du=typeof setImmediate<"u"?setImmediate:null;typeof navigator<"u"&&navigator.scheduling!==void 0&&navigator.scheduling.isInputPending!==void 0&&navigator.scheduling.isInputPending.bind(navigator.scheduling);function Jl(e){for(var n=ke(_e);n!==null;){if(n.callback===null)Ur(_e);else if(n.startTime<=e)Ur(_e),n.sortIndex=n.expirationTime,zl(Te,n);else break;n=ke(_e)}}function jl(e){if(mt=!1,Jl(e),!hn)if(ke(Te)!==null)hn=!0,Yl(Wl);else{var n=ke(_e);n!==null&&Vl(jl,n.startTime-e)}}function Wl(e,n){hn=!1,mt&&(mt=!1,mu(gt),gt=-1),Sr=!0;var t=X;try{Jl(n);for(he=ke(Te);he!==null&&(!(he.expirationTime>n)||e&&!Uu());){var r=he.callback;if(typeof r==="function"){he.callback=null,X=he.priorityLevel;var l=r(he.expirationTime<=n);n=Zp.unstable_now(),typeof l==="function"?he.callback=l:he===ke(Te)&&Ur(Te),Jl(n)}else Ur(Te);he=ke(Te)}if(he!==null)var o=!0;else{var i=ke(_e);i!==null&&Vl(jl,i.startTime-n),o=!1}return o}finally{he=null,X=t,Sr=!1}}var vr=!1,gr=null,gt=-1,gu=5,hu=-1;function Uu(){return Zp.unstable_now()-hu<gu?!1:!0}function Il(){if(gr!==null){var e=Zp.unstable_now();hu=e;var n=!0;try{n=gr(!0,e)}finally{n?At():(vr=!1,gr=null)}}else vr=!1}var At;if(typeof du==="function")At=function(){du(Il)};else if(typeof MessageChannel<"u")hr=new MessageChannel,Gl=hr.port2,hr.port1.onmessage=Il,At=function(){Gl.postMessage(null)};else At=function(){Au(Il,0)};var hr,Gl;function Yl(e){gr=e,vr||(vr=!0,At())}function Vl(e,n){gt=Au(function(){e(Zp.unstable_now())},n)}Zp.unstable_IdlePriority=5;Zp.unstable_ImmediatePriority=1;Zp.unstable_LowPriority=4;Zp.unstable_NormalPriority=3;Zp.unstable_Profiling=null;Zp.unstable_UserBlockingPriority=2;Zp.unstable_cancelCallback=function(e){e.callback=null};Zp.unstable_continueExecution=function(){hn||Sr||(hn=!0,Yl(Wl))};Zp.unstable_forceFrameRate=function(e){0>e||125<e?console.error("forceFrameRate takes a positive int between 0 and 125, forcing frame rates higher than 125 fps is not supported"):gu=0<e?Math.floor(1000/e):5};Zp.unstable_getCurrentPriorityLevel=function(){return X};Zp.unstable_getFirstCallbackNode=function(){return ke(Te)};Zp.unstable_next=function(e){switch(X){case 1:case 2:case 3:var n=3;break;default:n=X}var t=X;X=n;try{return e()}finally{X=t}};Zp.unstable_pauseExecution=function(){};Zp.unstable_requestPaint=function(){};Zp.unstable_runWithPriority=function(e,n){switch(e){case 1:case 2:case 3:case 4:case 5:break;default:e=3}var t=X;X=e;try{return n()}finally{X=t}};Zp.unstable_scheduleCallback=function(e,n,t){var r=Zp.unstable_now();switch(typeof t==="object"&&t!==null?(t=t.delay,t=typeof t==="number"&&0<t?r+t:r):t=r,e){case 1:var l=-1;break;case 2:l=250;break;case 5:l=1073741823;break;case 4:l=1e4;break;default:l=5000}return l=t+l,e={id:_p++,callback:n,priorityLevel:e,startTime:t,expirationTime:l,sortIndex:-1},t>r?(e.sortIndex=t,zl(_e,e),ke(Te)===null&&e===ke(_e)&&(mt?(mu(gt),gt=-1):mt=!0,Vl(jl,t-r))):(e.sortIndex=l,zl(Te,e),hn||Sr||(hn=!0,Yl(Wl))),e};Zp.unstable_shouldYield=Uu;Zp.unstable_wrapCallback=function(e){var n=X;return function(){var t=X;X=n;try{return e.apply(this,arguments)}finally{X=t}}}});var eu={};_c(eu,{version:()=>Mc,unstable_renderSubtreeIntoContainer:()=>Tc,unstable_batchedUpdates:()=>Qc,unmountComponentAtNode:()=>Nc,render:()=>Bc,hydrateRoot:()=>Ec,hydrate:()=>wc,flushSync:()=>Cc,findDOMNode:()=>Rc,createRoot:()=>kc,createPortal:()=>Fc,__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:()=>Kc});function U(e){for(var n="https://reactjs.org/docs/error-decoder.html?invariant="+e,t=1;t<arguments.length;t++)n+="&args[]="+encodeURIComponent(arguments[t]);return"Minified React error #"+e+"; visit "+n+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings."}function Qn(e,n){tt(e,n),tt(e+"Capture",n)}function tt(e,n){Ht[e]=n;for(e=0;e<n.length;e++)Ra.add(n[e])}function gf(e){if(go.call(yu,e))return!0;if(go.call(vu,e))return!1;if(mf.test(e))return yu[e]=!0;return vu[e]=!0,!1}function hf(e,n,t,r){if(t!==null&&t.type===0)return!1;switch(typeof n){case"function":case"symbol":return!0;case"boolean":if(r)return!1;if(t!==null)return!t.acceptsBooleans;return e=e.toLowerCase().slice(0,5),e!=="data-"&&e!=="aria-";default:return!1}}function Uf(e,n,t,r){if(n===null||typeof n>"u"||hf(e,n,t,r))return!0;if(r)return!1;if(t!==null)switch(t.type){case 3:return!n;case 4:return n===!1;case 5:return isNaN(n);case 6:return isNaN(n)||1>n}return!1}function oe(e,n,t,r,l,o,i){this.acceptsBooleans=n===2||n===3||n===4,this.attributeName=r,this.attributeNamespace=l,this.mustUseProperty=t,this.propertyName=e,this.type=n,this.sanitizeURL=o,this.removeEmptyString=i}function pi(e){return e[1].toUpperCase()}function fi(e,n,t,r){var l=q.hasOwnProperty(n)?q[n]:null;if(l!==null?l.type!==0:r||!(2<n.length)||n[0]!=="o"&&n[0]!=="O"||n[1]!=="n"&&n[1]!=="N")Uf(n,t,l,r)&&(t=null),r||l===null?gf(n)&&(t===null?e.removeAttribute(n):e.setAttribute(n,""+t)):l.mustUseProperty?e[l.propertyName]=t===null?l.type===3?!1:"":t:(n=l.attributeName,r=l.attributeNamespace,t===null?e.removeAttribute(n):(l=l.type,t=l===3||l===4&&t===!0?"":""+t,r?e.setAttributeNS(r,n,t):e.setAttribute(n,t)))}function ht(e){if(e===null||typeof e!=="object")return null;return e=Ku&&e[Ku]||e["@@iterator"],typeof e==="function"?e:null}function kt(e){if(_l===void 0)try{throw Error()}catch(t){var n=t.stack.trim().match(/\n( *(at )?)/);_l=n&&n[1]||""}return`
@@ -409,16 +648,16 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     safePlay();
   }
 
-  var GARG=new Audio(encodeURIComponent('collapsars.opus'));GARG.loop=true;GARG.volume=.5;GARG.preload='auto';
+  /* Bed collapsars.opus dimatikan: di dumul.html tidak ada audio otomatis di background. Objek GARG dibiarkan (tanpa src) supaya pemanggil lama tidak error. */
+  var GARG=new Audio();GARG.preload='none';
   var gargTimer=0;
   var gargFromSwallow=false;
   function gargCancel(){if(gargTimer){clearTimeout(gargTimer);gargTimer=0;}}
-  /* Resume collapsars where Observatory left off during the Gargantua swallow.
-     Observatory warp is now ~8.4s total (2800ms swallow + 5600ms tesseract),
-     so the handoff time is typically 5–7s into collapsars.opus. Seek must be
-     reliable across the longer transition, and volume ramps in so the page-cut
-     after the extended warp is not a hard hit. */
-  (function restoreCollapsars(){
+  /* Handoff dari swallow Gargantua (index.html): GARG di sana = glitch-instrumental.opus.
+     Di sini track itu langsung DILANJUT di player album Limerence (track 1,
+     Glitch (Instrumental)) dari detik terakhir, bukan lewat bed collapsars. */
+  var handoffT=0,handoffTimer=0,handoffSeek=false;
+  (function readHandoff(){
     try{
       var t=parseFloat(sessionStorage.getItem('dm_collapsars_t')||'');
       var from=sessionStorage.getItem('dm_collapsars_from');
@@ -426,60 +665,67 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       sessionStorage.removeItem('dm_collapsars_from');
       if(from!=='swallow'||!isFinite(t)||t<=0)return;
       gargFromSwallow=true;
-      var apply=function(){
-        try{
-          if(Math.abs((GARG.currentTime||0)-t)>0.15)GARG.currentTime=t;
-        }catch(e){}
-      };
-      /* Retry seek: after a long warp the first canplay can fire before the
-         decoder is ready to honour currentTime on some mobile WebViews. */
-      GARG.addEventListener('loadedmetadata',apply,{once:true});
-      GARG.addEventListener('canplay',apply,{once:true});
-      GARG.addEventListener('playing',function onPlay(){
-        apply();
-        GARG.removeEventListener('playing',onPlay);
-      });
-      try{GARG.load();}catch(e){}
-      apply();
-      /* Soft volume ramp matching Observatory fade target (~0.55 → settle 0.5). */
-      GARG.volume=0.28;
-      var v0=performance.now(),vDur=700,vFrom=0.28,vTo=0.5;
-      function rampVol(now){
-        var u=Math.min(1,(now-v0)/vDur);
-        GARG.volume=vFrom+(vTo-vFrom)*u;
-        if(u<1)requestAnimationFrame(rampVol);
-      }
-      requestAnimationFrame(rampVol);
+      handoffT=t;
     }catch(e){}
   })();
+  function applyHandoffSeek(){
+    if(!handoffT)return;
+    try{if(Math.abs((audio.currentTime||0)-handoffT)>0.15)audio.currentTime=handoffT;}catch(e){}
+  }
+  function tryHandoff(){
+    if(!handoffT)return;
+    var row=rows()[0];
+    if(!row)return; /* React belum render list, dicoba lagi */
+    if(current!==row||!audio.src){
+      current=row;
+      audio.preload='auto';
+      audio.src=srcOf(row);
+      audio.addEventListener('loadedmetadata',applyHandoffSeek,{once:true});
+      audio.addEventListener('canplay',applyHandoffSeek,{once:true});
+    }
+    applyHandoffSeek();
+    safePlay();
+  }
+  if(handoffT){
+    /* Volume masuk halus (index: 0.55) lalu naik ke level player biasa. */
+    audio.volume=.55;
+    audio.addEventListener('playing',function onHandoffPlay(){
+      audio.removeEventListener('playing',onHandoffPlay);
+      applyHandoffSeek();
+      handoffT=0; /* seek sudah diterapkan; sejak ini player berjalan normal */
+      if(handoffTimer){clearInterval(handoffTimer);handoffTimer=0;}
+      var v0=performance.now(),vDur=1500;
+      (function ramp(now){
+        var u=Math.min(1,(now-v0)/vDur);
+        audio.volume=.55+(1-.55)*u;
+        if(u<1)requestAnimationFrame(ramp);
+      })(v0);
+    });
+    /* Poll sampai list lagu ter-render & audio benar-benar jalan (max ~8 dtk). */
+    var hTries=0;
+    handoffTimer=setInterval(function(){
+      if(!handoffT||++hTries>80){clearInterval(handoffTimer);handoffTimer=0;return;}
+      tryHandoff();
+    },100);
+  }
   function gTry(){
-    /* Never bed ambient over an active album track. */
-    if(!audio.paused&&!audio.ended)return;
-    var p=GARG.play();if(p&&p.catch)p.catch(function(){});
+    /* Hanya untuk handoff swallow: lanjutkan di player album. Selain itu tidak ada audio otomatis. */
+    if(handoffT)tryHandoff();
   }
-  /* Idle resume is intentionally slow so brief pause / seek / track-change
-     never thrash: pause track → start collapsars → pause again.
-     After a swallow handoff, resume a bit sooner (900ms) so the longer
-     Observatory transition does not leave a silent gap if autoplay was blocked
-     on first paint and the user taps shortly after landing. */
-  function gargSchedule(){
-    gargCancel();
-    var delay=gargFromSwallow?900:1800;
-    gargTimer=setTimeout(function(){
-      gargTimer=0;
-      if(!audio.paused&&!audio.ended)return;
-      gTry();
-    },delay);
-  }
-  gTry();
-  /* Extra play attempts right after swallow land — first gesture + short retries. */
+  function gargSchedule(){gargCancel();} /* tidak ada lagi bed yang dinyalakan setelah pause */
   if(gargFromSwallow){
     setTimeout(gTry,120);
     setTimeout(gTry,400);
     setTimeout(gTry,900);
   }
-  document.addEventListener('pointerdown',gTry,{once:true});
-  document.addEventListener('keydown',gTry,{once:true});
+  function gGesture(e){
+    if(!handoffT)return;
+    if(e&&e.target&&e.target.closest&&e.target.closest(SEL))return; /* tap di baris lagu → toggle() */
+    ensureGraph();
+    gTry();
+  }
+  document.addEventListener('pointerdown',gGesture,{once:true});
+  document.addEventListener('keydown',gGesture,{once:true});
 
   audio.addEventListener('play',function(){
     gargCancel();
@@ -739,7 +985,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 })();
 </script>
 
-<!-- BGM transisi = collapsars.opus via GARG.
+<!-- BGM transisi = glitch-instrumental.opus (GARG di index.html), dilanjutkan di player album Limerence track 1.
      Handoff posisi playback sudah di-handle oleh sessionStorage
      (dm_collapsars_t / dm_collapsars_from) di restoreCollapsars() di atas.
      Observatory warp ≈ 8.4s (2800ms swallow + 5600ms tesseract) → seek ke currentTime handoff.
