@@ -49,23 +49,27 @@ h1.gl .kicker{animation:gk .65s steps(1,end)}
 86%{transform:translate(-1px,0);text-shadow:2px 0 #ff2bd6,-2px 0 #22e6ff}
 100%{transform:none}}
 @keyframes gk{0%{transform:translateX(4px);color:#ff7ad9}30%{transform:translateX(-4px);color:#6ee5ff}60%{transform:translateX(3px);color:#ff7ad9}100%{transform:none}}
-#music-player{position:fixed;right:12px;bottom:58px;z-index:12;width:min(258px,calc(100vw - 34px));padding:10px;border:1px solid rgba(110,229,255,.24);border-radius:8px;background:rgba(3,8,13,.88);box-shadow:0 10px 28px rgba(0,0,0,.34),0 0 18px rgba(110,229,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .28s ease,transform .28s cubic-bezier(.22,.7,.3,1)}
+#music-player{position:fixed;right:12px;bottom:58px;z-index:12;width:min(258px,calc(100vw - 34px));max-height:min(300px,calc(100vh - 120px));display:flex;flex-direction:column;overflow:hidden;padding:10px 10px 8px;border:1px solid rgba(110,229,255,.24);border-radius:8px;background:rgba(3,8,13,.88);box-shadow:0 10px 28px rgba(0,0,0,.34),0 0 18px rgba(110,229,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .28s ease,transform .28s cubic-bezier(.22,.7,.3,1)}
 #music-player.open{opacity:1;transform:none;pointer-events:auto;will-change:transform,opacity}
-.mp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mp-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px}
+.mp-scroll::-webkit-scrollbar{width:3px}
+.mp-scroll::-webkit-scrollbar-thumb{background:rgba(110,229,255,.3);border-radius:2px}
+.mp-foot{flex:0 0 auto;padding-top:8px;margin-top:2px;border-top:1px solid rgba(110,229,255,.1);background:rgba(3,8,13,.96)}
+.mp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex:0 0 auto}
 .mp-kicker{display:block;font-size:6.5px;line-height:1;text-transform:uppercase;letter-spacing:.2em;color:rgba(184,198,214,.4);margin-bottom:3px}.mp-head strong{font:600 12px/1 'Syne',sans-serif;letter-spacing:.04em;color:#dff7ff}
 #music-close{width:24px;height:24px;border:1px solid rgba(110,229,255,.12);border-radius:4px;background:rgba(110,229,255,.035);color:rgba(214,228,240,.65);font:300 17px/1 system-ui;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,transform .15s ease}
 #music-close:hover,#music-close:focus-visible{border-color:rgba(110,229,255,.4);background:rgba(110,229,255,.08);color:#eafcff}
-.mp-tracks{display:grid;gap:4px}.mp-track{display:grid;grid-template-columns:22px minmax(0,1fr) auto 9px;align-items:center;width:100%;padding:7px 8px;border:1px solid rgba(110,229,255,.09);border-radius:5px;background:rgba(110,229,255,.018);color:rgba(214,228,240,.62);text-align:left;cursor:pointer;gap:0 4px;transition:border-color .28s ease,background .28s ease,color .28s ease,box-shadow .28s ease}.mp-track.active{border-color:rgba(110,229,255,.38);background:rgba(110,229,255,.055);color:#eafcff;box-shadow:0 0 12px rgba(110,229,255,.06)}.mp-num{font:600 7.5px/1 'Courier New',monospace;color:rgba(110,229,255,.5);transition:color .28s ease}.mp-name{font:500 9px/1.2 'Courier New',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .28s ease}.mp-state{font-size:6px;opacity:0;color:#6ee5ff;transition:opacity .3s ease}.mp-track.playing .mp-state{opacity:1}
+.mp-tracks{display:grid;gap:3px}.mp-track{display:grid;grid-template-columns:18px minmax(0,1fr) 12px auto 9px;align-items:center;width:100%;padding:5px 7px;border:1px solid rgba(110,229,255,.09);border-radius:5px;background:rgba(110,229,255,.018);color:rgba(214,228,240,.62);text-align:left;cursor:pointer;gap:0 3px;transition:border-color .28s ease,background .28s ease,color .28s ease,box-shadow .28s ease}.mp-track.active{border-color:rgba(110,229,255,.38);background:rgba(110,229,255,.055);color:#eafcff;box-shadow:0 0 12px rgba(110,229,255,.06)}.mp-track.observed{border-color:rgba(110,229,255,.18)}.mp-num{font:600 7.5px/1 'Courier New',monospace;color:rgba(110,229,255,.5);transition:color .28s ease}.mp-name{font:500 9px/1.2 'Courier New',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .28s ease}.mp-obs{font:600 8px/1 'Courier New',monospace;letter-spacing:0;color:rgba(184,198,214,.28);white-space:nowrap;min-width:8px;text-align:center;transition:color .28s ease}.mp-track.observed .mp-obs{color:#6ee5ff;text-shadow:0 0 6px rgba(110,229,255,.45)}.mp-track.playing .mp-obs{opacity:0;max-width:0;overflow:hidden;margin:0;padding:0;font-size:0;min-width:0}.mp-track[data-type="bgm"]{grid-template-columns:20px minmax(0,1fr) auto 9px}.mp-state{font-size:6px;opacity:0;color:#6ee5ff;transition:opacity .3s ease}.mp-track.playing .mp-state{opacity:1}
 .mp-spec{display:inline-flex;align-items:flex-end;gap:1.4px;height:11px;margin-left:2px;opacity:0;max-width:0;overflow:hidden;pointer-events:none;transition:opacity .32s ease,max-width .32s ease,margin .32s ease}.mp-track.playing .mp-spec{opacity:1;max-width:28px;margin-left:2px}.mp-spec i{display:block;width:1.6px;height:3px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 4px rgba(110,229,255,.55);transform-origin:bottom center;will-change:height;transition:height .12s ease-out}
-.mp-play{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:30px;margin-top:7px;border:1px solid rgba(110,229,255,.22);border-radius:5px;background:rgba(110,229,255,.045);color:#dffaff;font:600 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,box-shadow .25s ease}.mp-play:hover,.mp-play:focus-visible{border-color:rgba(110,229,255,.45);background:rgba(110,229,255,.09);box-shadow:0 0 14px rgba(110,229,255,.1)}.mp-play:active,.mp-track:active,#music-close:active{transform:translateY(1px)}.mp-play-icon{font-size:8px;color:#6ee5ff;transition:color .25s ease}
+.mp-play{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:30px;margin:0;border:1px solid rgba(110,229,255,.22);border-radius:5px;background:rgba(110,229,255,.045);color:#dffaff;font:600 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,box-shadow .25s ease}.mp-play:hover,.mp-play:focus-visible{border-color:rgba(110,229,255,.45);background:rgba(110,229,255,.09);box-shadow:0 0 14px rgba(110,229,255,.1)}.mp-play:active,.mp-track:active,#music-close:active{transform:translateY(1px)}.mp-play-icon{font-size:8px;color:#6ee5ff;transition:color .25s ease}
 #music-toggle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;display:grid;place-items:center;width:32px;height:32px;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.7);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .3s ease,border-color .3s ease,background .3s ease,box-shadow .3s ease;overflow:hidden}#music-toggle:hover,#music-toggle:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.07)}#music-toggle svg{width:15px;height:15px;display:block;grid-area:1/1;transition:opacity .28s ease,transform .28s ease}#music-toggle.playing-closed{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.1);box-shadow:0 0 12px rgba(110,229,255,.18)}#music-toggle.playing-closed svg{opacity:0;transform:scale(.55)}
 .mp-spec-mini{grid-area:1/1;display:inline-flex;align-items:flex-end;justify-content:center;gap:1.5px;height:14px;opacity:0;pointer-events:none;transform:scale(.7);transition:opacity .3s ease,transform .3s ease}.mp-spec-mini i{display:block;width:2px;height:4px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 5px rgba(110,229,255,.65);transform-origin:bottom center;will-change:height;transition:height .12s ease-out}#music-toggle.playing-closed .mp-spec-mini{opacity:1;transform:scale(1)}
 /* Now-playing title: beside logo when HUD closed, then slides into logo after 2s */
 #mp-now-playing{position:fixed;right:50px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;height:32px;display:flex;align-items:center;max-width:min(160px,calc(100vw - 72px));padding:0 10px;border:1px solid rgba(110,229,255,.22);border-radius:5px;background:rgba(3,8,13,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 12px rgba(110,229,255,.08);font:500 9px/1 'Courier New',monospace;letter-spacing:.06em;color:#dff7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateX(10px) scale(.96);pointer-events:none;visibility:hidden;transition:opacity .38s ease,transform .42s cubic-bezier(.22,.7,.3,1),visibility 0s linear .42s}
 #mp-now-playing.show{opacity:1;transform:none;visibility:visible;transition:opacity .38s ease,transform .42s cubic-bezier(.22,.7,.3,1),visibility 0s}
 #mp-now-playing.absorb{opacity:0;transform:translateX(28px) scale(.55);visibility:hidden;transition:opacity .55s ease,transform .6s cubic-bezier(.4,0,.2,1),visibility 0s linear .55s}
-.mp-section-title{font-size:7.5px;line-height:1;text-transform:uppercase;letter-spacing:.18em;color:rgba(110,229,255,.65);margin:10px 0 4px 2px;font-weight:600}.mp-section-title:first-of-type{margin-top:2px}
-#music-player{max-height:calc(100vh - 75px);overflow-y:auto}
+.mp-section-title{font-size:7.5px;line-height:1;text-transform:uppercase;letter-spacing:.14em;color:rgba(110,229,255,.65);margin:10px 0 4px 2px;font-weight:600;display:flex;align-items:baseline;flex-wrap:wrap;gap:0 4px}.mp-section-title:first-of-type{margin-top:2px}.mp-rec-count{color:rgba(184,198,214,.45);font-weight:500;letter-spacing:.1em}.mp-rec-count em{color:#6ee5ff;font-style:normal;font-weight:600}
+/* music-player max-height owned by primary rule (~signals viewport) */
 #music-player::-webkit-scrollbar{width:3px}
 #music-player::-webkit-scrollbar-thumb{background:rgba(110,229,255,.3);border-radius:2px}
 @media (prefers-reduced-motion:reduce){
@@ -319,8 +323,8 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   }
   #music-player {
     bottom: 48px !important;
-    max-height: calc(100vh - 60px) !important;
-    overflow-y: auto !important;
+    max-height: min(280px, calc(100vh - 56px)) !important;
+    overflow: hidden !important;
   }
 }
 
@@ -420,6 +424,208 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   .tesseract-status { letter-spacing: 0.06em; }
 }
 
+
+/* ---------- Stellar Memory / Discovery Log / Signal Fragments ---------- */
+/* Compact constellation log inside music HUD (star progress lives on track rows). */
+.sr-list{display:grid;gap:2px;margin:0 0 4px}
+.sr-cons-row{
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px;
+  padding:4px 7px;border:1px solid rgba(110,229,255,.07);border-radius:4px;
+  background:rgba(110,229,255,.012);font-size:8px;
+}
+.sr-cons-row.archived{border-color:rgba(255,122,217,.28);background:rgba(255,122,217,.05)}
+.sr-cons-name{font:600 8px/1 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(214,228,240,.48)}
+.sr-cons-row.archived .sr-cons-name{color:#ff9ad9}
+.sr-cons-state{font-size:5.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(184,198,214,.28)}
+.sr-cons-row.archived .sr-cons-state{color:rgba(255,122,217,.85)}
+/* Tiny progress badge on music toggle when any signal captured */
+#music-toggle .sr-badge{
+  position:absolute;top:-3px;right:-3px;min-width:12px;height:12px;padding:0 3px;
+  border-radius:6px;background:#6ee5ff;color:#041018;font:700 7px/12px 'Courier New',monospace;
+  text-align:center;letter-spacing:0;opacity:0;transform:scale(.6);
+  transition:opacity .25s ease,transform .25s ease;pointer-events:none;z-index:1;
+}
+#music-toggle.has-stellar .sr-badge{opacity:1;transform:scale(1)}
+
+/* Signal fragment toast */
+#signal-fragment{
+  position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:14;
+  width:min(92vw,340px);transform:translateX(-50%) translateY(12px);
+  padding:14px 16px 12px;border:1px solid rgba(110,229,255,.32);border-radius:6px;
+  background:rgba(2,7,12,.92);box-shadow:0 0 28px rgba(110,229,255,.12),inset 0 0 18px rgba(110,229,255,.03);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .4s ease,transform .45s cubic-bezier(.22,.7,.3,1),visibility 0s linear .45s;
+  font-family:'Courier New',monospace;color:#8eeeff;
+}
+#signal-fragment.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;pointer-events:auto;
+  transition:opacity .4s ease,transform .45s cubic-bezier(.22,.7,.3,1),visibility 0s;
+}
+.sf-tag{font-size:7px;letter-spacing:.18em;text-transform:uppercase;color:rgba(110,229,255,.65);margin-bottom:6px}
+.sf-title{font:700 12px/1.2 'Syne',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#eafcff;margin-bottom:6px;text-shadow:0 0 10px rgba(110,229,255,.35)}
+.sf-body{font-size:10px;line-height:1.55;letter-spacing:.03em;color:rgba(184,224,238,.82);margin-bottom:8px}
+.sf-meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:7.5px;letter-spacing:.08em;color:rgba(110,229,255,.55);text-transform:uppercase}
+.sf-meta span{opacity:.9}
+.sf-close{
+  position:absolute;top:8px;right:8px;width:22px;height:22px;border:0;background:transparent;
+  color:rgba(214,228,240,.45);font:300 16px/1 system-ui;cursor:pointer;
+}
+.sf-close:hover{color:#eafcff}
+
+/* Constellation archive banner (one-shot) */
+#cons-archive{
+  position:fixed;left:50%;top:18%;z-index:16;transform:translate(-50%,-8px);
+  padding:16px 22px;border:1px solid rgba(255,122,217,.4);border-radius:4px;
+  background:rgba(6,4,12,.9);box-shadow:0 0 32px rgba(255,122,217,.18),inset 0 0 20px rgba(255,43,214,.05);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .5s ease,transform .55s cubic-bezier(.22,.7,.3,1),visibility 0s linear .55s;
+  text-align:center;font-family:'Courier New',monospace;
+}
+#cons-archive.on{
+  opacity:1;transform:translate(-50%,0);visibility:visible;
+  transition:opacity .5s ease,transform .55s cubic-bezier(.22,.7,.3,1),visibility 0s;
+}
+.ca-line{font-size:7px;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,122,217,.55);margin-bottom:8px}
+.ca-name{font:800 18px/1.1 'Syne',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#ff9ad9;text-shadow:0 0 16px rgba(255,43,214,.45),2px 0 #6ee5ff,-2px 0 #ff2bd6}
+.ca-sub{margin-top:8px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(234,246,255,.7)}
+.ca-rule{margin:10px auto 0;width:48px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,122,217,.7),transparent)}
+
+@media (max-width:600px){
+  #signal-fragment{bottom:calc(70px + env(safe-area-inset-bottom,0px));padding:12px 14px 10px}
+  .sf-title{font-size:11px}
+  .sf-body{font-size:9.5px}
+  #cons-archive{top:14%;padding:14px 16px}
+  .ca-name{font-size:15px;letter-spacing:.12em}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #signal-fragment{bottom:52px}
+  #cons-archive{top:10%}
+}
+@media (prefers-reduced-motion:reduce){
+  #signal-fragment,#cons-archive,#music-toggle .sr-badge{transition-duration:.01s!important}
+}
+
+
+
+/* ---------- Last Signal / Observe Mode / Radio Silence ---------- */
+#last-signal{
+  position:fixed;left:50%;top:max(56px,env(safe-area-inset-top,0px) + 48px);z-index:14;
+  transform:translateX(-50%) translateY(-6px);
+  width:min(92vw,280px);padding:12px 14px 11px;
+  border:1px solid rgba(110,229,255,.32);border-radius:6px;
+  background:rgba(2,7,12,.9);box-shadow:0 0 24px rgba(110,229,255,.12),inset 0 0 16px rgba(110,229,255,.03);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  font-family:'Courier New',monospace;text-align:center;
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .45s ease,transform .5s cubic-bezier(.22,.7,.3,1),visibility 0s linear .5s;
+}
+#last-signal.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;pointer-events:none;
+  transition:opacity .45s ease,transform .5s cubic-bezier(.22,.7,.3,1),visibility 0s;
+}
+.ls-tag{font-size:7px;letter-spacing:.22em;text-transform:uppercase;color:rgba(110,229,255,.65);margin-bottom:7px}
+.ls-name{font:800 15px/1.1 'Syne',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#eafcff;text-shadow:0 0 12px rgba(110,229,255,.4)}
+.ls-meta{margin-top:6px;font-size:9px;letter-spacing:.12em;color:rgba(184,224,238,.7);text-transform:uppercase}
+.ls-meta span{opacity:.85}
+.ls-meta span+span::before{content:'·';margin:0 6px;opacity:.4}
+
+/* Track glow for last signal */
+.mp-track.last-signal{
+  border-color:rgba(110,229,255,.45)!important;
+  background:rgba(110,229,255,.08)!important;
+  box-shadow:0 0 14px rgba(110,229,255,.14),inset 0 0 10px rgba(110,229,255,.04);
+}
+.mp-track.last-signal .mp-name{color:#eafcff}
+
+/* Mode toggles — horizontal icon row beside music toggle */
+#mode-cluster{
+  position:fixed;right:calc(12px + 32px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;
+  display:flex;flex-direction:row-reverse;align-items:center;gap:6px;
+}
+#mode-observe,#mode-silence{
+  width:32px;height:32px;padding:0;
+  display:grid;place-items:center;
+  border:1px solid rgba(110,229,255,.17);border-radius:5px;
+  background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);
+  font:500 15px/1 system-ui,sans-serif;letter-spacing:0;text-transform:none;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:color .25s,border-color .25s,background .25s,box-shadow .25s,transform .15s;
+}
+#mode-observe:hover,#mode-observe:focus-visible,
+#mode-silence:hover,#mode-silence:focus-visible{
+  color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.08);
+}
+#mode-observe:active,#mode-silence:active{transform:translateY(1px)}
+#mode-observe.on{
+  color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);
+  box-shadow:0 0 12px rgba(110,229,255,.15);
+}
+#mode-silence.on{
+  color:#ff9ad9;border-color:rgba(255,122,217,.5);background:rgba(255,122,217,.1);
+  box-shadow:0 0 12px rgba(255,122,217,.14);
+}
+/* Now-playing title sits left of the mode cluster + music button */
+#mp-now-playing{right:calc(12px + 32px + 6px + 32px + 6px + 32px + 8px)!important}
+
+/* Observe mode: strip HUD chrome, keep sky + hole + telescope */
+body.observe-mode #header,
+body.observe-mode #footer,
+body.observe-mode #owl-source,
+body.observe-mode #bh-clock,
+body.observe-mode #music-toggle,
+body.observe-mode #music-player,
+body.observe-mode #mp-now-playing,
+body.observe-mode #mode-silence,
+body.observe-mode .portal,
+body.observe-mode .cap,
+body.observe-mode #signal-fragment,
+body.observe-mode #cons-archive,
+body.observe-mode #secret-msg,
+body.observe-mode #terminal,
+body.observe-mode #sr-badge{
+  opacity:0!important;pointer-events:none!important;visibility:hidden!important;
+}
+body.observe-mode #mode-cluster{right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+body.observe-mode #mode-observe{opacity:1!important;visibility:visible!important;pointer-events:auto!important}
+body.observe-mode #mode-silence{display:none!important}
+
+/* Mode status toast (radio silence / observe) */
+#mode-toast{
+  position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:15;
+  transform:translateX(-50%) translateY(8px);
+  padding:10px 16px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
+  background:rgba(2,7,12,.9);font:600 9px/1.45 'Courier New',monospace;
+  letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;text-align:center;
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .35s ease,transform .4s ease,visibility 0s linear .4s;
+  white-space:pre-line;
+}
+#mode-toast.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;
+  transition:opacity .35s ease,transform .4s ease,visibility 0s;
+}
+#mode-toast.silence{border-color:rgba(255,122,217,.35);color:#ffb3e0}
+
+@media (max-width:520px){
+  #mode-cluster{right:calc(10px + 31px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  #mode-observe,#mode-silence{width:31px;height:31px;padding:0;font-size:14px}
+  body.observe-mode #mode-cluster{right:10px}
+  #mp-now-playing{right:calc(10px + 31px + 6px + 31px + 6px + 31px + 8px)!important}
+  #last-signal{top:max(48px,env(safe-area-inset-top,0px) + 40px);padding:10px 12px}
+  .ls-name{font-size:13px;letter-spacing:.12em}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #mode-cluster{right:calc(8px + 28px + 5px);bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  #mode-observe,#mode-silence{width:28px;height:28px;padding:0;font-size:13px}
+  body.observe-mode #mode-cluster{right:8px;bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  #last-signal{top:max(36px,env(safe-area-inset-top,0px) + 28px)}
+  #mode-toast{bottom:calc(42px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){
+  #last-signal,#mode-toast,#mode-observe,#mode-silence{transition-duration:.01s!important}
+}
+
 </style>
 <meta name="gimmick-revision" content="v41.10: perf baseline — matrix ring buffer, galaxy sprite cache, fitTitle proportional, visualViewport hybrid">
 </head>
@@ -473,6 +679,22 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   </svg>
 </a>
 <div id="secret-msg" aria-live="polite"></div>
+
+<!-- Stellar Fragments / Constellation Archive (overlays; record lives in music player) -->
+<div id="signal-fragment" aria-live="polite" aria-hidden="true">
+  <button type="button" class="sf-close" id="sf-close" aria-label="Dismiss">×</button>
+  <div class="sf-tag" id="sf-tag">FRAGMENT // —</div>
+  <div class="sf-title" id="sf-title"></div>
+  <div class="sf-body" id="sf-body"></div>
+  <div class="sf-meta" id="sf-meta"></div>
+</div>
+<div id="cons-archive" aria-live="polite" aria-hidden="true">
+  <div class="ca-line">PATTERN RECOGNIZED</div>
+  <div class="ca-name" id="ca-name">ORION</div>
+  <div class="ca-rule"></div>
+  <div class="ca-sub" id="ca-sub">ARCHIVED</div>
+</div>
+
 <div id="terminal" aria-hidden="true"><div class="term-title">DUMUL//SYSTEM</div><div>&gt; access DUMUL_logs...</div><div>&gt; authentication accepted</div><div>&gt; constellation channel open</div><div>&gt; <span class="cursor"></span></div></div>
 <div id="sn-flash" class="supernova-flash" aria-hidden="true"></div>
 <button id="rigel-fx" type="button" class="hit" aria-label="Putar suara Rigel"></button>
@@ -485,24 +707,42 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
 <div id="veil" aria-hidden="true"></div>
 <section id="music-player" aria-label="Music player" aria-hidden="true">
   <div class="mp-head"><div><span class="mp-kicker">Dumul's Observatory</span><strong>Music Transmission</strong></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
-  <div class="mp-section-title">Stellar Signals</div>
+  <div class="mp-scroll">
+  <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/08</span></div>
   <div class="mp-tracks">
-    <button class="mp-track" type="button" data-type="sfx" data-key="aldebaran"><span class="mp-num">01</span><span class="mp-name">aldebaran</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="antares"><span class="mp-num">02</span><span class="mp-name">antares</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="arcturus"><span class="mp-num">03</span><span class="mp-name">arcturus</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="betel"><span class="mp-num">04</span><span class="mp-name">betelgeuse</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="pleione"><span class="mp-num">05</span><span class="mp-name">pleione</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="rigel"><span class="mp-num">06</span><span class="mp-name">rigel</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="sirius"><span class="mp-num">07</span><span class="mp-name">sirius</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="spica"><span class="mp-num">08</span><span class="mp-name">spica</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="aldebaran"><span class="mp-num">01</span><span class="mp-name">aldebaran</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="antares"><span class="mp-num">02</span><span class="mp-name">antares</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="arcturus"><span class="mp-num">03</span><span class="mp-name">arcturus</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="betel"><span class="mp-num">04</span><span class="mp-name">betelgeuse</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="pleione"><span class="mp-num">05</span><span class="mp-name">pleione</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="rigel"><span class="mp-num">06</span><span class="mp-name">rigel</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="sirius"><span class="mp-num">07</span><span class="mp-name">sirius</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
+    <button class="mp-track" type="button" data-type="sfx" data-key="spica"><span class="mp-num">08</span><span class="mp-name">spica</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
   </div>
   <div class="mp-section-title">Observatory BGM</div>
   <div class="mp-tracks">
     <button class="mp-track active" type="button" data-type="bgm" data-index="0"><span class="mp-num">01</span><span class="mp-name">constellation</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
     <button class="mp-track" type="button" data-type="bgm" data-index="1"><span class="mp-num">02</span><span class="mp-name">collapsars</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
   </div>
-  <button id="music-play" class="mp-play" type="button" aria-label="Play music"><span class="mp-play-icon" aria-hidden="true">▶</span><span class="mp-play-label">Play</span></button>
+  <div class="mp-section-title">Constellation Log</div>
+  <div class="sr-list" id="sr-cons"></div>
+  </div>
+  <div class="mp-foot">
+    <button id="music-play" class="mp-play" type="button" aria-label="Play music"><span class="mp-play-icon" aria-hidden="true">▶</span><span class="mp-play-label">Play</span></button>
+  </div>
 </section>
+
+<!-- Last Signal / Observe / Radio Silence -->
+<div id="last-signal" aria-live="polite" aria-hidden="true">
+  <div class="ls-tag">LAST SIGNAL DETECTED</div>
+  <div class="ls-name" id="ls-name">—</div>
+  <div class="ls-meta"><span id="ls-spec">—</span><span id="ls-dist">—</span></div>
+</div>
+<div id="mode-cluster">
+  <button type="button" id="mode-silence" aria-pressed="false" aria-label="Radio Silence" title="Radio Silence">🔊</button>
+  <button type="button" id="mode-observe" aria-pressed="false" aria-label="Observation Mode" title="Observation Mode">👁️</button>
+</div>
+<div id="mode-toast" aria-live="polite" aria-hidden="true"></div>
 <button id="music-toggle" type="button" aria-label="Buka music player" aria-expanded="false" title="Music">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M9 18V5l10-2v13"/>
@@ -510,6 +750,7 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
     <circle cx="16.5" cy="16" r="3"/>
   </svg>
   <span class="mp-spec-mini" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+  <span class="sr-badge" id="sr-badge" aria-hidden="true">0</span>
 </button>
 <span id="mp-now-playing" aria-hidden="true"></span>
 <footer id="footer">
@@ -695,6 +936,7 @@ function audioVizOff(){
   AV.level*=.72;AV.bass*=.72;AV.mid*=.72;AV.high*=.72;AV.beat*=.68;AV.peak*=.9;AV.glitchUntil=0;
 }
 function updateAudioViz(now){
+  if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){audioVizOff();return;}
   if(!activeSfx||activeSfx.paused||activeSfx.ended){audioVizOff();return;}
   if(AV.fallback){
     /* Lightweight fallback only when Web Audio is genuinely unavailable. */
@@ -941,6 +1183,7 @@ function pauseMusicForSfx(){
 function playSfx(a){
   /* Star SFX no longer warms, loads, or auto-resumes constellation music. */
   if(!a)return;
+  if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   if(a.preload!=='auto'){a.preload='auto';}
   if(activeSfx===a){
     if(a.paused){
@@ -970,6 +1213,8 @@ function playSfx(a){
       setAVColor(null,false);
       audioVizOff();
       /* Intentionally do not resume music here. */
+      var sk=keyFromAudio(a);
+      if(sk)onStellarSignal(sk);
     }
   };
   safePlay(a);
@@ -1132,6 +1377,464 @@ PLEIADES.bright.forEach(function(st){st.ph=Math.random()*6.283;st._tw=0;st._twHi
 PLEIADES.dim.forEach(function(st){st.ph=Math.random()*6.283;st._tw=0;st._twHit=-1;});
 /* Shared compact breath/pulse geometry — same size language as Orion belt portal rings (~8). */
 var TRIGGER_PULSE_BASE=5.6;
+
+/* ---------- Stellar Memory + Discovery Log + Signal Fragments ---------- */
+var STELLAR_KEYS=['aldebaran','antares','arcturus','betel','pleione','rigel','sirius','spica'];
+var STELLAR_LABELS={
+  aldebaran:'Aldebaran',antares:'Antares',arcturus:'Arcturus',betel:'Betelgeuse',
+  pleione:'Pleione',rigel:'Rigel',sirius:'Sirius',spica:'Spica'
+};
+var STELLAR_CONS={
+  betel:'orion',rigel:'orion',
+  spica:'virgo',
+  sirius:'canis',
+  pleione:'pleiades',
+  aldebaran:'taurus',
+  arcturus:'bootes',
+  antares:'scorpius'
+};
+var CONS_LABELS={
+  orion:'Orion',virgo:'Virgo',canis:'Canis Major',pleiades:'Pleiades',
+  taurus:'Taurus',bootes:'Boötes',scorpius:'Scorpius'
+};
+/* Interactive stars per constellation (only the ones with SFX). */
+var CONS_STARS={
+  orion:['betel','rigel'],
+  virgo:['spica'],
+  canis:['sirius'],
+  pleiades:['pleione'],
+  taurus:['aldebaran'],
+  bootes:['arcturus'],
+  scorpius:['antares']
+};
+var SIGNAL_FRAGMENTS={
+  betel:{
+    tag:'FRAGMENT // BETELGEUSE',
+    title:'Red Giant · Imminent',
+    body:'A dying sun that still sings. The pulse you hear is collapse delayed — beauty measured in centuries of afterglow.',
+    meta:['RA 05h 55m','DEC +07° 24′','SPEC M1-2 Ia','LINK · Orion belt']
+  },
+  rigel:{
+    tag:'FRAGMENT // RIGEL',
+    title:'Blue Supergiant · Anchor',
+    body:'The foot of the hunter. Cold light, deep bass — a signal that arrives after the story has already moved on.',
+    meta:['RA 05h 14m','DEC −08° 12′','SPEC B8 Ia','LINK · Saiph arc']
+  },
+  spica:{
+    tag:'FRAGMENT // SPICA',
+    title:'Binary Spike · Harvest',
+    body:'Two stars locked in a brief, bright orbit. The earthen spike of Virgo — a note that cuts clean through the dark.',
+    meta:['RA 13h 25m','DEC −11° 09′','SPEC B1 III-IV','LINK · Virgo spine']
+  },
+  sirius:{
+    tag:'FRAGMENT // SIRIUS',
+    title:'Dog Star · Brightest',
+    body:'Nearest of the great ones. Sharp, white, impossible to ignore — the observatory’s first hello from the winter sky.',
+    meta:['RA 06h 45m','DEC −16° 42′','SPEC A1 V','LINK · Canis Major']
+  },
+  pleione:{
+    tag:'FRAGMENT // PLEIONE',
+    title:'Seven Sisters · Edge',
+    body:'A soft cluster voice near Atlas. Not the brightest, but the one that answers when you lean closer to the glass.',
+    meta:['RA 03h 49m','DEC +24° 08′','SPEC B8 Vne','LINK · Pleiades']
+  },
+  aldebaran:{
+    tag:'FRAGMENT // ALDEBARAN',
+    title:'Follower · Bull’s Eye',
+    body:'Orange watchman of Taurus. It trails the Pleiades across the night — patient, warm, always one step behind the sisters.',
+    meta:['RA 04h 35m','DEC +16° 30′','SPEC K5 III','LINK · Hyades']
+  },
+  arcturus:{
+    tag:'FRAGMENT // ARCTURUS',
+    title:'Bear Guardian · Kite Tip',
+    body:'The golden tip of Boötes. Ancient light from an old disk star — a calm, amber tone over the spring fields.',
+    meta:['RA 14h 15m','DEC +19° 10′','SPEC K1.5 III','LINK · Boötes kite']
+  },
+  antares:{
+    tag:'FRAGMENT // ANTARES',
+    title:'Rival of Mars · Sting',
+    body:'Heart of the scorpion. Red against the summer haze — a rival’s name for a star that refuses to be quiet.',
+    meta:['RA 16h 29m','DEC −26° 25′','SPEC M1.5 Iab','LINK · Scorpius arc']
+  }
+};
+
+var StellarMem={
+  observed:{},
+  archived:{},
+  storageKey:'obs_stellar_v1',
+  load:function(){
+    try{
+      var raw=localStorage.getItem(this.storageKey);
+      if(!raw)return;
+      var data=JSON.parse(raw);
+      if(data&&typeof data==='object'){
+        this.observed=data.observed&&typeof data.observed==='object'?data.observed:{};
+        this.archived=data.archived&&typeof data.archived==='object'?data.archived:{};
+      }
+    }catch(e){this.observed={};this.archived={};}
+  },
+  save:function(){
+    try{
+      localStorage.setItem(this.storageKey,JSON.stringify({
+        observed:this.observed,
+        archived:this.archived
+      }));
+    }catch(e){}
+  },
+  isObserved:function(key){return !!this.observed[key];},
+  isArchived:function(cid){return !!this.archived[cid];},
+  markObserved:function(key){
+    if(!key||this.observed[key])return false;
+    var now=new Date();
+    var y=now.getUTCFullYear();
+    var m=('0'+(now.getUTCMonth()+1)).slice(-2);
+    var d=('0'+now.getUTCDate()).slice(-2);
+    this.observed[key]={at:y+'.'+m+'.'+d,ts:now.getTime()};
+    this.save();
+    return true;
+  },
+  markArchived:function(cid){
+    if(!cid||this.archived[cid])return false;
+    this.archived[cid]={at:Date.now()};
+    this.save();
+    return true;
+  },
+  count:function(){
+    var n=0;
+    for(var i=0;i<STELLAR_KEYS.length;i++)if(this.observed[STELLAR_KEYS[i]])n++;
+    return n;
+  },
+  consComplete:function(cid){
+    var stars=CONS_STARS[cid];
+    if(!stars||!stars.length)return false;
+    for(var i=0;i<stars.length;i++)if(!this.observed[stars[i]])return false;
+    return true;
+  }
+};
+StellarMem.load();
+
+function formatSrCount(){
+  var n=StellarMem.count();
+  return (n<10?'0':'')+n+' <span>/ 08</span>';
+}
+function renderStellarRecord(){
+  var countEl=document.getElementById('sr-count');
+  var badge=document.getElementById('sr-badge');
+  var musicToggle=document.getElementById('music-toggle');
+  var consEl=document.getElementById('sr-cons');
+  var n=StellarMem.count();
+  var nn=(n<10?'0':'')+n;
+  if(countEl)countEl.innerHTML='// <em>'+nn+'</em>/08';
+  if(badge){
+    badge.textContent=String(n);
+    badge.setAttribute('aria-hidden',n>0?'false':'true');
+  }
+  if(musicToggle)musicToggle.classList.toggle('has-stellar',n>0);
+  /* Reflect capture state on each Stellar Signal row (status beside spectrum). */
+  var rows=document.querySelectorAll('#music-player .mp-track[data-type="sfx"]');
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i],key=row.getAttribute('data-key');
+    var on=!!(key&&StellarMem.isObserved(key));
+    row.classList.toggle('observed',on);
+    var obs=row.querySelector('.mp-obs');
+    if(obs){obs.textContent=on?'●':'○';obs.title=on?'Captured':'Unobserved';}
+  }
+  if(consEl){
+    var cids=['orion','virgo','canis','pleiades','taurus','bootes','scorpius'];
+    var html2='';
+    for(var j=0;j<cids.length;j++){
+      var cid=cids[j];
+      var arch=StellarMem.isArchived(cid);
+      var ready=StellarMem.consComplete(cid);
+      var state=arch?'● ARCHIVED':(ready?'◇ READY':'○ SCANNING');
+      html2+='<div class="sr-cons-row'+(arch?' archived':'')+'" data-cons="'+cid+'">';
+      html2+='<span class="sr-cons-name">'+CONS_LABELS[cid]+'</span>';
+      html2+='<span class="sr-cons-state">'+state+'</span>';
+      html2+='</div>';
+    }
+    consEl.innerHTML=html2;
+  }
+}
+
+function showSignalFragment(key){
+  var frag=SIGNAL_FRAGMENTS[key];
+  if(!frag)return;
+  var el=document.getElementById('signal-fragment');
+  if(!el)return;
+  var tag=document.getElementById('sf-tag');
+  var title=document.getElementById('sf-title');
+  var body=document.getElementById('sf-body');
+  var meta=document.getElementById('sf-meta');
+  var obs=StellarMem.observed[key];
+  if(tag)tag.textContent=frag.tag;
+  if(title)title.textContent=frag.title;
+  if(body)body.textContent=frag.body;
+  if(meta){
+    var bits=frag.meta.slice();
+    if(obs&&obs.at)bits.unshift('RECOVERED · '+obs.at);
+    else bits.unshift('SIGNAL ACQUIRED');
+    meta.innerHTML=bits.map(function(m){return '<span>'+m+'</span>';}).join('');
+  }
+  el.classList.remove('on');
+  void el.offsetWidth;
+  el.classList.add('on');
+  el.setAttribute('aria-hidden','false');
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){hideSignalFragment();},7200);
+}
+function hideSignalFragment(){
+  var el=document.getElementById('signal-fragment');
+  if(!el)return;
+  el.classList.remove('on');
+  el.setAttribute('aria-hidden','true');
+  clearTimeout(el._t);
+}
+function showConsArchive(cid){
+  var el=document.getElementById('cons-archive');
+  if(!el)return;
+  var name=document.getElementById('ca-name');
+  var sub=document.getElementById('ca-sub');
+  if(name)name.textContent=(CONS_LABELS[cid]||cid).toUpperCase();
+  if(sub)sub.textContent=(CONS_LABELS[cid]||cid).toUpperCase()+' // ARCHIVED';
+  el.classList.remove('on');
+  void el.offsetWidth;
+  el.classList.add('on');
+  el.setAttribute('aria-hidden','false');
+  /* One-shot visual: brief pink scan like Konami, then clear. */
+  document.body.classList.add('konami');
+  clearTimeout(showConsArchive._t);
+  showConsArchive._t=setTimeout(function(){
+    el.classList.remove('on');
+    el.setAttribute('aria-hidden','true');
+    document.body.classList.remove('konami');
+  },2800);
+  haptic(22);
+}
+function keyFromAudio(a){
+  if(!a||typeof SFX==='undefined')return null;
+  if(a===SFX.betel)return 'betel';
+  if(a===SFX.rigel)return 'rigel';
+  if(a===SFX.spica)return 'spica';
+  if(a===SFX.sirius)return 'sirius';
+  if(a===SFX.pleione)return 'pleione';
+  if(a===SFX.aldebaran)return 'aldebaran';
+  if(a===SFX.arcturus)return 'arcturus';
+  if(a===SFX.antares)return 'antares';
+  return null;
+}
+function onStellarSignal(key){
+  if(!key||STELLAR_KEYS.indexOf(key)<0)return;
+  /* Observed status is set on interaction; here we only surface the fragment
+     and finalize constellation archive if the set is complete. */
+  if(!StellarMem.isObserved(key))StellarMem.markObserved(key);
+  renderStellarRecord();
+  showSignalFragment(key);
+  var cid=STELLAR_CONS[key];
+  if(cid&&StellarMem.consComplete(cid)&&!StellarMem.isArchived(cid)){
+    if(StellarMem.markArchived(cid)){
+      setTimeout(function(){showConsArchive(cid);renderStellarRecord();},900);
+    }
+  }
+}
+
+
+/* ---------- Last Signal + Observation Mode + Radio Silence ---------- */
+var LAST_SIGNAL_DATA={
+  betel:{name:'BETELGEUSE',spec:'M1-2 Ia',dist:'640 LY'},
+  rigel:{name:'RIGEL',spec:'B8 Ia',dist:'860 LY'},
+  spica:{name:'SPICA',spec:'B1 III-IV',dist:'250 LY'},
+  sirius:{name:'SIRIUS',spec:'A1 V',dist:'8.6 LY'},
+  pleione:{name:'PLEIONE',spec:'B8 Vne',dist:'440 LY'},
+  aldebaran:{name:'ALDEBARAN',spec:'K5 III',dist:'65 LY'},
+  arcturus:{name:'ARCTURUS',spec:'K1.5 III',dist:'37 LY'},
+  antares:{name:'ANTARES',spec:'M1.5 Iab',dist:'550 LY'}
+};
+var OBSERVE_MODE=false;
+var RADIO_SILENCE=false;
+var lastSignalKey=null;
+var lastSignalGlowUntil=0;
+
+function rememberLastSignal(key){
+  if(!key||!LAST_SIGNAL_DATA[key])return;
+  lastSignalKey=key;
+  try{sessionStorage.setItem('obs_last_signal',key);}catch(e){}
+}
+function loadLastSignalKey(){
+  try{
+    var k=sessionStorage.getItem('obs_last_signal');
+    if(k&&LAST_SIGNAL_DATA[k])lastSignalKey=k;
+  }catch(e){}
+  /* Fallback: most recent observed star from StellarMem */
+  if(!lastSignalKey&&typeof StellarMem!=='undefined'){
+    var best=null,bestTs=-1;
+    for(var i=0;i<STELLAR_KEYS.length;i++){
+      var k=STELLAR_KEYS[i],o=StellarMem.observed[k];
+      if(o&&o.ts!=null&&o.ts>bestTs){bestTs=o.ts;best=k;}
+    }
+    if(best)lastSignalKey=best;
+  }
+  return lastSignalKey;
+}
+function markWentToDumul(){
+  try{sessionStorage.setItem('obs_went_to_dumul','1');}catch(e){}
+  if(lastSignalKey)rememberLastSignal(lastSignalKey);
+}
+function shouldShowLastSignal(){
+  try{
+    if(sessionStorage.getItem('obs_went_to_dumul')==='1')return true;
+  }catch(e){}
+  try{
+    var ref=document.referrer||'';
+    if(/dumul\.html/i.test(ref))return true;
+  }catch(e2){}
+  return false;
+}
+function clearWentToDumul(){
+  try{sessionStorage.removeItem('obs_went_to_dumul');}catch(e){}
+}
+function applyLastSignalTrackGlow(key){
+  var rows=document.querySelectorAll('#music-player .mp-track[data-type="sfx"]');
+  for(var i=0;i<rows.length;i++){
+    var on=key&&rows[i].getAttribute('data-key')===key;
+    rows[i].classList.toggle('last-signal',!!on);
+  }
+}
+function showLastSignalBanner(key){
+  var data=LAST_SIGNAL_DATA[key];
+  if(!data)return;
+  var el=document.getElementById('last-signal');
+  if(!el)return;
+  var nm=document.getElementById('ls-name');
+  var sp=document.getElementById('ls-spec');
+  var di=document.getElementById('ls-dist');
+  if(nm)nm.textContent=data.name;
+  if(sp)sp.textContent=data.spec;
+  if(di)di.textContent=data.dist;
+  el.classList.remove('on');
+  void el.offsetWidth;
+  el.classList.add('on');
+  el.setAttribute('aria-hidden','false');
+  applyLastSignalTrackGlow(key);
+  lastSignalGlowUntil=performance.now()+14000;
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){
+    el.classList.remove('on');
+    el.setAttribute('aria-hidden','true');
+  },5200);
+  clearTimeout(el._g);
+  el._g=setTimeout(function(){
+    if(performance.now()>=lastSignalGlowUntil)applyLastSignalTrackGlow(null);
+  },14000);
+  /* Soft glow on canvas star via lastSignalKey while lastSignalGlowUntil */
+}
+function maybeShowLastSignalOnReturn(){
+  if(!shouldShowLastSignal())return;
+  clearWentToDumul();
+  var key=loadLastSignalKey();
+  if(!key)return;
+  /* Defer until boot finishes so banner isn't under boot screen */
+  var tryShow=function(){
+    if(typeof bootDone!=='undefined'&&!bootDone){setTimeout(tryShow,200);return;}
+    showLastSignalBanner(key);
+  };
+  setTimeout(tryShow,400);
+}
+
+function showModeToast(text,kind,ms){
+  var el=document.getElementById('mode-toast');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.toggle('silence',kind==='silence');
+  el.classList.remove('on');
+  void el.offsetWidth;
+  el.classList.add('on');
+  el.setAttribute('aria-hidden','false');
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){
+    el.classList.remove('on');
+    el.setAttribute('aria-hidden','true');
+  },ms||2200);
+}
+
+function setObserveMode(on){
+  OBSERVE_MODE=!!on;
+  document.body.classList.toggle('observe-mode',OBSERVE_MODE);
+  var btn=document.getElementById('mode-observe');
+  if(btn){
+    btn.classList.toggle('on',OBSERVE_MODE);
+    btn.setAttribute('aria-pressed',OBSERVE_MODE?'true':'false');
+    btn.textContent='👁️';
+    btn.title=OBSERVE_MODE?'Exit Observation':'Observation Mode';
+    btn.setAttribute('aria-label',OBSERVE_MODE?'Exit Observation':'Observation Mode');
+  }
+  /* Close music HUD if open */
+  if(OBSERVE_MODE){
+    var panel=document.getElementById('music-player');
+    if(panel&&panel.classList.contains('open')){
+      panel.classList.remove('open');
+      panel.setAttribute('aria-hidden','true');
+      var mt=document.getElementById('music-toggle');
+      if(mt)mt.setAttribute('aria-expanded','false');
+    }
+    showModeToast('OBSERVATION MODE\nHUD OFF · LABELS OFF',null,2000);
+  }else{
+    showModeToast('HUD RESTORED',null,1600);
+  }
+}
+
+function setRadioSilence(on){
+  RADIO_SILENCE=!!on;
+  var btn=document.getElementById('mode-silence');
+  if(btn){
+    btn.classList.toggle('on',RADIO_SILENCE);
+    btn.setAttribute('aria-pressed',RADIO_SILENCE?'true':'false');
+    btn.textContent=RADIO_SILENCE?'🔈':'🔊';
+    btn.title=RADIO_SILENCE?'Signal Restored (unmute)':'Radio Silence';
+    btn.setAttribute('aria-label',RADIO_SILENCE?'Unmute / restore signal':'Radio Silence');
+  }
+  if(RADIO_SILENCE){
+    /* Kill all audio channels */
+    try{
+      if(typeof AMB!=='undefined'){safePause(AMB);}
+      if(typeof MUSIC_COLLAP!=='undefined'){safePause(MUSIC_COLLAP);}
+      if(typeof GARG!=='undefined'){safePause(GARG);}
+      if(typeof activeSfx!=='undefined'&&activeSfx){
+        safePause(activeSfx);
+        activeSfx=null;
+      }
+      if(typeof SFX!=='undefined'){
+        Object.keys(SFX).forEach(function(k){try{safePause(SFX[k]);}catch(e){}});
+      }
+      if(typeof audioVizOff==='function')audioVizOff();
+      if(typeof setAVColor==='function')setAVColor(null,false);
+      if(typeof musicForceStop==='function'){try{musicForceStop();}catch(e){}}
+    }catch(e){}
+    showModeToast('RADIO SILENCE\n─────────────\nAUDIO CHANNEL CLOSED','silence',2400);
+  }else{
+    showModeToast('SIGNAL RESTORED',null,1800);
+  }
+}
+
+(function initModeUI(){
+  loadLastSignalKey();
+  var obs=document.getElementById('mode-observe');
+  var sil=document.getElementById('mode-silence');
+  if(obs)obs.addEventListener('click',function(){setObserveMode(!OBSERVE_MODE);haptic(10);});
+  if(sil)sil.addEventListener('click',function(){setRadioSilence(!RADIO_SILENCE);haptic(10);});
+  maybeShowLastSignalOnReturn();
+  /* pageshow: back from dumul via BFCache */
+  window.addEventListener('pageshow',function(e){
+    if(e.persisted)maybeShowLastSignalOnReturn();
+  });
+})();
+
+/* Wire fragment dismiss + initial record paint (record lives in music HUD). */
+(function initStellarUI(){
+  var sfClose=document.getElementById('sf-close');
+  if(sfClose)sfClose.addEventListener('click',hideSignalFragment);
+  renderStellarRecord();
+})();
+
 
 /* ---------- V4: active constellation focus + low-cost slow twinkle ----------
    Only the constellation whose SFX is currently playing is full-bright +
@@ -2327,6 +3030,7 @@ function startTesseractWarp(targetUrl){
 }
 function startSwallow(href){
   if(SW)return;
+  if(typeof markWentToDumul==='function')markWentToDumul();
   /* Gargantua owns the collapsars track while the swallow sequence runs.
      If the mini player is already playing the same file through its separate
      Audio object, pause it first so collapsars.opus can never double-play.
@@ -2346,9 +3050,11 @@ function startSwallow(href){
   var pf=document.createElement('link');pf.rel='prefetch';pf.href=href;document.head.appendChild(pf);
   /* Include music toggle/HUD + side chrome so YT/IG aren't the only icons
      that fly into Gargantua — previously #music-toggle was left out. */
-  var els=[].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock')).filter(function(el){
+  var els=[].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock,#signal-fragment,#cons-archive,#mode-cluster,#mode-observe,#mode-silence,#last-signal')).filter(function(el){
     // Jangan ikutkan panel music-player ke animasi jika panel sedang tidak terbuka (.open)
     if(el.id === 'music-player' && !el.classList.contains('open')) return false;
+    // Fragment / archive toast only if currently visible
+    if((el.id === 'signal-fragment' || el.id === 'cons-archive' || el.id === 'last-signal') && !el.classList.contains('on')) return false;
     return true;
   });
   var maxD=Math.sqrt(W*W+H*H)*.6;
@@ -2705,6 +3411,7 @@ function drawBg(now){
 }
 /* ---------- [FITUR 2] Synthesizer Chime untuk Bintang Biasa (Web Audio) ---------- */
 function playStarChime(s){
+  if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   try {
     var AC = window.AudioContext || window.webkitAudioContext;
     if(!AV.ctx && AC) AV.ctx = new AC();
@@ -2825,6 +3532,7 @@ var STAR_DATA = {
 };
 
 function drawTargetLock(now){
+  if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)return;
   if(reduce || SW) return;
   var activeKey = null;
   if(activeSfx && !activeSfx.paused && !activeSfx.ended){
@@ -3054,6 +3762,7 @@ function drawTriggerVisuals(now){
     var phase=(now*.00135+s.ph)%1;
     var breathe=reduce?0.5:(.5+.5*Math.sin(now*.0025+s.ph));
     var strength=((selected?1:.42)+(hovered?.42:0))*focus;
+    if(typeof lastSignalKey!=='undefined'&&key===lastSignalKey&&typeof lastSignalGlowUntil!=='undefined'&&now<lastSignalGlowUntil)strength=Math.max(strength,.85);
     var base=TRIGGER_PULSE_BASE;
     var pulseR=base+2.2+6.5*phase;
     var outerR=base+5.5+7.5*phase;
@@ -3174,7 +3883,7 @@ function drawStars(c,age,now){
       g.strokeStyle='rgba('+s.rgb+','+(.4*a*tw)+')';g.lineWidth=.8;
       g.beginPath();g.moveTo(x-r*2.2,y);g.lineTo(x+r*2.2,y);g.moveTo(x,y-r*2.2);g.lineTo(x,y+r*2.2);g.stroke();
     }
-    if(s.name&&age>3.5&&kq<.25){
+    if(s.name&&age>3.5&&kq<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
       /* Audio-trigger labels: each one inherits its own pulse color. */
       /* triggerKey / tr / isPlaying were resolved above so potato audio-focus
          can decide the cheap star path before any gradient work is allocated. */
@@ -3277,7 +3986,7 @@ function drawPleiades(age,now){
       g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
       g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
       g.restore();
-      if(age>3.5&&q[2]<.25){
+      if(age>3.5&&q[2]<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
         g.textAlign='left';g.fillStyle='rgba('+tr.rgb+','+(hotP?.95:(selected?.78:.42))+')';
         var labelX=x+r*3.4+7,labelY=y+3;
@@ -3677,6 +4386,7 @@ var SN_COOLDOWN={};
   };
   function openPanel(){
     panel.classList.add('open');panel.setAttribute('aria-hidden','false');toggle.setAttribute('aria-expanded','true');
+    if(typeof renderStellarRecord==='function')renderStellarRecord();
     sync();
   }
   function shutPanel(){
@@ -3686,6 +4396,7 @@ var SN_COOLDOWN={};
   function selectAndPlay(i){
     var target=tracks[i];
     if(!target)return;
+    if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){showModeToast('RADIO SILENCE\nAUDIO CHANNEL CLOSED','silence',1800);return;}
     var playingIdx=getPlayingTrackIndex();
 
     /* Tapping the row that's already playing pauses it (toggle). */
@@ -3717,6 +4428,7 @@ var SN_COOLDOWN={};
     sync();
   }
   function toggleCurrentPlay(){
+    if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){var playingIdx0=getPlayingTrackIndex();if(playingIdx0===-1){showModeToast('RADIO SILENCE\nAUDIO CHANNEL CLOSED','silence',1800);return;}}
     var playingIdx=getPlayingTrackIndex();
     if(playingIdx!==-1){
       var t=tracks[playingIdx];
@@ -3797,6 +4509,19 @@ function triggerSupernova(key){
   TELESCOPE.onWarpComplete=function(){
     playSfx(SFX[key]);
     haptic(key==='betel'?20:18);
+    /* Stellar Memory: click/observe on interaction (fragment waits for SFX end). */
+    if(typeof StellarMem!=='undefined'&&STELLAR_KEYS.indexOf(key)>=0){
+      var firstObs=StellarMem.markObserved(key);
+      if(typeof rememberLastSignal==='function')rememberLastSignal(key);
+      renderStellarRecord();
+      var cid=STELLAR_CONS[key];
+      if(cid&&StellarMem.consComplete(cid)&&!StellarMem.isArchived(cid)){
+        if(StellarMem.markArchived(cid)){
+          setTimeout(function(){showConsArchive(cid);renderStellarRecord();},1200);
+        }
+      }
+      if(firstObs){/* light tick already via haptic above */}
+    }
   };
 }
 var SN_BURSTS=[];
@@ -3859,7 +4584,7 @@ function updateHover(px,py){
   else if(hot!=='bh'&&hot!=='spica'&&hot!=='rigel'&&hot!=='betel'&&hot!=='sirius'&&hot!=='aldebaran'&&hot!=='arcturus'&&hot!=='antares')hot=null;
 }
 document.addEventListener('pointerdown',function(e){
-  if(SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player'))return;
+  if(SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
   var now=performance.now(),hit=null,best=18;
   var ph=pleiadesHitAt(e.clientX,e.clientY);
   if(ph){
@@ -3947,7 +4672,7 @@ function beginBHDrag(e){
   if(reduce||SW||drag.on)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
-  if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player'))return false;
+  if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -4061,7 +4786,7 @@ function skyTwoAngle(){
 function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
-  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#title,#footer,#boot-screen'))return false;
+  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var dBH=Math.hypot(e.clientX-BH.x,e.clientY-BH.y);
@@ -4206,7 +4931,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#boot-screen'
+    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
