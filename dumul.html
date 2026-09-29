@@ -507,7 +507,7 @@ K+=(mid-0.3)*8*sig.amp;
 if(v>0)v-=c;
 let sinkY=u*(0.5+sig.sink*0.12*Math.sin(s*0.8));
 waveLayers[0].y=sinkY;waveLayers[1].y=sinkY-14*(1-sig.sink*0.4);waveLayers[2].y=sinkY+13*(1-sig.sink*0.4);
-let vAmp=sig.amp*(1+bass*0.35)*(1+listen*0.1);
+let vAmp=0.92*sig.amp*(1+bass*0.2)*(1+listen*0.06);
 let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
 let hot=__L>0.12||v>0||frac>0.08||listen>0.35||bass>0.35;
@@ -525,9 +525,9 @@ for(let y=0;y<waveLayers.length;y++){
   if(sig.cyanPink>0.8&&y===1)col="#ff7ad9";
   else if(sig.cyanPink<0.5&&y===1)col="#8eeeff";
   l.strokeStyle=col;
-  l.lineWidth=(y===0?1.2:0.7)*thin*(1+bass*0.3);
+  l.lineWidth=(y===0?1.05:0.55)*thin;
   l.globalAlpha=g*h.alpha*(0.8+nR()*0.4)*(1+listen*0.2);
-  if(hot){l.shadowBlur=(y===0?18:12)*(1+listen*0.5+__L*0.3);l.shadowColor=col;}
+  if(hot){l.shadowBlur=(y===0?10:7)*(1+listen*0.25+__L*0.15);l.shadowColor=col;}
   else l.shadowBlur=0;
   let Mn=0.12+y*0.05;
   let gapHalf=frac*14*(1+sig.frac*0.2);
@@ -536,13 +536,16 @@ for(let y=0;y<waveLayers.length;y++){
   for(let fe=0;fe<i;fe+=waveStep){
     if(nR()<Mn)continue;
     let sp=window.__dmSp?window.__dmSp(fe/i):0;
-    let pt=w+Math.sin(fe*0.02+s*2+y)*(y===0?1.5:0.8)*sig.breath+sp*Math.sin(fe*0.13+s*35+y*1.3)*(y===0?34:26)*vAmp;
+    let pt=w+Math.sin(fe*0.02+s*2+y)*(y===0?1.2:0.6)*sig.breath+sp*Math.sin(fe*0.13+s*35+y*1.3)*(y===0?16:12)*vAmp;
+    /* keep wave inside mesh vertical band */
+    let yMin=u*0.22,yMax=u*0.78;
+    if(pt<yMin)pt=yMin;else if(pt>yMax)pt=yMax;
     let dx=fe-gapCenter,inGap=frac>0.02&&Math.abs(dx)<gapHalf;
     let offY=0,offX=0;
     if(inGap){
       let uG=1-Math.abs(dx)/gapHalf;
-      offY=(dx<0?-1:1)*frac*6*uG;
-      offX=(dx<0?-1:1)*frac*5*uG;
+      offY=(dx<0?-1:1)*frac*4*uG;
+      offX=(dx<0?-1:1)*frac*3*uG;
       if(Math.abs(dx)<gapHalf*0.35)continue;
     }
     if(!moved){l.moveTo(fe+K+offX,pt+offY);moved=true;}
@@ -551,15 +554,16 @@ for(let y=0;y<waveLayers.length;y++){
   l.stroke();l.shadowBlur=0;
   /* bright core line — only on primary layer */
   if(y===0){
-    l.beginPath();l.strokeStyle="#e6f9ff";l.lineWidth=0.5*thin;l.globalAlpha=g*0.6*(0.7+Math.sin(s*9)*0.3)*(1+listen*0.25);
+    l.beginPath();l.strokeStyle="#e6f9ff";l.lineWidth=0.4*thin;l.globalAlpha=g*0.55*(0.7+Math.sin(s*9)*0.3)*(1+listen*0.2);
     moved=false;
     let coreStep=_perf>=3?3:(_perf===2?4:5);
     for(let fe=0;fe<i;fe+=coreStep){
       let sp=window.__dmSp?window.__dmSp(fe/i):0;
-      let pt=w+Math.sin(fe*0.05+s*5)*0.6+sp*Math.sin(fe*0.13+s*35)*34*vAmp;
+      let pt=w+Math.sin(fe*0.05+s*5)*0.5+sp*Math.sin(fe*0.13+s*35)*16*vAmp;
+      if(pt<u*0.22)pt=u*0.22;else if(pt>u*0.78)pt=u*0.78;
       let dx=fe-gapCenter,inGap=frac>0.02&&Math.abs(dx)<gapHalf*0.9;
       let offY=0;
-      if(inGap){let uG=1-Math.abs(dx)/(gapHalf*0.9);offY=(dx<0?-1:1)*frac*5*uG;if(Math.abs(dx)<gapHalf*0.3)continue;}
+      if(inGap){let uG=1-Math.abs(dx)/(gapHalf*0.9);offY=(dx<0?-1:1)*frac*3*uG;if(Math.abs(dx)<gapHalf*0.3)continue;}
       if(!moved){l.moveTo(fe,pt+offY);moved=true;}else l.lineTo(fe,pt+offY);
     }
     l.stroke();
