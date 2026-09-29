@@ -494,24 +494,24 @@ if((++_frameN&15)===0){
 let __A=window.__dmA||{level:0,beatAt:0,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:.5,listen:0,sig:"default",blips:[]};
 let __L=Math.max(__A.level||0,__A.memory||0);
 let s=__A.phase>0?__A.phase:Q*0.001;
-let sig=(function(){var t={glitch:{amp:1.35,frac:1.4,breath:.55,thin:.85,sink:0,cyanPink:1,mesh:1.25},"glitch-instrumental":{amp:.85,frac:.9,breath:.7,thin:1.15,sink:0,cyanPink:.7,mesh:.9},limerence:{amp:1.2,frac:.7,breath:1.35,thin:.95,sink:0,cyanPink:.55,mesh:1},nastenka:{amp:.75,frac:.45,breath:1.1,thin:1.35,sink:.15,cyanPink:.4,mesh:.75},larung:{amp:.95,frac:.55,breath:1,thin:1.05,sink:.72,cyanPink:.5,mesh:1.15}};return t[__A.sig]||{amp:1,frac:.8,breath:1,thin:1,sink:0,cyanPink:.6,mesh:1}})();
+let sig=(function(){var t={glitch:{amp:1.08,frac:.85,breath:.7,thin:.92,sink:0,cyanPink:1,mesh:1.1},"glitch-instrumental":{amp:.92,frac:.55,breath:.85,thin:1.08,sink:0,cyanPink:.7,mesh:.9},limerence:{amp:1.05,frac:.45,breath:1.2,thin:.98,sink:0,cyanPink:.55,mesh:1},nastenka:{amp:.88,frac:.3,breath:1.1,thin:1.15,sink:.12,cyanPink:.4,mesh:.8},larung:{amp:.95,frac:.35,breath:1,thin:1.02,sink:.55,cyanPink:.5,mesh:1.05}};return t[__A.sig]||{amp:1,frac:.8,breath:1,thin:1,sink:0,cyanPink:.6,mesh:1}})();
 let bass=__A.bass||0,mid=__A.mid||0,treble=__A.treble||0,frac=__A.fracture||0,fx=__A.fracX||.5,listen=__A.listen||0;
 let breath=0.7+0.3*Math.sin(s*(1.1/sig.breath))+0.15*Math.sin(s*(3.2/sig.breath)+1.2);
 /* cheap pseudo-noise for alpha jitter instead of Math.random */
 let g=Math.max(0.35,Math.min(1.15,(breath+(nR()-0.5)*0.14)*(0.55+0.45*Math.max(__L,0.2))*(1+listen*0.35)));
-if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=3+__L*9*sig.frac;S=6}
+if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=2+__L*5*sig.frac;S=5}
 l.clearRect(0,0,i,u);
 if(S-=c,S<=0){if(nR()>0.55)v=2+nR()*6;S=15+nR()*90}
-let K=v>0?(nR()-0.5)*24*(0.4+mid*1.2):0;
-K+=(mid-0.25)*18*sig.amp;
+let K=v>0?(nR()-0.5)*14*(0.35+mid*0.8):0;
+K+=(mid-0.3)*8*sig.amp;
 if(v>0)v-=c;
 let sinkY=u*(0.5+sig.sink*0.12*Math.sin(s*0.8));
 waveLayers[0].y=sinkY;waveLayers[1].y=sinkY-14*(1-sig.sink*0.4);waveLayers[2].y=sinkY+13*(1-sig.sink*0.4);
-let vAmp=sig.amp*(1+bass*1.1)*(1+listen*0.25);
+let vAmp=sig.amp*(1+bass*0.35)*(1+listen*0.1);
 let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
 let hot=__L>0.12||v>0||frac>0.08||listen>0.35||bass>0.35;
-let waveStep=_perf>=3?8:(_perf===2?10:12);
+let waveStep=_perf>=3?6:(_perf===2?8:10);
 let meshLinkMul=_perf>=2?1:0.72;
 let doGlitchBars=_perf>=2;
 let doSparks=_perf>=2&&treble>0.12;
@@ -530,7 +530,7 @@ for(let y=0;y<waveLayers.length;y++){
   if(hot){l.shadowBlur=(y===0?18:12)*(1+listen*0.5+__L*0.3);l.shadowColor=col;}
   else l.shadowBlur=0;
   let Mn=0.12+y*0.05;
-  let gapHalf=frac*28*(1+sig.frac*0.3);
+  let gapHalf=frac*14*(1+sig.frac*0.2);
   let gapCenter=fx*i;
   let moved=false;
   for(let fe=0;fe<i;fe+=waveStep){
@@ -541,8 +541,8 @@ for(let y=0;y<waveLayers.length;y++){
     let offY=0,offX=0;
     if(inGap){
       let uG=1-Math.abs(dx)/gapHalf;
-      offY=(dx<0?-1:1)*frac*14*uG;
-      offX=(dx<0?-1:1)*frac*10*uG;
+      offY=(dx<0?-1:1)*frac*6*uG;
+      offX=(dx<0?-1:1)*frac*5*uG;
       if(Math.abs(dx)<gapHalf*0.35)continue;
     }
     if(!moved){l.moveTo(fe+K+offX,pt+offY);moved=true;}
@@ -559,7 +559,7 @@ for(let y=0;y<waveLayers.length;y++){
       let pt=w+Math.sin(fe*0.05+s*5)*0.6+sp*Math.sin(fe*0.13+s*35)*34*vAmp;
       let dx=fe-gapCenter,inGap=frac>0.02&&Math.abs(dx)<gapHalf*0.9;
       let offY=0;
-      if(inGap){let uG=1-Math.abs(dx)/(gapHalf*0.9);offY=(dx<0?-1:1)*frac*10*uG;if(Math.abs(dx)<gapHalf*0.3)continue;}
+      if(inGap){let uG=1-Math.abs(dx)/(gapHalf*0.9);offY=(dx<0?-1:1)*frac*5*uG;if(Math.abs(dx)<gapHalf*0.3)continue;}
       if(!moved){l.moveTo(fe,pt+offY);moved=true;}else l.lineTo(fe,pt+offY);
     }
     l.stroke();
@@ -633,7 +633,7 @@ for(let h=0;h<p.length;h+=linkStep){
 for(let ni=0;ni<p.length;ni++){
   let h=p[ni];
   let y=0.7+0.3*Math.sin(s*3+h.phase);
-  let rBoost=1+__L*1.6*sig.amp*(1+bass*0.4);
+  let rBoost=1+__L*0.9*sig.amp*(1+bass*0.2);
   l.beginPath();l.globalAlpha=g*y*(1+listen*0.15);l.fillStyle=h.color;
   if(hot){l.shadowBlur=10*(1+listen*0.4);l.shadowColor=h.glow;}
   else l.shadowBlur=0;
@@ -857,11 +857,11 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   var ctx=null,an=null,SPEC=null,PREV=null,mix=0,level=0,avgFlux=0,lastBeatT=0;
   var A=window.__dmA={level:0,beatAt:0,active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
   var TRACK_SIG={
-    'glitch':{amp:1.35,frac:1.4,breath:0.55,thin:0.85,sink:0,cyanPink:1,mesh:1.25},
-    'glitch-instrumental':{amp:0.85,frac:0.9,breath:0.7,thin:1.15,sink:0,cyanPink:0.7,mesh:0.9},
-    'limerence':{amp:1.2,frac:0.7,breath:1.35,thin:0.95,sink:0,cyanPink:0.55,mesh:1.0},
-    'nastenka':{amp:0.75,frac:0.45,breath:1.1,thin:1.35,sink:0.15,cyanPink:0.4,mesh:0.75},
-    'larung':{amp:0.95,frac:0.55,breath:1.0,thin:1.05,sink:0.72,cyanPink:0.5,mesh:1.15}
+    'glitch':{amp:1.08,frac:0.85,breath:0.7,thin:0.92,sink:0,cyanPink:1,mesh:1.1},
+    'glitch-instrumental':{amp:0.92,frac:0.55,breath:0.85,thin:1.08,sink:0,cyanPink:0.7,mesh:0.9},
+    'limerence':{amp:1.05,frac:0.45,breath:1.2,thin:0.98,sink:0,cyanPink:0.55,mesh:1.0},
+    'nastenka':{amp:0.88,frac:0.3,breath:1.1,thin:1.15,sink:0.12,cyanPink:0.4,mesh:0.8},
+    'larung':{amp:0.95,frac:0.35,breath:1.0,thin:1.02,sink:0.55,cyanPink:0.5,mesh:1.05}
   };
   function currentSig(){
     var s=A.sig&&TRACK_SIG[A.sig]?TRACK_SIG[A.sig]:{amp:1,frac:0.8,breath:1,thin:1,sink:0,cyanPink:0.6,mesh:1};
@@ -941,7 +941,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       lastBeatT=now;A.beatAt=now;
       /* Beat fracture: crack one zone, then heal */
       var sig=currentSig();
-      A.fracture=Math.min(1,(0.55+level*0.45)*sig.frac);
+      A.fracture=Math.min(0.75,(0.35+level*0.3)*sig.frac);
       A.fracX=0.18+Math.random()*0.64;
     }
     PREV.set(SPEC);
@@ -1068,7 +1068,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     else{anSkip=0;level*=.9;}
     /* 60FPS smooth spectrum interpolation toward last analysis target */
     if(SMOOTH&&SMOOTH_T){
-      var si,sn=SMOOTH.length,a=playing?0.22:0.08;
+      var si,sn=SMOOTH.length,a=playing?0.14:0.06;
       for(si=0;si<sn;si++)SMOOTH[si]+=(SMOOTH_T[si]-SMOOTH[si])*a;
     }
     /* During handoff buffer, hold mix so spectrum/mesh stay lit.
@@ -1088,7 +1088,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     A.level=Math.max(level*mix, (A._seedLevel||0)*mix*0.6, A.memory*mix*0.45);
     A.phase=(audio.currentTime&&audio.currentTime>0)?audio.currentTime:(handoffT||A.phase||0);
     /* Beat fracture heal */
-    if(A.fracture>0)A.fracture=Math.max(0,A.fracture-0.028);
+    if(A.fracture>0)A.fracture=Math.max(0,A.fracture-0.04);
     /* Listening mode: idle ~7s while playing */
     if(playing){
       var _idle=typeof window.__dmIdleAt==="number"?window.__dmIdleAt:(now-8000);if(now-_idle>7000)A.listen=Math.min(1,A.listen+0.012);
