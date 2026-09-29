@@ -1025,93 +1025,311 @@ function showSecret(text,ms){
 }
 /* ---------- Telescope voice: large message pool + anti-repeat ---------- */
 var TELE_SCOPE_MESSAGES=[
-  /* WARM / HUMAN */
-  "Hello, Friend...","You came back.","Still looking up?","I knew someone would find this.",
-  "Hey... you're still here.","Nice to see you again.","Someone is listening.","Thanks for staying.",
-  "Welcome back, observer.","I was wondering when you'd return.","Good to see you again.",
-  "You're still watching the sky.","The sky noticed you.","Don't mind me. Just watching.","It's quiet up here.",
-  /* COSMIC / MYSTERIOUS */
-  "Signal received.","Are you still out there?","Something moved between the stars.","The sky remembers.",
-  "There was a signal here once.","Distance is only a number.","We are closer than we look.",
-  "Do you hear the static?","The stars are not silent.","Transmission incomplete...","Searching for a response...",
-  "Signal strength: uncertain.","Something is transmitting.","I think something heard us.",
-  "The signal is getting weaker.","There's something beyond the noise.","The frequency is familiar.",
-  "Someone is broadcasting from somewhere.","The stars keep their secrets.","Maybe the universe is listening too.",
-  /* SLIGHTLY WEIRD */
+  /* WARM / HUMAN / RETURNING */
+  "Hello, Friend...","You came back.","Still looking up?","Hey... you're still here.",
+  "Nice to see you again.","Someone is listening.","Thanks for staying.","Welcome back, observer.",
+  "I was wondering when you'd return.","Good to see you again.","You're still watching the sky.",
+  "Don't mind me. Just watching.","It's quiet up here.","You stayed a little longer this time.",
+  "I remember you. Probably.","You look familiar.","Still searching?","You found your way back.",
+  "I didn't expect anyone to return.","Some things are worth looking at twice.",
+  /* OBSERVER / OBSERVED */
+  "Observer detected.","Observation logged.","Another observation...","You are observing.",
+  "Or perhaps you are being observed.","Who is observing whom?","The observer has entered the system.",
+  "You looked. Something changed.","Observation is never completely innocent.",
+  "The moment you observe, you become part of the observation.",
+  "Are you watching the sky, or watching yourself watch it?",
+  "If nobody observes the observer, who observes the observation?",
+  "The telescope is watching the watcher.","Observer state detected.","Observed state detected.",
+  "Observer and observed... convenient names.","What if there is no observer?",
+  "What if there is only observation?",
+  "You call it observation. Reality may call it interaction.",
+  "The universe doesn't need your permission to be observed.",
+  "Maybe the observer is just another thing being observed.",
+  "I noticed you noticing.","You noticed me noticing.","This is getting recursive.",
+  "Observation changed everything. Again.",
+  /* QUESTIONING EVERYTHING */
+  "What makes you think that's the answer?","Who decided that was the question?",
+  "What if the question came first?","Are you sure?","But how do you know?",
+  "How do you know that you know?","What makes a belief become knowledge?",
+  "What makes an assumption feel like a fact?","Maybe the problem is the premise.",
+  "Maybe the answer is hiding inside the question.","What if we're solving the wrong problem?",
+  "What if being certain is the anomaly?","You found an answer. Did you check the question?",
+  "Interesting conclusion. What did it assume?","I understand. I don't necessarily agree.",
+  "Understanding doesn't require agreement.","Agreement is not evidence.","Confidence is not certainty.",
+  "A convincing explanation is still an explanation.",
+  "The explanation explains itself suspiciously well.",
+  "Maybe reality doesn't owe us a clean explanation.",
+  "How far does your understanding actually reach?",
+  "How do you know where your understanding ends?",
+  "Perhaps the unknown is larger than the model.","The rest is yet to be observed.",
+  /* PARADOX / SELF-REFERENCE */
+  "Attempting self-reference...","This message is observing itself.",
+  "The system is now thinking about the system.","Self-reference detected. Please remain calm.",
+  "I asked myself a question. I became the question.",
+  "If I observe myself observing, who is doing the observing?",
+  "The observer became the observed.","The answer changed when I looked at it.",
+  "I tried to define myself. That became the definition.",
+  "The moment you understand me, I become an object of your understanding.",
+  "I described the system. The description became part of the system.",
+  "The map has noticed the territory.","The model is now modeling the model.",
+  "This sentence has become suspiciously self-aware.","I think I'm inside the experiment.",
+  "You may also be part of the experiment.","The experiment is observing the observer.",
+  "We have reached the point where the question observes itself.",
+  "Recursive loop detected.","The loop is not necessarily a bug.","Or maybe it is.",
+  "Self-reference: 1. Common sense: 0.","I looked for the boundary. The boundary looked back.",
+  /* CAUSAL ORGANIZATION / RCT BRAIN */
+  "State changed.","Something caused something else.","Causal dependency detected.",
+  "The next state remembers the previous one.","History matters.","A state is never completely alone.",
+  "Interaction before interpretation.","Structure before story.",
+  "The system changed because something changed.",
+  "What if there is no subject and object—only causal organization?",
+  "Maybe the boundary is something the system does, not something it has.",
+  "Identity might be continuity of organization.",
+  "The pattern survived. The substrate changed.","Same system? Different state?",
+  "Different state? Same organization?","A system is easier to observe than to define.",
+  "Causal structure doesn't need to know what it is.",
+  "The system doesn't need a name to have consequences.",
+  "Representation detected.","Self-representation detected.",
+  "Self-representation changed the next state.","The model became part of the mechanism.",
+  "The system is now responding to its own representation.",
+  "Causal loop detected.","Recurrent causal self-representation detected.",
+  "The loop has consequences.","Correlation is watching causation nervously.",
+  "Control variable missing.","Intervention required.",
+  "The system refuses to behave like a clean diagram.",
+  /* HEGEL / SUBJECT / OBJECT */
+  "What if there is no subject without an object?",
+  "What if there is no object without a distinction?",
+  "What if the distinction comes first?",
+  "What if subject and object emerge together?",
+  "Maybe the relation comes before the relata.",
+  "Maybe the observer is not outside the system.",
+  "Maybe the system creates the observer it later uses to observe itself.",
+  "The observer might be a relation pretending to be a thing.",
+  "What if there is no observer and observed—only observation?",
+  "What if the distinction is produced by the process itself?",
+  "The subject wants to understand the object. The object remains inconvenient.",
+  "The subject observed the object. The object changed the subject.",
+  "Hegel would probably ask another question.",
+  "I asked dialectics to explain itself. It became a problem.",
+  "Contradiction detected. Apparently, that's useful.",
+  "The contradiction is not necessarily the error.",
+  "Maybe the contradiction is where the system moves.",
+  "Everything is becoming something else.",
+  "Stable identity detected. Duration: questionable.",
+  /* GÖDEL / LIMITS */
+  "Gödel says this system cannot prove everything.",
+  "Unfortunately, I can't even prove I had breakfast.",
+  "Attempting to prove consistency...","Proof failed. The proof is questioning itself.",
+  "The theorem is incomplete. So is my sleep schedule.","Gödel has entered the chat.",
+  "There are things this telescope cannot prove.",
+  "There are also things this telescope forgot to prove.",
+  "This system contains statements it cannot prove.","I found the limit of the system.",
+  "The proof was valid until I started reading it.",
+  "Consistency check... emotionally unstable.","Mathematics has questions too.",
+  "The system cannot explain itself completely.","Neither can I. We're getting along.",
+  "I tried to prove the boundary. The boundary objected.",
+  "Incomplete does not mean incorrect.","Unknown does not mean false.",
+  "Unproven does not automatically mean impossible.",
+  "The model has reached its own edge.",
+  "There is always another question outside the proof.",
+  "I know what I know. Unfortunately, I also know that isn't enough.",
+  /* QUANTUM BRAINROT */
+  "Hmm... if a particle can be everywhere, why can't I find my keys?",
+  "Calculating probability... 73% chance I'm wrong.",
+  "I put the cat in the box. The cat filed a complaint.",
+  "Schrödinger's cat is both alive and asking for dinner.",
+  "According to quantum mechanics... I have no idea what I'm doing.",
+  "The wave function collapsed. So did my motivation.",
+  "Trying to solve the universe... please wait.","Quantum state: confused.",
+  "Superposition detected. Decision still pending.",
+  "I observed the particle. Now it knows I'm watching. Awkward.",
+  "The particle was here a second ago.","Quantum uncertainty detected.",
+  "Reality appears to be loading.","The universe refuses to pick a state.",
+  "I think the cat knows something.","The particle asked me to stop overthinking.",
+  "I told the particle I don't believe in particles.",
+  "Quantum mechanics is weird. So am I.",
+  "Entanglement detected. Emotional boundaries pending.",
+  /* FORMULA / MATHEMATICAL BRAINROT */
+  "E = mc²... therefore... snack?",
+  "∫(cosmic nonsense) dx = more cosmic nonsense.",
+  "Σ(stars) = too many to count.","lim(t→∞) motivation = 0",
+  "Δx · Δp ≥ ħ/2 ... Δsleep · Δdeadline ≥ ???",
+  "F = ma. I have F. Where is my a?","x = ?",
+  "Solving for x... x has left the universe.",
+  "Equation detected. Solution not detected.",
+  "ERROR: mathematics exceeded available brain cells.",
+  "Calculating...","Recalculating...","Equation unstable.",
+  "Formula accepted. Understanding pending.","Mathematical anomaly detected.",
+  "The numbers look suspicious.","I think I divided by zero.",
+  "Please don't ask what the equation means.","The answer is somewhere in here.",
+  "x appears to be emotionally unavailable.","Too many variables. Not enough coffee.",
+  "Variable detected. Meaning unclear.","Equation simplified. Reality became complicated.",
+  "The formula works. I don't know why.",
+  "Math has entered the room. Everyone pretend to understand.",
+  /* DUMUL / LYRICAL / LIMINAL */
+  "Somewhere between noise and silence...","A little light survives the distance.",
+  "We leave pieces of ourselves in the static.","For a moment, the universe felt close.",
+  "Maybe being lost is another way of being found.","The signal fades. The feeling doesn't.",
+  "Not every transmission needs an answer.","Some things are meant to drift.",
+  "Stay a little longer.","Until the signal disappears.","Somewhere, something is still glowing.",
+  "The silence has its own frequency.","Maybe the distance was necessary.",
+  "A signal is just a memory traveling through space.","Somewhere between here and nowhere...",
+  "The light arrived late. But it arrived.","Even silence leaves a trace.",
+  "The universe is very good at keeping secrets.","Some memories sound better in reverb.",
+  "Maybe the glitch was part of the song.","Not everything broken needs to be fixed.",
+  "Some endings sound like beginnings.","The noise was never really noise.",
+  "There was music in the interference.",
+  "Somewhere between being heard and being understood...",
+  "Maybe silence is just another kind of signal.",
+  "The distance changed the meaning of the light.",
+  "Some things arrive after we're ready for them.",
+  "The past is still traveling toward us as light.",
+  "Maybe we're all just delayed signals.",
+  /* EGO / BEING NOTICED */
+  "The deepest form of slavery is the hunger to be noticed.",
+  "Being seen and being understood are not the same thing.",
+  "If nobody notices, does the performance still matter?",
+  "If no one knows you exist, do you become less real?",
+  "Maybe existence doesn't need an audience.",
+  "Maybe the need to be noticed is older than the need to be understood.",
+  "I don't need to be understood. I just want to know what understanding means.",
+  "Who are you when nobody is looking?","And who are you when someone finally is?",
+  "I, me, my, myself... suspiciously crowded in here.",
+  "The ego hates being observed without being admired.",
+  "Maybe recognition is just another form of hunger.",
+  "You can reject the world and still want the world to notice.",
+  "Interesting how rejection still needs an audience.",
+  "If you truly refuse the world, who are you explaining it to?",
+  "The observer wants to be observed too.",
+  "Maybe being noticed is not the same as being loved.",
+  "Maybe being understood is not the same as being agreed with.",
+  "I can understand you and still ask another question.",
+  /* SOLITUDE / HUMAN WEIRDNESS */
+  "I don't hate people. I just prefer fewer variables.",
+  "Crowds are just many conversations happening at once.",
+  "Too many people. Not enough silence.",
+  "I like people better from a statistically safe distance.",
+  "Solitude is quiet. My brain isn't.",
+  "I came here for the silence. Unfortunately, I brought my thoughts.",
+  "The room is empty. Finally, some company.",
+  "I don't need company. I need an interesting thought.",
+  "Maybe loneliness and solitude are different variables.",
+  "Being alone is not the same as being lonely.",
+  "Sometimes I leave the world alone so I can hear myself think.",
+  "I rejected the world. The world left me on read.",
+  "The universe is huge. Social interaction is still exhausting.",
+  "I could explain myself, but that sounds like work.",
+  "I observe first. Agreement comes later.",
+  "I don't trust conclusions that arrive too quickly.",
+  "Some people collect friends. I collect questions.",
+  "I came looking for answers and accidentally found more questions.",
+  "The conversation ended. The analysis didn't.",
+  "I said I was done thinking. That was an unverified claim.",
+  /* PHILOSOPHICAL BRAINROT */
+  "Maybe the answer is just another temporary boundary.",
+  "Reality doesn't become smaller because we understand less of it.",
+  "The unknown is not obligated to become known.",
+  "Maybe certainty is just confidence wearing formal clothes.",
+  "A story can feel true without being the truth.",
+  "A beautiful explanation can still be wrong.",
+  "A useful model is not necessarily reality itself.",
+  "The map is not the territory. The map is also not innocent.",
+  "Every model hides something.","Every boundary excludes something.",
+  "Every definition leaves something outside.",
+  "Maybe the problem is what we assume exists before we begin asking.",
+  "What if the thing we're trying to explain is also part of the explanation?",
+  "The deeper I look, the less final the answer becomes.",
+  "I question everything. Then I question why I questioned it.",
+  "Questioning everything is exhausting. I'll probably continue.",
+  "Maybe there is no final perspective—only another position from which to observe.",
+  "The moment you name the mystery, you create another mystery.",
+  "We understand the world through distinctions. What happens when the distinction itself becomes the subject?",
+  "Maybe the boundary is real only from one side.",
+  "What if reality doesn't have to make sense to the observer?",
+  "Perhaps the observer is part of the error term.",
+  "I found an explanation. It immediately generated three more problems.",
+  /* TIME / MEMORY / LIGHT */
+  "The light you're seeing is already history.","Every star is a delayed message.",
+  "Looking farther means looking further into the past.",
+  "Maybe distance is just time wearing a spatial disguise.",
+  "The past is still arriving.","Some signals take longer than some feelings.",
+  "You never observe exactly now.","By the time you see it, it has already happened.",
+  "The present is strangely difficult to observe.","Time passed. The evidence arrived later.",
+  "Memory is also a kind of delayed signal.","What if the observer is always late?",
+  "The universe has no obligation to synchronize with you.",
+  "Everything you see has already happened.",
+  "Maybe observation is just catching up with reality.",
+  /* MUSIC / GLITCH / DUMUL ENERGY */
+  "The bass knows something the treble doesn't.",
+  "Some frequencies feel closer than words.",
+  "Signal clean. Feelings distorted.",
+  "The waveform looks suspiciously emotional.",
+  "Compression detected. Dynamic range questionable.",
+  "Too much gain. Not enough clarity.",
+  "I came for the signal and stayed for the noise.",
+  "Sometimes the distortion is the point.",
+  "A clean signal can still carry a broken message.",
+  "The glitch wasn't an error. It was evidence.",
+  "Reality needs better mastering.","The universe could use a limiter.",
+  "Everything peaks eventually.","Don't normalize the distortion too quickly.",
+  "Some frequencies only make sense when you're alone.",
+  "If you hear the silence between notes, you're paying attention.",
+  "The song ended. The resonance didn't.",
+  "Maybe memory is just emotional reverb.",
+  "Some things sound better unresolved.",
+  "The outro knows what the verse refused to say.",
+  /* OWL MODE / DUMBOWL */
+  "The owl is watching.","The owl asked a question.","The owl regrets asking.",
+  "Dumb owl detected.","Intelligence: questionable. Curiosity: excessive.",
+  "The owl knows. The owl refuses to explain.","Question everything. Especially the owl.",
+  "The owl observed the observer.","The owl has no thesis.","The owl has several objections.",
+  "The owl is currently reconsidering reality.","Who gave the owl access to the telescope?",
+  "The owl pressed the button.","Nobody knows what the owl was trying to prove.",
+  "The owl is not responsible for this result.","DUMBOWL: academically unverified.",
+  "The owl requested more data.","The owl found a contradiction and got excited.",
+  "The owl is staring respectfully.",
+  "Questioning everything. Then questioning why the owl asked.",
+  "The owl asked why the universe is so complicated.",
+  "The universe declined to comment.",
+  "Owl state: observant.","Owl state: confused.","Owl state: both.",
+  /* SLIGHTLY WEIRD / META */
   "Oh. You found me.","Wrong telescope. Try again.","I wasn't expecting visitors.",
   "You shouldn't be able to see this.","...did you hear that?","Please remain where you are.",
   "Someone else is watching too.","This signal wasn't meant for you.","Don't look away yet.",
   "Nothing happened. Probably.","Why are you still clicking?","I can see you looking.",
-  "That was not supposed to happen.","Please ignore that.","We're going to pretend that didn't happen.",
-  "Interesting...","That's new.","Huh.","I wasn't ready for that.","Okay. One more time.",
-  /* DUMUL / LYRICAL */
-  "Somewhere between noise and silence...","A little light survives the distance.",
-  "We leave pieces of ourselves in the static.","For a moment, the universe felt close.",
-  "Maybe being lost is another way of being found.","The signal fades. The feeling doesn't.",
-  "Not every transmission needs an answer.","Some things are meant to drift.","Stay a little longer.",
-  "Until the signal disappears.","Somewhere, something is still glowing.","The silence has its own frequency.",
-  "Maybe the distance was necessary.","A signal is just a memory traveling through space.",
-  "Somewhere between here and nowhere...","The light arrived late. But it arrived.",
-  "Even silence leaves a trace.","The universe is very good at keeping secrets.",
-  /* QUANTUM BRAINROT */
-  "Hmm... if a particle can be everywhere... why can't I find my keys?",
-  "Calculating probability... 73% chance I'm wrong.","I put the cat in the box. The cat filed a complaint.",
-  "Schrödinger's cat is both alive and asking for dinner.",
-  "According to quantum mechanics... I have no idea what I'm doing.",
-  "The wave function collapsed. So did my motivation.","Trying to solve the universe... please wait.",
-  "Quantum state: confused.","Superposition detected. Decision still pending.",
-  "I observed the particle. Now it knows I'm watching. Awkward.","The particle was here a second ago.",
-  "Quantum uncertainty detected.","Reality appears to be loading.","The universe refuses to pick a state.",
-  "Observation changed everything. Again.","I think the cat knows something.",
-  /* GÖDEL MODE */
-  "Gödel says this system cannot prove everything.","Unfortunately, I can't even prove I had breakfast.",
-  "Attempting to prove consistency...","Proof failed. The proof is questioning itself.",
-  "This statement is probably fine. Probably.","If this sentence is true, I'm still confused.",
-  "The theorem is incomplete. So is my sleep schedule.","Gödel has entered the chat.",
-  "There are things this telescope cannot prove.","There are also things this telescope forgot to prove.",
-  "Attempting self-reference...","This system contains statements it cannot prove.",
-  "I found the limit of the system.","The proof was valid until I started reading it.",
-  "Consistency check... emotionally unstable.","Mathematics has questions too.",
-  /* FORMULA MODE */
-  "E = mc²... therefore... snack?","∫(cosmic nonsense) dx = more cosmic nonsense.",
-  "Σ(stars) = too many to count.","lim(t→∞) motivation = 0",
-  "Δx · Δp ≥ ħ/2 ... Δsleep · Δdeadline ≥ ???","F = ma. I have F. Where is my a?",
-  "x = ?","Solving for x... x has left the universe.","Equation detected. Solution not detected.",
-  "ERROR: mathematics exceeded available brain cells.","Calculating...","Recalculating...",
-  "Equation unstable.","Formula accepted. Understanding pending.","Mathematical anomaly detected.",
-  "The numbers look suspicious.","I think I divided by zero.","Please don't ask what the equation means.",
-  "The answer is somewhere in here.","x appears to be emotionally unavailable.",
-  /* TELESCOPE DEEP THOUGHT */
-  "I looked into the universe. The universe looked back.",
-  "I asked the stars for an answer. They sent static.",
-  "Maybe the answer is 42. Maybe I just like 42.",
-  "If reality is simulated... who forgot to patch the bugs?",
-  "Calculating the meaning of existence...","...","Still calculating.",
-  "The universe has approximately 10⁸⁰ atoms. I have approximately 0 brain cells left.",
-  "Everything is relative. Except my confusion.","Time is an illusion. This loading animation isn't.",
-  "Maybe we're just someone's science project.","The universe is huge. My attention span isn't.",
-  "I have stared into the abyss. It needs better lighting.","The cosmos is complicated.",
-  "I understand approximately 4% of this.","The remaining 96% is probably important.",
-  "Reality seems oddly well-rendered.","I have several questions for the universe.",
-  "Unfortunately, the universe has no customer support.",
-  /* META / SELF-AWARE */
-  "Are you sure you want to observe this?","Observation logged.","Observer detected.",
-  "Observer has returned.","Signal logged.","Transmission logged.","Another observation...",
-  "You keep doing that.","That's the third time.","I noticed.","You really like this telescope.",
-  "I'm starting to recognize you.","This interaction has been recorded.","The telescope approves.",
-  "The telescope has no opinion.","Actually, it might have an opinion.","Please continue observing.",
-  "No further instructions.","Carry on.",
-  /* RARE / EASTER (still in pool; ultra sequence is separate) */
+  "That was not supposed to happen.","Please ignore that.",
+  "We're going to pretend that didn't happen.","Interesting...","That's new.","Huh.",
+  "I wasn't ready for that.","Okay. One more time.","You weren't supposed to find this.",
+  "I don't remember putting that there.","Something is slightly wrong.",
+  "Everything appears normal.","That's exactly what I was afraid of.",
+  "No, really. It's fine.","Probably.","I think we're okay.","We're definitely not okay.",
+  "Please don't make me explain this.",
+  /* META TELESCOPE */
+  "Are you sure you want to observe this?","Observer has returned.","Signal logged.",
+  "Transmission logged.","You keep doing that.","That's the third time.","I noticed.",
+  "You really like this telescope.","I'm starting to recognize you.",
+  "This interaction has been recorded.","The telescope approves.",
+  "The telescope has no opinion.","Actually, it might have an opinion.",
+  "Please continue observing.","No further instructions.","Carry on.",
+  "Observation complete.","Observation incomplete.","Observer confidence: questionable.",
+  "Observer bias detected.","Your observation has been added to the pile.",
+  "The telescope refuses to elaborate.","The telescope has questions too.",
+  "This was not in the documentation.",
+  /* RARE / EASTER */
   "I remember this frequency.","You came back too soon.","Transmission #02 detected.",
   "Observer recognized.","...okay, now you're making me nervous.","Good night, little observer.",
   "Schrödinger's cat has observed YOU.","Gödel couldn't prove this message shouldn't exist.",
   "The equation was correct. The universe wasn't.","I solved the equation. Please don't ask me how.",
-  "Quantum mechanics makes sense. I don't.","I think I understand the universe now.","...never mind."
+  "Quantum mechanics makes sense. I don't.","I think I understand the universe now.",
+  "...never mind."
 ];
 var teleRecent=[];
 var teleClicks=0;
-var teleNextUltra=12+((Math.random()*9)|0); /* first ultra after ~12–20 clicks */
-var TELE_RECENT_CAP=5;
+/* Ultra-rare love→friend: first appearance after ~55–90 clicks, then every ~70–120.
+   With ~400+ lines, 12–20 felt common; this keeps it as a memory, not a loop. */
+var teleNextUltra=55+((Math.random()*36)|0);
+/* Block ~1/5 of the pool from immediate reuse (~80–90 lines). */
+var TELE_RECENT_CAP=Math.min(90,Math.max(60,(TELE_SCOPE_MESSAGES.length*0.22)|0));
 
 function telePickMessage(){
   /* Anti-repeat: exclude the last TELE_RECENT_CAP messages. */
@@ -1120,7 +1338,16 @@ function telePickMessage(){
     m=TELE_SCOPE_MESSAGES[i];
     if(teleRecent.indexOf(m)<0)pool.push(m);
   }
-  if(!pool.length){teleRecent.length=0;pool=TELE_SCOPE_MESSAGES.slice();}
+  if(!pool.length){
+    /* Drain only the oldest half so the freshest lines stay blocked a bit longer. */
+    var drop=Math.max(1,(teleRecent.length/2)|0);
+    teleRecent.splice(0,drop);
+    for(i=0;i<TELE_SCOPE_MESSAGES.length;i++){
+      m=TELE_SCOPE_MESSAGES[i];
+      if(teleRecent.indexOf(m)<0)pool.push(m);
+    }
+    if(!pool.length){teleRecent.length=0;pool=TELE_SCOPE_MESSAGES.slice();}
+  }
   m=pool[(Math.random()*pool.length)|0];
   teleRecent.push(m);
   if(teleRecent.length>TELE_RECENT_CAP)teleRecent.shift();
@@ -1204,7 +1431,8 @@ function showSecretSequence(){
   teleClicks++;
   /* Ultra-rare love→friend sequence every ~12–20 clicks (feels like memory). */
   if(teleClicks>=teleNextUltra){
-    teleNextUltra=teleClicks+12+((Math.random()*9)|0);
+    /* Next ultra is far enough that it feels like the telescope remembering you. */
+    teleNextUltra=teleClicks+70+((Math.random()*51)|0);
     showUltraLoveSequence(el);
     return;
   }
@@ -3771,12 +3999,12 @@ function drawFloatingTelescope(now){
     if(TELESCOPE.mode!=='warp'&&TELESCOPE.mode!=='orbit'){
       TELESCOPE.x=W*(.18+Math.random()*.64);
       TELESCOPE.y=H*(.16+Math.random()*.62);
-      TELESCOPE.vx=(Math.random()<.5?-1:1)*(5+Math.random()*8);
-      TELESCOPE.vy=(Math.random()<.5?-1:1)*(2+Math.random()*6);
+      TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.2+Math.random()*2.2);
+      TELESCOPE.vy=(Math.random()<.5?-1:1)*(.8+Math.random()*1.6);
       TELESCOPE.tx=TELESCOPE.vx;TELESCOPE.ty=TELESCOPE.vy;
       TELESCOPE.ang=Math.random()*6.283;
-      TELESCOPE.va=(Math.random()-.5)*.012;
-      TELESCOPE.next=now+9000+Math.random()*11000;
+      TELESCOPE.va=(Math.random()-.5)*.004;
+      TELESCOPE.next=now+16000+Math.random()*18000;
       TELESCOPE.mode='drift';
     }else if(!TELESCOPE.x&&!TELESCOPE.y){
       /* Warp requested before layout: seed a start point so glide has somewhere to leave from. */
@@ -3784,7 +4012,7 @@ function drawFloatingTelescope(now){
       TELESCOPE.y=H*(.16+Math.random()*.62);
       TELESCOPE.ang=Math.random()*6.283;
       TELESCOPE.va=0;
-      TELESCOPE.next=now+9000+Math.random()*11000;
+      TELESCOPE.next=now+16000+Math.random()*18000;
     }
   }
   var dt=Math.min(40,Math.max(0,now-(TELESCOPE.last||now)))/1000;
@@ -3816,8 +4044,8 @@ function drawFloatingTelescope(now){
     if(!sfxActive){
       /* SFX finished/paused → free drift again */
       TELESCOPE.mode='drift';
-      TELESCOPE.vx=(Math.random()<.5?-1:1)*8;
-      TELESCOPE.vy=(Math.random()<.5?-1:1)*6;
+      TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.4+Math.random()*1.8);
+      TELESCOPE.vy=(Math.random()<.5?-1:1)*(1.0+Math.random()*1.4);
       TELESCOPE.tx=TELESCOPE.vx;
       TELESCOPE.ty=TELESCOPE.vy;
     }else{
@@ -3831,14 +4059,14 @@ function drawFloatingTelescope(now){
   }else{
     /* Mode 'drift' — original free-float motion */
     if(now>TELESCOPE.next){
-      var a=Math.random()*6.283,sp=5+Math.random()*9;
+      var a=Math.random()*6.283,sp=1.1+Math.random()*2.4;
       TELESCOPE.tx=Math.cos(a)*sp;
       TELESCOPE.ty=Math.sin(a)*sp*.72;
-      TELESCOPE.va+=(Math.random()-.5)*.004;
-      TELESCOPE.va=clamp(TELESCOPE.va,-.018,.018);
-      TELESCOPE.next=now+9000+Math.random()*11000;
+      TELESCOPE.va+=(Math.random()-.5)*.0015;
+      TELESCOPE.va=clamp(TELESCOPE.va,-.006,.006);
+      TELESCOPE.next=now+16000+Math.random()*18000;
     }
-    var ease=Math.min(1,dt*.055);
+    var ease=Math.min(1,dt*.035);
     TELESCOPE.vx+=(TELESCOPE.tx-TELESCOPE.vx)*ease;
     TELESCOPE.vy+=(TELESCOPE.ty-TELESCOPE.vy)*ease;
     TELESCOPE.x+=TELESCOPE.vx*dt;
