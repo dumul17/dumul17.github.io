@@ -1294,6 +1294,49 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     kick();
   });
 
+  /* ---------- judul tab dinamis + Media Session (lock screen / notifikasi) ---------- */
+  (function(){
+    var BASE=document.title,AWAY='come back to the stars \u2726';
+    function nowPlaying(){return !!current&&!audio.paused&&!audio.ended;}
+    function curTitle(){try{return current?titleOf(current):'';}catch(e){return '';}}
+    function updateTitle(){
+      var t;
+      if(nowPlaying()&&curTitle())t='\u25B6 '+curTitle()+' \u2014 DUMUL';
+      else if(document.hidden)t=AWAY;
+      else t=BASE;
+      if(document.title!==t)document.title=t;
+    }
+    var ms=('mediaSession' in navigator)?navigator.mediaSession:null,lastMeta='';
+    function setMeta(){
+      if(!ms||!window.MediaMetadata)return;
+      var t=curTitle();if(!t||t===lastMeta)return;lastMeta=t;
+      try{ms.metadata=new MediaMetadata({title:t,artist:'DUMUL',album:'Limerence',
+        artwork:[{src:'og.jpg',sizes:'720x720',type:'image/jpeg'}]});}catch(e){}
+    }
+    function setPos(){
+      if(!ms||!ms.setPositionState)return;
+      var d=audio.duration;
+      if(!isFinite(d)||!(d>0))return;
+      try{ms.setPositionState({duration:d,playbackRate:audio.playbackRate||1,position:Math.min(d,Math.max(0,audio.currentTime||0))});}catch(e){}
+    }
+    if(ms){
+      var H=function(a,f){try{ms.setActionHandler(a,f);}catch(e){}};
+      H('play',function(){if(current)safePlay();});
+      H('pause',function(){audio.pause();});
+      H('previoustrack',function(){if(current)go(-1);});
+      H('nexttrack',function(){if(current)go(1);});
+      H('seekto',function(d){if(d&&isFinite(d.seekTime)){audio.currentTime=d.seekTime;setPos();}});
+      H('seekbackward',function(d){audio.currentTime=Math.max(0,audio.currentTime-((d&&d.seekOffset)||10));setPos();});
+      H('seekforward',function(d){audio.currentTime=Math.min(audio.duration||0,audio.currentTime+((d&&d.seekOffset)||10));setPos();});
+    }
+    audio.addEventListener('play',function(){setMeta();if(ms)ms.playbackState='playing';updateTitle();});
+    audio.addEventListener('pause',function(){if(ms)ms.playbackState='paused';setPos();updateTitle();});
+    audio.addEventListener('ended',function(){updateTitle();});
+    audio.addEventListener('error',function(){lastMeta='';if(ms){ms.playbackState='none';ms.metadata=null;}updateTitle();});
+    ['loadedmetadata','durationchange','seeked'].forEach(function(ev){audio.addEventListener(ev,function(){setMeta();setPos();});});
+    document.addEventListener('visibilitychange',updateTitle);
+  })();
+
   document.addEventListener('click',function(e){
     var r=e.target.closest&&e.target.closest(SEL);
     if(r)toggle(r);
