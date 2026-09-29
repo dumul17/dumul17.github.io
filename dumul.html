@@ -654,7 +654,7 @@ for(let ni=0;ni<p.length;ni++){
 if(v>0&&nR()>0.5){let h=nR()*u,y=2+nR()*8;l.globalAlpha=g*0.35;l.fillStyle=nR()>0.5?"#6ee5ff":"#ff7ad9";l.fillRect(0,h,i,y)}
 l.restore();
 o=_vis?requestAnimationFrame(k):0};
-let _io=null;if("IntersectionObserver"in window){_io=new IntersectionObserver(function(es){var e=es[es.length-1];_vis=e.isIntersecting;if(_vis&&!o){d=performance.now();o=requestAnimationFrame(k)}},{rootMargin:"80px"});_io.observe(r)}
+let _io=null;if("IntersectionObserver"in window){_io=new IntersectionObserver(function(es){var e=es[es.length-1];_vis=e.isIntersecting;window.__dmHeroVis=_vis;if(_vis&&!o){d=performance.now();o=requestAnimationFrame(k)}},{rootMargin:"80px"});_io.observe(r)}
 return o=requestAnimationFrame(k),()=>{cancelAnimationFrame(o),_io&&_io.disconnect(),window.removeEventListener("resize",m)}},[]),T("div",{className:"min-h-screen bg-[#0a1218] text-[#b8c6d6] antialiased selection:bg-[#6ee5ff]/30 selection:text-[#e6eef8]",children:[C("style",{children:`
         * { font-family: "Space Grotesk", system-ui, sans-serif; }
         .display { font-family: "Syne", sans-serif; }
@@ -717,6 +717,8 @@ body.dm-has-bar{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px));back
 #dm-title{font-family:"Space Grotesk",system-ui,sans-serif;font-size:13.5px;font-weight:500;letter-spacing:.02em;text-transform:lowercase;color:#eaf6ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #dm-title.dm-dec{text-shadow:-1px 0 rgba(255,43,214,.75),1px 0 rgba(34,230,255,.75)}
 #dm-time{flex:none;font-family:"Space Grotesk",system-ui,sans-serif;font-size:11px;font-weight:400;letter-spacing:.04em;color:rgba(184,198,214,.62);font-variant-numeric:tabular-nums}
+#dm-mini{position:absolute;left:0;right:0;bottom:100%;width:100%;height:34px;display:block;pointer-events:none;opacity:0;transition:opacity .35s;background:linear-gradient(to top,rgba(8,14,20,.7),rgba(8,14,20,0));-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+#dm-mini.dm-on{opacity:1}
 #dm-seek{position:relative;height:24px;cursor:pointer;touch-action:none;outline:none}
 #dm-wave{display:block;width:100%;height:100%}
 #dm-seek:focus-visible{outline:2px solid #ff7ad9;outline-offset:1px;border-radius:6px}
@@ -860,6 +862,41 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       if(dragging){wctx.beginPath();wctx.arc(xe,y,10,0,Math.PI*2);wctx.strokeStyle='rgba(110,229,255,.35)';wctx.lineWidth=1;wctx.stroke();}
     }
     wctx.shadowBlur=0;
+  }
+  /* Mini spectrum di atas bar: muncul kalau spektrum hero sudah keluar layar (mis. lagu di urutan bawah, lagi baca lirik) */
+  var miniEl=document.createElement('canvas');miniEl.id='dm-mini';miniEl.setAttribute('aria-hidden','true');bar.appendChild(miniEl);
+  var mctx=miniEl.getContext('2d'),miniW=0,miniH=0,miniDpr=0,miniLast=0,miniOn=false;
+  function drawMini(now,playing){
+    var want=!!playing&&window.__dmHeroVis===false&&!document.hidden;
+    if(want!==miniOn){miniOn=want;miniEl.classList.toggle('dm-on',want);}
+    if(!want||now-miniLast<33)return;
+    miniLast=now;
+    var w=miniEl.clientWidth,h=miniEl.clientHeight;
+    if(!w||!h)return;
+    var dpr=Math.min(window.devicePixelRatio||1,2);
+    if(w!==miniW||h!==miniH||dpr!==miniDpr){
+      miniW=w;miniH=h;miniDpr=dpr;
+      miniEl.width=Math.round(w*dpr);miniEl.height=Math.round(h*dpr);
+      mctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    mctx.clearRect(0,0,w,h);
+    var y=h/2,t=now/1000,sp=window.__dmSp,amp=h*.42,beat=(now-(A.beatAt||0))<140;
+    mctx.lineCap='round';mctx.lineJoin='round';
+    mctx.beginPath();mctx.moveTo(0,y);mctx.lineTo(w,y);
+    mctx.strokeStyle='rgba(184,198,214,.1)';mctx.lineWidth=1;mctx.stroke();
+    for(var pass=0;pass<2;pass++){
+      var ox=pass?(beat?(Math.random()-.5)*7:1.4):0;
+      mctx.beginPath();
+      for(var x=0;x<=w;x+=3){
+        var v=sp?sp(x/w):0;
+        var yy=y+Math.sin(x*.02+t*2+pass)*1.1+v*Math.sin(x*.13+t*35+pass*1.3)*amp*(pass?.75:1);
+        if(x===0)mctx.moveTo(x+ox,yy);else mctx.lineTo(x+ox,yy);
+      }
+      if(pass){mctx.strokeStyle='rgba(255,122,217,.55)';mctx.lineWidth=1;mctx.shadowBlur=0;}
+      else{mctx.strokeStyle='#6ee5ff';mctx.lineWidth=1.5;mctx.shadowColor='rgba(110,229,255,.6)';mctx.shadowBlur=6;}
+      mctx.stroke();
+    }
+    mctx.shadowBlur=0;
   }
   function uiStep(){
     if(!current)return;
@@ -1099,7 +1136,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     if(!panel)return;
     /* Only size the lyrics panel so it fits above the player bar.
        NEVER window.scrollBy — that was yanking the page to mid-track on handoff. */
-    var limit=window.innerHeight-(bar.offsetHeight||66)-10;
+    var limit=window.innerHeight-(bar.offsetHeight||66)-10-32;
     var top=panel.getBoundingClientRect().top;
     panel.style.maxHeight=Math.max(110,Math.min(210,limit-top))+'px';
   }
@@ -1174,6 +1211,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     if(playing){lyricsStep();uiStep();}
     seekAmp+=((playing?1:0)-seekAmp)*.12;
     drawSeek(now);
+    drawMini(now,playing);
     if(seekGlitchUntil&&performance.now()>=seekGlitchUntil){seekGlitchUntil=0;seekForce=true;drawSeek(undefined,true);}
     if(playing||mix>.001||seekAmp>.01||A.memory>0.01||A.fracture>0.01||A.listen>0.01||seekGlitchUntil>0)raf=requestAnimationFrame(loop);
   }
