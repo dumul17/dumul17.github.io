@@ -979,6 +979,16 @@ function mkAudio(name,vol,loop,preloadMode){var a=new Audio(encodeURIComponent(n
 function safePlay(a){
   if(!a)return false;
   try{
+    /* Wake Web Audio if a prior star-chime/spectrum path left the context suspended.
+       MediaElementSource nodes are silent while the context is suspended. */
+    if(typeof unlockAudioGraph==='function')unlockAudioGraph();
+    /* Recover volume if a fade left the element at 0 (e.g. swallow transition). */
+    if(!(a.volume>0.01)){
+      if(a===AMB||a===MUSIC_COLLAP)a.volume=.5;
+      else if(typeof SFX!=='undefined'){
+        for(var sk in SFX){if(SFX[sk]===a){a.volume=.85;break;}}
+      }
+    }
     /* First tap on a cold file often rejects until the buffer is ready.
        Kick load(), then retry on canplay so Pleione (and any slow SFX)
        starts on the same user gesture without needing a second click. */
@@ -992,6 +1002,7 @@ function safePlay(a){
         a._retrying=false;
         a.removeEventListener('canplay',retry);
         a.removeEventListener('canplaythrough',retry);
+        if(typeof unlockAudioGraph==='function')unlockAudioGraph();
         if(a.paused||a.ended){
           var p2=a.play();if(p2&&p2.catch)p2.catch(function(){});
         }
@@ -1003,6 +1014,7 @@ function safePlay(a){
     if(p&&p.catch)p.catch(function(){
       setTimeout(function(){
         if(!a.paused&&!a.ended)return;
+        if(typeof unlockAudioGraph==='function')unlockAudioGraph();
         try{var p3=a.play();if(p3&&p3.catch)p3.catch(function(){});}catch(e2){}
       },120);
     });
@@ -1467,6 +1479,44 @@ var AV={ctx:null,an:null,sources:{},data:null,prev:null,ready:false,fallback:fal
    one AudioContext + one AnalyserNode, FFT 1024, smoothed spectrum and a
    low-frequency spectral-flux beat detector. Playback remains owned by the
    normal <audio> elements; this layer only observes them. */
+function ensureAVGraph(){
+  /* Shared Web Audio graph for star spectrum + optional chimes.
+     Important: playStarChime used to create AV.ctx without an AnalyserNode.
+     Later createMediaElementSource() then connected to a null analyser and
+     permanently muted those <audio> elements. Always finish the graph here. */
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return false;
+    if(!AV.ctx)AV.ctx=new AC();
+    if(!AV.an){
+      AV.an=AV.ctx.createAnalyser();
+      AV.an.fftSize=1024;
+      AV.an.smoothingTimeConstant=.46;
+      AV.an.minDecibels=-90;
+      AV.an.maxDecibels=-12;
+      AV.data=new Uint8Array(AV.an.frequencyBinCount);
+      AV.prev=new Uint8Array(AV.an.frequencyBinCount);
+      try{AV.an.connect(AV.ctx.destination);}catch(eConn){}
+    }
+    if(AV.ctx.state!=='running'&&AV.ctx.resume){
+      try{
+        var rp=AV.ctx.resume();
+        if(rp&&rp.catch)rp.catch(function(){});
+      }catch(eRes){}
+    }
+    return true;
+  }catch(e){return false;}
+}
+function unlockAudioGraph(){
+  /* Call from any user-gesture play path so suspended contexts wake up. */
+  if(typeof AV==='undefined'||!AV.ctx)return;
+  if(AV.ctx.state!=='running'&&AV.ctx.resume){
+    try{
+      var rp=AV.ctx.resume();
+      if(rp&&rp.catch)rp.catch(function(){});
+    }catch(e){}
+  }
+}
 function audioVizInit(a){
   if(!a)return false;
   /* Potato devices never enter the Web Audio analyser path. Some low-end
@@ -1475,20 +1525,7 @@ function audioVizInit(a){
      deterministic currentTime fallback instead. */
   if(IS_POTATO){AV.fallback=true;AV.ready=false;return true;}
   try{
-    var AC=window.AudioContext||window.webkitAudioContext;
-    if(!AC){AV.fallback=true;AV.ready=false;return true;}
-    if(!AV.ctx){
-      AV.ctx=new AC();
-      AV.an=AV.ctx.createAnalyser();
-      AV.an.fftSize=1024;
-      /* Slightly less smoothing keeps kick/snare transients readable. */
-      AV.an.smoothingTimeConstant=.46;
-      AV.an.minDecibels=-90;
-      AV.an.maxDecibels=-12;
-      AV.data=new Uint8Array(AV.an.frequencyBinCount);
-      AV.prev=new Uint8Array(AV.an.frequencyBinCount);
-      AV.an.connect(AV.ctx.destination);
-    }
+    if(!ensureAVGraph()){AV.fallback=true;AV.ready=false;return true;}
     var key=SFX.rigel===a?'rigel':(SFX.spica===a?'spica':(SFX.betel===a?'betel':(SFX.sirius===a?'sirius':(SFX.pleione===a?'pleione':(SFX.aldebaran===a?'aldebaran':(SFX.arcturus===a?'arcturus':(SFX.antares===a?'antares':null)))))));
     if(!key)return false;
     if(!AV.sources[key]){
@@ -1497,15 +1534,17 @@ function audioVizInit(a){
         src.connect(AV.an);
         AV.sources[key]=src;
       }catch(srcErr){
+        /* Element may already be wired from a previous session attempt. */
         AV.fallback=true;AV.ready=false;return true;
       }
+    }else{
+      /* Re-assert graph connection after a suspended/resumed context. */
+      try{AV.sources[key].connect(AV.an);}catch(eRe){}
     }
+    unlockAudioGraph();
     AV.fallback=false;
     AV.ready=true;
     AV.skip=0;AV.avgFlux=0;AV.lastBeatT=0;
-    if(AV.ctx.state!=='running'&&AV.ctx.resume){
-      var rp=AV.ctx.resume();if(rp&&rp.catch)rp.catch(function(){AV.fallback=true;AV.ready=false;});
-    }
     return true;
   }catch(e){AV.fallback=true;AV.ready=false;return true;}
 }
@@ -4275,10 +4314,15 @@ function drawBg(now){
 function playStarChime(s){
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   try {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if(!AV.ctx && AC) AV.ctx = new AC();
+    /* Must build the full analyser graph — never leave a bare AudioContext
+       that later star-SFX MediaElementSources would connect into incorrectly. */
+    if(typeof ensureAVGraph==='function'){if(!ensureAVGraph())return;}
+    else{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AV.ctx && AC) AV.ctx = new AC();
+    }
     if(!AV.ctx) return;
-    if(AV.ctx.state === 'suspended' && AV.ctx.resume) AV.ctx.resume();
+    unlockAudioGraph();
 
     var osc = AV.ctx.createOscillator();
     var gain = AV.ctx.createGain();
@@ -4303,6 +4347,7 @@ function playStarChime(s){
     gain.connect(AV.ctx.destination);
     osc.start(nowTime);
     osc.stop(nowTime + 0.55);
+    osc.onended=function(){try{osc.disconnect();gain.disconnect();}catch(eD){};};
   } catch(e){}
 }
 
@@ -5254,6 +5299,7 @@ document.addEventListener('visibilitychange',function(){
     if(lastFrameOK)lastFrameOK+=pause;
   }
   hiddenAt=0;
+  if(typeof unlockAudioGraph==='function')unlockAudioGraph();
   startRenderLoop();
 });
 
