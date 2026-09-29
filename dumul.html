@@ -1808,7 +1808,7 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
 <!-- ===== DUMUL Signal Deck: add-on non-destruktif =====
      Hanya membaca window.__dmA dan menekan tombol player yang sudah ada (#dm-pp, #dm-next, #dm-prev, #dm-seek, baris lagu).
      1) Beat RGB-split di judul hero + garis cahaya di player bar
-     2) Governor kualitas: auto hemat daya kalau FPS jatuh (+ chip manual)
+     2) Visual full by default; hemat daya manual (chip) atau auto-lighten opt-in
      3) Pintasan keyboard (?), ketik "dumul" untuk glitch judul
      4) Warna address bar browser ikut lagu (theme-color)
      5) Haptic bass (opt-in, Android) -->
@@ -1825,6 +1825,8 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
 .dm-chip[aria-pressed="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.45);background:rgba(110,229,255,.08)}
 .dm-chip:hover{border-color:rgba(255,122,217,.4)}
 .dm-chip:focus-visible{outline:2px solid #6ee5ff;outline-offset:2px}
+#dm-help{position:fixed;top:max(8px,env(safe-area-inset-top,0px));right:10px;z-index:30;width:34px;height:34px;border-radius:8px;border:1px solid rgba(110,229,255,.2);background:rgba(6,14,20,.78);color:rgba(214,228,240,.78);font:600 14px/1 'Space Grotesk',system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .2s,border-color .2s}
+#dm-help:hover,#dm-help:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.5);outline:none}
 #dm-keys{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(6,10,14,.72)}
 #dm-keys.on{display:flex}
 #dm-keys .dm-kp{width:min(92vw,360px);padding:20px 22px;border:1px solid rgba(110,229,255,.22);border-radius:10px;background:rgba(10,18,24,.96);color:rgba(214,228,240,.82);font:400 13px/1.9 'Space Grotesk',system-ui,sans-serif}
@@ -1841,9 +1843,9 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   function A(){return window.__dmA;}
   function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){}return null;}
   var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
-  var conn=navigator.connection||{};
-  var weak=!!(conn.saveData||(navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2));
-  var lowPref=ls('dm_lowfx'),auto=false,hap=ls('dm_haptic')==='1';
+  function ss(k,v){try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v);}catch(e){}return null;}
+  /* Fresh open = full visuals. Low-power hanya kalau dipilih manual (berlaku selama sesi tab) atau auto-lighten dinyalakan. */
+  var lowPref=ss('dm_lowfx'),auto=false,autoGov=ls('dm_autogov')==='1',hap=ls('dm_haptic')==='1';
   var ROWS='[class*="space-y-[1px]"] > div';
   var chips={};
 
@@ -1855,10 +1857,11 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   }
 
   /* ---------- mode hemat daya ---------- */
-  function isLow(){return lowPref==='1'||(lowPref!=='0'&&(auto||weak||reduce));}
+  function isLow(){return lowPref==='1'||(lowPref!=='0'&&auto);}
   function sync(){
     if(chips.fx)chips.fx.setAttribute('aria-pressed',isLow()?'true':'false');
     if(chips.hap)chips.hap.setAttribute('aria-pressed',hap?'true':'false');
+    if(chips.gov)chips.gov.setAttribute('aria-pressed',autoGov?'true':'false');
   }
   function applyFx(){
     var low=isLow();
@@ -1874,21 +1877,26 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
     if(pressed!==null)b.setAttribute('aria-pressed',pressed?'true':'false');
     b.addEventListener('click',fn);chips[k]=b;return b;
   }
+  var hasKb=!!(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches);
   var notes=q('dm-notes');
   if(notes){
     var deck=document.createElement('div');
     deck.id='dm-deck';deck.setAttribute('role','group');deck.setAttribute('aria-label','Display and playback options');
     deck.appendChild(chip('fx','Low-power visuals',false,function(){
-      lowPref=isLow()?'0':'1';ls('dm_lowfx',lowPref);applyFx();
+      lowPref=isLow()?'0':'1';ss('dm_lowfx',lowPref);auto=false;applyFx();
       toast(isLow()?'Low-power visuals on':'Full visuals on');
+    }));
+    deck.appendChild(chip('gov','Auto-lighten when laggy',autoGov,function(){
+      autoGov=!autoGov;ls('dm_autogov',autoGov?'1':'0');sync();
+      toast(autoGov?'Auto-lighten on':'Auto-lighten off (always full visuals)');
     }));
     if(navigator.vibrate)deck.appendChild(chip('hap','Haptic bass',hap,function(){
       hap=!hap;ls('dm_haptic',hap?'1':'0');sync();
-      if(hap)try{navigator.vibrate(20);}catch(e){}
-      toast(hap?'Haptic bass on':'Haptic bass off');
+      if(!hap){toast('Haptic bass off');return;}
+      var ok=false;try{ok=navigator.vibrate([60,80,60]);}catch(e){}
+      toast(ok?'Haptic bass on. You should feel two buzzes now':'Vibration blocked. Check Android vibration / battery saver settings');
     }));
-    if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches)
-      deck.appendChild(chip('keys','Keyboard shortcuts',null,function(){keys(true);}));
+    if(hasKb)deck.appendChild(chip('keys','Keyboard shortcuts',null,function(){keys(true);}));
     notes.appendChild(deck);
   }
 
@@ -1908,6 +1916,12 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
     else{ov.classList.remove('on');if(lastFocus&&lastFocus.focus)lastFocus.focus();}
   }
   ov.addEventListener('click',function(){keys(false);});
+  if(hasKb){
+    var hb=document.createElement('button');
+    hb.id='dm-help';hb.type='button';hb.textContent='?';hb.setAttribute('aria-label','Keyboard shortcuts');hb.title='Keyboard shortcuts';
+    hb.addEventListener('click',function(){keys(true);});
+    document.body.appendChild(hb);
+  }
 
   /* ---------- keyboard ---------- */
   var typed='';
@@ -1974,7 +1988,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
     if(root.classList.contains('dm-fx'))setBeat(b);
     if(hap&&p&&a&&a.beatAt&&a.beatAt!==lastBeat){
       lastBeat=a.beatAt;
-      if(a.bass>0.3&&now-a.beatAt<80)try{navigator.vibrate(12);}catch(e){}
+      try{navigator.vibrate(30);}catch(e){}
     }
     if(((++tickN)&15)===0)tint();
     /* governor: 2 jendela x 2.5 detik di bawah 40fps (setelah 4 detik pemanasan) => hemat daya otomatis */
@@ -1984,7 +1998,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
         acc+=dt;frames++;
         if(acc>=2500){
           bad=(frames*1000/acc<40)?bad+1:0;acc=0;frames=0;
-          if(bad>=2&&lowPref===null&&!auto&&!weak){auto=true;applyFx();toast('Visuals lightened to keep playback smooth');}
+          if(bad>=2&&autoGov&&lowPref===null&&!auto){auto=true;applyFx();toast('Visuals lightened to keep playback smooth');}
         }
       }
     }
