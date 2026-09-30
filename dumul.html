@@ -266,8 +266,8 @@ function dmHeroRect(){
   }catch(e){}
   if(!h)h=hEst;
   if(!m){
-    /* Same band as transition: top at (H-meshH)*0.38 → mesh centered on og.jpg chest. */
-    var y=Math.max(0,Math.round((h-meshH)*0.38));
+    /* Same band as transition: top at (H-meshH)*0.48 → mesh on og.jpg shoulder / light-bridge. */
+    var y=Math.max(0,Math.round((h-meshH)*0.48));
     m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
   }
   return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
@@ -472,7 +472,7 @@ function dmNeuralDraw(g,W,H,net,t){
   </script>
   
   <script>
-  /* Align hero spectrum canvas to the same vertical band as the neural transition (og.jpg chest). */
+  /* Align hero spectrum canvas to the same vertical band as the neural transition (og.jpg shoulder / light-bridge). */
   (function(){
     function align(){
       var s=document.querySelector('section.dm-hero');
@@ -482,7 +482,7 @@ function dmNeuralDraw(g,W,H,net,t){
       var H=s.getBoundingClientRect().height;
       if(H<80)return;
       var meshH=132;
-      var targetY=Math.max(0,Math.round((H-meshH)*0.38));
+      var targetY=Math.max(0,Math.round((H-meshH)*0.48));
       var hr=s.getBoundingClientRect();
       var wr=wrap.getBoundingClientRect();
       var curY=wr.top-hr.top;
