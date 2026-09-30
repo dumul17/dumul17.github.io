@@ -504,18 +504,18 @@ let bass=__A.bass||0,mid=__A.mid||0,treble=__A.treble||0,frac=__A.fracture||0,fx
 let breath=0.7+0.3*Math.sin(s*(1.1/sig.breath))+0.15*Math.sin(s*(3.2/sig.breath)+1.2);
 /* cheap pseudo-noise for alpha jitter instead of Math.random */
 let g=Math.max(0.35,Math.min(1.15,(breath+(nR()-0.5)*0.14)*(0.55+0.45*Math.max(__L,0.2))*(1+listen*0.35)));
-if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=2+__L*5*sig.frac;S=5}
+if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=1.15+__L*2.8*sig.frac*(__A.beatKind==='snare'?0.75:1);S=4}
 l.clearRect(0,0,i,u);
-if(S-=c,S<=0){if(nR()>0.55)v=2+nR()*6;S=15+nR()*90}
-let K=v>0?(nR()-0.5)*14*(0.35+mid*0.8):0;
-K+=(mid-0.3)*8*sig.amp;
+if(S-=c,S<=0){if(nR()>0.72)v=1.2+nR()*3.5;S=28+nR()*120}
+let K=v>0?(nR()-0.5)*9*(0.28+mid*0.55):0;
+K+=(mid-0.35)*5.2*sig.amp;
 if(v>0)v-=c;
 let sinkY=u*(0.5+sig.sink*0.12*Math.sin(s*0.8));
 waveLayers[0].y=sinkY;waveLayers[1].y=sinkY-14*(1-sig.sink*0.4);waveLayers[2].y=sinkY+13*(1-sig.sink*0.4);
-let vAmp=0.92*sig.amp*(1+bass*0.2)*(1+listen*0.06);
+let vAmp=0.78*sig.amp*(1+bass*0.14)*(1+listen*0.05);
 let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
-let hot=__L>0.12||v>0||frac>0.08||listen>0.35||bass>0.35;
+let hot=__L>0.16||v>0||frac>0.1||listen>0.4||bass>0.42;
 let waveStep=_perf>=3?6:(_perf===2?8:10);
 let meshLinkMul=_perf>=2?1:0.72;
 let doGlitchBars=_perf>=2;
@@ -535,7 +535,7 @@ for(let y=0;y<waveLayers.length;y++){
   if(hot){l.shadowBlur=(y===0?10:7)*(1+listen*0.25+__L*0.15);l.shadowColor=col;}
   else l.shadowBlur=0;
   let Mn=0.12+y*0.05;
-  let gapHalf=frac*14*(1+sig.frac*0.2);
+  let gapHalf=frac*10*(1+sig.frac*0.15);
   let gapCenter=fx*i;
   let moved=false;
   for(let fe=0;fe<i;fe+=waveStep){
@@ -642,7 +642,7 @@ for(let h=0;h<p.length;h+=linkStep){
 for(let ni=0;ni<p.length;ni++){
   let h=p[ni];
   let y=0.7+0.3*Math.sin(s*3+h.phase);
-  let rBoost=1+__L*0.9*sig.amp*(1+bass*0.2);
+  let rBoost=1+__L*0.55*sig.amp*(1+bass*0.12);
   l.beginPath();l.globalAlpha=g*y*(1+listen*0.15);l.fillStyle=h.color;
   if(hot){l.shadowBlur=10*(1+listen*0.4);l.shadowColor=h.glow;}
   else l.shadowBlur=0;
@@ -1058,7 +1058,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   /* ---------- audio analyser (buat animasi glitch di hero) ---------- */
   var ctx=null,an=null,SPEC=null,PREV=null,mix=0,level=0,avgFlux=0,lastBeatT=0;
   var anB=null,BSPEC=null,BPREV=null,bAvg=.03,bPk=.25,bFl=.05,bAd=0,ePk=.3,eFl=.1;
-  var A=window.__dmA={level:0,beatAt:0,active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
+  var A=window.__dmA={level:0,beatAt:0,beatStr:0,beatKind:'',active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
   var TRACK_SIG={
     'glitch':{amp:1.08,frac:0.85,breath:0.7,thin:0.92,sink:0,cyanPink:1,mesh:1.1},
     'glitch-instrumental':{amp:0.92,frac:0.55,breath:0.85,thin:1.08,sink:0,cyanPink:0.7,mesh:0.9},
@@ -1133,26 +1133,34 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       if(ctx.state!=='running'&&ctx.resume)ctx.resume();
     }catch(e){ctx=null;an=null;/* keep seeded SPEC if any */A.active=!!SPEC;}
   }
-  /* Beat/bass tiap frame (60Hz) dari analyser 2048: hanya bin 1-7 (~23-160Hz), murah. Ambang adaptif. */
+  /* Beat/bass tiap frame (60Hz) dari analyser 2048.
+     Kick: bin 1-7 (~23-160Hz). Snare: bin 12-28 (~280-650Hz). Ambang lebih tinggi, cooldown lebih longgar. */
   function beatStep(now){
     if(!anB||!BSPEC)return;
     anB.getByteFrequencyData(BSPEC);
-    var i,flux=0,e=0,lim=7,e2=0;
-    for(i=1;i<=lim;i++){var v=BSPEC[i],d=v-BPREV[i];if(d>0)flux+=d*(i<=3?1.3:1);e+=v;BPREV[i]=v;}
+    var i,flux=0,e=0,lim=7,e2=0,snFlux=0,snE=0;
+    for(i=1;i<=lim;i++){var v=BSPEC[i],d=v-BPREV[i];if(d>0)flux+=d*(i<=3?1.25:1);e+=v;BPREV[i]=v;}
     for(i=8;i<=12;i++)e2+=BSPEC[i];
+    for(i=12;i<=28;i++){var sv=BSPEC[i],sd=sv-(BPREV[i]||0);if(sd>0)snFlux+=sd;snE+=sv;BPREV[i]=sv;}
     flux/=lim*255;e/=lim*255;e2/=5*255;
-    bAvg+=(flux-bAvg)*.05;
-    var thr=bAvg*1.5+.008;
-    if(flux>thr&&e>.12&&now-lastBeatT>120){
+    snFlux/=17*255;snE/=17*255;
+    bAvg+=(flux-bAvg)*.04;
+    var thr=bAvg*1.85+.014;
+    var snThr=0.045+snE*0.35;
+    var isKick=flux>thr&&e>.155&&now-lastBeatT>165;
+    var isSnare=!isKick&&snFlux>snThr&&snE>.14&&now-lastBeatT>145;
+    if(isKick||isSnare){
       lastBeatT=now;A.beatAt=now;
-      A.beatStr=Math.max(.2,Math.min(1,(flux-bAvg)/.28));
+      A.beatKind=isKick?'kick':'snare';
+      A.beatStr=Math.max(.18,Math.min(1,isKick?(flux-bAvg)/.38:(snFlux/snThr)*.85));
       var sig=currentSig();
-      A.fracture=Math.min(0.75,(0.35+level*0.3)*sig.frac);
-      A.fracX=0.18+Math.random()*0.64;
+      /* Fracture lebih lembut — kurang agresif di hero */
+      A.fracture=Math.min(0.52,(0.22+level*0.22)*sig.frac*(isKick?1:0.72));
+      A.fracX=0.22+Math.random()*0.56;
     }
     var eb=(e*7+e2*5)/12;
-    bPk=Math.max(eb,bPk*.9995);bFl+=(eb-bFl)*(eb<bFl?.2:.0008);
-    bAd=Math.max(0,Math.min(1,(eb-bFl)/(bPk-bFl+.08)))*.9;
+    bPk=Math.max(eb,bPk*.9995);bFl+=(eb-bFl)*(eb<bFl?.18:.0007);
+    bAd=Math.max(0,Math.min(1,(eb-bFl)/(bPk-bFl+.1)))*.78;
   }
   function analyse(now){
     if(!an||!SPEC)return;
@@ -1163,32 +1171,33 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     for(i=1;i<=lim;i++){var d=SPEC[i]-PREV[i];if(d>0)flux+=d;}
     flux/=Math.max(1,lim)*255;
     avgFlux+=(flux-avgFlux)*.06;
-    if(!anB&&flux>avgFlux*1.7+.02&&now-lastBeatT>170){
-      lastBeatT=now;A.beatAt=now;
-      /* Beat fracture: crack one zone, then heal */
+    if(!anB&&flux>avgFlux*2.05+.03&&now-lastBeatT>200){
+      lastBeatT=now;A.beatAt=now;A.beatKind='kick';A.beatStr=Math.max(.2,Math.min(1,(flux-avgFlux)/.4));
+      /* Beat fracture: crack one zone, then heal — milder */
       var sig=currentSig();
-      A.fracture=Math.min(0.75,(0.35+level*0.3)*sig.frac);
-      A.fracX=0.18+Math.random()*0.64;
+      A.fracture=Math.min(0.52,(0.22+level*0.22)*sig.frac);
+      A.fracX=0.22+Math.random()*0.56;
     }
     PREV.set(SPEC);
     var el=Math.min(120,n-1);
     for(i=1;i<=el;i++)e+=SPEC[i];
     e/=Math.max(1,el)*255;
-    ePk=Math.max(e,ePk*.998);eFl+=(e-eFl)*(e<eFl?.2:.002);
-    var lvA=Math.max(0,Math.min(1,(e-eFl)/(ePk-eFl+.1)))*.85;
-    level+=(Math.max(Math.max(0,Math.min(1,(e-.22)*2.4)),lvA)-level)*.35;
+    ePk=Math.max(e,ePk*.998);eFl+=(e-eFl)*(e<eFl?.18:.0018);
+    var lvA=Math.max(0,Math.min(1,(e-eFl)/(ePk-eFl+.12)))*.72;
+    /* Level gain diturunkan sedikit — spektrum & glow kurang loncat */
+    level+=(Math.max(Math.max(0,Math.min(1,(e-.26)*1.85)),lvA)-level)*.28;
     /* Spectrum personality: bass / mid / treble bands */
     var bSum=0,mSum=0,tSum=0,bN=0,mN=0,tN=0;
     var bEnd=Math.min(12,n-1),mEnd=Math.min(64,n-1),tEnd=Math.min(180,n-1);
     for(i=1;i<=bEnd;i++){bSum+=SPEC[i];bN++;}
     for(i=bEnd+1;i<=mEnd;i++){mSum+=SPEC[i];mN++;}
     for(i=mEnd+1;i<=tEnd;i++){tSum+=SPEC[i];tN++;}
-    var bT=Math.max(bAd,Math.max(0,Math.min(1,((bSum/Math.max(1,bN)/255)-0.18)*2.2)));
-    var mT=Math.max(0,Math.min(1,((mSum/Math.max(1,mN)/255)-0.12)*2.0));
-    var tT=Math.max(0,Math.min(1,((tSum/Math.max(1,tN)/255)-0.06)*2.4));
-    A.bass+=(bT-A.bass)*.28;
-    A.mid+=(mT-A.mid)*.28;
-    A.treble+=(tT-A.treble)*.28;
+    var bT=Math.max(bAd,Math.max(0,Math.min(1,((bSum/Math.max(1,bN)/255)-0.22)*1.75)));
+    var mT=Math.max(0,Math.min(1,((mSum/Math.max(1,mN)/255)-0.15)*1.65));
+    var tT=Math.max(0,Math.min(1,((tSum/Math.max(1,tN)/255)-0.08)*1.9));
+    A.bass+=(bT-A.bass)*.22;
+    A.mid+=(mT-A.mid)*.22;
+    A.treble+=(tT-A.treble)*.22;
     /* Signal memory peak while playing */
     if(level>A.memory)A.memory=level;
     /* Snap SMOOTH toward live SPEC (analysis is ~30Hz; renderer interpolates at 60) */
@@ -3210,11 +3219,25 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   function tick(now){
     raf=0;
     var p=playing(),a=A();
-    var b=(a&&a.beatAt&&p)?Math.max(0,1-(now-a.beatAt)/240):0;
+    var b=(a&&a.beatAt&&p)?Math.max(0,1-(now-a.beatAt)/320):0;
     if(root.classList.contains('dm-fx'))setBeat(b);
     if(hap&&p&&a&&a.beatAt&&a.beatAt!==lastBeat){
       lastBeat=a.beatAt;
-      if(now-(window.__dmLV||0)>110){window.__dmLV=now;var st=a.beatStr||.5,ms=Math.round(24+st*46);try{navigator.vibrate(st>.8?[ms,26,Math.round(ms*.6)]:ms);}catch(e){}}
+      if(now-(window.__dmLV||0)>130){
+        window.__dmLV=now;
+        var st=a.beatStr||.5,kind=a.beatKind||'kick';
+        try{
+          if(kind==='snare'){
+            /* snare: short sharp click */
+            var sn=Math.round(12+st*18);
+            navigator.vibrate(sn);
+          }else{
+            /* kick: deeper pulse — longer first hit, optional second thump */
+            var k1=Math.round(28+st*42),k2=Math.round(14+st*22);
+            navigator.vibrate(st>.55?[k1,38,k2]:k1);
+          }
+        }catch(e){}
+      }
     }
     if(((++tickN)&15)===0)tint();
     /* governor: 2 jendela x 2.5 detik di bawah 40fps (setelah 4 detik pemanasan) => hemat daya otomatis */
