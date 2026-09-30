@@ -1544,26 +1544,15 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   }
 
   /* ---------- Corrupted Memory: pengunjung yang balik dapat log sinyal terakhir ---------- */
-  var MEMK='dm_mem',lastTitle='',memSaveAt=0,memPrev=null;
-  try{memPrev=JSON.parse(localStorage.getItem(MEMK)||'null');}catch(e){}
-  function curTitle(){try{if(current&&current.isConnected){var t=titleOf(current);if(t)lastTitle=t;}}catch(e){}return lastTitle;}
-  function memSave(end){
-    var t=curTitle();if(!t)return;
-    var s=end?-1:Math.floor(audio.currentTime||0);
-    if(!end&&s<3)return;
-    try{localStorage.setItem(MEMK,JSON.stringify({t:t,s:s,ts:Date.now()}));}catch(e){}
-  }
-  audio.addEventListener('timeupdate',function(){var n=performance.now();if(!audio.paused&&n-memSaveAt>4000){memSaveAt=n;memSave(false);}});
-  audio.addEventListener('pause',function(){if(!audio.ended)memSave(false);});
-  audio.addEventListener('ended',function(){memSave(true);});
-  document.addEventListener('visibilitychange',function(){if(document.hidden&&!audio.paused)memSave(false);});
-  window.addEventListener('pagehide',function(){if(!audio.paused)memSave(false);});
+  /* Corrupted Memory: data last track/posisi/waktu sekarang disimpan oleh dm_album (lihat snapFrag), dibaca lewat window.__dmMemPrev */
   (function(){
-    var hasMem=!!(memPrev&&memPrev.t);
-    var t=hasMem?String(memPrev.t).slice(0,40):'',s=hasMem?+memPrev.s:0,ts=hasMem?(+memPrev.ts||0):0,tries=0,dead=false,steps=[];
+    var hasMem=false,t='',s=0,ts=0,tries=0,dead=false,steps=[];
     function ok(){return !dead&&audio.paused&&!active&&!audio.currentTime;}
     /* urutan: pesan sambutan (The Album Remembers) → memory lama (last signal / gap) → bersihkan */
     function build(){
+      var mp=null;try{mp=window.__dmMemPrev&&window.__dmMemPrev();}catch(e){}
+      hasMem=!!(mp&&mp.t&&+mp.ts>0);
+      if(hasMem){t=String(mp.t).slice(0,40);s=isFinite(+mp.s)?+mp.s:0;ts=+mp.ts||0;}
       var W=[];try{if(window.__dmWelcome)W=window.__dmWelcome()||[];}catch(e){}
       if(!hasMem&&!W.length)return false;
       var at=0;
@@ -1739,25 +1728,6 @@ html.dm-from-swallow{scroll-behavior:auto!important}
 #dm-notes li{font-size:14px;line-height:1.75;color:rgba(214,228,240,.75);margin-bottom:6px}
 .dm-tracklink{background:none;border:0;padding:0;margin:0;font:inherit;color:#6ee5ff;cursor:pointer;text-decoration:underline;text-underline-offset:2px;-webkit-tap-highlight-color:transparent}
 .dm-tracklink:hover,.dm-tracklink:focus-visible{color:#ff7ad9}
-#dm-top{
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  width:100%;max-width:min(92vw,640px);margin:8px auto 28px;
-  padding:14px 16px;
-  border:1px solid rgba(110,229,255,.18);
-  border-radius:8px;
-  background:rgba(110,229,255,.04);
-  color:rgba(214,228,240,.78);
-  font:600 11px/1 'Space Grotesk',system-ui,sans-serif;
-  letter-spacing:.2em;text-transform:uppercase;
-  cursor:pointer;-webkit-tap-highlight-color:transparent;
-  transition:color .25s ease,border-color .25s ease,background .25s ease,box-shadow .25s ease;
-}
-#dm-top:hover,#dm-top:focus-visible{
-  color:#6ee5ff;border-color:rgba(110,229,255,.45);
-  background:rgba(110,229,255,.09);box-shadow:0 0 18px rgba(110,229,255,.08);
-  outline:none;
-}
-#dm-top span{font-size:13px;letter-spacing:0;line-height:1}
 #dm-top-fab{
   position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:28;
   width:40px;height:40px;border-radius:10px;
@@ -1777,7 +1747,7 @@ html.dm-from-swallow{scroll-behavior:auto!important}
 #dm-top-fab svg{width:16px;height:16px;display:block}
 body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 @media (prefers-reduced-motion:reduce){
-  #dm-top,#dm-top-fab{transition-duration:.01s!important}
+  #dm-top-fab{transition-duration:.01s!important}
 }
 </style>
 <section id="dm-notes">
@@ -1795,9 +1765,6 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 <li><button type="button" class="dm-tracklink" data-title="Nastenka">Nastenka</button>: painful acceptance</li>
 <li><button type="button" class="dm-tracklink" data-title="Larung">Larung</button>: release</li>
 </ul>
-<button type="button" id="dm-top" aria-label="Kembali ke atas halaman">
-  <span aria-hidden="true">↑</span> Back to top
-</button>
 </section>
 <button type="button" id="dm-top-fab" aria-label="Kembali ke atas" title="Back to top">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
@@ -1838,9 +1805,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
     }
     scrollRaf=requestAnimationFrame(step);
   }
-  var btn=document.getElementById('dm-top');
   var fab=document.getElementById('dm-top-fab');
-  if(btn)btn.addEventListener('click',toTop);
   if(fab)fab.addEventListener('click',toTop);
   if(!fab)return;
   var ticking=false,shown=false;
@@ -1903,8 +1868,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 /* Listening mode: dim content below hero, boost spectrum presence */
 html.dm-listening #dm-notes,
 html.dm-listening [class*="space-y-[1px]"],
-html.dm-listening .dm-lyrics,
-html.dm-listening #dm-top {
+html.dm-listening .dm-lyrics {
   opacity: calc(1 - var(--dm-listen, 0) * 0.72);
   transition: opacity 0.9s ease;
   pointer-events: auto;
@@ -2041,7 +2005,7 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
      - TRACK MEMORY: MEMORY TRACE jejak lagu + ALL SIGNALS HAVE BEEN OBSERVED
      - DUMBOWL DENIAL: setelah protokol ditemukan, sequence yang sama ditolak
      - window.__dmLog(msg, hot): dipakai juga oleh signal-interruption bertingkat
-     - localStorage 'dm_album' {tracksPlayed, lastTrack, timesVisited, lastObserved, lastSignal, lastInterruption, taps, lastDwell}
+     - localStorage 'dm_album' {tracksPlayed, lastTrack, lastPos, lastTs, timesVisited, lastObserved, lastSignal, lastInterruption, taps, lastDwell}
      - window.__dmWelcome(): daftar pesan sambutan + memory fragments, tampil di hero lirik -->
 <style>
 /* SESSION LOG: panel hidden by default; single-line toast when active; owl opens full log */
@@ -2137,7 +2101,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
 (function(){
   var KEY='dm_album',MAXL=5;
   /* ---------- state lokal: tracks + memory fragments ---------- */
-  var st={tracksPlayed:[],lastTrack:'',timesVisited:0,lastObserved:'',lastSignal:'',lastInterruption:0,taps:0,lastDwell:0,dumbowl:0};
+  var st={tracksPlayed:[],lastTrack:'',timesVisited:0,lastObserved:'',lastSignal:'',lastInterruption:0,taps:0,lastDwell:0,dumbowl:0,lastPos:0,lastTs:0};
   try{
     var o=JSON.parse(localStorage.getItem(KEY)||'null');
     if(o&&typeof o==='object'){
@@ -2150,14 +2114,42 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       if(+o.taps>0)st.taps=Math.min(Math.floor(+o.taps),99999);
       if(+o.lastDwell>0)st.lastDwell=Math.min(Math.floor(+o.lastDwell),86400000);
       if(+o.dumbowl>0)st.dumbowl=1;
+      if(+o.lastTs>0)st.lastTs=Math.floor(+o.lastTs);
+      if(isFinite(+o.lastPos)&&+o.lastPos>=-1)st.lastPos=Math.floor(+o.lastPos);
+    }
+  }catch(e){}
+  /* migrasi sekali jalan: dm_mem (store lama) -> dm_album, supaya pengunjung lama tidak kehilangan memori */
+  try{
+    var rawOld=localStorage.getItem('dm_mem');
+    if(rawOld!==null){
+      var om=JSON.parse(rawOld);
+      if(om&&typeof om.t==='string'&&om.t&&+om.ts>st.lastTs){
+        st.lastTrack=om.t.slice(0,60);
+        st.lastPos=isFinite(+om.s)?Math.max(-1,Math.floor(+om.s)):0;
+        st.lastTs=Math.floor(+om.ts);
+      }
+      localStorage.setItem(KEY,JSON.stringify(st));
+      localStorage.removeItem('dm_mem');
     }
   }catch(e){}
   var prev={
     tracksPlayed:st.tracksPlayed.slice(),lastTrack:st.lastTrack,timesVisited:st.timesVisited,
     lastObserved:st.lastObserved,lastSignal:st.lastSignal,lastInterruption:st.lastInterruption,taps:st.taps,
-    lastDwell:st.lastDwell,dumbowl:st.dumbowl
+    lastDwell:st.lastDwell,dumbowl:st.dumbowl,lastPos:st.lastPos,lastTs:st.lastTs
   };
+  window.__dmMemPrev=function(){return {t:prev.lastTrack,s:prev.lastPos,ts:prev.lastTs};};
   function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+  /* saver tunggal fragmen memori: lagu terakhir, posisi, waktu. Posisi/track hanya ditulis setelah >=3 detik atau saat lagu selesai. */
+  function snapFrag(){
+    var P=window.__dmPlayer,t=P&&P.title?P.title():'';
+    if(!t)return;
+    var a=P.audio,c=a?(a.currentTime||0):0,end=!!(a&&a.ended);
+    st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+    if(a)st.lastSignal=end?'END':fmtSig(c);
+    if(end||c>=3){st.lastTrack=String(t).slice(0,60);st.lastPos=end?-1:Math.floor(c);st.lastTs=Date.now();}
+    st.lastInterruption=st.taps||st.lastInterruption||0;
+    save();
+  }
   function fmtSig(sec){
     sec=Math.max(0,Math.floor(+sec||0));
     var m=Math.floor(sec/60),s=sec%60;
@@ -2326,7 +2318,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       if(Math.random()<0.45)out.push('I REMEMBER THIS.');
       else out.push('YOU WERE HERE BEFORE.');
       if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
-      /* LAST SIGNAL di-skip: dm_mem (Corrupted Memory) sudah tampilkan last signal + gap di hero */
+      /* LAST SIGNAL di-skip: Corrupted Memory (lastTrack/lastPos/lastTs) sudah tampilkan last signal + gap di hero */
       if(prev.lastInterruption>0)out.push('LAST INTERRUPTION: '+prev.lastInterruption+' TAPS');
     }else{
       out.push('WELCOME BACK.');
@@ -2456,16 +2448,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       hiddenAt=Date.now();
       setObs('ABSENT',true);
       /* persist memory fragment on leave */
-      try{
-        var P=window.__dmPlayer,t=P&&P.title?P.title():'';
-        if(t){
-          st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
-          st.lastTrack=String(t).slice(0,60);
-        }
-        if(P&&P.audio)st.lastSignal=fmtSig(P.audio.currentTime||0);
-        st.lastInterruption=st.taps||st.lastInterruption||0;
-        save();
-      }catch(e){}
+      try{snapFrag();}catch(e){}
       return;
     }
     if(hiddenAt){
@@ -2480,16 +2463,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     hiddenAt=0;act(false);
   });
   window.addEventListener('pagehide',function(){
-    try{
-      var P=window.__dmPlayer,t=P&&P.title?P.title():'';
-      if(t){
-        st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
-        st.lastTrack=String(t).slice(0,60);
-      }
-      if(P&&P.audio)st.lastSignal=fmtSig(P.audio.currentTime||0);
-      st.lastInterruption=st.taps||st.lastInterruption||0;
-      save();
-    }catch(e){}
+    try{snapFrag();}catch(e){}
   });
   setTimeout(function(){log('SIGNAL FOUND');},700);
   /* indikator idle awal — menunggu deteksi */
@@ -2825,14 +2799,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     var P=window.__dmPlayer;
     if(!P||!P.audio){if(tries<40)setTimeout(function(){hook(tries+1);},250);return;}
     var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false,sigSaveAt=0;
-    function persistFrag(){
-      var t=P.title();if(!t)return;
-      st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
-      st.lastTrack=String(t).slice(0,60);
-      st.lastSignal=fmtSig(a.currentTime||0);
-      st.lastInterruption=st.taps||st.lastInterruption||0;
-      save();
-    }
+    function persistFrag(){snapFrag();}
     a.addEventListener('play',function(){
       var t=P.title();if(!t)return;
       if(t!==shown){
@@ -2840,13 +2807,12 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
         else log('TRACK CHANGED');
         narrLock(2000);
         shown=t;obsA=obsB=false;
-        st.lastTrack=t.slice(0,60);
         st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
         save();
       }
     });
     a.addEventListener('pause',function(){if(!a.ended)persistFrag();});
-    a.addEventListener('ended',function(){st.lastSignal='END';persistFrag();});
+    a.addEventListener('ended',function(){persistFrag();});
     a.addEventListener('timeupdate',function(){
       var t=P.title(),c=a.currentTime||0;
       /* track dianggap "sudah didengar" setelah 20 detik */
@@ -2856,7 +2822,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       }
       /* autosave signal position ~ tiap 8 detik */
       var n=Date.now();
-      if(n-sigSaveAt>8000){sigSaveAt=n;st.lastSignal=fmtSig(c);st.lastObserved=String(t||st.lastObserved).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);save();}
+      if(n-sigSaveAt>8000){sigSaveAt=n;snapFrag();}
       /* sinkron dengan catatan Glitch (Instrumental): "Something is already watching..." */
       if(/instrumental/i.test(t||'')){
         if(!obsA&&c>=212&&c<226){obsA=true;narrFree();var qa=!narrBusy;if(qa)narrLock(4000);setObs('DETECTED',qa);}
@@ -2959,7 +2925,6 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
       var ok=false;try{ok=navigator.vibrate([60,80,60]);}catch(e){}
       toast(ok?'Haptic bass on. You should feel two buzzes now':'Vibration blocked. Check Android vibration / battery saver settings');
     }));
-    if(hasKb)deck.appendChild(chip('keys','Keyboard shortcuts',null,function(){keys(true);}));
     notes.appendChild(deck);
   }
 
