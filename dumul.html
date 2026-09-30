@@ -255,21 +255,20 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
   var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
-  /* Compact hero (CSS overrides). gap = margin-top canvas — naikkan = mesh turun ke dada siluet. */
   var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=24,meshH=132;
   var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
   var mw=Math.round(Math.min(W*.92,640));
-  var yFlow=padTop+titleH+gap;
   try{
     var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
-    /* Only trust storage when BOTH height and mesh rect exist — stale h-only misaligns crop vs mesh. */
     if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
       h=s.h;m=s.m;
     }
   }catch(e){}
   if(!h)h=hEst;
   if(!m){
-    m={x:Math.round((W-mw)/2),y:yFlow,w:mw,h:meshH};
+    /* Same band as transition: top at (H-meshH)*0.38 → mesh centered on og.jpg chest. */
+    var y=Math.max(0,Math.round((h-meshH)*0.38));
+    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
   }
   return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
 }
@@ -471,7 +470,55 @@ function dmNeuralDraw(g,W,H,net,t){
     maybeLeave();
   })();
   </script>
+  
   <script>
+  /* Align hero spectrum canvas to the same vertical band as the neural transition (og.jpg chest). */
+  (function(){
+    function align(){
+      var s=document.querySelector('section.dm-hero');
+      if(!s)return;
+      var wrap=s.querySelector('div[class*="w-[min(92vw,640px)]"]');
+      if(!wrap)return;
+      var H=s.getBoundingClientRect().height;
+      if(H<80)return;
+      var meshH=132;
+      var targetY=Math.max(0,Math.round((H-meshH)*0.38));
+      var hr=s.getBoundingClientRect();
+      var wr=wrap.getBoundingClientRect();
+      var curY=wr.top-hr.top;
+      var mt=parseFloat(window.getComputedStyle(wrap).marginTop)||0;
+      var next=mt+(targetY-curY);
+      if(Math.abs(next-mt)<1)return;
+      wrap.style.marginTop=Math.max(0,Math.round(next))+'px';
+      /* Persist aligned rect so index transition matches this exact band. */
+      try{
+        var hr2=s.getBoundingClientRect(),w=document.documentElement.clientWidth;
+        var cv=s.querySelector('canvas'),m=null;
+        if(cv){
+          var cr=cv.getBoundingClientRect();
+          m={x:Math.round(cr.left-hr2.left),y:Math.max(0,Math.round(cr.top-hr2.top)),w:Math.round(cr.width),h:Math.round(cr.height)};
+        }
+        if(hr2.height>60)localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(hr2.height*10)/10,m:m}));
+      }catch(e){}
+    }
+    function run(){
+      align();
+      /* Re-measure after layout settle + fonts */
+      setTimeout(align,100);
+      setTimeout(align,400);
+      setTimeout(align,900);
+    }
+    if(document.readyState==='complete')run();
+    else window.addEventListener('load',run);
+    window.addEventListener('resize',function(){
+      clearTimeout(window.__dmMeshAlignT);
+      window.__dmMeshAlignT=setTimeout(align,150);
+    });
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){setTimeout(align,50);});
+  })();
+  </script>
+
+<script>
   /* Ukur hero asli lalu simpan → index.html memakai ukuran persis ini untuk og.jpg + neural network saat transisi. */
   (function(){
     function save(){
