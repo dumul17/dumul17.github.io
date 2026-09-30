@@ -254,23 +254,30 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
-  /* DETERMINISTIK: semua angka turunan dari lebar layar saja. Tidak ada pengukuran DOM / localStorage,
+  /* DETERMINISTIK: semua angka turunan dari lebar layar saja (tanpa pengukuran DOM / localStorage),
      jadi index.html (transisi) dan dumul.html (hero asli) SELALU menghasilkan kotak yang sama. */
   var W=document.documentElement.clientWidth||window.innerWidth||360;
   var wide=W>=640;
-  var padTop=wide?56:30,titleH=wide?46:30,gap=24,meshH=132;
-  /* + ruang tetap untuk baris lirik (#dm-hl: tinggi 56/42 + margin 8) supaya hero tidak perlu tumbuh saat lirik muncul */
-  var heroH=(wide?344:308)+(W>=480?50:64);
-  var mw=Math.round(Math.min(W*.92,640));
-  var my=padTop+titleH+gap;                 /* atas kanvas mesh */
-  /* Titik jembatan cahaya di og.jpg (fraksi gambar 720x720). */
-  var BX=.49,BY=.527,IW=720,IH=720;
-  /* Skala gambar: minimal cover, dan cukup besar supaya jembatan bisa dipasang PERSIS di pusat mesh (zoom kalau perlu). */
+  var padTop=wide?56:30,titleH=wide?46:30,gap0=24,meshH=132;
+  var tb=padTop+titleH;                       /* dasar judul DUMUL */
+  /* Titik jembatan cahaya di og.jpg (fraksi 720x720) & puncak kepala siluet. */
+  var BX=.49,BY=.527,HEADY=.165,IW=720,IH=720;
+  /* Skala gambar = lebar layar (kepala tetap utuh); bawah gambar dipudarkan lewat mask. */
+  var s=Math.max(W/IW,(W/2)/(BX*IW),(W/2)/((1-BX)*IW));
+  var dw=IW*s,dh=IH*s;
+  /* Turunkan mesh + gambar bersama-sama (jembatan tetap di pusat mesh) sampai puncak kepala
+     berada di bawah judul → judul punya ruang bersih. Layar lebar: kepala memang terpotong, tidak perlu. */
+  var off=(BY-HEADY)*dh;                      /* jarak jembatan → puncak kepala */
+  var extra=wide?0:Math.max(0,Math.min(160,Math.round(off-(gap0+meshH/2)+24)));
+  var my=tb+gap0+extra;                       /* atas kanvas mesh */
+  var heroH=(wide?344:308)+(W>=480?50:64)+extra; /* + ruang tetap baris lirik (#dm-hl) */
   var cx=W/2,cy=my+meshH/2;
-  /* Skala = lebar layar (kepala siluet tetap kelihatan). Bagian bawah gambar boleh berhenti sebelum dasar hero: dipudarkan ke #0a1218 lewat mask. */
-  var s=Math.max(W/IW,cy/(BY*IH),cx/(BX*IW),(W-cx)/((1-BX)*IW));
-  var dw=IW*s,dh=IH*s,ix=cx-BX*dw,iy=cy-BY*dh;
-  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},img:{x:ix,y:iy,w:dw,h:dh},padTop:padTop,titleH:titleH};
+  var ix=cx-BX*dw,iy=cy-BY*dh;
+  /* Mask gambar (koordinat piksel elemen): transparan di belakang judul, muncul perlahan, pudar di bawah. */
+  var a0=Math.max(0,tb-10-iy),a1=Math.max(a0+1,tb+30-iy),d1=dh,c1=Math.max(a1+1,dh*.72);
+  var mg='linear-gradient(to bottom,transparent 0,transparent '+a0.toFixed(1)+'px,#000 '+a1.toFixed(1)+'px,#000 '+c1.toFixed(1)+'px,transparent '+d1.toFixed(1)+'px)';
+  var mw=Math.round(Math.min(W*.92,640));
+  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},img:{x:ix,y:iy,w:dw,h:dh},mask:mg,gap:gap0+extra,padTop:padTop,titleH:titleH};
 }
 var DM_NN_DUR=5600;
 function dmNeuralBuild(W,H){
@@ -481,7 +488,7 @@ function dmNeuralDraw(g,W,H,net,t){
       d.setProperty('--dm-title-h',r.titleH+'px');
       d.setProperty('--dm-mesh-w',r.m.w+'px');
       d.setProperty('--dm-img-x',r.img.x.toFixed(2)+'px');d.setProperty('--dm-img-y',r.img.y.toFixed(2)+'px');
-      d.setProperty('--dm-img-w',r.img.w.toFixed(2)+'px');d.setProperty('--dm-img-h',r.img.h.toFixed(2)+'px');
+      d.setProperty('--dm-img-mask',r.mask);d.setProperty('--dm-mesh-gap',r.gap+'px');d.setProperty('--dm-img-w',r.img.w.toFixed(2)+'px');d.setProperty('--dm-img-h',r.img.h.toFixed(2)+'px');
     }
     apply();
     window.addEventListener('resize',apply,{passive:true});
@@ -684,10 +691,10 @@ return o=requestAnimationFrame(k),()=>{cancelAnimationFrame(o),_io&&_io.disconne
 /* layout: hero dirapetin, daftar lagu langsung di bawah spektrum */
 /* Hero DETERMINISTIK (angka dari dmHeroRect di atas → CSS var). Mesh TIDAK ikut geser oleh apa pun. */
 section.dm-hero{height:var(--dm-hero-h,308px)!important;min-height:0!important;max-height:none!important}
-section.dm-hero > img{position:absolute!important;inset:auto!important;left:var(--dm-img-x,0)!important;top:var(--dm-img-y,0)!important;width:var(--dm-img-w,100%)!important;height:var(--dm-img-h,100%)!important;max-width:none!important;object-fit:fill!important;-webkit-mask-image:linear-gradient(to bottom,#000 0,#000 70%,transparent 100%);mask-image:linear-gradient(to bottom,#000 0,#000 70%,transparent 100%)!important}
+section.dm-hero > img{position:absolute!important;inset:auto!important;left:var(--dm-img-x,0)!important;top:var(--dm-img-y,0)!important;width:var(--dm-img-w,100%)!important;height:var(--dm-img-h,100%)!important;max-width:none!important;object-fit:fill!important;-webkit-mask-image:var(--dm-img-mask,none)!important;mask-image:var(--dm-img-mask,none)!important}
 section.dm-hero > div[class*="justify-center"]{height:100%!important;justify-content:flex-start!important;padding-top:var(--dm-pad-top,30px)!important;padding-bottom:0!important}
 section.dm-hero h1{margin:0!important;height:var(--dm-title-h,30px)!important;display:flex;align-items:center;justify-content:center;line-height:1!important;flex:none}
-section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:24px!important;height:132px!important;width:var(--dm-mesh-w,92vw)!important;flex:none}
+section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:var(--dm-mesh-gap,24px)!important;height:132px!important;width:var(--dm-mesh-w,92vw)!important;flex:none}
 section.dm-hero p[class*="tracking-[0.32em]"]{margin-top:6px!important}
 section.dm-hero div[class*="bottom-8"]{position:static!important;transform:none!important;margin-top:14px!important;gap:6px!important}
 section.dm-hero div[class*="h-[28px]"]{height:16px!important}

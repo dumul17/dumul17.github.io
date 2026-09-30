@@ -3378,23 +3378,30 @@ function drawHole(now,age){
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (tidak ada lagi: sekarang murni dihitung dari lebar layar). */
 function dmHeroRect(){
-  /* DETERMINISTIK: semua angka turunan dari lebar layar saja. Tidak ada pengukuran DOM / localStorage,
+  /* DETERMINISTIK: semua angka turunan dari lebar layar saja (tanpa pengukuran DOM / localStorage),
      jadi index.html (transisi) dan dumul.html (hero asli) SELALU menghasilkan kotak yang sama. */
   var W=document.documentElement.clientWidth||window.innerWidth||360;
   var wide=W>=640;
-  var padTop=wide?56:30,titleH=wide?46:30,gap=24,meshH=132;
-  /* + ruang tetap untuk baris lirik (#dm-hl: tinggi 56/42 + margin 8) supaya hero tidak perlu tumbuh saat lirik muncul */
-  var heroH=(wide?344:308)+(W>=480?50:64);
-  var mw=Math.round(Math.min(W*.92,640));
-  var my=padTop+titleH+gap;                 /* atas kanvas mesh */
-  /* Titik jembatan cahaya di og.jpg (fraksi gambar 720x720). */
-  var BX=.49,BY=.527,IW=720,IH=720;
-  /* Skala gambar: minimal cover, dan cukup besar supaya jembatan bisa dipasang PERSIS di pusat mesh (zoom kalau perlu). */
+  var padTop=wide?56:30,titleH=wide?46:30,gap0=24,meshH=132;
+  var tb=padTop+titleH;                       /* dasar judul DUMUL */
+  /* Titik jembatan cahaya di og.jpg (fraksi 720x720) & puncak kepala siluet. */
+  var BX=.49,BY=.527,HEADY=.165,IW=720,IH=720;
+  /* Skala gambar = lebar layar (kepala tetap utuh); bawah gambar dipudarkan lewat mask. */
+  var s=Math.max(W/IW,(W/2)/(BX*IW),(W/2)/((1-BX)*IW));
+  var dw=IW*s,dh=IH*s;
+  /* Turunkan mesh + gambar bersama-sama (jembatan tetap di pusat mesh) sampai puncak kepala
+     berada di bawah judul → judul punya ruang bersih. Layar lebar: kepala memang terpotong, tidak perlu. */
+  var off=(BY-HEADY)*dh;                      /* jarak jembatan → puncak kepala */
+  var extra=wide?0:Math.max(0,Math.min(160,Math.round(off-(gap0+meshH/2)+24)));
+  var my=tb+gap0+extra;                       /* atas kanvas mesh */
+  var heroH=(wide?344:308)+(W>=480?50:64)+extra; /* + ruang tetap baris lirik (#dm-hl) */
   var cx=W/2,cy=my+meshH/2;
-  /* Skala = lebar layar (kepala siluet tetap kelihatan). Bagian bawah gambar boleh berhenti sebelum dasar hero: dipudarkan ke #0a1218 lewat mask. */
-  var s=Math.max(W/IW,cy/(BY*IH),cx/(BX*IW),(W-cx)/((1-BX)*IW));
-  var dw=IW*s,dh=IH*s,ix=cx-BX*dw,iy=cy-BY*dh;
-  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},img:{x:ix,y:iy,w:dw,h:dh},padTop:padTop,titleH:titleH};
+  var ix=cx-BX*dw,iy=cy-BY*dh;
+  /* Mask gambar (koordinat piksel elemen): transparan di belakang judul, muncul perlahan, pudar di bawah. */
+  var a0=Math.max(0,tb-10-iy),a1=Math.max(a0+1,tb+30-iy),d1=dh,c1=Math.max(a1+1,dh*.72);
+  var mg='linear-gradient(to bottom,transparent 0,transparent '+a0.toFixed(1)+'px,#000 '+a1.toFixed(1)+'px,#000 '+c1.toFixed(1)+'px,transparent '+d1.toFixed(1)+'px)';
+  var mw=Math.round(Math.min(W*.92,640));
+  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},img:{x:ix,y:iy,w:dw,h:dh},mask:mg,gap:gap0+extra,padTop:padTop,titleH:titleH};
 }
 var DM_NN_DUR=5600;
 var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_X=0,DM_TR_MESH_Y=0,DM_TR_GLITCH_V=0,DM_TR_GLITCH_S=0,DM_TR_GLITCH_SEEN=0;
@@ -3822,7 +3829,7 @@ function startTesseractWarp(targetUrl) {
     stage.style.width = W + 'px'; stage.style.height = H + 'px';
     stage.style.backgroundImage='none';
     var _og=stage.querySelector('.tesseract-og');
-    if(_og){var _s=_og.style;_s.setProperty('inset','auto','important');_s.setProperty('max-width','none','important');_s.setProperty('object-fit','fill','important');_s.left=hr.img.x+'px';_s.top=hr.img.y+'px';_s.width=hr.img.w+'px';_s.height=hr.img.h+'px';}
+    if(_og){var _s=_og.style;_s.setProperty('inset','auto','important');_s.setProperty('max-width','none','important');_s.setProperty('object-fit','fill','important');_s.left=hr.img.x+'px';_s.top=hr.img.y+'px';_s.width=hr.img.w+'px';_s.height=hr.img.h+'px';_s.setProperty('-webkit-mask-image',hr.mask);_s.setProperty('mask-image',hr.mask);}
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     canvas.width = Math.max(1, Math.round(W * dpr));
     canvas.height = Math.max(1, Math.round(H * dpr));
