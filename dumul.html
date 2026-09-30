@@ -2027,9 +2027,19 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
      - #dm-owl: tombol ikon burung hantu → buka/tutup panel log penuh
      - #dm-log-toast: notif sebaris saat log aktif, auto-hilang (~2.8s)
      - #dm-log: panel penuh (hidden default), timestamp UTC 12 jam
+     - #dm-obs: indikator OBSERVER STATUS (DETECTED/ACTIVE/SILENT/ABSENT/RETURNED/YOU)
+     - MEMORY FRAGMENT: lastObserved / lastSignal / lastInterruption di localStorage dm_album
+     - NULL STATE: semantic glitch sporadis (SIGNAL/MEMORY/OBSERVER: NULL → ... → normal)
+     - TIME LOST: dwell time sesi + toast saat reload / setelah ~20 menit
+     - SIGNAL DECAY: idle panjang → STABLE/WEAKENING/FADING/... ; touch → SIGNAL RESTORED
+     - REFLECTION ERROR: aksi berulang dikomentari (SIGNAL RECEIVED → YOU KEEP CHECKING → WHY?)
+     - STATE CONTRADICTION: state saling bertentangan → STATE CONFLICT
+     - THE BUG THAT ISN'T: error palsu semantik (WARNING / ERROR 0x0 / NO ERROR DETECTED)
+     - TRACK MEMORY: MEMORY TRACE jejak lagu + ALL SIGNALS HAVE BEEN OBSERVED
+     - DUMBOWL DENIAL: setelah protokol ditemukan, sequence yang sama ditolak
      - window.__dmLog(msg, hot): dipakai juga oleh signal-interruption bertingkat
-     - localStorage 'dm_album' {tracksPlayed, lastTrack, timesVisited}: lokal di browser, tanpa server
-     - window.__dmWelcome(): daftar pesan sambutan, dibaca player untuk ditampilkan di hero -->
+     - localStorage 'dm_album' {tracksPlayed, lastTrack, timesVisited, lastObserved, lastSignal, lastInterruption, taps, lastDwell}
+     - window.__dmWelcome(): daftar pesan sambutan + memory fragments, tampil di hero lirik -->
 <style>
 /* SESSION LOG: panel hidden by default; single-line toast when active; owl opens full log */
 #dm-owl{
@@ -2051,6 +2061,26 @@ body.dm-has-bar #dm-owl{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
 #dm-owl:active{transform:translateY(1px)}
 #dm-owl svg{width:20px;height:20px;display:block}
 #dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.12)}
+/* OBSERVER STATUS — indikator kecil, cost hampir nol */
+#dm-obs{
+  position:fixed;left:56px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:34;
+  font:500 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;
+  color:rgba(110,229,255,.45);text-shadow:0 0 6px rgba(0,0,0,.85);
+  pointer-events:none;user-select:none;-webkit-user-select:none;
+  opacity:0;transform:translateY(4px);transition:opacity .35s ease,transform .35s ease,color .4s ease;
+  white-space:nowrap;max-width:min(50vw,200px);overflow:hidden;text-overflow:ellipsis;
+}
+body.dm-has-bar #dm-obs{bottom:calc(82px + env(safe-area-inset-bottom,0px))}
+#dm-obs.on{opacity:1;transform:none}
+#dm-obs[data-st="ACTIVE"]{color:rgba(110,229,255,.7)}
+#dm-obs[data-st="SILENT"]{color:rgba(184,198,214,.4)}
+#dm-obs[data-st="ABSENT"]{color:rgba(184,198,214,.28)}
+#dm-obs[data-st="RETURNED"]{color:rgba(255,122,217,.75)}
+#dm-obs[data-st="YOU"]{color:rgba(255,122,217,.9)}
+#dm-obs[data-st="DETECTED"]{color:rgba(110,229,255,.85)}
+/* toast naik sedikit kalau obs label aktif di area yang sama — toast sudah di left:56px; obs di bawah toast saat toast on */
+#dm-log-toast.on ~ #dm-obs, body:has(#dm-log-toast.on) #dm-obs{opacity:.2}
+@media (prefers-reduced-motion:reduce){#dm-obs{transition-duration:.01s!important}}
 #dm-log-toast{
   position:fixed;left:56px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
   max-width:min(58vw,280px);
@@ -2103,18 +2133,33 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
 <script>
 (function(){
   var KEY='dm_album',MAXL=5;
-  /* ---------- state lokal: tracksPlayed / lastTrack / timesVisited ---------- */
-  var st={tracksPlayed:[],lastTrack:'',timesVisited:0};
+  /* ---------- state lokal: tracks + memory fragments ---------- */
+  var st={tracksPlayed:[],lastTrack:'',timesVisited:0,lastObserved:'',lastSignal:'',lastInterruption:0,taps:0,lastDwell:0,dumbowl:0};
   try{
     var o=JSON.parse(localStorage.getItem(KEY)||'null');
     if(o&&typeof o==='object'){
       if(Array.isArray(o.tracksPlayed))st.tracksPlayed=o.tracksPlayed.filter(function(x){return typeof x==='string';}).slice(0,20);
       if(typeof o.lastTrack==='string')st.lastTrack=o.lastTrack.slice(0,60);
       if(+o.timesVisited>0)st.timesVisited=Math.min(Math.floor(+o.timesVisited),9999);
+      if(typeof o.lastObserved==='string')st.lastObserved=o.lastObserved.slice(0,40);
+      if(typeof o.lastSignal==='string')st.lastSignal=o.lastSignal.slice(0,12);
+      if(+o.lastInterruption>0)st.lastInterruption=Math.min(Math.floor(+o.lastInterruption),99999);
+      if(+o.taps>0)st.taps=Math.min(Math.floor(+o.taps),99999);
+      if(+o.lastDwell>0)st.lastDwell=Math.min(Math.floor(+o.lastDwell),86400000);
+      if(+o.dumbowl>0)st.dumbowl=1;
     }
   }catch(e){}
-  var prev={tracksPlayed:st.tracksPlayed.slice(),lastTrack:st.lastTrack,timesVisited:st.timesVisited};
+  var prev={
+    tracksPlayed:st.tracksPlayed.slice(),lastTrack:st.lastTrack,timesVisited:st.timesVisited,
+    lastObserved:st.lastObserved,lastSignal:st.lastSignal,lastInterruption:st.lastInterruption,taps:st.taps,
+    lastDwell:st.lastDwell,dumbowl:st.dumbowl
+  };
   function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+  function fmtSig(sec){
+    sec=Math.max(0,Math.floor(+sec||0));
+    var m=Math.floor(sec/60),s=sec%60;
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
   /* hitung kunjungan sekali per sesi tab (reload tidak menggelembungkan angka) */
   var newSession=true;
   try{newSession=!sessionStorage.getItem('dm_sess');sessionStorage.setItem('dm_sess','1');}catch(e){}
@@ -2228,30 +2273,108 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1000);}
   window.__dmLog=function(msg,hot){log(msg,hot);};
 
-  /* ---------- sambutan (dibaca player, tampil di hero) ---------- */
+  /* ---------- sambutan + MEMORY FRAGMENT (tampil di hero lirik via __dmWelcome) ---------- */
   var welcomed=false;
   window.__dmWelcome=function(){
     if(welcomed||!newSession||prev.timesVisited<1)return [];
     welcomed=true;
-    var out=['WELCOME BACK.'];
+    var out=[];
+    var hasFrag=!!(prev.lastObserved||prev.lastSignal||prev.lastInterruption>0);
+    if(hasFrag){
+      if(Math.random()<0.45)out.push('I REMEMBER THIS.');
+      else out.push('YOU WERE HERE BEFORE.');
+      if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
+      if(prev.lastSignal)out.push('LAST SIGNAL: '+prev.lastSignal);
+      if(prev.lastInterruption>0)out.push('LAST INTERRUPTION: '+prev.lastInterruption+' TAPS');
+    }else{
+      out.push('WELCOME BACK.');
+    }
     try{
       var P=window.__dmPlayer,r=P&&P.rows?P.rows():[],all=r.length>0;
       for(var i=0;i<r.length;i++){if(prev.tracksPlayed.indexOf(P.title.call(null,r[i]))<0){all=false;break;}}
-      if(/^glitch/i.test(prev.lastTrack))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
+      if(/^glitch/i.test(prev.lastTrack||prev.lastObserved||''))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
       if(all)out.push('ALL SIGNALS HAVE BEEN OBSERVED.');
     }catch(e){}
-    if(prev.timesVisited>=2&&Math.random()<0.12)out=['YOU CAME BACK.','I WONDER WHY.'];
-    out.forEach(function(m,i){setTimeout(function(){log(m,i>0||m.indexOf('CAME BACK')>-1);},i*2600);});
+    if(prev.timesVisited>=2&&Math.random()<0.12){
+      out=['YOU CAME BACK.','I WONDER WHY.'];
+      if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
+    }
+    out.forEach(function(m,i){
+      setTimeout(function(){log(m,i===0||/REMEMBER|WERE HERE|CAME BACK|WONDER/i.test(m));},i*2600);
+    });
     return out;
   };
 
+  /* ---------- OBSERVER STATUS ---------- */
+  var obsEl=document.createElement('div');
+  obsEl.id='dm-obs';obsEl.setAttribute('aria-live','polite');obsEl.setAttribute('aria-hidden','true');
+  bodyRoot.appendChild(obsEl);
+  var obsState='',obsSilentAt=0,obsYouCool=0,obsActiveCool=0,obsDetected=false;
+  function setObs(stName,toastIt){
+    if(stName===obsState)return;
+    obsState=stName;
+    obsEl.textContent='OBSERVER: '+stName;
+    obsEl.setAttribute('data-st',stName);
+    obsEl.classList.add('on');
+    obsEl.setAttribute('aria-hidden','false');
+    if(toastIt)log('OBSERVER: '+stName,stName==='YOU'||stName==='RETURNED'||stName==='DETECTED');
+  }
+  function obsTick(){
+    setTimeout(obsTick,1200);
+    if(document.hidden)return;
+    var idle=Date.now()-lastAct;
+    if(obsState==='ABSENT'||obsState==='RETURNED')return;
+    if(idle>=10000){
+      if(obsState!=='SILENT'&&obsState!=='YOU'){
+        /* sesekali YOU saat masuk silent */
+        if(Date.now()>obsYouCool&&Math.random()<0.12){
+          setObs('YOU',true);
+          obsYouCool=Date.now()+90000;
+          setTimeout(function(){if(obsState==='YOU'&&Date.now()-lastAct>=10000)setObs('SILENT',false);},3200);
+        }else setObs('SILENT',true);
+      }
+    }else if(obsDetected&&obsState!=='ACTIVE'&&obsState!=='DETECTED'){
+      if(Date.now()>obsActiveCool){setObs('ACTIVE',false);obsActiveCool=Date.now()+2500;}
+    }
+  }
+  setTimeout(obsTick,1500);
+
   /* ---------- interaksi & idle ---------- */
-  var seen=false,lastAct=Date.now(),idleFired=false,hiddenAt=0;
-  function act(){lastAct=Date.now();idleFired=false;}
-  ['pointerdown','keydown','touchstart','wheel'].forEach(function(ev){
-    window.addEventListener(ev,function(){if(!seen){seen=true;log('LISTENER DETECTED');}act();},{passive:true,capture:true});
+  var seen=false,lastAct=Date.now(),idleFired=false,hiddenAt=0,sessTaps=0;
+  var sigDecay=0; /* 0 ok, 1 STABLE, 2 WEAKENING, 3 FADING, 4 ... */
+  function act(isTap){
+    lastAct=Date.now();idleFired=false;
+    if(isTap){
+      sessTaps++;
+      st.taps=(st.taps||0)+1;
+      st.lastInterruption=st.taps;
+      if(sessTaps%7===0)save();
+    }
+    if(sigDecay>0){
+      sigDecay=0;
+      log('SIGNAL RESTORED.',true);
+    }
+    if(!obsDetected){
+      obsDetected=true;
+      setObs('DETECTED',true);
+      setTimeout(function(){if(obsState==='DETECTED')setObs('ACTIVE',false);},1800);
+    }else if(obsState==='SILENT'||obsState==='YOU'||obsState==='RETURNED'){
+      setObs('ACTIVE',obsState==='RETURNED');
+    }
+  }
+  ['pointerdown','touchstart'].forEach(function(ev){
+    window.addEventListener(ev,function(){
+      if(!seen){seen=true;log('LISTENER DETECTED');}
+      act(true);
+    },{passive:true,capture:true});
   });
-  window.addEventListener('scroll',act,{passive:true});
+  ['keydown','wheel','mousemove','scroll'].forEach(function(ev){
+    window.addEventListener(ev,function(){
+      if(!seen){seen=true;log('LISTENER DETECTED');}
+      act(false);
+    },{passive:true,capture:true});
+  });
+  /* long-idle narrative (tetap, terpisah dari OBSERVER SILENT 10s) */
   function idleTick(){
     setTimeout(idleTick,5000);
     if(document.hidden||idleFired||Date.now()-lastAct<45000)return;
@@ -2261,40 +2384,419 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   }
   setTimeout(idleTick,5000);
   document.addEventListener('visibilitychange',function(){
-    if(document.hidden){hiddenAt=Date.now();return;}
-    if(hiddenAt&&Date.now()-hiddenAt>15000&&Math.random()<0.3){
-      log('SESSION TERMINATED',true);log('...',true);
-      setTimeout(function(){log('NOT REALLY',true);},1000);
+    if(document.hidden){
+      hiddenAt=Date.now();
+      setObs('ABSENT',true);
+      /* persist memory fragment on leave */
+      try{
+        var P=window.__dmPlayer,t=P&&P.title?P.title():'';
+        if(t){
+          st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+          st.lastTrack=String(t).slice(0,60);
+        }
+        if(P&&P.audio)st.lastSignal=fmtSig(P.audio.currentTime||0);
+        st.lastInterruption=st.taps||st.lastInterruption||0;
+        save();
+      }catch(e){}
+      return;
     }
-    hiddenAt=0;act();
+    if(hiddenAt){
+      var away=Date.now()-hiddenAt;
+      setObs('RETURNED',true);
+      if(away>15000&&Math.random()<0.3){
+        log('SESSION TERMINATED',true);log('...',true);
+        setTimeout(function(){log('NOT REALLY',true);},1000);
+      }
+      setTimeout(function(){if(obsState==='RETURNED')setObs('ACTIVE',false);},2400);
+    }
+    hiddenAt=0;act(false);
+  });
+  window.addEventListener('pagehide',function(){
+    try{
+      var P=window.__dmPlayer,t=P&&P.title?P.title():'';
+      if(t){
+        st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+        st.lastTrack=String(t).slice(0,60);
+      }
+      if(P&&P.audio)st.lastSignal=fmtSig(P.audio.currentTime||0);
+      st.lastInterruption=st.taps||st.lastInterruption||0;
+      save();
+    }catch(e){}
   });
   setTimeout(function(){log('SIGNAL FOUND');},700);
+  /* indikator idle awal — menunggu deteksi */
+  setTimeout(function(){if(!obsDetected){obsEl.textContent='OBSERVER: —';obsEl.classList.add('on');}},900);
+
+  /* ---------- TIME LOST (dwell) ---------- */
+  var sessStart=Date.now(),dwellVisible=0,dwellHiddenAt=0,timeLostShown=false,dwellMilestone=false;
+  function fmtHMS(ms){
+    ms=Math.max(0,Math.floor(+ms||0));
+    var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+    function p(n){return n<10?'0'+n:''+n;}
+    return p(h)+':'+p(m)+':'+p(sec);
+  }
+  function fmtMS(ms){
+    ms=Math.max(0,Math.floor(+ms||0));
+    var s=Math.floor(ms/1000),m=Math.floor(s/60),sec=s%60;
+    function p(n){return n<10?'0'+n:''+n;}
+    return p(m)+':'+p(sec);
+  }
+  function dwellNow(){
+    var extra=dwellHiddenAt?0:(Date.now()-sessStart);
+    /* only count time while tab roughly "alive"; simple: wall clock from sessStart minus last continuous hidden gap is overkill — use wall clock */
+    return Date.now()-sessStart;
+  }
+  function persistDwell(){
+    st.lastDwell=dwellNow();
+    save();
+  }
+  /* TIME LOST dari sesi sebelumnya (reload / tab baru setelah kunjungan) */
+  if(newSession&&prev.lastDwell>=5000){
+    setTimeout(function(){
+      log('TIME LOST: '+fmtHMS(prev.lastDwell),true);
+    },3200);
+  }
+  /* milestone ~20 menit */
+  function dwellTick(){
+    setTimeout(dwellTick,15000);
+    if(document.hidden)return;
+    var d=dwellNow();
+    persistDwell();
+    if(!dwellMilestone&&d>=20*60*1000){
+      dwellMilestone=true;
+      if(Math.random()<0.55){
+        log('YOU HAVE BEEN HERE FOR '+fmtMS(d)+'.',true);
+        setTimeout(function(){log('DID YOU NOTICE?',true);},2200);
+      }else{
+        log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
+      }
+    }
+    /* soft reminders tiap ~15 menit setelah milestone, jarang */
+    else if(dwellMilestone&&d>=35*60*1000&&!timeLostShown&&Math.random()<0.08){
+      timeLostShown=true;
+      log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
+    }
+  }
+  setTimeout(dwellTick,12000);
+  /* pastikan dwell tersimpan saat leave (sudah ada pagehide fragment — tambah dwell) */
+  var _ph=window.onpagehide;
+  /* augment existing pagehide via additional listener (already have one above — this is fine, multiple ok) */
+  window.addEventListener('pagehide',persistDwell);
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden)persistDwell();
+  });
+
+  /* ---------- NULL STATE (semantic glitch, sporadis) ---------- */
+  var nullBusy=false,nullPrevObs='';
+  function nullSequence(){
+    if(nullBusy||document.hidden)return;
+    nullBusy=true;
+    nullPrevObs=obsState||'';
+    var steps=[
+      [0,'SIGNAL: NULL',true],
+      [900,'MEMORY: NULL',true],
+      [1800,'OBSERVER: NULL',true],
+      [2800,'...',false],
+      [4200,null,false] /* restore */
+    ];
+    steps.forEach(function(step){
+      setTimeout(function(){
+        if(step[1]===null){
+          /* kembali normal tanpa penjelasan */
+          if(nullPrevObs&&nullPrevObs!=='ABSENT')setObs(nullPrevObs,false);
+          else if(obsDetected)setObs('ACTIVE',false);
+          else{obsEl.textContent='OBSERVER: —';obsEl.removeAttribute('data-st');}
+          nullBusy=false;
+          return;
+        }
+        log(step[1],step[2]);
+        if(step[1]==='OBSERVER: NULL'){
+          obsEl.textContent='OBSERVER: NULL';
+          obsEl.setAttribute('data-st','YOU');
+          obsEl.classList.add('on');
+          obsState='NULL';
+        }
+      },step[0]);
+    });
+  }
+  function nullSchedule(){
+    /* jadwal berikutnya: 45s–3.5 menit, peluang tembak ~18% */
+    var wait=45000+Math.floor(Math.random()*165000);
+    setTimeout(function(){
+      if(!document.hidden&&Math.random()<0.18)nullSequence();
+      nullSchedule();
+    },wait);
+  }
+  setTimeout(nullSchedule,25000);
+
+  /* ---------- SIGNAL DECAY (idle panjang, timer + state only) ---------- */
+  var decayLabels=['','SIGNAL: STABLE','SIGNAL: WEAKENING','SIGNAL: FADING','SIGNAL: ...'];
+  var decayAt=[0,40000,70000,100000,130000]; /* ms idle thresholds */
+  function decayTick(){
+    setTimeout(decayTick,4000);
+    if(document.hidden||nullBusy)return;
+    var idle=Date.now()-lastAct;
+    var stage=0;
+    for(var i=decayAt.length-1;i>=1;i--){
+      if(idle>=decayAt[i]){stage=i;break;}
+    }
+    if(stage>sigDecay){
+      sigDecay=stage;
+      log(decayLabels[stage],stage>=3);
+    }
+  }
+  setTimeout(decayTick,8000);
+
+  /* ---------- REFLECTION ERROR (aksi berulang → komentar psikologis) ---------- */
+  var refl={kind:'',count:0,last:0};
+  function reflect(kind){
+    if(!kind)return;
+    var now=Date.now();
+    if(kind===refl.kind&&now-refl.last<14000)refl.count++;
+    else{refl.kind=kind;refl.count=1;}
+    refl.last=now;
+    var c=refl.count;
+    /* milestone only — jangan spam tiap tap */
+    if(c===1||c===2||c===3)log('SIGNAL RECEIVED.');
+    else if(c===4)log('YOU KEEP CHECKING.',true);
+    else if(c===5)log('WHY?',true);
+    else if(c===6)log('...',true);
+    else if(c===8)log('THIS WON\'T CHANGE ANYTHING.',true);
+    else if(c===11)log('STILL WATCHING.',true);
+    else if(c===15)log('OK.',true);
+  }
+  /* owl = cek session log berulang */
+  owl.addEventListener('click',function(){reflect('owl');},true);
+  /* player controls + track rows (delegasi, non-destruktif) */
+  document.addEventListener('click',function(e){
+    var t=e.target;if(!t||!t.closest)return;
+    if(t.closest('#dm-pp'))reflect('pp');
+    else if(t.closest('#dm-next'))reflect('next');
+    else if(t.closest('#dm-prev'))reflect('prev');
+    else if(t.closest('#dm-help'))reflect('help');
+    else if(t.closest('[class*="space-y-[1px]"] > div'))reflect('track');
+    else if(t.closest('.dm-tracklink'))reflect('tracklink');
+    else if(t.closest('#dm-seek,[role="slider"]'))reflect('seek');
+  },true);
+  /* reset rantai refleksi setelah idle */
+  setInterval(function(){
+    if(refl.count&&Date.now()-refl.last>16000){refl.kind='';refl.count=0;}
+  },5000);
+
+  /* ---------- STATE CONTRADICTION (semantic, sporadis) ---------- */
+  var conflictBusy=false;
+  var conflictSets=[
+    ['SIGNAL: ACTIVE','MEMORY: LOST','OBSERVER: ABSENT','SYSTEM: AWAKE'],
+    ['OBSERVER: ABSENT','OBSERVATION: ACTIVE'],
+    ['SIGNAL: STABLE','SIGNAL: FADING'],
+    ['MEMORY: PRESENT','MEMORY: NULL','OBSERVER: YOU'],
+    ['SYSTEM: ASLEEP','OBSERVER: ACTIVE','SIGNAL: AWAKE']
+  ];
+  function conflictSequence(){
+    if(conflictBusy||document.hidden||nullBusy)return;
+    conflictBusy=true;
+    var set=conflictSets[Math.floor(Math.random()*conflictSets.length)];
+    var t0=0;
+    set.forEach(function(line,i){
+      setTimeout(function(){log(line,true);},t0);
+      t0+=850;
+    });
+    setTimeout(function(){log('STATE CONFLICT.',true);},t0+400);
+    setTimeout(function(){conflictBusy=false;},t0+2000);
+  }
+  function conflictSchedule(){
+    var wait=70000+Math.floor(Math.random()*150000);
+    setTimeout(function(){
+      if(!document.hidden&&Math.random()<0.22)conflictSequence();
+      conflictSchedule();
+    },wait);
+  }
+  setTimeout(conflictSchedule,55000);
+
+  /* ---------- THE BUG THAT ISN'T A BUG ---------- */
+  var bugBusy=false;
+  var bugScripts=[
+    function(){
+      log('WARNING:',true);
+      setTimeout(function(){log('EXPECTED BEHAVIOR NOT FOUND.',true);},900);
+    },
+    function(){
+      log('ERROR 0x00000000',true);
+      setTimeout(function(){log('CAUSE: UNKNOWN');},800);
+      setTimeout(function(){log('STATUS: NORMAL');},1600);
+    },
+    function(){
+      log('NO ERROR DETECTED.',true);
+      setTimeout(function(){log('ERROR: USER LOOKING FOR ERROR.',true);},1100);
+    },
+    function(){
+      log('EXCEPTION IN OBSERVER',true);
+      setTimeout(function(){log('STACK: [redacted]');},900);
+      setTimeout(function(){log('CONTINUE ANYWAY.');},1800);
+    }
+  ];
+  function bugSequence(){
+    if(bugBusy||document.hidden||nullBusy||conflictBusy)return;
+    bugBusy=true;
+    var fn=bugScripts[Math.floor(Math.random()*bugScripts.length)];
+    fn();
+    setTimeout(function(){bugBusy=false;},4500);
+  }
+  function bugSchedule(){
+    var wait=90000+Math.floor(Math.random()*180000);
+    setTimeout(function(){
+      if(!document.hidden&&Math.random()<0.16)bugSequence();
+      bugSchedule();
+    },wait);
+  }
+  setTimeout(bugSchedule,80000);
+  /* refresh after fake "EXPECTED BEHAVIOR NOT FOUND" → soft callback on visibility if flagged */
+  var expectBehavior=false;
+  var _bugLog=log;
+  /* patch: when WARNING path fires, mark flag; on return show BEHAVIOR FOUND */
+  var origBug0=bugScripts[0];
+  bugScripts[0]=function(){
+    expectBehavior=true;
+    origBug0();
+  };
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden&&expectBehavior){
+      expectBehavior=false;
+      setTimeout(function(){log('BEHAVIOR FOUND.',true);},600);
+    }
+  });
+
+  /* ---------- TRACK MEMORY (jejak digital, bukan chart) ---------- */
+  var traceShown=false,allObservedLogged=false;
+  var TRACE_ORDER=['Glitch (Instrumental)','Limerence','Glitch','Nastenka','Larung'];
+  function barsFor(name){
+    /* intensitas dari urutan penemuan di tracksPlayed */
+    var idx=-1;
+    for(var i=0;i<st.tracksPlayed.length;i++){
+      if(String(st.tracksPlayed[i]).toLowerCase().indexOf(name.split(' ')[0].toLowerCase())>=0){idx=i;break;}
+    }
+    if(idx<0)return '\u00b7'; /* · belum */
+    var n=1+(idx%3); /* 1–3 */
+    return Array(n+1).join('\u25a0'); /* ■ */
+  }
+  function shortName(t){
+    return String(t||'').replace(/\s*\(Instrumental\)/i,' (INSTRU)').replace(/\s+/g,' ').trim().toUpperCase().slice(0,14);
+  }
+  function showMemoryTrace(){
+    if(st.tracksPlayed.length<1)return;
+    log('MEMORY TRACE',true);
+    var delay=900;
+    TRACE_ORDER.forEach(function(name){
+      var played=st.tracksPlayed.some(function(t){
+        return String(t).toLowerCase().indexOf(name.split(' ')[0].toLowerCase())>=0
+          && ((/instru/i.test(name))===(/instru/i.test(t)) || !/instru/i.test(name));
+      });
+      /* match more carefully for Glitch vs Glitch Instrumental */
+      if(/instru/i.test(name)){
+        played=st.tracksPlayed.some(function(t){return /instru/i.test(t);});
+      }else if(/^Glitch$/i.test(name)){
+        played=st.tracksPlayed.some(function(t){return /^glitch$/i.test(String(t).trim())||(/^glitch/i.test(t)&&!/instru/i.test(t));});
+      }else{
+        played=st.tracksPlayed.some(function(t){return String(t).toLowerCase().indexOf(name.toLowerCase())>=0;});
+      }
+      var label=shortName(name);
+      var bar=played?barsFor(name):'\u00b7';
+      setTimeout(function(){log(label+Array(Math.max(1,16-label.length)).join(' ')+bar,false);},delay);
+      delay+=700;
+    });
+  }
+  function checkAllObserved(){
+    if(allObservedLogged)return;
+    var need=['limerence','glitch','nastenka','larung'];
+    var hasInstru=st.tracksPlayed.some(function(t){return /instru/i.test(t);});
+    var hasGlitch=st.tracksPlayed.some(function(t){return /glitch/i.test(t)&&!/instru/i.test(t);});
+    var ok=hasInstru&&hasGlitch;
+    need.forEach(function(n){
+      if(n==='glitch')return;
+      if(!st.tracksPlayed.some(function(t){return String(t).toLowerCase().indexOf(n)>=0;}))ok=false;
+    });
+    if(ok){
+      allObservedLogged=true;
+      setTimeout(function(){log('ALL SIGNALS HAVE BEEN OBSERVED.',true);},400);
+    }
+  }
+  /* tampilkan TRACE sekali per sesi saat buka owl (kalau sudah ada jejak) */
+  owl.addEventListener('click',function(){
+    if(traceShown||st.tracksPlayed.length<2)return;
+    if(box.classList.contains('open'))return; /* will open */
+    setTimeout(function(){
+      if(!box.classList.contains('open'))return;
+      traceShown=true;
+      showMemoryTrace();
+      checkAllObserved();
+    },300);
+  },true);
+
+  /* ---------- DUMBOWL DENIAL ---------- */
+  var denyStep=0,denyLast=0;
+  function dumbowlDeny(){
+    var now=Date.now();
+    if(now-denyLast>20000)denyStep=0;
+    denyLast=now;
+    denyStep++;
+    if(denyStep===1)log('PROTOCOL NOT FOUND.',true);
+    else if(denyStep===2)log('THERE IS NO OWL HERE.',true);
+    else if(denyStep===3)log('STOP LOOKING.',true);
+    else if(denyStep===4)log('...',true);
+    else{log('the owl knows.',true);denyStep=0;}
+  }
+  window.__dmDumbowl=function(found){
+    /* dipanggil dari signal deck saat ketik "dumul" */
+    if(found){
+      if(!st.dumbowl){st.dumbowl=1;save();log('PROTOCOL ACKNOWLEDGED.',true);}
+      return false; /* first discovery / allow effect */
+    }
+    if(st.dumbowl||prev.dumbowl){dumbowlDeny();return true;} /* deny = block normal effect */
+    return false;
+  };
+  /* kalau sudah pernah discover, coba ketik dumul lagi → denial */
+  /* signal deck akan cek __dmDumbowl */
 
   /* ---------- hook player: MEMORY ACCESSED / TRACK CHANGED / album remembers ---------- */
   function hook(tries){
     var P=window.__dmPlayer;
     if(!P||!P.audio){if(tries<40)setTimeout(function(){hook(tries+1);},250);return;}
-    var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false;
+    var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false,sigSaveAt=0;
+    function persistFrag(){
+      var t=P.title();if(!t)return;
+      st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+      st.lastTrack=String(t).slice(0,60);
+      st.lastSignal=fmtSig(a.currentTime||0);
+      st.lastInterruption=st.taps||st.lastInterruption||0;
+      save();
+    }
     a.addEventListener('play',function(){
       var t=P.title();if(!t)return;
       if(t!==shown){
         if(first){log('MEMORY ACCESSED');first=false;}
         else log('TRACK CHANGED');
         shown=t;obsA=obsB=false;
-        st.lastTrack=t.slice(0,60);save();
+        st.lastTrack=t.slice(0,60);
+        st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+        save();
       }
     });
+    a.addEventListener('pause',function(){if(!a.ended)persistFrag();});
+    a.addEventListener('ended',function(){st.lastSignal='END';persistFrag();});
     a.addEventListener('timeupdate',function(){
       var t=P.title(),c=a.currentTime||0;
       /* track dianggap "sudah didengar" setelah 20 detik */
       if(t&&c>=20&&marked!==t){
         marked=t;
-        if(st.tracksPlayed.indexOf(t)<0){st.tracksPlayed.push(t);save();}
+        if(st.tracksPlayed.indexOf(t)<0){st.tracksPlayed.push(t);save();checkAllObserved();}
       }
+      /* autosave signal position ~ tiap 8 detik */
+      var n=Date.now();
+      if(n-sigSaveAt>8000){sigSaveAt=n;st.lastSignal=fmtSig(c);st.lastObserved=String(t||st.lastObserved).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);save();}
       /* sinkron dengan catatan Glitch (Instrumental): "Something is already watching..." */
       if(/instrumental/i.test(t||'')){
-        if(!obsA&&c>=212&&c<226){obsA=true;log('OBSERVER DETECTED',true);}
-        if(!obsB&&c>=218&&c<232){obsB=true;log('OBSERVER IS YOU',true);}
+        if(!obsA&&c>=212&&c<226){obsA=true;log('OBSERVER DETECTED',true);setObs('DETECTED',false);}
+        if(!obsB&&c>=218&&c<232){obsB=true;log('OBSERVER IS YOU',true);setObs('YOU',false);}
       }
     });
   }
@@ -2438,6 +2940,12 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
       typed=(typed+k.toLowerCase()).slice(-5);
       if(typed==='dumul'){
         typed='';
+        try{
+          var known=false;
+          try{var raw=localStorage.getItem('dm_album');if(raw){var o=JSON.parse(raw);known=!!(o&&o.dumbowl);}}catch(e1){}
+          if(known&&window.__dmDumbowl){window.__dmDumbowl(false);return;}
+          if(window.__dmDumbowl)window.__dmDumbowl(true);
+        }catch(e2){}
         var h=document.querySelector('h1.display');
         if(h){h.dispatchEvent(new Event('pointerdown',{bubbles:true}));toast('signal locked');}
       }
