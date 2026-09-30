@@ -2263,28 +2263,40 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     onOutsideScroll();
   },{passive:true});
 
+  var lastToastAt=0,TOAST_GAP=2400,narrBusy=false,narrUntil=0;
+  function narrLock(ms){narrBusy=true;narrUntil=Date.now()+(ms||4000);}
+  function narrFree(){if(Date.now()>=narrUntil)narrBusy=false;}
   function log(msg,hot){
     var entry={ts:stamp(),msg:String(msg).slice(0,60),hot:!!hot};
     hist.push(entry);
     while(hist.length>MAXHIST)hist.shift();
-    if(box.classList.contains('open'))renderList();
-    else showToast(entry.msg,entry.hot);
+    if(box.classList.contains('open')){renderList();return;}
+    var now=Date.now();
+    if(now-lastToastAt<TOAST_GAP&&!hot)return;
+    if(now-lastToastAt<1200&&hot){
+      setTimeout(function(){
+        if(!box.classList.contains('open')){lastToastAt=Date.now();showToast(entry.msg,true);}
+      },Math.max(200,TOAST_GAP-(now-lastToastAt)));
+      return;
+    }
+    lastToastAt=now;
+    showToast(entry.msg,entry.hot);
   }
-  function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1000);}
+  function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1400);}
   window.__dmLog=function(msg,hot){log(msg,hot);};
 
-  /* ---------- sambutan + MEMORY FRAGMENT (tampil di hero lirik via __dmWelcome) ---------- */
-  var welcomed=false;
+  /* ---------- sambutan + MEMORY FRAGMENT (hero via return; session log ringkas) ---------- */
+  var welcomed=false,allObservedLogged=false;
   window.__dmWelcome=function(){
     if(welcomed||!newSession||prev.timesVisited<1)return [];
     welcomed=true;
     var out=[];
-    var hasFrag=!!(prev.lastObserved||prev.lastSignal||prev.lastInterruption>0);
+    var hasFrag=!!(prev.lastObserved||prev.lastInterruption>0||prev.lastSignal);
     if(hasFrag){
       if(Math.random()<0.45)out.push('I REMEMBER THIS.');
       else out.push('YOU WERE HERE BEFORE.');
       if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
-      if(prev.lastSignal)out.push('LAST SIGNAL: '+prev.lastSignal);
+      /* LAST SIGNAL di-skip: dm_mem (Corrupted Memory) sudah tampilkan last signal + gap di hero */
       if(prev.lastInterruption>0)out.push('LAST INTERRUPTION: '+prev.lastInterruption+' TAPS');
     }else{
       out.push('WELCOME BACK.');
@@ -2293,15 +2305,15 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       var P=window.__dmPlayer,r=P&&P.rows?P.rows():[],all=r.length>0;
       for(var i=0;i<r.length;i++){if(prev.tracksPlayed.indexOf(P.title.call(null,r[i]))<0){all=false;break;}}
       if(/^glitch/i.test(prev.lastTrack||prev.lastObserved||''))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
-      if(all)out.push('ALL SIGNALS HAVE BEEN OBSERVED.');
+      if(all){out.push('ALL SIGNALS HAVE BEEN OBSERVED.');allObservedLogged=true;}
     }catch(e){}
     if(prev.timesVisited>=2&&Math.random()<0.12){
       out=['YOU CAME BACK.','I WONDER WHY.'];
       if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
     }
-    out.forEach(function(m,i){
-      setTimeout(function(){log(m,i===0||/REMEMBER|WERE HERE|CAME BACK|WONDER/i.test(m));},i*2600);
-    });
+    /* satu toast ringkas — detail penuh hanya di hero (hindari double-spam toast+lirik) */
+    var summary=hasFrag?'MEMORY FRAGMENT RECOVERED.':(out[0]||'WELCOME BACK.');
+    setTimeout(function(){log(summary,true);},400);
     return out;
   };
 
@@ -2309,7 +2321,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   var obsEl=document.createElement('div');
   obsEl.id='dm-obs';obsEl.setAttribute('aria-live','polite');obsEl.setAttribute('aria-hidden','true');
   bodyRoot.appendChild(obsEl);
-  var obsState='',obsSilentAt=0,obsYouCool=0,obsActiveCool=0,obsDetected=false;
+  var obsState='',obsSilentAt=0,obsYouCool=0,obsActiveCool=0,obsSilentCool=0,obsDetected=false;
+  /* Toast HANYA untuk momen bermakna. SILENT/ACTIVE = indikator saja (hindari spam saat lirik/scroll). */
+  var OBS_TOAST={DETECTED:1,ABSENT:1,RETURNED:1,YOU:1};
   function setObs(stName,toastIt){
     if(stName===obsState)return;
     obsState=stName;
@@ -2317,32 +2331,45 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     obsEl.setAttribute('data-st',stName);
     obsEl.classList.add('on');
     obsEl.setAttribute('aria-hidden','false');
-    if(toastIt)log('OBSERVER: '+stName,stName==='YOU'||stName==='RETURNED'||stName==='DETECTED');
+    if(toastIt&&OBS_TOAST[stName])log('OBSERVER: '+stName,stName==='YOU'||stName==='RETURNED'||stName==='DETECTED');
+  }
+  function obsPlaying(){
+    try{var p=document.getElementById('dm-pp');return !!(p&&p.classList.contains('dm-on'));}catch(e){return false;}
   }
   function obsTick(){
-    setTimeout(obsTick,1200);
+    setTimeout(obsTick,2000);
     if(document.hidden)return;
     var idle=Date.now()-lastAct;
     if(obsState==='ABSENT'||obsState==='RETURNED')return;
-    if(idle>=10000){
-      if(obsState!=='SILENT'&&obsState!=='YOU'){
-        /* sesekali YOU saat masuk silent */
-        if(Date.now()>obsYouCool&&Math.random()<0.12){
+    /* threshold lebih longgar saat musik main — lirik pindah ≠ user "aktif" */
+    var need=obsPlaying()?28000:14000;
+    if(idle>=need){
+      if(obsState!=='SILENT'&&obsState!=='YOU'&&Date.now()>obsSilentCool){
+        if(Date.now()>obsYouCool&&Math.random()<0.10){
           setObs('YOU',true);
-          obsYouCool=Date.now()+90000;
-          setTimeout(function(){if(obsState==='YOU'&&Date.now()-lastAct>=10000)setObs('SILENT',false);},3200);
-        }else setObs('SILENT',true);
+          obsYouCool=Date.now()+120000;
+          setTimeout(function(){
+            if(obsState==='YOU'&&Date.now()-lastAct>=need)setObs('SILENT',false);
+          },3200);
+        }else setObs('SILENT',false); /* indikator only, no toast */
       }
     }else if(obsDetected&&obsState!=='ACTIVE'&&obsState!=='DETECTED'){
-      if(Date.now()>obsActiveCool){setObs('ACTIVE',false);obsActiveCool=Date.now()+2500;}
+      if(Date.now()>obsActiveCool){setObs('ACTIVE',false);obsActiveCool=Date.now()+4000;}
     }
   }
-  setTimeout(obsTick,1500);
+  setTimeout(obsTick,2000);
 
   /* ---------- interaksi & idle ---------- */
   var seen=false,lastAct=Date.now(),idleFired=false,hiddenAt=0,sessTaps=0;
   var sigDecay=0; /* 0 ok, 1 STABLE, 2 WEAKENING, 3 FADING, 4 ... */
-  function act(isTap){
+  var actMoveAt=0;
+  function act(isTap,isMove){
+    /* throttle gerak pasif (mousemove/scroll/wheel) biar gak osilasi SILENT↔ACTIVE pas lirik */
+    if(isMove){
+      var n=Date.now();
+      if(n-actMoveAt<3000){lastAct=n;return;}
+      actMoveAt=n;
+    }
     lastAct=Date.now();idleFired=false;
     if(isTap){
       sessTaps++;
@@ -2350,39 +2377,52 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       st.lastInterruption=st.taps;
       if(sessTaps%7===0)save();
     }
-    if(sigDecay>0){
+    if(sigDecay>0&&(isTap||!isMove)){
       sigDecay=0;
       log('SIGNAL RESTORED.',true);
+    }else if(sigDecay>0&&isMove){
+      /* gerak pasif mereset decay stage tanpa toast */
+      sigDecay=0;
     }
     if(!obsDetected){
       obsDetected=true;
       setObs('DETECTED',true);
       setTimeout(function(){if(obsState==='DETECTED')setObs('ACTIVE',false);},1800);
     }else if(obsState==='SILENT'||obsState==='YOU'||obsState==='RETURNED'){
+      /* ACTIVE tanpa toast; cooldown supaya gak bolak-balik ke SILENT */
+      obsSilentCool=Date.now()+8000;
       setObs('ACTIVE',obsState==='RETURNED');
     }
   }
   ['pointerdown','touchstart'].forEach(function(ev){
     window.addEventListener(ev,function(){
       if(!seen){seen=true;log('LISTENER DETECTED');}
-      act(true);
+      act(true,false);
     },{passive:true,capture:true});
   });
-  ['keydown','wheel','mousemove','scroll'].forEach(function(ev){
+  ['keydown'].forEach(function(ev){
     window.addEventListener(ev,function(){
       if(!seen){seen=true;log('LISTENER DETECTED');}
-      act(false);
+      act(false,false);
     },{passive:true,capture:true});
   });
-  /* long-idle narrative (tetap, terpisah dari OBSERVER SILENT 10s) */
+  ['wheel','mousemove','scroll'].forEach(function(ev){
+    window.addEventListener(ev,function(){
+      if(!seen){seen=true;log('LISTENER DETECTED');}
+      act(false,true);
+    },{passive:true,capture:true});
+  });
+  /* long-idle narrative — jauh dari SIGNAL DECAY supaya tidak bertumpuk */
   function idleTick(){
-    setTimeout(idleTick,5000);
-    if(document.hidden||idleFired||Date.now()-lastAct<45000)return;
+    setTimeout(idleTick,8000);
+    narrFree();
+    if(document.hidden||idleFired||narrBusy||Date.now()-lastAct<95000)return;
     idleFired=true;
-    if(Math.random()<0.3)pair('OBSERVER DETECTED','OBSERVER IS YOU',1000);
-    else pair('USER STILL HERE','WHY',1000);
+    narrLock(5000);
+    if(Math.random()<0.3)pair('OBSERVER DETECTED','OBSERVER IS YOU',1400);
+    else pair('USER STILL HERE','WHY',1400);
   }
-  setTimeout(idleTick,5000);
+  setTimeout(idleTick,8000);
   document.addEventListener('visibilitychange',function(){
     if(document.hidden){
       hiddenAt=Date.now();
@@ -2489,8 +2529,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   /* ---------- NULL STATE (semantic glitch, sporadis) ---------- */
   var nullBusy=false,nullPrevObs='';
   function nullSequence(){
-    if(nullBusy||document.hidden)return;
-    nullBusy=true;
+    narrFree();
+    if(nullBusy||document.hidden||conflictBusy||bugBusy||narrBusy)return;
+    nullBusy=true;narrLock(6000);
     nullPrevObs=obsState||'';
     var steps=[
       [0,'SIGNAL: NULL',true],
@@ -2534,7 +2575,8 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   var decayAt=[0,40000,70000,100000,130000]; /* ms idle thresholds */
   function decayTick(){
     setTimeout(decayTick,4000);
-    if(document.hidden||nullBusy)return;
+    narrFree();
+    if(document.hidden||nullBusy||conflictBusy||bugBusy||narrBusy)return;
     var idle=Date.now()-lastAct;
     var stage=0;
     for(var i=decayAt.length-1;i>=1;i--){
@@ -2542,6 +2584,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     }
     if(stage>sigDecay){
       sigDecay=stage;
+      narrLock(2800);
       log(decayLabels[stage],stage>=3);
     }
   }
@@ -2556,14 +2599,23 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     else{refl.kind=kind;refl.count=1;}
     refl.last=now;
     var c=refl.count;
-    /* milestone only — jangan spam tiap tap */
-    if(c===1||c===2||c===3)log('SIGNAL RECEIVED.');
-    else if(c===4)log('YOU KEEP CHECKING.',true);
-    else if(c===5)log('WHY?',true);
-    else if(c===6)log('...',true);
-    else if(c===8)log('THIS WON\'T CHANGE ANYTHING.',true);
-    else if(c===11)log('STILL WATCHING.',true);
-    else if(c===15)log('OK.',true);
+    /* track/pp sudah dapat TRACK CHANGED / MEMORY ACCESSED — jangan dobel di awal */
+    var soft=(kind==='track'||kind==='tracklink'||kind==='pp');
+    if(soft){
+      if(c===4)log('YOU KEEP CHECKING.',true);
+      else if(c===5)log('WHY?',true);
+      else if(c===6)log('...',true);
+      else if(c===9)log('THIS WON\'T CHANGE ANYTHING.',true);
+      else if(c===12)log('STILL WATCHING.',true);
+      return;
+    }
+    if(c===1||c===2)log('SIGNAL RECEIVED.');
+    else if(c===3)log('YOU KEEP CHECKING.',true);
+    else if(c===4)log('WHY?',true);
+    else if(c===5)log('...',true);
+    else if(c===7)log('THIS WON\'T CHANGE ANYTHING.',true);
+    else if(c===10)log('STILL WATCHING.',true);
+    else if(c===14)log('OK.',true);
   }
   /* owl = cek session log berulang */
   owl.addEventListener('click',function(){reflect('owl');},true);
@@ -2593,8 +2645,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     ['SYSTEM: ASLEEP','OBSERVER: ACTIVE','SIGNAL: AWAKE']
   ];
   function conflictSequence(){
-    if(conflictBusy||document.hidden||nullBusy)return;
-    conflictBusy=true;
+    narrFree();
+    if(conflictBusy||document.hidden||nullBusy||bugBusy||narrBusy)return;
+    conflictBusy=true;narrLock(7000);
     var set=conflictSets[Math.floor(Math.random()*conflictSets.length)];
     var t0=0;
     set.forEach(function(line,i){
@@ -2636,8 +2689,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     }
   ];
   function bugSequence(){
-    if(bugBusy||document.hidden||nullBusy||conflictBusy)return;
-    bugBusy=true;
+    narrFree();
+    if(bugBusy||document.hidden||nullBusy||conflictBusy||narrBusy)return;
+    bugBusy=true;narrLock(5500);
     var fn=bugScripts[Math.floor(Math.random()*bugScripts.length)];
     fn();
     setTimeout(function(){bugBusy=false;},4500);
@@ -2667,7 +2721,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   });
 
   /* ---------- TRACK MEMORY (jejak digital, bukan chart) ---------- */
-  var traceShown=false,allObservedLogged=false;
+  var traceShown=false;
   var TRACE_ORDER=['Glitch (Instrumental)','Limerence','Glitch','Nastenka','Larung'];
   function barsFor(name){
     /* intensitas dari urutan penemuan di tracksPlayed */
@@ -2775,6 +2829,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       if(t!==shown){
         if(first){log('MEMORY ACCESSED');first=false;}
         else log('TRACK CHANGED');
+        narrLock(2000);
         shown=t;obsA=obsB=false;
         st.lastTrack=t.slice(0,60);
         st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
@@ -2795,8 +2850,8 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       if(n-sigSaveAt>8000){sigSaveAt=n;st.lastSignal=fmtSig(c);st.lastObserved=String(t||st.lastObserved).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);save();}
       /* sinkron dengan catatan Glitch (Instrumental): "Something is already watching..." */
       if(/instrumental/i.test(t||'')){
-        if(!obsA&&c>=212&&c<226){obsA=true;log('OBSERVER DETECTED',true);setObs('DETECTED',false);}
-        if(!obsB&&c>=218&&c<232){obsB=true;log('OBSERVER IS YOU',true);setObs('YOU',false);}
+        if(!obsA&&c>=212&&c<226){obsA=true;narrFree();if(!narrBusy){narrLock(4000);log('OBSERVER DETECTED',true);}setObs('DETECTED',false);}
+        if(!obsB&&c>=218&&c<232){obsB=true;narrFree();if(!narrBusy){narrLock(4000);log('OBSERVER IS YOU',true);}setObs('YOU',false);}
       }
     });
   }
