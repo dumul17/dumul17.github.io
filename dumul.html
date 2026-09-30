@@ -2295,6 +2295,27 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   window.__dmLog=function(msg,hot,silent){log(msg,hot,silent);};
 
   /* ---------- sambutan + MEMORY FRAGMENT (hero via return; session log ringkas) ---------- */
+  /* Sumber tunggal daftar lagu = row di player (urutan DOM = urutan keyboard 1-5). Fallback kalau player belum siap. */
+  var FALLBACK_TRACKS=['Glitch (Instrumental)','Limerence','Glitch','Nastenka','Larung'];
+  function normT(x){return String(x||'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function trackList(){
+    try{
+      var P=window.__dmPlayer,r=P&&P.rows?P.rows():[],out=[];
+      for(var i=0;i<r.length;i++){var t=P.title.call(null,r[i]);if(t)out.push(t);}
+      if(out.length)return out;
+    }catch(e){}
+    return FALLBACK_TRACKS;
+  }
+  function playedIdx(list,title){
+    var n=normT(title);
+    for(var i=0;i<list.length;i++){if(normT(list[i])===n)return i;}
+    return -1;
+  }
+  function allObserved(list){
+    var tr=trackList();
+    for(var i=0;i<tr.length;i++){if(playedIdx(list||[],tr[i])<0)return false;}
+    return tr.length>0;
+  }
   var welcomed=false,allObservedLogged=false;
   window.__dmWelcome=function(){
     if(welcomed||!newSession||prev.timesVisited<1)return [];
@@ -2311,8 +2332,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       out.push('WELCOME BACK.');
     }
     try{
-      var P=window.__dmPlayer,r=P&&P.rows?P.rows():[],all=r.length>0;
-      for(var i=0;i<r.length;i++){if(prev.tracksPlayed.indexOf(P.title.call(null,r[i]))<0){all=false;break;}}
+      var all=allObserved(prev.tracksPlayed);
       if(/^glitch/i.test(prev.lastTrack||prev.lastObserved||''))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
       if(all){out.push('ALL SIGNALS HAVE BEEN OBSERVED.');allObservedLogged=true;}
     }catch(e){}
@@ -2395,7 +2415,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     }
     if(!obsDetected){
       obsDetected=true;
-      setObs('DETECTED',true);
+      setObs('DETECTED',false); /* indikator saja: 'LISTENER DETECTED' sudah jadi toast pembuka */
       setTimeout(function(){if(obsState==='DETECTED')setObs('ACTIVE',false);},1800);
     }else if(obsState==='SILENT'||obsState==='YOU'||obsState==='RETURNED'){
       /* ACTIVE tanpa toast; cooldown supaya gak bolak-balik ke SILENT */
@@ -2428,8 +2448,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     if(document.hidden||idleFired||narrBusy||Date.now()-lastAct<95000)return;
     idleFired=true;
     narrLock(5000);
-    if(Math.random()<0.3)pair('OBSERVER DETECTED','OBSERVER IS YOU',1400);
-    else pair('USER STILL HERE','WHY',1400);
+    pair('USER STILL HERE','WHY',1400);
   }
   setTimeout(idleTick,8000);
   document.addEventListener('visibilitychange',function(){
@@ -2735,13 +2754,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
 
   /* ---------- TRACK MEMORY (jejak digital, bukan chart) ---------- */
   var traceShown=false;
-  var TRACE_ORDER=['Glitch (Instrumental)','Limerence','Glitch','Nastenka','Larung'];
   function barsFor(name){
     /* intensitas dari urutan penemuan di tracksPlayed */
-    var idx=-1;
-    for(var i=0;i<st.tracksPlayed.length;i++){
-      if(String(st.tracksPlayed[i]).toLowerCase().indexOf(name.split(' ')[0].toLowerCase())>=0){idx=i;break;}
-    }
+    var idx=playedIdx(st.tracksPlayed,name);
     if(idx<0)return '\u00b7'; /* · belum */
     var n=1+(idx%3); /* 1–3 */
     return Array(n+1).join('\u25a0'); /* ■ */
@@ -2753,19 +2768,8 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     if(st.tracksPlayed.length<1)return;
     log('MEMORY TRACE',true);
     var delay=900;
-    TRACE_ORDER.forEach(function(name){
-      var played=st.tracksPlayed.some(function(t){
-        return String(t).toLowerCase().indexOf(name.split(' ')[0].toLowerCase())>=0
-          && ((/instru/i.test(name))===(/instru/i.test(t)) || !/instru/i.test(name));
-      });
-      /* match more carefully for Glitch vs Glitch Instrumental */
-      if(/instru/i.test(name)){
-        played=st.tracksPlayed.some(function(t){return /instru/i.test(t);});
-      }else if(/^Glitch$/i.test(name)){
-        played=st.tracksPlayed.some(function(t){return /^glitch$/i.test(String(t).trim())||(/^glitch/i.test(t)&&!/instru/i.test(t));});
-      }else{
-        played=st.tracksPlayed.some(function(t){return String(t).toLowerCase().indexOf(name.toLowerCase())>=0;});
-      }
+    trackList().forEach(function(name){
+      var played=playedIdx(st.tracksPlayed,name)>=0;
       var label=shortName(name);
       var bar=played?barsFor(name):'\u00b7';
       setTimeout(function(){log(label+Array(Math.max(1,16-label.length)).join(' ')+bar,false);},delay);
@@ -2774,15 +2778,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   }
   function checkAllObserved(){
     if(allObservedLogged)return;
-    var need=['limerence','glitch','nastenka','larung'];
-    var hasInstru=st.tracksPlayed.some(function(t){return /instru/i.test(t);});
-    var hasGlitch=st.tracksPlayed.some(function(t){return /glitch/i.test(t)&&!/instru/i.test(t);});
-    var ok=hasInstru&&hasGlitch;
-    need.forEach(function(n){
-      if(n==='glitch')return;
-      if(!st.tracksPlayed.some(function(t){return String(t).toLowerCase().indexOf(n)>=0;}))ok=false;
-    });
-    if(ok){
+    if(allObserved(st.tracksPlayed)){
       allObservedLogged=true;
       setTimeout(function(){log('ALL SIGNALS HAVE BEEN OBSERVED.',true);},400);
     }
@@ -2863,8 +2859,8 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       if(n-sigSaveAt>8000){sigSaveAt=n;st.lastSignal=fmtSig(c);st.lastObserved=String(t||st.lastObserved).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);save();}
       /* sinkron dengan catatan Glitch (Instrumental): "Something is already watching..." */
       if(/instrumental/i.test(t||'')){
-        if(!obsA&&c>=212&&c<226){obsA=true;narrFree();if(!narrBusy){narrLock(4000);log('OBSERVER DETECTED',true);}setObs('DETECTED',false);}
-        if(!obsB&&c>=218&&c<232){obsB=true;narrFree();if(!narrBusy){narrLock(4000);log('OBSERVER IS YOU',true);}setObs('YOU',false);}
+        if(!obsA&&c>=212&&c<226){obsA=true;narrFree();var qa=!narrBusy;if(qa)narrLock(4000);setObs('DETECTED',qa);}
+        if(!obsB&&c>=218&&c<232){obsB=true;narrFree();var qb=!narrBusy;if(qb)narrLock(4000);setObs('YOU',qb);}
       }
     });
   }
@@ -3018,7 +3014,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
         if(h){if(window.__dmGlitch)window.__dmGlitch(h);toast('signal locked');}
       }
     }
-    var digit=/^[1-5]$/.test(k);
+    var digit=/^[1-9]$/.test(k)&&+k<=document.querySelectorAll(ROWS).length;
     if(!digit&&!barOn())return;
     var interactive=t&&t.closest&&t.closest('button,a,[role="slider"],[role="button"],[tabindex]');
     if(k===' '){if(interactive)return;press('dm-pp');e.preventDefault();}
