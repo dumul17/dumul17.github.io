@@ -254,16 +254,23 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
-  /* SINGLE SOURCE OF TRUTH for the hero crop + mesh coordinate space.
-     Do not read/write localStorage here: a stale rect from another render
-     was the reason the handoff could use a different og.jpg crop than dumul.html.
-     These heights mirror the final dumul hero layout after its compact-layout CSS. */
-  var W=document.documentElement.clientWidth||window.innerWidth||360;
-  var meshH=132;
-  var h=W>=640?346:292;
+  var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
+  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=24,meshH=132;
+  var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
   var mw=Math.round(Math.min(W*.92,640));
-  var y=Math.max(0,Math.round((h-meshH)*0.38));
-  return{x:0,y:0,w:W,h:h,m:{x:Math.round((W-mw)/2),y:y,w:mw,h:meshH}};
+  try{
+    var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
+    if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
+      h=s.h;m=s.m;
+    }
+  }catch(e){}
+  if(!h)h=hEst;
+  if(!m){
+    /* Same band as transition: top at (H-meshH)*0.38 → mesh centered on og.jpg chest. */
+    var y=Math.max(0,Math.round((h-meshH)*0.38));
+    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
+  }
+  return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
 }
 var DM_NN_DUR=5600;
 function dmNeuralBuild(W,H){
@@ -465,9 +472,7 @@ function dmNeuralDraw(g,W,H,net,t){
   </script>
   
   <script>
-  /* Deterministic mesh placement: never mutate hero height or depend on a
-     previous page's localStorage measurement. The wrapper is visually shifted
-     to the exact same Y used by index.html's transition stage. */
+  /* Align hero spectrum canvas to the same vertical band as the neural transition (og.jpg chest). */
   (function(){
     function align(){
       var s=document.querySelector('section.dm-hero');
@@ -480,14 +485,36 @@ function dmNeuralDraw(g,W,H,net,t){
       var targetY=Math.max(0,Math.round((H-meshH)*0.38));
       var hr=s.getBoundingClientRect();
       var wr=wrap.getBoundingClientRect();
-      var delta=targetY-(wr.top-hr.top);
-      wrap.style.transform='translateY('+delta+'px)';
+      var curY=wr.top-hr.top;
+      var mt=parseFloat(window.getComputedStyle(wrap).marginTop)||0;
+      var next=mt+(targetY-curY);
+      if(Math.abs(next-mt)<1)return;
+      wrap.style.marginTop=Math.max(0,Math.round(next))+'px';
+      /* Persist aligned rect so index transition matches this exact band. */
+      try{
+        var hr2=s.getBoundingClientRect(),w=document.documentElement.clientWidth;
+        var cv=s.querySelector('canvas'),m=null;
+        if(cv){
+          var cr=cv.getBoundingClientRect();
+          m={x:Math.round(cr.left-hr2.left),y:Math.max(0,Math.round(cr.top-hr2.top)),w:Math.round(cr.width),h:Math.round(cr.height)};
+        }
+        if(hr2.height>60)localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(hr2.height*10)/10,m:m}));
+      }catch(e){}
     }
-    function run(){align();requestAnimationFrame(align);}
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);
-    else run();
-    window.addEventListener('resize',function(){requestAnimationFrame(align);},{passive:true});
-    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){requestAnimationFrame(align);});
+    function run(){
+      align();
+      /* Re-measure after layout settle + fonts */
+      setTimeout(align,100);
+      setTimeout(align,400);
+      setTimeout(align,900);
+    }
+    if(document.readyState==='complete')run();
+    else window.addEventListener('load',run);
+    window.addEventListener('resize',function(){
+      clearTimeout(window.__dmMeshAlignT);
+      window.__dmMeshAlignT=setTimeout(align,150);
+    });
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){setTimeout(align,50);});
   })();
   </script>
 
@@ -503,7 +530,7 @@ function dmNeuralDraw(g,W,H,net,t){
         var cr=cv.getBoundingClientRect();
         m={x:Math.round(cr.left-hr.left),y:Math.max(0,Math.round(cr.top-hr.top)),w:Math.round(cr.width),h:Math.round(cr.height)};
       }
-      if(h>60&&h<2000){try{/* geometry is deterministic now; no localStorage handoff */;}catch(e){}}
+      if(h>60&&h<2000){try{localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(h*10)/10,m:m}));}catch(e){}}
     }
     var rt=0;function later(){clearTimeout(rt);rt=setTimeout(save,250);}
     window.addEventListener('load',function(){save();setTimeout(save,800);});
@@ -702,14 +729,6 @@ return o=requestAnimationFrame(k),()=>{cancelAnimationFrame(o),_io&&_io.disconne
 </script>
   <script>(function(){function m(a){var h=a.getAttribute("href");if(!h)return;try{var u=new URL(h,document.baseURI);if((u.protocol==="http:"||u.protocol==="https:")&&u.host!==location.host){a.target="_blank";a.rel="noopener noreferrer";}}catch(e){}}function s(){document.querySelectorAll("a[href]").forEach(m);}if(document.readyState!=="loading"){s();}else{document.addEventListener("DOMContentLoaded",s);}document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a){m(a);}},true);})();</script>
   
-<style id="dm-handoff-geometry">
-/* HANDOFF GEOMETRY: this must stay numerically identical to dmHeroRect() in
-   index.html. The image crop and the mesh therefore share one coordinate space. */
-section.dm-hero{height:292px!important;min-height:0!important}
-section.dm-hero > div[class*="justify-center"]{height:100%!important;min-height:0!important}
-@media (min-width:640px){section.dm-hero{height:346px!important}}
-</style>
-
 <style>
 /* layout: hero dirapetin, daftar lagu langsung di bawah spektrum */
 section.dm-hero{height:auto!important;min-height:0!important}
@@ -3320,12 +3339,5 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
 })();
 </script>
 
-
-<style id="dm-handoff-geometry-final">
-/* FINAL OVERRIDE: must be after the compact-layout CSS above. */
-section.dm-hero{height:292px!important;min-height:0!important}
-section.dm-hero > div[class*="justify-center"]{height:100%!important;min-height:0!important;justify-content:flex-start!important}
-@media (min-width:640px){section.dm-hero{height:346px!important}}
-</style>
 </body>
 </html>
