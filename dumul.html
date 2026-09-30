@@ -259,17 +259,17 @@ function dmHeroRect(){
   var W=document.documentElement.clientWidth||window.innerWidth||360;
   var wide=W>=640;
   var padTop=wide?56:30,titleH=wide?46:30,gap=24,meshH=132;
-  var heroH=wide?344:308;
+  /* + ruang tetap untuk baris lirik (#dm-hl: tinggi 56/42 + margin 8) supaya hero tidak perlu tumbuh saat lirik muncul */
+  var heroH=(wide?344:308)+(W>=480?50:64);
   var mw=Math.round(Math.min(W*.92,640));
   var my=padTop+titleH+gap;                 /* atas kanvas mesh */
   /* Titik jembatan cahaya di og.jpg (fraksi gambar 720x720). */
   var BX=.49,BY=.527,IW=720,IH=720;
-  var s=Math.max(W/IW,heroH/IH),dw=IW*s,dh=IH*s;
-  /* object-position supaya jembatan jatuh persis di pusat kanvas mesh (x=W/2, y=my+meshH/2). */
-  var px=dw>W+.5?(W/2-BX*dw)/(W-dw):.5;
-  var py=dh>heroH+.5?((my+meshH/2)-BY*dh)/(heroH-dh):.5;
-  px=Math.max(0,Math.min(1,px));py=Math.max(0,Math.min(1,py));
-  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},px:px,py:py,padTop:padTop,titleH:titleH};
+  /* Skala gambar: minimal cover, dan cukup besar supaya jembatan bisa dipasang PERSIS di pusat mesh (zoom kalau perlu). */
+  var cx=W/2,cy=my+meshH/2;
+  var s=Math.max(W/IW,heroH/IH,cy/(BY*IH),(heroH-cy)/((1-BY)*IH),cx/(BX*IW),(W-cx)/((1-BX)*IW));
+  var dw=IW*s,dh=IH*s,ix=cx-BX*dw,iy=cy-BY*dh;
+  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},img:{x:ix,y:iy,w:dw,h:dh},padTop:padTop,titleH:titleH};
 }
 var DM_NN_DUR=5600;
 function dmNeuralBuild(W,H){
@@ -479,7 +479,8 @@ function dmNeuralDraw(g,W,H,net,t){
       d.setProperty('--dm-pad-top',r.padTop+'px');
       d.setProperty('--dm-title-h',r.titleH+'px');
       d.setProperty('--dm-mesh-w',r.m.w+'px');
-      d.setProperty('--dm-img-pos',(r.px*100).toFixed(3)+'% '+(r.py*100).toFixed(3)+'%');
+      d.setProperty('--dm-img-x',r.img.x.toFixed(2)+'px');d.setProperty('--dm-img-y',r.img.y.toFixed(2)+'px');
+      d.setProperty('--dm-img-w',r.img.w.toFixed(2)+'px');d.setProperty('--dm-img-h',r.img.h.toFixed(2)+'px');
     }
     apply();
     window.addEventListener('resize',apply,{passive:true});
@@ -682,7 +683,7 @@ return o=requestAnimationFrame(k),()=>{cancelAnimationFrame(o),_io&&_io.disconne
 /* layout: hero dirapetin, daftar lagu langsung di bawah spektrum */
 /* Hero DETERMINISTIK (angka dari dmHeroRect di atas → CSS var). Mesh TIDAK ikut geser oleh apa pun. */
 section.dm-hero{height:var(--dm-hero-h,308px)!important;min-height:0!important;max-height:none!important}
-section.dm-hero > img{object-position:var(--dm-img-pos,50% 50%)!important}
+section.dm-hero > img{position:absolute!important;inset:auto!important;left:var(--dm-img-x,0)!important;top:var(--dm-img-y,0)!important;width:var(--dm-img-w,100%)!important;height:var(--dm-img-h,100%)!important;max-width:none!important;object-fit:fill!important}
 section.dm-hero > div[class*="justify-center"]{height:100%!important;justify-content:flex-start!important;padding-top:var(--dm-pad-top,30px)!important;padding-bottom:0!important}
 section.dm-hero h1{margin:0!important;height:var(--dm-title-h,30px)!important;display:flex;align-items:center;justify-content:center;line-height:1!important;flex:none}
 section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:24px!important;height:132px!important;width:var(--dm-mesh-w,92vw)!important;flex:none}
@@ -716,7 +717,7 @@ div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
 @media (prefers-reduced-motion:reduce){.dm-sync .dm-line.on{animation:none}}
 /* lirik hero: di bawah spektrum. Tinggi DIPESAN tetap (3 baris) + line-clamp supaya teks panjang
    tidak nabrak subtitle "INDONESIAN ALTERNATIVE ROCK PROJECT" di device sempit / font besar. */
-#dm-hl{position:relative;z-index:1;width:min(88vw,520px);height:56px;margin:8px auto 0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;overflow:hidden}
+#dm-hl{flex:none;position:relative;z-index:1;width:min(88vw,520px);height:56px;margin:8px auto 0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;overflow:hidden}
 #dm-hl .dm-hl-t{
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;
   overflow:hidden;text-overflow:ellipsis;
