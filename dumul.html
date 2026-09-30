@@ -696,9 +696,27 @@ div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
 .dm-line.dm-gap{display:none}
 .dm-line.dm-space{height:.9em;padding:0}
 @media (prefers-reduced-motion:reduce){.dm-sync .dm-line.on{animation:none}}
-/* lirik hero: 1 baris, di bawah spektrum. Tinggi DIPESAN tetap (2 baris) supaya layout tidak geser saat play/pause/ganti baris */
-#dm-hl{position:relative;z-index:1;width:min(88vw,520px);height:38px;margin:8px auto 0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;overflow:visible}
-#dm-hl .dm-hl-t{display:block;text-align:center;font-family:"Space Grotesk",system-ui,sans-serif;font-size:12px;font-weight:300;letter-spacing:.06em;line-height:1.55;color:#dff9ff;text-shadow:0 0 12px rgba(110,229,255,.35);text-wrap:balance;opacity:0;transition:opacity .28s}
+/* lirik hero: di bawah spektrum. Tinggi DIPESAN tetap (3 baris) + line-clamp supaya teks panjang
+   tidak nabrak subtitle "INDONESIAN ALTERNATIVE ROCK PROJECT" di device sempit / font besar. */
+#dm-hl{position:relative;z-index:1;width:min(88vw,520px);height:56px;margin:8px auto 0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;overflow:hidden}
+#dm-hl .dm-hl-t{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;
+  overflow:hidden;text-overflow:ellipsis;
+  text-align:center;font-family:"Space Grotesk",system-ui,sans-serif;
+  font-size:12px;font-weight:300;letter-spacing:.04em;line-height:1.5;
+  color:#dff9ff;text-shadow:0 0 12px rgba(110,229,255,.35);
+  text-wrap:balance;max-width:100%;opacity:0;transition:opacity .28s;
+  /* fallback multi-line height without webkit box on rare engines */
+  max-height:calc(1.5em * 3);
+}
+@media (max-width:360px){
+  #dm-hl{height:54px}
+  #dm-hl .dm-hl-t{font-size:11px;letter-spacing:.03em;line-height:1.45;max-height:calc(1.45em * 3)}
+}
+@media (min-width:480px){
+  #dm-hl{height:42px}
+  #dm-hl .dm-hl-t{-webkit-line-clamp:2;line-clamp:2;max-height:calc(1.5em * 2);font-size:12.5px}
+}
 #dm-hl.on .dm-hl-t{opacity:1}
 #dm-hl .dm-hl-t.dm-hl-glitch{animation:dm-hl-glitch .42s steps(1,end) 1}
 @keyframes dm-hl-glitch{
@@ -2174,11 +2192,31 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     owl.setAttribute('aria-label',on?'Close session log':'Open session log');
     if(on)renderList();
   }
-  owl.addEventListener('click',function(){setOpen(!box.classList.contains('open'));});
-  closeBtn.addEventListener('click',function(){setOpen(false);});
+  owl.addEventListener('click',function(e){e.stopPropagation();setOpen(!box.classList.contains('open'));});
+  closeBtn.addEventListener('click',function(e){e.stopPropagation();setOpen(false);});
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'&&box.classList.contains('open')){setOpen(false);}
   });
+  /* Auto-hide full panel when tapping / scrolling outside it */
+  document.addEventListener('pointerdown',function(e){
+    if(!box.classList.contains('open'))return;
+    var t=e.target;
+    if(box.contains(t)||owl.contains(t))return;
+    setOpen(false);
+  },true);
+  var scrollCloseT=0;
+  function onOutsideScroll(){
+    if(!box.classList.contains('open'))return;
+    clearTimeout(scrollCloseT);
+    scrollCloseT=setTimeout(function(){setOpen(false);},40);
+  }
+  window.addEventListener('scroll',onOutsideScroll,{passive:true,capture:true});
+  document.addEventListener('touchmove',function(e){
+    if(!box.classList.contains('open'))return;
+    var t=e.target;
+    if(box.contains(t))return; /* allow scrolling inside the panel */
+    onOutsideScroll();
+  },{passive:true});
 
   function log(msg,hot){
     var entry={ts:stamp(),msg:String(msg).slice(0,60),hot:!!hot};
