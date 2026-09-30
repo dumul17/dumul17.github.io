@@ -254,23 +254,22 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
-  var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
-  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=24,meshH=132;
-  var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
+  /* DETERMINISTIK: semua angka turunan dari lebar layar saja. Tidak ada pengukuran DOM / localStorage,
+     jadi index.html (transisi) dan dumul.html (hero asli) SELALU menghasilkan kotak yang sama. */
+  var W=document.documentElement.clientWidth||window.innerWidth||360;
+  var wide=W>=640;
+  var padTop=wide?56:30,titleH=wide?46:30,gap=24,meshH=132;
+  var heroH=wide?344:308;
   var mw=Math.round(Math.min(W*.92,640));
-  try{
-    var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
-    if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
-      h=s.h;m=s.m;
-    }
-  }catch(e){}
-  if(!h)h=hEst;
-  if(!m){
-    /* Same band as transition: top at (H-meshH)*0.48 → mesh on og.jpg shoulder / light-bridge. */
-    var y=Math.max(0,Math.round((h-meshH)*0.48));
-    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
-  }
-  return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
+  var my=padTop+titleH+gap;                 /* atas kanvas mesh */
+  /* Titik jembatan cahaya di og.jpg (fraksi gambar 720x720). */
+  var BX=.49,BY=.527,IW=720,IH=720;
+  var s=Math.max(W/IW,heroH/IH),dw=IW*s,dh=IH*s;
+  /* object-position supaya jembatan jatuh persis di pusat kanvas mesh (x=W/2, y=my+meshH/2). */
+  var px=dw>W+.5?(W/2-BX*dw)/(W-dw):.5;
+  var py=dh>heroH+.5?((my+meshH/2)-BY*dh)/(heroH-dh):.5;
+  px=Math.max(0,Math.min(1,px));py=Math.max(0,Math.min(1,py));
+  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},px:px,py:py,padTop:padTop,titleH:titleH};
 }
 var DM_NN_DUR=5600;
 function dmNeuralBuild(W,H){
@@ -472,70 +471,20 @@ function dmNeuralDraw(g,W,H,net,t){
   </script>
   
   <script>
-  /* Align hero spectrum canvas to the same vertical band as the neural transition (og.jpg shoulder / light-bridge). */
+  /* Hero deterministik: tinggi hero, posisi mesh & crop og.jpg semuanya dari dmHeroRect(W). */
   (function(){
-    function align(){
-      var s=document.querySelector('section.dm-hero');
-      if(!s)return;
-      var wrap=s.querySelector('div[class*="w-[min(92vw,640px)]"]');
-      if(!wrap)return;
-      var H=s.getBoundingClientRect().height;
-      if(H<80)return;
-      var meshH=132;
-      var targetY=Math.max(0,Math.round((H-meshH)*0.48));
-      var hr=s.getBoundingClientRect();
-      var wr=wrap.getBoundingClientRect();
-      var curY=wr.top-hr.top;
-      var mt=parseFloat(window.getComputedStyle(wrap).marginTop)||0;
-      var next=mt+(targetY-curY);
-      if(Math.abs(next-mt)<1)return;
-      wrap.style.marginTop=Math.max(0,Math.round(next))+'px';
-      /* Persist aligned rect so index transition matches this exact band. */
-      try{
-        var hr2=s.getBoundingClientRect(),w=document.documentElement.clientWidth;
-        var cv=s.querySelector('canvas'),m=null;
-        if(cv){
-          var cr=cv.getBoundingClientRect();
-          m={x:Math.round(cr.left-hr2.left),y:Math.max(0,Math.round(cr.top-hr2.top)),w:Math.round(cr.width),h:Math.round(cr.height)};
-        }
-        if(hr2.height>60)localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(hr2.height*10)/10,m:m}));
-      }catch(e){}
+    function apply(){
+      var r=dmHeroRect(),d=document.documentElement.style;
+      d.setProperty('--dm-hero-h',r.h+'px');
+      d.setProperty('--dm-pad-top',r.padTop+'px');
+      d.setProperty('--dm-title-h',r.titleH+'px');
+      d.setProperty('--dm-mesh-w',r.m.w+'px');
+      d.setProperty('--dm-img-pos',(r.px*100).toFixed(3)+'% '+(r.py*100).toFixed(3)+'%');
     }
-    function run(){
-      align();
-      /* Re-measure after layout settle + fonts */
-      setTimeout(align,100);
-      setTimeout(align,400);
-      setTimeout(align,900);
-    }
-    if(document.readyState==='complete')run();
-    else window.addEventListener('load',run);
-    window.addEventListener('resize',function(){
-      clearTimeout(window.__dmMeshAlignT);
-      window.__dmMeshAlignT=setTimeout(align,150);
-    });
-    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){setTimeout(align,50);});
-  })();
-  </script>
-
-<script>
-  /* Ukur hero asli lalu simpan → index.html memakai ukuran persis ini untuk og.jpg + neural network saat transisi. */
-  (function(){
-    function save(){
-      var s=document.querySelector('section.dm-hero');if(!s)return;
-      var hr=s.getBoundingClientRect(),h=hr.height,w=document.documentElement.clientWidth;
-      var m=null;
-      var cv=s.querySelector('canvas');
-      if(cv){
-        var cr=cv.getBoundingClientRect();
-        m={x:Math.round(cr.left-hr.left),y:Math.max(0,Math.round(cr.top-hr.top)),w:Math.round(cr.width),h:Math.round(cr.height)};
-      }
-      if(h>60&&h<2000){try{localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(h*10)/10,m:m}));}catch(e){}}
-    }
-    var rt=0;function later(){clearTimeout(rt);rt=setTimeout(save,250);}
-    window.addEventListener('load',function(){save();setTimeout(save,800);});
-    window.addEventListener('resize',later);
-    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){save();});
+    apply();
+    window.addEventListener('resize',apply,{passive:true});
+    window.addEventListener('orientationchange',apply);
+    try{localStorage.removeItem('dm_hero_rect');}catch(e){}
   })();
   </script>
   <div id="root"></div>
@@ -731,16 +680,18 @@ return o=requestAnimationFrame(k),()=>{cancelAnimationFrame(o),_io&&_io.disconne
   
 <style>
 /* layout: hero dirapetin, daftar lagu langsung di bawah spektrum */
-section.dm-hero{height:auto!important;min-height:0!important}
-section.dm-hero > div[class*="justify-center"]{height:auto!important;justify-content:flex-start!important;padding-top:30px;padding-bottom:4px}
-section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:24px!important}
+/* Hero DETERMINISTIK (angka dari dmHeroRect di atas → CSS var). Mesh TIDAK ikut geser oleh apa pun. */
+section.dm-hero{height:var(--dm-hero-h,308px)!important;min-height:0!important;max-height:none!important}
+section.dm-hero > img{object-position:var(--dm-img-pos,50% 50%)!important}
+section.dm-hero > div[class*="justify-center"]{height:100%!important;justify-content:flex-start!important;padding-top:var(--dm-pad-top,30px)!important;padding-bottom:0!important}
+section.dm-hero h1{margin:0!important;height:var(--dm-title-h,30px)!important;display:flex;align-items:center;justify-content:center;line-height:1!important;flex:none}
+section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:24px!important;height:132px!important;width:var(--dm-mesh-w,92vw)!important;flex:none}
 section.dm-hero p[class*="tracking-[0.32em]"]{margin-top:6px!important}
 section.dm-hero div[class*="bottom-8"]{position:static!important;transform:none!important;margin-top:14px!important;gap:6px!important}
 section.dm-hero div[class*="h-[28px]"]{height:16px!important}
 div[class*="max-w-[720px]"]{padding-top:10px!important}
 div[class*="max-w-[720px]"] > div[class*="mb-14"]{margin-bottom:14px!important}
 div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
-@media (min-width:640px){section.dm-hero > div[class*="justify-center"]{padding-top:56px;padding-bottom:12px}}
 [class*="space-y-[1px]"] > div{cursor:pointer;-webkit-tap-highlight-color:transparent;padding-top:15px!important;padding-bottom:15px!important}
 [class*="space-y-[1px]"] > div span.display{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:400;letter-spacing:.012em}
 [class*="space-y-[1px]"] > div span.display::before{content:"";display:inline-block;width:9px;height:11px;margin-right:13px;vertical-align:-1px;background:currentColor;opacity:.38;transition:opacity .2s;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12'%3E%3Cpath d='M1.2 1v10L9.2 6z' fill='%23000' stroke='%23000' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12'%3E%3Cpath d='M1.2 1v10L9.2 6z' fill='%23000' stroke='%23000' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}

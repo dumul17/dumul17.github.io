@@ -3375,25 +3375,24 @@ function drawHole(now,age){
    Layout deterministik (seed tetap, koordinat relatif ke viewport) → posisi node & garis
    di index.html (saat masuk) identik dengan di dumul.html (saat tiba). */
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
-   dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
+   dumul.html mengukur hero aslinya lalu menyimpannya (tidak ada lagi: sekarang murni dihitung dari lebar layar). */
 function dmHeroRect(){
-  var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
-  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=24,meshH=132;
-  var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
+  /* DETERMINISTIK: semua angka turunan dari lebar layar saja. Tidak ada pengukuran DOM / localStorage,
+     jadi index.html (transisi) dan dumul.html (hero asli) SELALU menghasilkan kotak yang sama. */
+  var W=document.documentElement.clientWidth||window.innerWidth||360;
+  var wide=W>=640;
+  var padTop=wide?56:30,titleH=wide?46:30,gap=24,meshH=132;
+  var heroH=wide?344:308;
   var mw=Math.round(Math.min(W*.92,640));
-  try{
-    var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
-    if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
-      h=s.h;m=s.m;
-    }
-  }catch(e){}
-  if(!h)h=hEst;
-  if(!m){
-    /* Same band as transition: top at (H-meshH)*0.48 → mesh on og.jpg shoulder / light-bridge. */
-    var y=Math.max(0,Math.round((h-meshH)*0.48));
-    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
-  }
-  return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
+  var my=padTop+titleH+gap;                 /* atas kanvas mesh */
+  /* Titik jembatan cahaya di og.jpg (fraksi gambar 720x720). */
+  var BX=.49,BY=.527,IW=720,IH=720;
+  var s=Math.max(W/IW,heroH/IH),dw=IW*s,dh=IH*s;
+  /* object-position supaya jembatan jatuh persis di pusat kanvas mesh (x=W/2, y=my+meshH/2). */
+  var px=dw>W+.5?(W/2-BX*dw)/(W-dw):.5;
+  var py=dh>heroH+.5?((my+meshH/2)-BY*dh)/(heroH-dh):.5;
+  px=Math.max(0,Math.min(1,px));py=Math.max(0,Math.min(1,py));
+  return{x:0,y:0,w:W,h:heroH,m:{x:Math.round((W-mw)/2),y:my,w:mw,h:meshH},px:px,py:py,padTop:padTop,titleH:titleH};
 }
 var DM_NN_DUR=5600;
 var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_X=0,DM_TR_MESH_Y=0,DM_TR_GLITCH_V=0,DM_TR_GLITCH_S=0,DM_TR_GLITCH_SEEN=0;
@@ -3819,6 +3818,9 @@ function startTesseractWarp(targetUrl) {
     var mr = hr.m, meshW = mr.w;
     DM_TR_MESH_X = mr.x; DM_TR_MESH_Y = mr.y;
     stage.style.width = W + 'px'; stage.style.height = H + 'px';
+    var _pos=(hr.px*100).toFixed(3)+'% '+(hr.py*100).toFixed(3)+'%';
+    stage.style.backgroundPosition=_pos;
+    var _og=stage.querySelector('.tesseract-og'); if(_og) _og.style.objectPosition=_pos;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     canvas.width = Math.max(1, Math.round(W * dpr));
     canvas.height = Math.max(1, Math.round(H * dpr));
