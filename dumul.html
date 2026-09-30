@@ -1071,6 +1071,9 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     A.sig=slug||'default';
   }
 
+  /* SMOOTH: 30Hz analysis → 60FPS visual interpolation (analog feel).
+     Deklarasi SEBELUM seed supaya handoff tidak di-wipe oleh assignment =null. */
+  var SMOOTH=null,SMOOTH_T=null;
   /* Seed visual continuity from index.html transition (level/phase/spec). */
   (function seedVisualContinuity(){
     try{
@@ -1093,8 +1096,6 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       }
     }catch(e){}
   })();
-  /* SMOOTH: 30Hz analysis → 60FPS visual interpolation (analog feel) */
-  var SMOOTH=null,SMOOTH_T=null;
   window.__dmSp=function(x){
     var src=SMOOTH&&SMOOTH.length?SMOOTH:SPEC;
     if(!src||mix<=0.001)return 0;
@@ -1981,12 +1982,7 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
   var moQ = false;
   var mo = new MutationObserver(function(){ if(moQ) return; moQ = true; requestAnimationFrame(function(){ moQ = false; bind(); }); });
   mo.observe(document.getElementById('root')||document.body, {childList:true, subtree:true});
-  /* Sync lastInteract into player loop variable via periodic bridge */
-  setInterval(function(){
-    try{
-      if(typeof window.__dmSetIdle === 'function') window.__dmSetIdle(lastInteract);
-    }catch(e){}
-  }, 200);
+  /* Idle bridge: player loop membaca window.__dmIdleAt (getter di atas). Tidak perlu setInterval / __dmSetIdle. */
 })();
 </script>
 
@@ -2258,7 +2254,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     onOutsideScroll();
   },{passive:true});
 
-  var lastToastAt=0,TOAST_GAP=2400,narrBusy=false,narrUntil=0;
+  var narrBusy=false,narrUntil=0;
+  /* busy flags generator — dideklarasi di sini biar obsTick/idleTick/reflect/dwell bisa cek aman */
+  var nullBusy=false,conflictBusy=false,bugBusy=false;
   function narrLock(ms){narrBusy=true;narrUntil=Date.now()+(ms||4000);}
   function narrFree(){if(Date.now()>=narrUntil)narrBusy=false;}
   /* Antrian toast: urutan terjaga, hot selalu masuk, non-hot dibuang kalau antrian sudah >=2 */
@@ -2268,7 +2266,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     var e=toastQ.shift();
     if(!e)return;
     if(box.classList.contains('open')){toastQ.length=0;return;}
-    toastBusy=true;lastToastAt=Date.now();
+    toastBusy=true;
     showToast(e.msg,e.hot);
     setTimeout(function(){toastBusy=false;drainToast();},TOAST_HOLD);
   }
@@ -2360,8 +2358,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   function obsTick(){
     setTimeout(obsTick,2000);
     if(document.hidden)return;
+    /* Jangan timpa state selama NULL sequence atau status ABSENT/RETURNED/NULL */
+    if(nullBusy||obsState==='ABSENT'||obsState==='RETURNED'||obsState==='NULL')return;
     var idle=Date.now()-lastAct;
-    if(obsState==='ABSENT'||obsState==='RETURNED')return;
     /* threshold lebih longgar saat musik main — lirik pindah ≠ user "aktif" */
     var need=obsPlaying()?28000:14000;
     if(idle>=need){
@@ -2385,10 +2384,11 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   var sigDecay=0; /* 0 ok, 1 STABLE, 2 WEAKENING, 3 FADING, 4 ... */
   var actMoveAt=0;
   function act(isTap,isMove){
-    /* throttle gerak pasif (mousemove/scroll/wheel) biar gak osilasi SILENT↔ACTIVE pas lirik */
+    /* throttle gerak pasif (mousemove/scroll/wheel): jangan refresh lastAct di dalam window
+       supaya SIGNAL DECAY / SILENT tetap bisa tembak saat user diam baca lirik */
     if(isMove){
       var n=Date.now();
-      if(n-actMoveAt<3000){lastAct=n;return;}
+      if(n-actMoveAt<3000)return;
       actMoveAt=n;
     }
     lastAct=Date.now();idleFired=false;
@@ -2402,7 +2402,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       sigDecay=0;
       log('SIGNAL RESTORED.',true);
     }else if(sigDecay>0&&isMove){
-      /* gerak pasif mereset decay stage tanpa toast */
+      /* gerak pasif (di luar throttle) mereset decay stage tanpa toast */
       sigDecay=0;
     }
     if(!obsDetected){
@@ -2433,11 +2433,13 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       act(false,true);
     },{passive:true,capture:true});
   });
-  /* long-idle narrative — jauh dari SIGNAL DECAY supaya tidak bertumpuk */
+  /* long-idle narrative — setelah decay stage penuh (130s) supaya tidak bertumpuk dengan WEAKENING/FADING */
   function idleTick(){
     setTimeout(idleTick,8000);
     narrFree();
-    if(document.hidden||idleFired||narrBusy||Date.now()-lastAct<95000)return;
+    if(document.hidden||idleFired||narrBusy||nullBusy||conflictBusy||bugBusy)return;
+    if(Date.now()-lastAct<140000)return; /* ≥140s: melewati decay stage 4 @ 130s */
+    if(sigDecay>0&&sigDecay<4)return; /* tunggu decay selesai / di-restore dulu */
     idleFired=true;
     narrLock(5000);
     pair('USER STILL HERE','WHY',1400);
@@ -2503,8 +2505,12 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     if(document.hidden)return;
     var d=dwellNow();
     persistDwell();
+    narrFree();
+    /* jangan tumpuk di atas NULL/CONFLICT/BUG/idle narrative */
+    if(narrBusy||nullBusy||conflictBusy||bugBusy)return;
     if(!dwellMilestone&&d>=20*60*1000){
       dwellMilestone=true;
+      narrLock(4000);
       if(Math.random()<0.55){
         log('YOU HAVE BEEN HERE FOR '+fmtMS(d)+'.',true);
         setTimeout(function(){log('DID YOU NOTICE?',true);},2200);
@@ -2515,6 +2521,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     /* soft reminders tiap ~15 menit setelah milestone, jarang */
     else if(dwellMilestone&&d>=35*60*1000&&!timeLostShown&&Math.random()<0.08){
       timeLostShown=true;
+      narrLock(2800);
       log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
     }
   }
@@ -2533,7 +2540,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   });
 
   /* ---------- NULL STATE (semantic glitch, sporadis) ---------- */
-  var nullBusy=false,nullPrevObs='';
+  var nullPrevObs='';
   function nullSequence(){
     narrFree();
     if(nullBusy||document.hidden||conflictBusy||bugBusy||narrBusy)return;
@@ -2600,6 +2607,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   var refl={kind:'',count:0,last:0};
   function reflect(kind){
     if(!kind)return;
+    /* hormati narrasi aktif (NULL/CONFLICT/BUG/idle/decay) supaya tidak numpuk */
+    narrFree();
+    if(narrBusy||nullBusy||conflictBusy||bugBusy)return;
     var now=Date.now();
     if(kind===refl.kind&&now-refl.last<14000)refl.count++;
     else{refl.kind=kind;refl.count=1;}
@@ -2642,7 +2652,6 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   },5000);
 
   /* ---------- STATE CONTRADICTION (semantic, sporadis) ---------- */
-  var conflictBusy=false;
   var conflictSets=[
     ['SIGNAL: ACTIVE','MEMORY: LOST','OBSERVER: ABSENT','SYSTEM: AWAKE'],
     ['OBSERVER: ABSENT','OBSERVATION: ACTIVE'],
@@ -2673,7 +2682,6 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   setTimeout(conflictSchedule,55000);
 
   /* ---------- THE BUG THAT ISN'T A BUG ---------- */
-  var bugBusy=false;
   var bugScripts=[
     function(){
       log('WARNING:',true);
