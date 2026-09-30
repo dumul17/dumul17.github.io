@@ -710,6 +710,16 @@ div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
 78%{transform:translate(-1px,0);clip-path:inset(0 0 0 0);text-shadow:1px 0 rgba(255,43,214,.3),-1px 0 rgba(34,230,255,.3)}
 100%{transform:none;clip-path:inset(0 0 0 0);text-shadow:0 0 12px rgba(110,229,255,.35)}}
 @media (prefers-reduced-motion:reduce){#dm-hl .dm-hl-t.dm-hl-glitch{animation:none}}
+#dm-hl .dm-hl-t.dm-hl-hard{animation:dm-hl-hard .62s steps(1,end) 1}
+@keyframes dm-hl-hard{
+0%{text-shadow:-4px 0 rgba(255,43,214,1),4px 0 rgba(34,230,255,1);transform:translate(6px,0) skewX(-8deg);clip-path:inset(0 0 60% 0);letter-spacing:.14em}
+12%{text-shadow:4px 0 rgba(255,43,214,.95),-4px 0 rgba(34,230,255,.95);transform:translate(-6px,0) skewX(6deg);clip-path:inset(40% 0 0 0)}
+24%{text-shadow:-3px 0 rgba(255,43,214,.85),3px 0 rgba(34,230,255,.85);transform:translate(4px,0);clip-path:inset(15% 0 45% 0)}
+38%{text-shadow:3px 0 rgba(255,43,214,.7),-3px 0 rgba(34,230,255,.7);transform:translate(-4px,0) skewX(-4deg);clip-path:inset(0 0 0 0)}
+55%{text-shadow:-2px 0 rgba(255,43,214,.6),2px 0 rgba(34,230,255,.6);transform:translate(3px,0);clip-path:inset(55% 0 0 0)}
+75%{text-shadow:1.5px 0 rgba(255,43,214,.4),-1.5px 0 rgba(34,230,255,.4);transform:translate(-1px,0);clip-path:inset(0 0 0 0)}
+100%{transform:none;clip-path:inset(0 0 0 0);text-shadow:0 0 12px rgba(110,229,255,.35);letter-spacing:.06em}}
+@media (prefers-reduced-motion:reduce){#dm-hl .dm-hl-t.dm-hl-hard{animation:none}}
 #dm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:50;max-width:90vw;padding:10px 16px;border-radius:999px;background:rgba(18,29,38,.95);border:1px solid rgba(110,229,255,.25);color:#e6eef8;font-size:12px;letter-spacing:.05em}
 /* mini player */
 body.dm-has-bar{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px));background:#0a1218}
@@ -1025,6 +1035,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
 
   /* ---------- audio analyser (buat animasi glitch di hero) ---------- */
   var ctx=null,an=null,SPEC=null,PREV=null,mix=0,level=0,avgFlux=0,lastBeatT=0;
+  var anB=null,BSPEC=null,BPREV=null,bAvg=.03,bPk=.25,bFl=.05,bAd=0,ePk=.3,eFl=.1;
   var A=window.__dmA={level:0,beatAt:0,active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
   var TRACK_SIG={
     'glitch':{amp:1.08,frac:0.85,breath:0.7,thin:0.92,sink:0,cyanPink:1,mesh:1.1},
@@ -1084,6 +1095,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       an.fftSize=1024;an.smoothingTimeConstant=.6;
       var src=ctx.createMediaElementSource(audio);
       src.connect(an);an.connect(ctx.destination);
+      try{anB=ctx.createAnalyser();anB.fftSize=2048;anB.smoothingTimeConstant=.25;anB.minDecibels=-90;anB.maxDecibels=-20;src.connect(anB);BSPEC=new Uint8Array(anB.frequencyBinCount);BPREV=new Uint8Array(anB.frequencyBinCount);}catch(_e){anB=null;}
       var seeded=SPEC&&SPEC.length;
       var fresh=new Uint8Array(an.frequencyBinCount);
       var freshP=new Uint8Array(an.frequencyBinCount);
@@ -1098,6 +1110,27 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       if(ctx.state!=='running'&&ctx.resume)ctx.resume();
     }catch(e){ctx=null;an=null;/* keep seeded SPEC if any */A.active=!!SPEC;}
   }
+  /* Beat/bass tiap frame (60Hz) dari analyser 2048: hanya bin 1-7 (~23-160Hz), murah. Ambang adaptif. */
+  function beatStep(now){
+    if(!anB||!BSPEC)return;
+    anB.getByteFrequencyData(BSPEC);
+    var i,flux=0,e=0,lim=7,e2=0;
+    for(i=1;i<=lim;i++){var v=BSPEC[i],d=v-BPREV[i];if(d>0)flux+=d*(i<=3?1.3:1);e+=v;BPREV[i]=v;}
+    for(i=8;i<=12;i++)e2+=BSPEC[i];
+    flux/=lim*255;e/=lim*255;e2/=5*255;
+    bAvg+=(flux-bAvg)*.05;
+    var thr=bAvg*1.5+.008;
+    if(flux>thr&&e>.12&&now-lastBeatT>120){
+      lastBeatT=now;A.beatAt=now;
+      A.beatStr=Math.max(.2,Math.min(1,(flux-bAvg)/.28));
+      var sig=currentSig();
+      A.fracture=Math.min(0.75,(0.35+level*0.3)*sig.frac);
+      A.fracX=0.18+Math.random()*0.64;
+    }
+    var eb=(e*7+e2*5)/12;
+    bPk=Math.max(eb,bPk*.9995);bFl+=(eb-bFl)*(eb<bFl?.2:.0008);
+    bAd=Math.max(0,Math.min(1,(eb-bFl)/(bPk-bFl+.08)))*.9;
+  }
   function analyse(now){
     if(!an||!SPEC)return;
     an.getByteFrequencyData(SPEC);
@@ -1107,7 +1140,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     for(i=1;i<=lim;i++){var d=SPEC[i]-PREV[i];if(d>0)flux+=d;}
     flux/=Math.max(1,lim)*255;
     avgFlux+=(flux-avgFlux)*.06;
-    if(flux>avgFlux*1.7+.02&&now-lastBeatT>170){
+    if(!anB&&flux>avgFlux*1.7+.02&&now-lastBeatT>170){
       lastBeatT=now;A.beatAt=now;
       /* Beat fracture: crack one zone, then heal */
       var sig=currentSig();
@@ -1118,14 +1151,16 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var el=Math.min(120,n-1);
     for(i=1;i<=el;i++)e+=SPEC[i];
     e/=Math.max(1,el)*255;
-    level+=(Math.max(0,Math.min(1,(e-.22)*2.4))-level)*.35;
+    ePk=Math.max(e,ePk*.998);eFl+=(e-eFl)*(e<eFl?.2:.002);
+    var lvA=Math.max(0,Math.min(1,(e-eFl)/(ePk-eFl+.1)))*.85;
+    level+=(Math.max(Math.max(0,Math.min(1,(e-.22)*2.4)),lvA)-level)*.35;
     /* Spectrum personality: bass / mid / treble bands */
     var bSum=0,mSum=0,tSum=0,bN=0,mN=0,tN=0;
     var bEnd=Math.min(12,n-1),mEnd=Math.min(64,n-1),tEnd=Math.min(180,n-1);
     for(i=1;i<=bEnd;i++){bSum+=SPEC[i];bN++;}
     for(i=bEnd+1;i<=mEnd;i++){mSum+=SPEC[i];mN++;}
     for(i=mEnd+1;i<=tEnd;i++){tSum+=SPEC[i];tN++;}
-    var bT=Math.max(0,Math.min(1,((bSum/Math.max(1,bN)/255)-0.18)*2.2));
+    var bT=Math.max(bAd,Math.max(0,Math.min(1,((bSum/Math.max(1,bN)/255)-0.18)*2.2)));
     var mT=Math.max(0,Math.min(1,((mSum/Math.max(1,mN)/255)-0.12)*2.0));
     var tT=Math.max(0,Math.min(1,((tSum/Math.max(1,tN)/255)-0.06)*2.4));
     A.bass+=(bT-A.bass)*.28;
@@ -1185,7 +1220,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var tok=++hlTok;if(hlRaf){cancelAnimationFrame(hlRaf);hlRaf=0;}
     if(!text){el.classList.remove('on');return;}
     var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
-    hlT.classList.remove('dm-hl-glitch');void hlT.offsetWidth;
+    hlT.classList.remove('dm-hl-hard');hlT.classList.remove('dm-hl-glitch');void hlT.offsetWidth;
     el.classList.add('on');
     if(reduce){hlT.textContent=text;return;}
     hlT.classList.add('dm-hl-glitch');
@@ -1240,6 +1275,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     if(idx!==lastIdx){
       lastIdx=idx;
       hlShow(idx>-1?L[idx].text:'');
+      if(idx>-1)kwGlitch(L[idx].text);
     }
   }
 
@@ -1250,6 +1286,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var playing=!audio.paused&&!audio.ended;
     /* Analyser every other frame — spectrum motion is slower than 60fps.
        seek bar di-throttle ~30fps di dalam drawSeek (bukan full 60). */
+    if(anB&&playing)beatStep(now);
     if(an&&playing){anSkip^=1;if(!anSkip)analyse(now);}
     else{anSkip=0;level*=.9;}
     /* 60FPS smooth spectrum interpolation toward last analysis target */
@@ -1473,6 +1510,50 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   ['playing','canplay'].forEach(function(ev){audio.addEventListener(ev,function(){if(seekGlitchUntil>0)seekGlitchUntil=performance.now()+220;});});
   audio.addEventListener('seeking',function(){seekGlitch(260);});
   audio.addEventListener('loadstart',function(){seekGlitch(380);});
+
+  /* ---------- glitch ngikutin kata kunci di lirik ---------- */
+  var KW=/tanpamu|bersamamu|hantui|belenggu|error|loop|corrupt|glitch|watching/i,KW2=/tanpamu|glitch|loop|error|corrupt/i,kwLast=0;
+  function kwGlitch(text){
+    if(reduceMotion||!text||!KW.test(text))return;
+    var n=performance.now();if(n-kwLast<2500)return;kwLast=n;
+    try{
+      var a=window.__dmA;if(a){a.fracture=Math.max(a.fracture||0,.7);a.fracX=.2+Math.random()*.6;}
+      if(hlT){hlT.classList.remove('dm-hl-hard');void hlT.offsetWidth;hlT.classList.add('dm-hl-hard');}
+      seekGlitch(320);
+      if(KW2.test(text)){var hh=document.querySelector('h1.display');if(hh)hh.dispatchEvent(new Event('pointerdown',{bubbles:true}));}
+    }catch(e){}
+  }
+
+  /* ---------- Corrupted Memory: pengunjung yang balik dapat log sinyal terakhir ---------- */
+  var MEMK='dm_mem',lastTitle='',memSaveAt=0,memPrev=null;
+  try{memPrev=JSON.parse(localStorage.getItem(MEMK)||'null');}catch(e){}
+  function curTitle(){try{if(current&&current.isConnected){var t=titleOf(current);if(t)lastTitle=t;}}catch(e){}return lastTitle;}
+  function memSave(end){
+    var t=curTitle();if(!t)return;
+    var s=end?-1:Math.floor(audio.currentTime||0);
+    if(!end&&s<3)return;
+    try{localStorage.setItem(MEMK,JSON.stringify({t:t,s:s,ts:Date.now()}));}catch(e){}
+  }
+  audio.addEventListener('timeupdate',function(){var n=performance.now();if(!audio.paused&&n-memSaveAt>4000){memSaveAt=n;memSave(false);}});
+  audio.addEventListener('pause',function(){if(!audio.ended)memSave(false);});
+  audio.addEventListener('ended',function(){memSave(true);});
+  document.addEventListener('visibilitychange',function(){if(document.hidden&&!audio.paused)memSave(false);});
+  window.addEventListener('pagehide',function(){if(!audio.paused)memSave(false);});
+  (function(){
+    if(!memPrev||!memPrev.t)return;
+    var t=String(memPrev.t).slice(0,40),s=+memPrev.s,ts=+memPrev.ts||0,tries=0,dead=false;
+    function ok(){return !dead&&audio.paused&&!active&&!audio.currentTime;}
+    var m=ts?Math.floor((Date.now()-ts)/60000):0,g='';
+    if(m>=60){var hr=Math.floor(m/60);g='signal gap: '+(hr<48?hr+'h':Math.floor(hr/24)+' days');}
+    var steps=[[0,'memory found.'],[2400,'last signal: '+t+(s>=0?' — '+fmt(s):' — fully decoded')]];
+    if(g)steps.push([5600,g]);
+    steps.push([g?8600:5600,'']);
+    function run(){
+      if(!hlEl()){if(++tries<24)setTimeout(run,400);return;}
+      steps.forEach(function(st){setTimeout(function(){if(ok())hlShow(st[1]);else dead=true;},st[0]);});
+    }
+    setTimeout(run,1400);
+  })();
   document.addEventListener('visibilitychange',function(){
     if(!document.hidden&&ctx&&ctx.state!=='running'&&!audio.paused&&ctx.resume)ctx.resume();
     kick();
@@ -2069,7 +2150,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
     if(root.classList.contains('dm-fx'))setBeat(b);
     if(hap&&p&&a&&a.beatAt&&a.beatAt!==lastBeat){
       lastBeat=a.beatAt;
-      try{navigator.vibrate(30);}catch(e){}
+      if(now-(window.__dmLV||0)>110){window.__dmLV=now;var st=a.beatStr||.5,ms=Math.round(24+st*46);try{navigator.vibrate(st>.8?[ms,26,Math.round(ms*.6)]:ms);}catch(e){}}
     }
     if(((++tickN)&15)===0)tint();
     /* governor: 2 jendela x 2.5 detik di bawah 40fps (setelah 4 detik pemanasan) => hemat daya otomatis */
