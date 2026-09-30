@@ -3378,12 +3378,25 @@ function drawHole(now,age){
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
   var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
-  try{var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000){h=s.h;if(s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400)m=s.m;}}catch(e){}
   /* Compact hero (CSS overrides): padTop + title + gap + 132 canvas + subtitle + discover. */
-  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=6;
-  if(!h){h=padTop+titleH+gap+132+6+16.5+14+9+16+(W>=640?12:4);}
-  /* Kanvas mesh asli di hero: lebar min(92vw,640px), rata tengah, top = padding+judul+gap. */
-  if(!m){var mw=Math.round(Math.min(W*.92,640));m={x:Math.round((W-mw)/2),y:padTop+titleH+gap,w:mw,h:132};}
+  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=6,meshH=132;
+  var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
+  var mw=Math.round(Math.min(W*.92,640));
+  /* Mesh band centered on ~45% of hero = chest of silhouettes in og.jpg (cover/center). */
+  var yEst=Math.max(0,Math.round(hEst*0.45-meshH/2));
+  try{
+    var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
+    /* Only trust storage when BOTH height and mesh rect exist — stale h-only data misaligns crop vs mesh. */
+    if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
+      h=s.h;m=s.m;
+    }
+  }catch(e){}
+  if(!h)h=hEst;
+  if(!m){
+    /* Scale meshY with actual H so chest alignment holds when height differs. */
+    var y=Math.max(0,Math.round(h*0.45-meshH/2));
+    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
+  }
   return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
 }
 var DM_NN_DUR=5600;
@@ -3706,7 +3719,7 @@ function dmTransitionSpectrum(g,W,H,t,fade){
   var lev=DM_TR_LEVEL,beat=(DM_TR_BEAT&&performance.now()-DM_TR_BEAT<150)?1:0;
   /* Hero canvas is h-[132px] — keep transition mesh in that exact space. */
   var meshH=(typeof DM_MESH_H==='number'?DM_MESH_H:132);
-  var meshY=(typeof DM_TR_MESH_Y==='number'&&DM_TR_MESH_Y>0?DM_TR_MESH_Y:Math.max(0,Math.round((H-meshH)*0.28)));
+  var meshY=(typeof DM_TR_MESH_Y==='number'&&DM_TR_MESH_Y>0?DM_TR_MESH_Y:Math.max(0,Math.round(H*0.45-meshH/2)));
   if(!DM_TR_NET||!DM_TR_NET.length)DM_TR_NET=dmSpectrumMeshBuild(W,meshH);
   var phase=(typeof GARG!=='undefined'&&GARG&&!isNaN(GARG.currentTime))?GARG.currentTime:0;
   g.save();
