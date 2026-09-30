@@ -254,13 +254,14 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
-  var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,meshY=0;
-  try{var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000){h=s.h;if(typeof s.meshY==='number'&&s.meshY>=0)meshY=s.meshY;}}catch(e){}
+  var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
+  try{var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000){h=s.h;if(s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400)m=s.m;}}catch(e){}
   /* Compact hero (CSS overrides): padTop + title + gap + 132 canvas + subtitle + discover. */
   var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=6;
-  if(!meshY)meshY=padTop+titleH+gap;
   if(!h){h=padTop+titleH+gap+132+6+16.5+14+9+16+(W>=640?12:4);}
-  return{x:0,y:0,w:W,h:Math.round(h*10)/10,meshY:Math.round(meshY)};
+  /* Kanvas mesh asli di hero: lebar min(92vw,640px), rata tengah, top = padding+judul+gap. */
+  if(!m){var mw=Math.round(Math.min(W*.92,640));m={x:Math.round((W-mw)/2),y:padTop+titleH+gap,w:mw,h:132};}
+  return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
 }
 var DM_NN_DUR=5600;
 function dmNeuralBuild(W,H){
@@ -466,10 +467,13 @@ function dmNeuralDraw(g,W,H,net,t){
     function save(){
       var s=document.querySelector('section.dm-hero');if(!s)return;
       var hr=s.getBoundingClientRect(),h=hr.height,w=document.documentElement.clientWidth;
-      var meshY=0;
+      var m=null;
       var cv=s.querySelector('canvas');
-      if(cv){var cr=cv.getBoundingClientRect();meshY=Math.max(0,Math.round(cr.top-hr.top));}
-      if(h>60&&h<2000){try{localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(h*10)/10,meshY:meshY}));}catch(e){}}
+      if(cv){
+        var cr=cv.getBoundingClientRect();
+        m={x:Math.round(cr.left-hr.left),y:Math.max(0,Math.round(cr.top-hr.top)),w:Math.round(cr.width),h:Math.round(cr.height)};
+      }
+      if(h>60&&h<2000){try{localStorage.setItem('dm_hero_rect',JSON.stringify({w:w,h:Math.round(h*10)/10,m:m}));}catch(e){}}
     }
     var rt=0;function later(){clearTimeout(rt);rt=setTimeout(save,250);}
     window.addEventListener('load',function(){save();setTimeout(save,800);});
@@ -510,18 +514,18 @@ let bass=__A.bass||0,mid=__A.mid||0,treble=__A.treble||0,frac=__A.fracture||0,fx
 let breath=0.7+0.3*Math.sin(s*(1.1/sig.breath))+0.15*Math.sin(s*(3.2/sig.breath)+1.2);
 /* cheap pseudo-noise for alpha jitter instead of Math.random */
 let g=Math.max(0.35,Math.min(1.15,(breath+(nR()-0.5)*0.14)*(0.55+0.45*Math.max(__L,0.2))*(1+listen*0.35)));
-if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=2+__L*5*sig.frac;S=5}
+if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=1.15+__L*2.8*sig.frac*(__A.beatKind==='snare'?0.75:1);S=4}
 l.clearRect(0,0,i,u);
-if(S-=c,S<=0){if(nR()>0.55)v=2+nR()*6;S=15+nR()*90}
-let K=v>0?(nR()-0.5)*14*(0.35+mid*0.8):0;
-K+=(mid-0.3)*8*sig.amp;
+if(S-=c,S<=0){if(nR()>0.72)v=1.2+nR()*3.5;S=28+nR()*120}
+let K=v>0?(nR()-0.5)*9*(0.28+mid*0.55):0;
+K+=(mid-0.35)*5.2*sig.amp;
 if(v>0)v-=c;
 let sinkY=u*(0.5+sig.sink*0.12*Math.sin(s*0.8));
 waveLayers[0].y=sinkY;waveLayers[1].y=sinkY-14*(1-sig.sink*0.4);waveLayers[2].y=sinkY+13*(1-sig.sink*0.4);
-let vAmp=0.92*sig.amp*(1+bass*0.2)*(1+listen*0.06);
+let vAmp=0.78*sig.amp*(1+bass*0.14)*(1+listen*0.05);
 let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
-let hot=__L>0.12||v>0||frac>0.08||listen>0.35||bass>0.35;
+let hot=__L>0.16||v>0||frac>0.1||listen>0.4||bass>0.42;
 let waveStep=_perf>=3?6:(_perf===2?8:10);
 let meshLinkMul=_perf>=2?1:0.72;
 let doGlitchBars=_perf>=2;
@@ -541,7 +545,7 @@ for(let y=0;y<waveLayers.length;y++){
   if(hot){l.shadowBlur=(y===0?10:7)*(1+listen*0.25+__L*0.15);l.shadowColor=col;}
   else l.shadowBlur=0;
   let Mn=0.12+y*0.05;
-  let gapHalf=frac*14*(1+sig.frac*0.2);
+  let gapHalf=frac*10*(1+sig.frac*0.15);
   let gapCenter=fx*i;
   let moved=false;
   for(let fe=0;fe<i;fe+=waveStep){
@@ -648,7 +652,7 @@ for(let h=0;h<p.length;h+=linkStep){
 for(let ni=0;ni<p.length;ni++){
   let h=p[ni];
   let y=0.7+0.3*Math.sin(s*3+h.phase);
-  let rBoost=1+__L*0.9*sig.amp*(1+bass*0.2);
+  let rBoost=1+__L*0.55*sig.amp*(1+bass*0.12);
   l.beginPath();l.globalAlpha=g*y*(1+listen*0.15);l.fillStyle=h.color;
   if(hot){l.shadowBlur=10*(1+listen*0.4);l.shadowColor=h.glow;}
   else l.shadowBlur=0;
@@ -744,7 +748,8 @@ div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
 75%{text-shadow:1.5px 0 rgba(255,43,214,.4),-1.5px 0 rgba(34,230,255,.4);transform:translate(-1px,0);clip-path:inset(0 0 0 0)}
 100%{transform:none;clip-path:inset(0 0 0 0);text-shadow:0 0 12px rgba(110,229,255,.35);letter-spacing:.06em}}
 @media (prefers-reduced-motion:reduce){#dm-hl .dm-hl-t.dm-hl-hard{animation:none}}
-#dm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:50;max-width:90vw;padding:10px 16px;border-radius:999px;background:rgba(18,29,38,.95);border:1px solid rgba(110,229,255,.25);color:#e6eef8;font-size:12px;letter-spacing:.05em}
+/* #dm-toast center retired — semua toast lewat #dm-log-toast (nempel dock). Fallback no-style only. */
+#dm-toast{display:none!important}
 /* mini player */
 body.dm-has-bar{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px));background:#0a1218}
 #dm-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;align-items:center;gap:6px;padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(8,14,20,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
@@ -838,6 +843,8 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   function srcOf(r){var s=slugOf(r);if(s==='limerence'||s==='glitch'||s==='nastenka'||s==='larung')return s+'.opus';return s+'.opus';}
   function fmt(s){if(!isFinite(s)||s<0)return '--:--';s=Math.floor(s);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
   function toast(msg){
+    try{if(window.__dmToast){window.__dmToast(msg,false,3200);return;}}catch(e){}
+    /* fallback sebelum dock script siap */
     var t=document.getElementById('dm-toast');
     if(!t){t=document.createElement('div');t.id='dm-toast';document.body.appendChild(t);}
     t.textContent=msg;t.style.display='block';
@@ -1061,7 +1068,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   /* ---------- audio analyser (buat animasi glitch di hero) ---------- */
   var ctx=null,an=null,SPEC=null,PREV=null,mix=0,level=0,avgFlux=0,lastBeatT=0;
   var anB=null,BSPEC=null,BPREV=null,bAvg=.03,bPk=.25,bFl=.05,bAd=0,ePk=.3,eFl=.1;
-  var A=window.__dmA={level:0,beatAt:0,active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
+  var A=window.__dmA={level:0,beatAt:0,beatStr:0,beatKind:'',active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
   var TRACK_SIG={
     'glitch':{amp:1.08,frac:0.85,breath:0.7,thin:0.92,sink:0,cyanPink:1,mesh:1.1},
     'glitch-instrumental':{amp:0.92,frac:0.55,breath:0.85,thin:1.08,sink:0,cyanPink:0.7,mesh:0.9},
@@ -1077,6 +1084,9 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     A.sig=slug||'default';
   }
 
+  /* SMOOTH: 30Hz analysis → 60FPS visual interpolation (analog feel).
+     Deklarasi SEBELUM seed supaya handoff tidak di-wipe oleh assignment =null. */
+  var SMOOTH=null,SMOOTH_T=null;
   /* Seed visual continuity from index.html transition (level/phase/spec). */
   (function seedVisualContinuity(){
     try{
@@ -1099,8 +1109,6 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       }
     }catch(e){}
   })();
-  /* SMOOTH: 30Hz analysis → 60FPS visual interpolation (analog feel) */
-  var SMOOTH=null,SMOOTH_T=null;
   window.__dmSp=function(x){
     var src=SMOOTH&&SMOOTH.length?SMOOTH:SPEC;
     if(!src||mix<=0.001)return 0;
@@ -1135,26 +1143,34 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       if(ctx.state!=='running'&&ctx.resume)ctx.resume();
     }catch(e){ctx=null;an=null;/* keep seeded SPEC if any */A.active=!!SPEC;}
   }
-  /* Beat/bass tiap frame (60Hz) dari analyser 2048: hanya bin 1-7 (~23-160Hz), murah. Ambang adaptif. */
+  /* Beat/bass tiap frame (60Hz) dari analyser 2048.
+     Kick: bin 1-7 (~23-160Hz). Snare: bin 12-28 (~280-650Hz). Ambang lebih tinggi, cooldown lebih longgar. */
   function beatStep(now){
     if(!anB||!BSPEC)return;
     anB.getByteFrequencyData(BSPEC);
-    var i,flux=0,e=0,lim=7,e2=0;
-    for(i=1;i<=lim;i++){var v=BSPEC[i],d=v-BPREV[i];if(d>0)flux+=d*(i<=3?1.3:1);e+=v;BPREV[i]=v;}
+    var i,flux=0,e=0,lim=7,e2=0,snFlux=0,snE=0;
+    for(i=1;i<=lim;i++){var v=BSPEC[i],d=v-BPREV[i];if(d>0)flux+=d*(i<=3?1.25:1);e+=v;BPREV[i]=v;}
     for(i=8;i<=12;i++)e2+=BSPEC[i];
+    for(i=12;i<=28;i++){var sv=BSPEC[i],sd=sv-(BPREV[i]||0);if(sd>0)snFlux+=sd;snE+=sv;BPREV[i]=sv;}
     flux/=lim*255;e/=lim*255;e2/=5*255;
-    bAvg+=(flux-bAvg)*.05;
-    var thr=bAvg*1.5+.008;
-    if(flux>thr&&e>.12&&now-lastBeatT>120){
+    snFlux/=17*255;snE/=17*255;
+    bAvg+=(flux-bAvg)*.04;
+    var thr=bAvg*1.85+.014;
+    var snThr=0.045+snE*0.35;
+    var isKick=flux>thr&&e>.155&&now-lastBeatT>165;
+    var isSnare=!isKick&&snFlux>snThr&&snE>.14&&now-lastBeatT>145;
+    if(isKick||isSnare){
       lastBeatT=now;A.beatAt=now;
-      A.beatStr=Math.max(.2,Math.min(1,(flux-bAvg)/.28));
+      A.beatKind=isKick?'kick':'snare';
+      A.beatStr=Math.max(.18,Math.min(1,isKick?(flux-bAvg)/.38:(snFlux/snThr)*.85));
       var sig=currentSig();
-      A.fracture=Math.min(0.75,(0.35+level*0.3)*sig.frac);
-      A.fracX=0.18+Math.random()*0.64;
+      /* Fracture lebih lembut — kurang agresif di hero */
+      A.fracture=Math.min(0.52,(0.22+level*0.22)*sig.frac*(isKick?1:0.72));
+      A.fracX=0.22+Math.random()*0.56;
     }
     var eb=(e*7+e2*5)/12;
-    bPk=Math.max(eb,bPk*.9995);bFl+=(eb-bFl)*(eb<bFl?.2:.0008);
-    bAd=Math.max(0,Math.min(1,(eb-bFl)/(bPk-bFl+.08)))*.9;
+    bPk=Math.max(eb,bPk*.9995);bFl+=(eb-bFl)*(eb<bFl?.18:.0007);
+    bAd=Math.max(0,Math.min(1,(eb-bFl)/(bPk-bFl+.1)))*.78;
   }
   function analyse(now){
     if(!an||!SPEC)return;
@@ -1165,32 +1181,33 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     for(i=1;i<=lim;i++){var d=SPEC[i]-PREV[i];if(d>0)flux+=d;}
     flux/=Math.max(1,lim)*255;
     avgFlux+=(flux-avgFlux)*.06;
-    if(!anB&&flux>avgFlux*1.7+.02&&now-lastBeatT>170){
-      lastBeatT=now;A.beatAt=now;
-      /* Beat fracture: crack one zone, then heal */
+    if(!anB&&flux>avgFlux*2.05+.03&&now-lastBeatT>200){
+      lastBeatT=now;A.beatAt=now;A.beatKind='kick';A.beatStr=Math.max(.2,Math.min(1,(flux-avgFlux)/.4));
+      /* Beat fracture: crack one zone, then heal — milder */
       var sig=currentSig();
-      A.fracture=Math.min(0.75,(0.35+level*0.3)*sig.frac);
-      A.fracX=0.18+Math.random()*0.64;
+      A.fracture=Math.min(0.52,(0.22+level*0.22)*sig.frac);
+      A.fracX=0.22+Math.random()*0.56;
     }
     PREV.set(SPEC);
     var el=Math.min(120,n-1);
     for(i=1;i<=el;i++)e+=SPEC[i];
     e/=Math.max(1,el)*255;
-    ePk=Math.max(e,ePk*.998);eFl+=(e-eFl)*(e<eFl?.2:.002);
-    var lvA=Math.max(0,Math.min(1,(e-eFl)/(ePk-eFl+.1)))*.85;
-    level+=(Math.max(Math.max(0,Math.min(1,(e-.22)*2.4)),lvA)-level)*.35;
+    ePk=Math.max(e,ePk*.998);eFl+=(e-eFl)*(e<eFl?.18:.0018);
+    var lvA=Math.max(0,Math.min(1,(e-eFl)/(ePk-eFl+.12)))*.72;
+    /* Level gain diturunkan sedikit — spektrum & glow kurang loncat */
+    level+=(Math.max(Math.max(0,Math.min(1,(e-.26)*1.85)),lvA)-level)*.28;
     /* Spectrum personality: bass / mid / treble bands */
     var bSum=0,mSum=0,tSum=0,bN=0,mN=0,tN=0;
     var bEnd=Math.min(12,n-1),mEnd=Math.min(64,n-1),tEnd=Math.min(180,n-1);
     for(i=1;i<=bEnd;i++){bSum+=SPEC[i];bN++;}
     for(i=bEnd+1;i<=mEnd;i++){mSum+=SPEC[i];mN++;}
     for(i=mEnd+1;i<=tEnd;i++){tSum+=SPEC[i];tN++;}
-    var bT=Math.max(bAd,Math.max(0,Math.min(1,((bSum/Math.max(1,bN)/255)-0.18)*2.2)));
-    var mT=Math.max(0,Math.min(1,((mSum/Math.max(1,mN)/255)-0.12)*2.0));
-    var tT=Math.max(0,Math.min(1,((tSum/Math.max(1,tN)/255)-0.06)*2.4));
-    A.bass+=(bT-A.bass)*.28;
-    A.mid+=(mT-A.mid)*.28;
-    A.treble+=(tT-A.treble)*.28;
+    var bT=Math.max(bAd,Math.max(0,Math.min(1,((bSum/Math.max(1,bN)/255)-0.22)*1.75)));
+    var mT=Math.max(0,Math.min(1,((mSum/Math.max(1,mN)/255)-0.15)*1.65));
+    var tT=Math.max(0,Math.min(1,((tSum/Math.max(1,tN)/255)-0.08)*1.9));
+    A.bass+=(bT-A.bass)*.22;
+    A.mid+=(mT-A.mid)*.22;
+    A.treble+=(tT-A.treble)*.22;
     /* Signal memory peak while playing */
     if(level>A.memory)A.memory=level;
     /* Snap SMOOTH toward live SPEC (analysis is ~30Hz; renderer interpolates at 60) */
@@ -1545,31 +1562,20 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       var a=window.__dmA;if(a){a.fracture=Math.max(a.fracture||0,.7);a.fracX=.2+Math.random()*.6;}
       if(hlT){hlT.classList.remove('dm-hl-hard');void hlT.offsetWidth;hlT.classList.add('dm-hl-hard');}
       seekGlitch(320);
-      if(KW2.test(text)){var hh=document.querySelector('h1.display');if(hh)hh.dispatchEvent(new Event('pointerdown',{bubbles:true}));}
+      if(KW2.test(text)){var hh=document.querySelector('h1.display');if(hh&&window.__dmGlitch)window.__dmGlitch(hh);}
     }catch(e){}
   }
 
   /* ---------- Corrupted Memory: pengunjung yang balik dapat log sinyal terakhir ---------- */
-  var MEMK='dm_mem',lastTitle='',memSaveAt=0,memPrev=null;
-  try{memPrev=JSON.parse(localStorage.getItem(MEMK)||'null');}catch(e){}
-  function curTitle(){try{if(current&&current.isConnected){var t=titleOf(current);if(t)lastTitle=t;}}catch(e){}return lastTitle;}
-  function memSave(end){
-    var t=curTitle();if(!t)return;
-    var s=end?-1:Math.floor(audio.currentTime||0);
-    if(!end&&s<3)return;
-    try{localStorage.setItem(MEMK,JSON.stringify({t:t,s:s,ts:Date.now()}));}catch(e){}
-  }
-  audio.addEventListener('timeupdate',function(){var n=performance.now();if(!audio.paused&&n-memSaveAt>4000){memSaveAt=n;memSave(false);}});
-  audio.addEventListener('pause',function(){if(!audio.ended)memSave(false);});
-  audio.addEventListener('ended',function(){memSave(true);});
-  document.addEventListener('visibilitychange',function(){if(document.hidden&&!audio.paused)memSave(false);});
-  window.addEventListener('pagehide',function(){if(!audio.paused)memSave(false);});
+  /* Corrupted Memory: data last track/posisi/waktu sekarang disimpan oleh dm_album (lihat snapFrag), dibaca lewat window.__dmMemPrev */
   (function(){
-    var hasMem=!!(memPrev&&memPrev.t);
-    var t=hasMem?String(memPrev.t).slice(0,40):'',s=hasMem?+memPrev.s:0,ts=hasMem?(+memPrev.ts||0):0,tries=0,dead=false,steps=[];
+    var hasMem=false,t='',s=0,ts=0,tries=0,dead=false,steps=[];
     function ok(){return !dead&&audio.paused&&!active&&!audio.currentTime;}
     /* urutan: pesan sambutan (The Album Remembers) → memory lama (last signal / gap) → bersihkan */
     function build(){
+      var mp=null;try{mp=window.__dmMemPrev&&window.__dmMemPrev();}catch(e){}
+      hasMem=!!(mp&&mp.t&&+mp.ts>0);
+      if(hasMem){t=String(mp.t).slice(0,40);s=isFinite(+mp.s)?+mp.s:0;ts=+mp.ts||0;}
       var W=[];try{if(window.__dmWelcome)W=window.__dmWelcome()||[];}catch(e){}
       if(!hasMem&&!W.length)return false;
       var at=0;
@@ -1657,7 +1663,9 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     clearTimeout(h._g);
     h._g=setTimeout(function(){h.classList.remove('dm-glitching');},700);
   }
+  window.__dmGlitch=glitch;
   document.addEventListener('pointerdown',function(e){
+    if(!e.isTrusted)return;
     var h=e.target.closest&&e.target.closest('h1.display');
     if(h)glitch(h);
   });
@@ -1687,50 +1695,26 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
 </script>
 
 <style>
-#dm-home{
-  position:fixed;top:max(8px,env(safe-area-inset-top,0px));left:10px;z-index:30;
-  display:inline-flex;align-items:center;gap:8px;
-  padding:8px 12px 8px 10px;
-  border:1px solid rgba(110,229,255,.2);
-  border-radius:8px;
-  background:rgba(6,14,20,.78);
-  box-shadow:0 4px 18px rgba(0,0,0,.28),0 0 12px rgba(110,229,255,.05);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  font:600 9px/1 'Space Grotesk',system-ui,sans-serif;
-  letter-spacing:.18em;text-transform:uppercase;
-  color:rgba(214,228,240,.78);text-decoration:none;
-  -webkit-tap-highlight-color:transparent;
-  transition:color .25s ease,border-color .25s ease,background .25s ease,box-shadow .25s ease,transform .2s ease;
-}
-#dm-home svg{width:14px;height:14px;flex-shrink:0;opacity:.9}
-#dm-home:hover,#dm-home:focus-visible{
-  color:#6ee5ff;border-color:rgba(110,229,255,.5);
-  background:rgba(110,229,255,.1);
-  box-shadow:0 4px 20px rgba(0,0,0,.3),0 0 16px rgba(110,229,255,.12);
-  outline:none;
-}
-#dm-home:active{transform:translateY(1px)}
-/* Hero title: smaller + cleared below the fixed back panel */
+/* Home chip digabung ke dock 🦉 (session log). Fallback no-JS tetap ada, disembunyikan. */
+#dm-home{display:none!important}
+/* Hero: tidak perlu margin besar untuk chip top-left lagi */
 h1.display{
   font-size:clamp(26px,6.5vw,42px)!important;
   letter-spacing:.12em!important;
   line-height:1.08!important;
-  margin-top:max(52px,env(safe-area-inset-top,0px) + 44px)!important;
+  margin-top:max(12px,env(safe-area-inset-top,0px) + 8px)!important;
 }
-/* Nudge whole hero column down so centered content clears the chip */
 #root section.relative > .relative.z-10{
-  padding-top:max(28px,env(safe-area-inset-top,0px) + 12px);
+  padding-top:max(12px,env(safe-area-inset-top,0px) + 4px);
   box-sizing:border-box;
 }
 html{scroll-behavior:smooth}
 html.dm-from-swallow{scroll-behavior:auto!important}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
-  #dm-home{transition-duration:.01s!important}
 }
 </style>
 <a id="dm-home" href="/" aria-label="Back to Dumul's Observatory">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
   <span>DUMUL'S OBSERVATORY</span>
 </a>
 <style>
@@ -1743,25 +1727,6 @@ html.dm-from-swallow{scroll-behavior:auto!important}
 #dm-notes li{font-size:14px;line-height:1.75;color:rgba(214,228,240,.75);margin-bottom:6px}
 .dm-tracklink{background:none;border:0;padding:0;margin:0;font:inherit;color:#6ee5ff;cursor:pointer;text-decoration:underline;text-underline-offset:2px;-webkit-tap-highlight-color:transparent}
 .dm-tracklink:hover,.dm-tracklink:focus-visible{color:#ff7ad9}
-#dm-top{
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  width:100%;max-width:min(92vw,640px);margin:8px auto 28px;
-  padding:14px 16px;
-  border:1px solid rgba(110,229,255,.18);
-  border-radius:8px;
-  background:rgba(110,229,255,.04);
-  color:rgba(214,228,240,.78);
-  font:600 11px/1 'Space Grotesk',system-ui,sans-serif;
-  letter-spacing:.2em;text-transform:uppercase;
-  cursor:pointer;-webkit-tap-highlight-color:transparent;
-  transition:color .25s ease,border-color .25s ease,background .25s ease,box-shadow .25s ease;
-}
-#dm-top:hover,#dm-top:focus-visible{
-  color:#6ee5ff;border-color:rgba(110,229,255,.45);
-  background:rgba(110,229,255,.09);box-shadow:0 0 18px rgba(110,229,255,.08);
-  outline:none;
-}
-#dm-top span{font-size:13px;letter-spacing:0;line-height:1}
 #dm-top-fab{
   position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:28;
   width:40px;height:40px;border-radius:10px;
@@ -1781,7 +1746,7 @@ html.dm-from-swallow{scroll-behavior:auto!important}
 #dm-top-fab svg{width:16px;height:16px;display:block}
 body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 @media (prefers-reduced-motion:reduce){
-  #dm-top,#dm-top-fab{transition-duration:.01s!important}
+  #dm-top-fab{transition-duration:.01s!important}
 }
 </style>
 <section id="dm-notes">
@@ -1799,9 +1764,6 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 <li><button type="button" class="dm-tracklink" data-title="Nastenka">Nastenka</button>: painful acceptance</li>
 <li><button type="button" class="dm-tracklink" data-title="Larung">Larung</button>: release</li>
 </ul>
-<button type="button" id="dm-top" aria-label="Kembali ke atas halaman">
-  <span aria-hidden="true">↑</span> Back to top
-</button>
 </section>
 <button type="button" id="dm-top-fab" aria-label="Kembali ke atas" title="Back to top">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
@@ -1842,9 +1804,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
     }
     scrollRaf=requestAnimationFrame(step);
   }
-  var btn=document.getElementById('dm-top');
   var fab=document.getElementById('dm-top-fab');
-  if(btn)btn.addEventListener('click',toTop);
   if(fab)fab.addEventListener('click',toTop);
   if(!fab)return;
   var ticking=false,shown=false;
@@ -1907,8 +1867,7 @@ body.dm-has-bar #dm-top-fab{bottom:calc(78px + env(safe-area-inset-bottom,0px))}
 /* Listening mode: dim content below hero, boost spectrum presence */
 html.dm-listening #dm-notes,
 html.dm-listening [class*="space-y-[1px]"],
-html.dm-listening .dm-lyrics,
-html.dm-listening #dm-top {
+html.dm-listening .dm-lyrics {
   opacity: calc(1 - var(--dm-listen, 0) * 0.72);
   transition: opacity 0.9s ease;
   pointer-events: auto;
@@ -1928,25 +1887,24 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
   var lastInteract = performance.now();
   var tapN = 0, lastTap = 0, tapH = 0;
   /* Signal interruption bertingkat: combo tap (reset kalau jeda >700ms) → [pesan, durasi ms, tulis ke log?] */
+  /* Tier tap → pesan dock toast. hot=true masuk hist + toast pink; false = toast saja (bisa di-drop antrean). */
   var TAPS = {
-    1:  ['SIGNAL RECEIVED', 1100, false],
-    2:  ['SIGNAL RECEIVED\nSIGNAL RECEIVED', 1300, false],
-    4:  ['SIGNAL INTERRUPTED', 2400, true],
-    7:  ['STOP.', 2200, true],
-    10: ['WHY ARE YOU DOING THIS', 3200, true]
+    1:  ['SIGNAL RECEIVED', false],
+    2:  ['SIGNAL RECEIVED ×2', false],
+    4:  ['SIGNAL INTERRUPTED', true],
+    7:  ['STOP.', true],
+    10: ['WHY ARE YOU DOING THIS', true]
   };
-  function tapToast(msg, ms){
-    var t = document.getElementById('dm-toast');
-    if(!t){ t=document.createElement('div'); t.id='dm-toast'; document.body.appendChild(t); }
-    t.textContent = msg;
-    t.style.whiteSpace = 'pre-line';
-    t.style.textAlign = 'center';
-    t.style.borderRadius = msg.indexOf('\n') > -1 ? '18px' : '';
-    t.style.display = 'block';
-    clearTimeout(t._h);
-    t._h = setTimeout(function(){ t.style.display='none'; t.style.borderRadius=''; }, ms);
+  /* Satu kanal: toast dock (__dmLog / __dmToast). Tidak pakai #dm-toast center. */
+  function tapToast(msg, hot){
+    var line = String(msg||'').replace(/\s+/g,' ').trim().slice(0,52);
+    if(!line)return;
+    try{
+      if(hot && window.__dmLog){ window.__dmLog(line, true, false); return; }
+      if(window.__dmToast){ window.__dmToast(line, false, 2200); return; }
+      if(window.__dmLog){ window.__dmLog(line, false, false); return; }
+    }catch(e){}
   }
-  function tapLog(msg){ try{ if(window.__dmLog) window.__dmLog(msg, true); }catch(e){} }
   /* Expose for player loop */
   window.__dmLastInteract = function(){ return lastInteract; };
   /* Patch into A if player already defined lastInteract — we sync via property */
@@ -1997,16 +1955,14 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     tapN++;
     if(tapN === 13){
       tapN = 0;
-      tapToast('...', 1300);
+      tapToast('...', false);
       clearTimeout(tapH);
       tapH = setTimeout(function(){
-        tapToast('YOU FOUND NOTHING.', 3600);
-        tapLog('YOU FOUND NOTHING.');
+        tapToast('YOU FOUND NOTHING.', true);
       }, 1500);
     }else if(TAPS[tapN]){
       var tier = TAPS[tapN];
       tapToast(tier[0], tier[1]);
-      if(tier[2]) tapLog(tier[0]);
     }
     bump();
   }
@@ -2018,82 +1974,139 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     }
   }
   bind();
-  var mo = new MutationObserver(function(){ bind(); });
+  var moQ = false;
+  var mo = new MutationObserver(function(){ if(moQ) return; moQ = true; requestAnimationFrame(function(){ moQ = false; bind(); }); });
   mo.observe(document.getElementById('root')||document.body, {childList:true, subtree:true});
-  /* Sync lastInteract into player loop variable via periodic bridge */
-  setInterval(function(){
-    try{
-      if(typeof window.__dmSetIdle === 'function') window.__dmSetIdle(lastInteract);
-    }catch(e){}
-  }, 200);
+  /* Idle bridge: player loop membaca window.__dmIdleAt (getter di atas). Tidak perlu setInterval / __dmSetIdle. */
 })();
 </script>
 
 <!-- ===== DUMUL // SESSION LOG + THE ALBUM REMEMBERS (add-on, non-destruktif) =====
-     - #dm-owl: tombol ikon burung hantu → buka/tutup panel log penuh
+     - #dm-dock / #dm-owl: chip 🦉 dragable (parkir bebas, pos di localStorage dm_dock_pos)
+     - #dm-log: panel = Back to Observatory (atas) + SESSION LOG (bawah)
      - #dm-log-toast: notif sebaris saat log aktif, auto-hilang (~2.8s)
-     - #dm-log: panel penuh (hidden default), timestamp UTC 12 jam
+     - #dm-obs: indikator OBSERVER STATUS (DETECTED/ACTIVE/SILENT/ABSENT/RETURNED/YOU)
+     - MEMORY FRAGMENT: lastObserved / lastSignal / lastInterruption di localStorage dm_album
+     - NULL STATE: semantic glitch sporadis (SIGNAL/MEMORY/OBSERVER: NULL → ... → normal)
+     - TIME LOST: dwell time sesi + toast saat reload / setelah ~20 menit
+     - SIGNAL DECAY: idle panjang → STABLE/WEAKENING/FADING/... ; touch → SIGNAL RESTORED
+     - REFLECTION ERROR: aksi berulang dikomentari (SIGNAL RECEIVED → YOU KEEP CHECKING → WHY?)
+     - STATE CONTRADICTION: state saling bertentangan → STATE CONFLICT
+     - THE BUG THAT ISN'T: error palsu semantik (WARNING / ERROR 0x0 / NO ERROR DETECTED)
+     - TRACK MEMORY: MEMORY TRACE jejak lagu + ALL SIGNALS HAVE BEEN OBSERVED
+     - DUMBOWL DENIAL: setelah protokol ditemukan, sequence yang sama ditolak
      - window.__dmLog(msg, hot): dipakai juga oleh signal-interruption bertingkat
-     - localStorage 'dm_album' {tracksPlayed, lastTrack, timesVisited}: lokal di browser, tanpa server
-     - window.__dmWelcome(): daftar pesan sambutan, dibaca player untuk ditampilkan di hero -->
+     - localStorage 'dm_album' {tracksPlayed, lastTrack, lastPos, lastTs, timesVisited, lastObserved, lastSignal, lastInterruption, taps, lastDwell}
+     - window.__dmWelcome(): daftar pesan sambutan + memory fragments, tampil di hero lirik -->
 <style>
-/* SESSION LOG: panel hidden by default; single-line toast when active; owl opens full log */
-#dm-owl{
-  position:fixed;left:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:36;
-  width:40px;height:40px;border-radius:10px;
-  border:1px solid rgba(110,229,255,.22);
-  background:rgba(6,14,20,.82);color:rgba(214,228,240,.75);
-  display:grid;place-items:center;
-  cursor:pointer;-webkit-tap-highlight-color:transparent;
-  transition:color .2s,border-color .2s,background .2s,box-shadow .2s,transform .15s;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  padding:0;margin:0;
+/* DOCK 🦉: back + session log, dragable, parkir bebas */
+#dm-dock{
+  position:fixed;z-index:36;
+  left:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  width:44px;height:44px;
+  touch-action:none;user-select:none;-webkit-user-select:none;
 }
-body.dm-has-bar #dm-owl{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+body.dm-has-bar #dm-dock:not([data-parked]){bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+#dm-owl{
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid rgba(110,229,255,.22);
+  background:rgba(6,14,20,.88);color:rgba(214,228,240,.82);
+  display:grid;place-items:center;
+  cursor:grab;-webkit-tap-highlight-color:transparent;
+  transition:color .2s,border-color .2s,background .2s,box-shadow .2s;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  padding:0;margin:0;
+  box-shadow:0 4px 18px rgba(0,0,0,.32),0 0 12px rgba(110,229,255,.06);
+}
 #dm-owl:hover,#dm-owl:focus-visible{
   color:#6ee5ff;border-color:rgba(110,229,255,.5);
-  background:rgba(110,229,255,.1);box-shadow:0 0 14px rgba(110,229,255,.12);outline:none;
+  background:rgba(110,229,255,.12);box-shadow:0 0 16px rgba(110,229,255,.14);outline:none;
 }
-#dm-owl:active{transform:translateY(1px)}
-#dm-owl svg{width:20px;height:20px;display:block}
-#dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.12)}
+#dm-owl:active, #dm-dock.dm-dragging #dm-owl{cursor:grabbing}
+#dm-dock.dm-dragging #dm-owl{
+  color:#6ee5ff;border-color:rgba(110,229,255,.55);
+  background:rgba(110,229,255,.14);box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 18px rgba(110,229,255,.18);
+  transform:scale(1.06);
+}
+#dm-owl svg{width:22px;height:22px;display:block;pointer-events:none}
+#dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.14)}
+/* OBSERVER STATUS — posisi di-set JS (placeObs) nempel dock */
+#dm-obs{
+  position:fixed;left:60px;bottom:calc(48px + env(safe-area-inset-bottom,0px));z-index:34;
+  font:500 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;
+  color:rgba(110,229,255,.45);text-shadow:0 0 6px rgba(0,0,0,.85);
+  pointer-events:none;user-select:none;-webkit-user-select:none;
+  opacity:0;transition:opacity .35s ease,color .4s ease,left .12s ease,top .12s ease;
+  white-space:nowrap;max-width:min(42vw,160px);overflow:hidden;text-overflow:ellipsis;
+}
+#dm-obs.on{opacity:1}
+#dm-obs[data-st="ACTIVE"]{color:rgba(110,229,255,.7)}
+#dm-obs[data-st="SILENT"]{color:rgba(184,198,214,.4)}
+#dm-obs[data-st="ABSENT"]{color:rgba(184,198,214,.28)}
+#dm-obs[data-st="RETURNED"]{color:rgba(255,122,217,.75)}
+#dm-obs[data-st="YOU"]{color:rgba(255,122,217,.9)}
+#dm-obs[data-st="DETECTED"]{color:rgba(110,229,255,.85)}
+#dm-log-toast.on ~ #dm-obs, body:has(#dm-log-toast.on) #dm-obs{opacity:.15}
+@media (prefers-reduced-motion:reduce){#dm-obs{transition-duration:.01s!important}}
+/* Toast dock: selalu di-anchor JS ke #dm-dock (placeNearDock) */
 #dm-log-toast{
-  position:fixed;left:56px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
-  max-width:min(58vw,280px);
+  position:fixed;left:60px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
+  max-width:min(56vw,240px);
   font:400 9px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;
   color:rgba(110,229,255,.85);text-shadow:0 0 6px rgba(0,0,0,.9);
   pointer-events:none;user-select:none;-webkit-user-select:none;
   padding:7px 11px;border-radius:6px;
-  border:1px solid rgba(110,229,255,.18);background:rgba(6,14,20,.88);
+  border:1px solid rgba(110,229,255,.18);background:rgba(6,14,20,.92);
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  opacity:0;transform:translateY(6px);
-  transition:opacity .28s ease,transform .28s ease;
+  opacity:0;
+  transition:opacity .28s ease,left .12s ease,top .12s ease;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
 }
-body.dm-has-bar #dm-log-toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
-#dm-log-toast.on{opacity:1;transform:none}
-#dm-log-toast.x{color:rgba(255,122,217,.9);border-color:rgba(255,122,217,.25)}
+#dm-log-toast.on{opacity:1}
+#dm-log-toast.x{color:rgba(255,122,217,.9);border-color:rgba(255,122,217,.28)}
 #dm-log-toast .t{color:rgba(184,198,214,.5);margin-right:8px}
+html.dm-lowfx #dm-log-toast{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+/* Panel: posisi di-set JS mengikuti dock */
 #dm-log{
-  position:fixed;left:10px;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:35;
-  max-width:min(72vw,280px);max-height:min(42vh,320px);overflow:auto;
+  position:fixed;z-index:35;
+  width:min(78vw,300px);max-height:min(48vh,360px);overflow:auto;
   font:400 9px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;
   color:rgba(110,229,255,.6);text-shadow:0 0 6px rgba(0,0,0,.9);
   pointer-events:none;user-select:none;-webkit-user-select:none;display:none;
-  padding:8px 10px;border-radius:8px;border:1px solid rgba(110,229,255,.18);
-  background:rgba(6,14,20,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  box-shadow:0 8px 28px rgba(0,0,0,.4);
+  padding:0;border-radius:10px;border:1px solid rgba(110,229,255,.2);
+  background:rgba(6,14,20,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:0 10px 32px rgba(0,0,0,.45),0 0 16px rgba(110,229,255,.06);
 }
-body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
-#dm-log.open{display:block;pointer-events:auto;user-select:text;-webkit-user-select:text}
-#dm-log .h{color:rgba(184,198,214,.5);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-#dm-log .h span{letter-spacing:.12em}
+#dm-log.open{display:flex;flex-direction:column;pointer-events:auto;user-select:text;-webkit-user-select:text}
+#dm-log .dm-back{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(110,229,255,.12);
+  color:rgba(214,228,240,.88);text-decoration:none;
+  font:600 10px/1 'Space Grotesk',system-ui,sans-serif;
+  letter-spacing:.14em;text-transform:uppercase;
+  -webkit-tap-highlight-color:transparent;
+  transition:color .2s,background .2s;
+}
+#dm-log .dm-back svg{width:14px;height:14px;flex-shrink:0;opacity:.85}
+#dm-log .dm-back:hover,#dm-log .dm-back:focus-visible{
+  color:#6ee5ff;background:rgba(110,229,255,.07);outline:none;
+}
+#dm-log .h{
+  color:rgba(184,198,214,.5);padding:8px 12px 6px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border-bottom:1px solid rgba(184,198,214,.08);
+  flex-shrink:0;
+}
+#dm-log .h span{letter-spacing:.12em;font:600 9px/1 'Space Grotesk',system-ui,sans-serif}
 #dm-log .dm-log-close{
   flex-shrink:0;width:22px;height:22px;border-radius:5px;border:1px solid rgba(110,229,255,.2);
   background:transparent;color:rgba(214,228,240,.7);cursor:pointer;font:600 12px/1 system-ui,sans-serif;
   display:grid;place-items:center;padding:0;-webkit-tap-highlight-color:transparent;
 }
 #dm-log .dm-log-close:hover,#dm-log .dm-log-close:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.5);outline:none}
+#dm-log .dm-log-list{padding:6px 12px 10px;overflow:auto;flex:1;min-height:0}
 #dm-log .l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:dmLogIn .4s ease-out both}
 #dm-log .l:nth-last-child(n+5){opacity:.4}
 #dm-log .l:nth-last-child(n+4){opacity:.6}
@@ -2104,41 +2117,90 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   #dm-log .l{animation:none}
   #dm-log-toast{transition-duration:.01s!important}
   #dm-owl{transition-duration:.01s!important}
+  #dm-dock.dm-dragging #dm-owl{transform:none}
 }
+html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 </style>
 <script>
 (function(){
   var KEY='dm_album',MAXL=5;
-  /* ---------- state lokal: tracksPlayed / lastTrack / timesVisited ---------- */
-  var st={tracksPlayed:[],lastTrack:'',timesVisited:0};
+  /* ---------- state lokal: tracks + memory fragments ---------- */
+  var st={tracksPlayed:[],lastTrack:'',timesVisited:0,lastObserved:'',lastSignal:'',lastInterruption:0,taps:0,lastDwell:0,dumbowl:0,lastPos:0,lastTs:0};
   try{
     var o=JSON.parse(localStorage.getItem(KEY)||'null');
     if(o&&typeof o==='object'){
       if(Array.isArray(o.tracksPlayed))st.tracksPlayed=o.tracksPlayed.filter(function(x){return typeof x==='string';}).slice(0,20);
       if(typeof o.lastTrack==='string')st.lastTrack=o.lastTrack.slice(0,60);
       if(+o.timesVisited>0)st.timesVisited=Math.min(Math.floor(+o.timesVisited),9999);
+      if(typeof o.lastObserved==='string')st.lastObserved=o.lastObserved.slice(0,40);
+      if(typeof o.lastSignal==='string')st.lastSignal=o.lastSignal.slice(0,12);
+      if(+o.lastInterruption>0)st.lastInterruption=Math.min(Math.floor(+o.lastInterruption),99999);
+      if(+o.taps>0)st.taps=Math.min(Math.floor(+o.taps),99999);
+      if(+o.lastDwell>0)st.lastDwell=Math.min(Math.floor(+o.lastDwell),86400000);
+      if(+o.dumbowl>0)st.dumbowl=1;
+      if(+o.lastTs>0)st.lastTs=Math.floor(+o.lastTs);
+      if(isFinite(+o.lastPos)&&+o.lastPos>=-1)st.lastPos=Math.floor(+o.lastPos);
     }
   }catch(e){}
-  var prev={tracksPlayed:st.tracksPlayed.slice(),lastTrack:st.lastTrack,timesVisited:st.timesVisited};
+  /* migrasi sekali jalan: dm_mem (store lama) -> dm_album, supaya pengunjung lama tidak kehilangan memori */
+  try{
+    var rawOld=localStorage.getItem('dm_mem');
+    if(rawOld!==null){
+      var om=JSON.parse(rawOld);
+      if(om&&typeof om.t==='string'&&om.t&&+om.ts>st.lastTs){
+        st.lastTrack=om.t.slice(0,60);
+        st.lastPos=isFinite(+om.s)?Math.max(-1,Math.floor(+om.s)):0;
+        st.lastTs=Math.floor(+om.ts);
+      }
+      localStorage.setItem(KEY,JSON.stringify(st));
+      localStorage.removeItem('dm_mem');
+    }
+  }catch(e){}
+  var prev={
+    tracksPlayed:st.tracksPlayed.slice(),lastTrack:st.lastTrack,timesVisited:st.timesVisited,
+    lastObserved:st.lastObserved,lastSignal:st.lastSignal,lastInterruption:st.lastInterruption,taps:st.taps,
+    lastDwell:st.lastDwell,dumbowl:st.dumbowl,lastPos:st.lastPos,lastTs:st.lastTs
+  };
+  window.__dmMemPrev=function(){return {t:prev.lastTrack,s:prev.lastPos,ts:prev.lastTs};};
   function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+  /* saver tunggal fragmen memori: lagu terakhir, posisi, waktu. Posisi/track hanya ditulis setelah >=3 detik atau saat lagu selesai. */
+  function snapFrag(){
+    var P=window.__dmPlayer,t=P&&P.title?P.title():'';
+    if(!t)return;
+    var a=P.audio,c=a?(a.currentTime||0):0,end=!!(a&&a.ended);
+    st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+    if(a)st.lastSignal=end?'END':fmtSig(c);
+    if(end||c>=3){st.lastTrack=String(t).slice(0,60);st.lastPos=end?-1:Math.floor(c);st.lastTs=Date.now();}
+    st.lastInterruption=st.taps||st.lastInterruption||0;
+    save();
+  }
+  function fmtSig(sec){
+    sec=Math.max(0,Math.floor(+sec||0));
+    var m=Math.floor(sec/60),s=sec%60;
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
   /* hitung kunjungan sekali per sesi tab (reload tidak menggelembungkan angka) */
   var newSession=true;
   try{newSession=!sessionStorage.getItem('dm_sess');sessionStorage.setItem('dm_sess','1');}catch(e){}
   if(newSession){st.timesVisited++;save();}
 
-  /* ---------- SESSION LOG (UTC 12h, toast-only UI, owl opens full panel) ---------- */
+  /* ---------- SESSION LOG + OBSERVATORY DOCK (UTC 12h, dragable 🦉) ---------- */
   var MAXHIST=40;
   var hist=[]; /* {ts,msg,hot} */
   var bodyRoot=document.body||document.documentElement;
+  var DOCK_KEY='dm_dock_pos';
 
-  /* Owl toggle button */
+  /* Dock wrapper — posisi bebas, default kiri-bawah */
+  var dock=document.createElement('div');
+  dock.id='dm-dock';
   var owl=document.createElement('button');
   owl.id='dm-owl';owl.type='button';
-  owl.setAttribute('aria-label','Open session log');
-  owl.setAttribute('title','Session log');
+  owl.setAttribute('aria-label','Open session log and observatory');
+  owl.setAttribute('title','Drag to move · tap to open');
   owl.setAttribute('aria-expanded','false');
   owl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 14.2c.9.9 2.1 1.3 3 1.3s2.1-.4 3-1.3"/><path d="M7.2 7.8C8.4 6.6 10 6 12 6s3.6.6 4.8 1.8"/><path d="M4.8 11.2c.3-1.6 1-2.8 1.8-3.6"/><path d="M19.2 11.2c-.3-1.6-1-2.8-1.8-3.6"/></svg>';
-  bodyRoot.appendChild(owl);
+  dock.appendChild(owl);
+  bodyRoot.appendChild(dock);
 
   /* Single-line toast (auto-hide) */
   var toastEl=document.createElement('div');
@@ -2146,17 +2208,175 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   bodyRoot.appendChild(toastEl);
   var toastTimer=0;
 
-  /* Full panel (hidden until owl opens it) */
+  /* Panel: Back to Observatory di atas, session log di bawah */
   var box=document.createElement('div');
-  box.id='dm-log';box.setAttribute('aria-hidden','true');box.setAttribute('role','dialog');box.setAttribute('aria-label','Session log');
+  box.id='dm-log';box.setAttribute('aria-hidden','true');box.setAttribute('role','dialog');box.setAttribute('aria-label','Observatory and session log');
+  var backLink=document.createElement('a');
+  backLink.className='dm-back';backLink.href='/';
+  backLink.setAttribute('aria-label','Back to Dumul\'s Observatory');
+  backLink.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Back to Observatory</span>';
   var head=document.createElement('div');head.className='h';
   var headLbl=document.createElement('span');headLbl.textContent='DUMUL // SESSION LOG';
   var closeBtn=document.createElement('button');closeBtn.type='button';closeBtn.className='dm-log-close';
-  closeBtn.setAttribute('aria-label','Close session log');closeBtn.textContent='\u00d7';
+  closeBtn.setAttribute('aria-label','Close');closeBtn.textContent='\u00d7';
   head.appendChild(headLbl);head.appendChild(closeBtn);
-  var list=document.createElement('div');
-  box.appendChild(head);box.appendChild(list);
+  var list=document.createElement('div');list.className='dm-log-list';
+  box.appendChild(backLink);box.appendChild(head);box.appendChild(list);
   bodyRoot.appendChild(box);
+
+  /* ---- drag / parkir dock ---- */
+  function dockSize(){return {w:dock.offsetWidth||44,h:dock.offsetHeight||44};}
+  function clampDock(x,y){
+    var s=dockSize(),pad=6;
+    var maxX=Math.max(pad,(window.innerWidth||360)-s.w-pad);
+    var maxY=Math.max(pad,(window.innerHeight||640)-s.h-pad);
+    return {x:Math.min(maxX,Math.max(pad,x)),y:Math.min(maxY,Math.max(pad,y))};
+  }
+  function applyDock(x,y,parked){
+    var p=clampDock(x,y);
+    dock.style.left=p.x+'px';
+    dock.style.top=p.y+'px';
+    dock.style.right='auto';
+    dock.style.bottom='auto';
+    if(parked)dock.setAttribute('data-parked','1');
+    else dock.removeAttribute('data-parked');
+    return p;
+  }
+  function saveDock(x,y){
+    try{localStorage.setItem(DOCK_KEY,JSON.stringify({x:Math.round(x),y:Math.round(y)}));}catch(e){}
+  }
+  function loadDock(){
+    try{
+      var o=JSON.parse(localStorage.getItem(DOCK_KEY)||'null');
+      if(o&&isFinite(+o.x)&&isFinite(+o.y)){
+        applyDock(+o.x,+o.y,true);
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  loadDock();
+  window.addEventListener('resize',function(){
+    if(dock.hasAttribute('data-parked')){
+      var r=dock.getBoundingClientRect();
+      applyDock(r.left,r.top,true);
+    }
+    if(box.classList.contains('open'))placePanel();
+    if(toastEl.classList.contains('on'))placeToast();
+    placeObs();
+  });
+
+  function placePanel(){
+    var r=dock.getBoundingClientRect();
+    var pw=Math.min(window.innerWidth*0.78,300);
+    var gap=8,pad=8;
+    var left=r.left;
+    if(left+pw>window.innerWidth-pad)left=Math.max(pad,window.innerWidth-pw-pad);
+    if(left<pad)left=pad;
+    /* prefer open above dock; fallback below */
+    var spaceAbove=r.top-pad;
+    var spaceBelow=window.innerHeight-r.bottom-pad;
+    var preferAbove=spaceAbove>=160||spaceAbove>=spaceBelow;
+    box.style.left=left+'px';
+    box.style.width=pw+'px';
+    box.style.right='auto';
+    if(preferAbove){
+      box.style.bottom=(window.innerHeight-r.top+gap)+'px';
+      box.style.top='auto';
+      box.style.maxHeight=Math.min(window.innerHeight*0.48,Math.max(140,spaceAbove-gap))+'px';
+    }else{
+      box.style.top=(r.bottom+gap)+'px';
+      box.style.bottom='auto';
+      box.style.maxHeight=Math.min(window.innerHeight*0.48,Math.max(140,spaceBelow-gap))+'px';
+    }
+  }
+  /* Anchor UI ke dock: pilih sisi terdekat yang muat — jangan pernah loncat ke ujung layar jauh. */
+  function placeNearDock(el, tw, th){
+    var r=dock.getBoundingClientRect();
+    var gap=6,pad=8;
+    var vw=window.innerWidth||360,vh=window.innerHeight||640;
+    tw=Math.min(tw,vw-pad*2);
+    th=th||32;
+    var cx=r.left+r.width/2,cy=r.top+r.height/2;
+    var mid=vw/2;
+    /* kandidat: kanan, kiri, atas, bawah — skor = jarak ke pusat dock + penalti out-of-bounds */
+    var cands=[
+      {left:r.right+gap, top:cy-th/2},
+      {left:r.left-tw-gap, top:cy-th/2},
+      {left:cx-tw/2, top:r.top-th-gap},
+      {left:cx-tw/2, top:r.bottom+gap}
+    ];
+    /* prefer sisi menghadap pusat layar */
+    if(cx>=mid){cands=[cands[1],cands[0],cands[2],cands[3]];}
+    var best=null,bestScore=1e15;
+    for(var i=0;i<cands.length;i++){
+      var c=cands[i];
+      var L=Math.min(vw-tw-pad,Math.max(pad,c.left));
+      var T=Math.min(vh-th-pad,Math.max(pad,c.top));
+      /* penalti besar kalau clamp menjauh dari dock (>28px = “kepisah”) */
+      var drift=Math.abs(L-c.left)+Math.abs(T-c.top);
+      var dx=(L+tw/2)-cx,dy=(T+th/2)-cy;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      var score=dist+drift*4+(drift>28?200:0);
+      if(score<bestScore){bestScore=score;best={left:L,top:T};}
+    }
+    el.style.left=best.left+'px';
+    el.style.top=best.top+'px';
+    el.style.bottom='auto';
+    el.style.right='auto';
+    el.style.maxWidth=tw+'px';
+    return best;
+  }
+  function placeToast(){
+    var tw=Math.min(window.innerWidth*0.56,240);
+    placeNearDock(toastEl,tw,34);
+    toastEl.setAttribute('data-anchored','1');
+  }
+  function placeObs(){
+    if(!obsEl||!obsEl.classList.contains('on'))return;
+    /* compact label di atas/samping dock */
+    placeNearDock(obsEl,Math.min(window.innerWidth*0.42,160),18);
+  }
+
+  var drag={on:false,moved:false,pid:0,ox:0,oy:0,sx:0,sy:0};
+  function onDragStart(e){
+    if(e.button!=null&&e.button!==0)return;
+    drag.on=true;drag.moved=false;drag.pid=e.pointerId;
+    var r=dock.getBoundingClientRect();
+    drag.ox=e.clientX-r.left;drag.oy=e.clientY-r.top;
+    drag.sx=e.clientX;drag.sy=e.clientY;
+    try{owl.setPointerCapture(e.pointerId);}catch(err){}
+  }
+  function onDragMove(e){
+    if(!drag.on||e.pointerId!==drag.pid)return;
+    var dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+    if(!drag.moved&&(dx*dx+dy*dy)<64)return; /* threshold ~8px */
+    drag.moved=true;
+    dock.classList.add('dm-dragging');
+    if(box.classList.contains('open'))setOpen(false);
+    var p=applyDock(e.clientX-drag.ox,e.clientY-drag.oy,true);
+    if(toastEl.classList.contains('on'))placeToast();
+    placeObs();
+    /* live-save light: only on end */
+    drag._lx=p.x;drag._ly=p.y;
+  }
+  function onDragEnd(e){
+    if(!drag.on||(e.pointerId!=null&&e.pointerId!==drag.pid))return;
+    drag.on=false;
+    dock.classList.remove('dm-dragging');
+    try{owl.releasePointerCapture(drag.pid);}catch(err){}
+    if(drag.moved){
+      var r=dock.getBoundingClientRect();
+      var p=applyDock(r.left,r.top,true);
+      saveDock(p.x,p.y);
+      placeObs();
+      if(toastEl.classList.contains('on'))placeToast();
+    }
+  }
+  owl.addEventListener('pointerdown',onDragStart);
+  owl.addEventListener('pointermove',onDragMove);
+  owl.addEventListener('pointerup',onDragEnd);
+  owl.addEventListener('pointercancel',onDragEnd);
 
   function pad(n){return n<10?'0'+n:''+n;}
   /* UTC 12-hour clock, e.g. 02:15:30 PM UTC */
@@ -2178,10 +2398,11 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       list.appendChild(l);
     }
   }
-  function showToast(msg,hot){
+  function showToast(msg,hot,holdMs){
+    placeToast();
     toastEl.textContent='';
     var t=document.createElement('span');t.className='t';t.textContent=stamp();
-    toastEl.appendChild(t);toastEl.appendChild(document.createTextNode(String(msg).slice(0,48)));
+    toastEl.appendChild(t);toastEl.appendChild(document.createTextNode(String(msg).replace(/\s+/g,' ').trim().slice(0,52)));
     toastEl.classList.toggle('x',!!hot);
     toastEl.classList.add('on');
     toastEl.setAttribute('aria-hidden','false');
@@ -2189,16 +2410,25 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     toastTimer=setTimeout(function(){
       toastEl.classList.remove('on');
       toastEl.setAttribute('aria-hidden','true');
-    },2800);
+    },holdMs||2800);
   }
+  /* Toast UI saja (tanpa hist) — dipakai player/deck/settings. Selalu nempel ke dock. */
+  window.__dmToast=function(msg,hot,holdMs){
+    if(box.classList.contains('open'))return; /* panel terbuka = jangan ganggu */
+    showToast(msg,!!hot,holdMs||2600);
+  };
   function setOpen(on){
     box.classList.toggle('open',on);
     box.setAttribute('aria-hidden',on?'false':'true');
     owl.setAttribute('aria-expanded',on?'true':'false');
-    owl.setAttribute('aria-label',on?'Close session log':'Open session log');
-    if(on)renderList();
+    owl.setAttribute('aria-label',on?'Close panel':'Open session log and observatory');
+    if(on){renderList();placePanel();}
   }
-  owl.addEventListener('click',function(e){e.stopPropagation();setOpen(!box.classList.contains('open'));});
+  owl.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(drag.moved){drag.moved=false;return;} /* selesai drag → jangan toggle */
+    setOpen(!box.classList.contains('open'));
+  });
   closeBtn.addEventListener('click',function(e){e.stopPropagation();setOpen(false);});
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'&&box.classList.contains('open')){setOpen(false);}
@@ -2207,7 +2437,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   document.addEventListener('pointerdown',function(e){
     if(!box.classList.contains('open'))return;
     var t=e.target;
-    if(box.contains(t)||owl.contains(t))return;
+    if(box.contains(t)||dock.contains(t))return;
     setOpen(false);
   },true);
   var scrollCloseT=0;
@@ -2224,83 +2454,589 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     onOutsideScroll();
   },{passive:true});
 
-  function log(msg,hot){
+  var narrBusy=false,narrUntil=0;
+  /* busy flags generator — dideklarasi di sini biar obsTick/idleTick/reflect/dwell bisa cek aman */
+  var nullBusy=false,conflictBusy=false,bugBusy=false;
+  function narrLock(ms){narrBusy=true;narrUntil=Date.now()+(ms||4000);}
+  function narrFree(){if(Date.now()>=narrUntil)narrBusy=false;}
+  /* Antrian toast: urutan terjaga, hot selalu masuk, non-hot dibuang kalau antrian sudah >=2 */
+  var toastQ=[],toastBusy=false,TOAST_HOLD=1400;
+  function drainToast(){
+    if(toastBusy)return;
+    var e=toastQ.shift();
+    if(!e)return;
+    if(box.classList.contains('open')){toastQ.length=0;return;}
+    toastBusy=true;
+    showToast(e.msg,e.hot);
+    setTimeout(function(){toastBusy=false;drainToast();},TOAST_HOLD);
+  }
+  function log(msg,hot,silent){
     var entry={ts:stamp(),msg:String(msg).slice(0,60),hot:!!hot};
     hist.push(entry);
     while(hist.length>MAXHIST)hist.shift();
-    if(box.classList.contains('open'))renderList();
-    else showToast(entry.msg,entry.hot);
+    if(box.classList.contains('open')){renderList();return;}
+    if(silent)return;
+    if(!hot&&toastQ.length>=2)return;
+    if(toastQ.length>=6)toastQ.shift();
+    toastQ.push(entry);
+    drainToast();
   }
-  function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1000);}
-  window.__dmLog=function(msg,hot){log(msg,hot);};
+  function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1400);}
+  window.__dmLog=function(msg,hot,silent){log(msg,hot,silent);};
 
-  /* ---------- sambutan (dibaca player, tampil di hero) ---------- */
-  var welcomed=false;
+  /* ---------- sambutan + MEMORY FRAGMENT (hero via return; session log ringkas) ---------- */
+  /* Sumber tunggal daftar lagu = row di player (urutan DOM = urutan keyboard 1-5). Fallback kalau player belum siap. */
+  var FALLBACK_TRACKS=['Glitch (Instrumental)','Limerence','Glitch','Nastenka','Larung'];
+  function normT(x){return String(x||'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function trackList(){
+    try{
+      var P=window.__dmPlayer,r=P&&P.rows?P.rows():[],out=[];
+      for(var i=0;i<r.length;i++){var t=P.title.call(null,r[i]);if(t)out.push(t);}
+      if(out.length)return out;
+    }catch(e){}
+    return FALLBACK_TRACKS;
+  }
+  function playedIdx(list,title){
+    var n=normT(title);
+    for(var i=0;i<list.length;i++){if(normT(list[i])===n)return i;}
+    return -1;
+  }
+  function allObserved(list){
+    var tr=trackList();
+    for(var i=0;i<tr.length;i++){if(playedIdx(list||[],tr[i])<0)return false;}
+    return tr.length>0;
+  }
+  var welcomed=false,allObservedLogged=false;
   window.__dmWelcome=function(){
     if(welcomed||!newSession||prev.timesVisited<1)return [];
     welcomed=true;
-    var out=['WELCOME BACK.'];
+    var out=[];
+    var hasFrag=!!(prev.lastObserved||prev.lastInterruption>0||prev.lastSignal);
+    if(hasFrag){
+      if(Math.random()<0.45)out.push('I REMEMBER THIS.');
+      else out.push('YOU WERE HERE BEFORE.');
+      if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
+      /* LAST SIGNAL di-skip: Corrupted Memory (lastTrack/lastPos/lastTs) sudah tampilkan last signal + gap di hero */
+      if(prev.lastInterruption>0)out.push('LAST INTERRUPTION: '+prev.lastInterruption+' TAPS');
+    }else{
+      out.push('WELCOME BACK.');
+    }
     try{
-      var P=window.__dmPlayer,r=P&&P.rows?P.rows():[],all=r.length>0;
-      for(var i=0;i<r.length;i++){if(prev.tracksPlayed.indexOf(P.title.call(null,r[i]))<0){all=false;break;}}
-      if(/^glitch/i.test(prev.lastTrack))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
-      if(all)out.push('ALL SIGNALS HAVE BEEN OBSERVED.');
+      var all=allObserved(prev.tracksPlayed);
+      if(/^glitch/i.test(prev.lastTrack||prev.lastObserved||''))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
+      if(all){out.push('ALL SIGNALS HAVE BEEN OBSERVED.');allObservedLogged=true;}
     }catch(e){}
-    if(prev.timesVisited>=2&&Math.random()<0.12)out=['YOU CAME BACK.','I WONDER WHY.'];
-    out.forEach(function(m,i){setTimeout(function(){log(m,i>0||m.indexOf('CAME BACK')>-1);},i*2600);});
+    if(prev.timesVisited>=2&&Math.random()<0.12){
+      out=['YOU CAME BACK.','I WONDER WHY.'];
+      if(prev.lastObserved)out.push('LAST OBSERVED: '+prev.lastObserved.toUpperCase());
+    }
+    /* satu toast ringkas — detail penuh hanya di hero (hindari double-spam toast+lirik) */
+    var summary=hasFrag?'MEMORY FRAGMENT RECOVERED.':(out[0]||'WELCOME BACK.');
+    setTimeout(function(){log(summary,true);},400);
     return out;
   };
 
-  /* ---------- interaksi & idle ---------- */
-  var seen=false,lastAct=Date.now(),idleFired=false,hiddenAt=0;
-  function act(){lastAct=Date.now();idleFired=false;}
-  ['pointerdown','keydown','touchstart','wheel'].forEach(function(ev){
-    window.addEventListener(ev,function(){if(!seen){seen=true;log('LISTENER DETECTED');}act();},{passive:true,capture:true});
-  });
-  window.addEventListener('scroll',act,{passive:true});
-  function idleTick(){
-    setTimeout(idleTick,5000);
-    if(document.hidden||idleFired||Date.now()-lastAct<45000)return;
-    idleFired=true;
-    if(Math.random()<0.3)pair('OBSERVER DETECTED','OBSERVER IS YOU',1000);
-    else pair('USER STILL HERE','WHY',1000);
+  /* ---------- OBSERVER STATUS ---------- */
+  var obsEl=document.createElement('div');
+  obsEl.id='dm-obs';obsEl.setAttribute('aria-live','polite');obsEl.setAttribute('aria-hidden','true');
+  bodyRoot.appendChild(obsEl);
+  var obsState='',obsSilentAt=0,obsYouCool=0,obsActiveCool=0,obsSilentCool=0,obsDetected=false;
+  /* Toast HANYA untuk momen bermakna. SILENT/ACTIVE = indikator saja (hindari spam saat lirik/scroll). */
+  var OBS_TOAST={DETECTED:1,ABSENT:1,RETURNED:1,YOU:1};
+  function setObs(stName,toastIt){
+    if(stName===obsState)return;
+    obsState=stName;
+    obsEl.textContent='OBSERVER: '+stName;
+    obsEl.setAttribute('data-st',stName);
+    obsEl.classList.add('on');
+    obsEl.setAttribute('aria-hidden','false');
+    placeObs();
+    if(toastIt&&OBS_TOAST[stName])log('OBSERVER: '+stName,stName==='YOU'||stName==='RETURNED'||stName==='DETECTED');
   }
-  setTimeout(idleTick,5000);
-  document.addEventListener('visibilitychange',function(){
-    if(document.hidden){hiddenAt=Date.now();return;}
-    if(hiddenAt&&Date.now()-hiddenAt>15000&&Math.random()<0.3){
-      log('SESSION TERMINATED',true);log('...',true);
-      setTimeout(function(){log('NOT REALLY',true);},1000);
+  function obsPlaying(){
+    try{var p=document.getElementById('dm-pp');return !!(p&&p.classList.contains('dm-on'));}catch(e){return false;}
+  }
+  function obsTick(){
+    setTimeout(obsTick,2000);
+    if(document.hidden)return;
+    /* Jangan timpa state selama NULL sequence atau status ABSENT/RETURNED/NULL */
+    if(nullBusy||obsState==='ABSENT'||obsState==='RETURNED'||obsState==='NULL')return;
+    var idle=Date.now()-lastAct;
+    /* threshold lebih longgar saat musik main — lirik pindah ≠ user "aktif" */
+    var need=obsPlaying()?28000:14000;
+    if(idle>=need){
+      if(obsState!=='SILENT'&&obsState!=='YOU'&&Date.now()>obsSilentCool){
+        if(Date.now()>obsYouCool&&Math.random()<0.10){
+          setObs('YOU',true);
+          obsYouCool=Date.now()+120000;
+          setTimeout(function(){
+            if(obsState==='YOU'&&Date.now()-lastAct>=need)setObs('SILENT',false);
+          },3200);
+        }else setObs('SILENT',false); /* indikator only, no toast */
+      }
+    }else if(obsDetected&&obsState!=='ACTIVE'&&obsState!=='DETECTED'){
+      if(Date.now()>obsActiveCool){setObs('ACTIVE',false);obsActiveCool=Date.now()+4000;}
     }
-    hiddenAt=0;act();
+  }
+  setTimeout(obsTick,2000);
+
+  /* ---------- interaksi & idle ---------- */
+  var seen=false,lastAct=Date.now(),idleFired=false,hiddenAt=0,sessTaps=0;
+  var sigDecay=0; /* 0 ok, 1 STABLE, 2 WEAKENING, 3 FADING, 4 ... */
+  var actMoveAt=0;
+  function act(isTap,isMove){
+    /* throttle gerak pasif (mousemove/scroll/wheel): jangan refresh lastAct di dalam window
+       supaya SIGNAL DECAY / SILENT tetap bisa tembak saat user diam baca lirik */
+    if(isMove){
+      var n=Date.now();
+      if(n-actMoveAt<3000)return;
+      actMoveAt=n;
+    }
+    lastAct=Date.now();idleFired=false;
+    if(isTap){
+      sessTaps++;
+      st.taps=(st.taps||0)+1;
+      st.lastInterruption=st.taps;
+      if(sessTaps%7===0)save();
+    }
+    if(sigDecay>0&&(isTap||!isMove)){
+      sigDecay=0;
+      log('SIGNAL RESTORED.',true);
+    }else if(sigDecay>0&&isMove){
+      /* gerak pasif (di luar throttle) mereset decay stage tanpa toast */
+      sigDecay=0;
+    }
+    if(!obsDetected){
+      obsDetected=true;
+      setObs('DETECTED',false); /* indikator saja: 'LISTENER DETECTED' sudah jadi toast pembuka */
+      setTimeout(function(){if(obsState==='DETECTED')setObs('ACTIVE',false);},1800);
+    }else if(obsState==='SILENT'||obsState==='YOU'||obsState==='RETURNED'){
+      /* ACTIVE tanpa toast; cooldown supaya gak bolak-balik ke SILENT */
+      obsSilentCool=Date.now()+8000;
+      setObs('ACTIVE',obsState==='RETURNED');
+    }
+  }
+  /* pointerdown saja: touchstart ikut nembak di HP -> tap kehitung dobel. isTrusted: abaikan event sintetis. */
+  window.addEventListener('pointerdown',function(e){
+    if(!e.isTrusted)return;
+    if(!seen){seen=true;log('LISTENER DETECTED');}
+    act(true,false);
+  },{passive:true,capture:true});
+  ['keydown'].forEach(function(ev){
+    window.addEventListener(ev,function(){
+      if(!seen){seen=true;log('LISTENER DETECTED');}
+      act(false,false);
+    },{passive:true,capture:true});
+  });
+  ['wheel','mousemove','scroll'].forEach(function(ev){
+    window.addEventListener(ev,function(){
+      if(!seen){seen=true;log('LISTENER DETECTED');}
+      act(false,true);
+    },{passive:true,capture:true});
+  });
+  /* long-idle narrative — setelah decay stage penuh (130s) supaya tidak bertumpuk dengan WEAKENING/FADING */
+  function idleTick(){
+    setTimeout(idleTick,8000);
+    narrFree();
+    if(document.hidden||idleFired||narrBusy||nullBusy||conflictBusy||bugBusy)return;
+    if(Date.now()-lastAct<140000)return; /* ≥140s: melewati decay stage 4 @ 130s */
+    if(sigDecay>0&&sigDecay<4)return; /* tunggu decay selesai / di-restore dulu */
+    idleFired=true;
+    narrLock(5000);
+    pair('USER STILL HERE','WHY',1400);
+  }
+  setTimeout(idleTick,8000);
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){
+      hiddenAt=Date.now();
+      setObs('ABSENT',true);
+      /* persist memory fragment on leave */
+      try{snapFrag();}catch(e){}
+      return;
+    }
+    if(hiddenAt){
+      var away=Date.now()-hiddenAt;
+      setObs('RETURNED',true);
+      if(away>15000&&Math.random()<0.3){
+        log('SESSION TERMINATED',true);log('...',true);
+        setTimeout(function(){log('NOT REALLY',true);},1000);
+      }
+      setTimeout(function(){if(obsState==='RETURNED')setObs('ACTIVE',false);},2400);
+    }
+    hiddenAt=0;act(false);
+  });
+  window.addEventListener('pagehide',function(){
+    try{snapFrag();}catch(e){}
   });
   setTimeout(function(){log('SIGNAL FOUND');},700);
+  /* indikator idle awal — menunggu deteksi */
+  setTimeout(function(){if(!obsDetected){obsEl.textContent='OBSERVER: —';obsEl.classList.add('on');placeObs();}},900);
+
+  /* ---------- TIME LOST (dwell) ---------- */
+  var dwellVisible=0,visStart=document.hidden?0:Date.now(),timeLostShown=false,dwellMilestone=false;
+  function fmtHMS(ms){
+    ms=Math.max(0,Math.floor(+ms||0));
+    var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+    function p(n){return n<10?'0'+n:''+n;}
+    return p(h)+':'+p(m)+':'+p(sec);
+  }
+  function fmtMS(ms){
+    ms=Math.max(0,Math.floor(+ms||0));
+    var s=Math.floor(ms/1000),m=Math.floor(s/60),sec=s%60;
+    function p(n){return n<10?'0'+n:''+n;}
+    return p(m)+':'+p(sec);
+  }
+  /* dwell = akumulasi waktu tab visible saja (bukan jam dinding) */
+  function dwellNow(){
+    return dwellVisible+(visStart?Date.now()-visStart:0);
+  }
+  function persistDwell(){
+    st.lastDwell=dwellNow();
+    save();
+  }
+  /* TIME LOST dari sesi sebelumnya (reload / tab baru setelah kunjungan) */
+  if(newSession&&prev.lastDwell>=5000){
+    setTimeout(function(){
+      log('TIME LOST: '+fmtHMS(prev.lastDwell),true);
+    },3200);
+  }
+  /* milestone ~20 menit */
+  function dwellTick(){
+    setTimeout(dwellTick,15000);
+    if(document.hidden)return;
+    var d=dwellNow();
+    persistDwell();
+    narrFree();
+    /* jangan tumpuk di atas NULL/CONFLICT/BUG/idle narrative */
+    if(narrBusy||nullBusy||conflictBusy||bugBusy)return;
+    if(!dwellMilestone&&d>=20*60*1000){
+      dwellMilestone=true;
+      narrLock(4000);
+      if(Math.random()<0.55){
+        log('YOU HAVE BEEN HERE FOR '+fmtMS(d)+'.',true);
+        setTimeout(function(){log('DID YOU NOTICE?',true);},2200);
+      }else{
+        log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
+      }
+    }
+    /* soft reminders tiap ~15 menit setelah milestone, jarang */
+    else if(dwellMilestone&&d>=35*60*1000&&!timeLostShown&&Math.random()<0.08){
+      timeLostShown=true;
+      narrLock(2800);
+      log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
+    }
+  }
+  setTimeout(dwellTick,12000);
+  /* pastikan dwell tersimpan saat leave (sudah ada pagehide fragment — tambah dwell) */
+  var _ph=window.onpagehide;
+  /* augment existing pagehide via additional listener (already have one above — this is fine, multiple ok) */
+  window.addEventListener('pagehide',persistDwell);
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){
+      if(visStart){dwellVisible+=Date.now()-visStart;visStart=0;}
+      persistDwell();
+    }else if(!visStart){
+      visStart=Date.now();
+    }
+  });
+
+  /* ---------- NULL STATE (semantic glitch, sporadis) ---------- */
+  var nullPrevObs='';
+  function nullSequence(){
+    narrFree();
+    if(nullBusy||document.hidden||conflictBusy||bugBusy||narrBusy)return;
+    nullBusy=true;narrLock(6000);
+    nullPrevObs=obsState||'';
+    var steps=[
+      [0,'SIGNAL: NULL',true],
+      [900,'MEMORY: NULL',true],
+      [1800,'OBSERVER: NULL',true],
+      [2800,'...',false],
+      [4200,null,false] /* restore */
+    ];
+    steps.forEach(function(step){
+      setTimeout(function(){
+        if(step[1]===null){
+          /* kembali normal tanpa penjelasan */
+          if(nullPrevObs&&nullPrevObs!=='ABSENT')setObs(nullPrevObs,false);
+          else if(obsDetected)setObs('ACTIVE',false);
+          else{obsEl.textContent='OBSERVER: —';obsEl.removeAttribute('data-st');placeObs();}
+          nullBusy=false;
+          return;
+        }
+        log(step[1],step[2]);
+        if(step[1]==='OBSERVER: NULL'){
+          obsEl.textContent='OBSERVER: NULL';
+          obsEl.setAttribute('data-st','YOU');
+          obsEl.classList.add('on');
+          obsState='NULL';
+          placeObs();
+        }
+      },step[0]);
+    });
+  }
+  function nullSchedule(){
+    /* jadwal berikutnya: 45s–3.5 menit, peluang tembak ~18% */
+    var wait=45000+Math.floor(Math.random()*165000);
+    setTimeout(function(){
+      if(!document.hidden&&Math.random()<0.18)nullSequence();
+      nullSchedule();
+    },wait);
+  }
+  setTimeout(nullSchedule,25000);
+
+  /* ---------- SIGNAL DECAY (idle panjang, timer + state only) ---------- */
+  var decayLabels=['','SIGNAL: STABLE','SIGNAL: WEAKENING','SIGNAL: FADING','SIGNAL: ...'];
+  var decayAt=[0,40000,70000,100000,130000]; /* ms idle thresholds */
+  function decayTick(){
+    setTimeout(decayTick,4000);
+    narrFree();
+    if(document.hidden||nullBusy||conflictBusy||bugBusy||narrBusy)return;
+    var idle=Date.now()-lastAct;
+    var stage=0;
+    for(var i=decayAt.length-1;i>=1;i--){
+      if(idle>=decayAt[i]){stage=i;break;}
+    }
+    if(stage>sigDecay){
+      sigDecay=stage;
+      narrLock(2800);
+      log(decayLabels[stage],stage>=3);
+    }
+  }
+  setTimeout(decayTick,8000);
+
+  /* ---------- REFLECTION ERROR (aksi berulang → komentar psikologis) ---------- */
+  var refl={kind:'',count:0,last:0};
+  function reflect(kind){
+    if(!kind)return;
+    /* hormati narrasi aktif (NULL/CONFLICT/BUG/idle/decay) supaya tidak numpuk */
+    narrFree();
+    if(narrBusy||nullBusy||conflictBusy||bugBusy)return;
+    var now=Date.now();
+    if(kind===refl.kind&&now-refl.last<14000)refl.count++;
+    else{refl.kind=kind;refl.count=1;}
+    refl.last=now;
+    var c=refl.count;
+    /* track/pp sudah dapat TRACK CHANGED / MEMORY ACCESSED — jangan dobel di awal */
+    var soft=(kind==='track'||kind==='tracklink'||kind==='pp');
+    if(soft){
+      if(c===4)log('YOU KEEP CHECKING.',true);
+      else if(c===5)log('WHY?',true);
+      else if(c===6)log('...',true);
+      else if(c===9)log('THIS WON\'T CHANGE ANYTHING.',true);
+      else if(c===12)log('STILL WATCHING.',true);
+      return;
+    }
+    if(c===1||c===2)log('SIGNAL RECEIVED.');
+    else if(c===3)log('YOU KEEP CHECKING.',true);
+    else if(c===4)log('WHY?',true);
+    else if(c===5)log('...',true);
+    else if(c===7)log('THIS WON\'T CHANGE ANYTHING.',true);
+    else if(c===10)log('STILL WATCHING.',true);
+    else if(c===14)log('OK.',true);
+  }
+  /* owl = cek session log berulang */
+  owl.addEventListener('click',function(){reflect('owl');},true);
+  /* player controls + track rows (delegasi, non-destruktif) */
+  document.addEventListener('click',function(e){
+    var t=e.target;if(!t||!t.closest)return;
+    if(t.closest('#dm-pp'))reflect('pp');
+    else if(t.closest('#dm-next'))reflect('next');
+    else if(t.closest('#dm-prev'))reflect('prev');
+    else if(t.closest('#dm-help'))reflect('help');
+    else if(t.closest('[class*="space-y-[1px]"] > div'))reflect('track');
+    else if(t.closest('.dm-tracklink'))reflect('tracklink');
+    else if(t.closest('#dm-seek,[role="slider"]'))reflect('seek');
+  },true);
+  /* reset rantai refleksi setelah idle */
+  setInterval(function(){
+    if(refl.count&&Date.now()-refl.last>16000){refl.kind='';refl.count=0;}
+  },5000);
+
+  /* ---------- STATE CONTRADICTION (semantic, sporadis) ---------- */
+  var conflictSets=[
+    ['SIGNAL: ACTIVE','MEMORY: LOST','OBSERVER: ABSENT','SYSTEM: AWAKE'],
+    ['OBSERVER: ABSENT','OBSERVATION: ACTIVE'],
+    ['SIGNAL: STABLE','SIGNAL: FADING'],
+    ['MEMORY: PRESENT','MEMORY: NULL','OBSERVER: YOU'],
+    ['SYSTEM: ASLEEP','OBSERVER: ACTIVE','SIGNAL: AWAKE']
+  ];
+  function conflictSequence(){
+    narrFree();
+    if(conflictBusy||document.hidden||nullBusy||bugBusy||narrBusy)return;
+    conflictBusy=true;narrLock(7000);
+    var set=conflictSets[Math.floor(Math.random()*conflictSets.length)];
+    var t0=0;
+    set.forEach(function(line,i){
+      setTimeout(function(){log(line,true);},t0);
+      t0+=850;
+    });
+    setTimeout(function(){log('STATE CONFLICT.',true);},t0+400);
+    setTimeout(function(){conflictBusy=false;},t0+2000);
+  }
+  function conflictSchedule(){
+    var wait=70000+Math.floor(Math.random()*150000);
+    setTimeout(function(){
+      if(!document.hidden&&Math.random()<0.22)conflictSequence();
+      conflictSchedule();
+    },wait);
+  }
+  setTimeout(conflictSchedule,55000);
+
+  /* ---------- THE BUG THAT ISN'T A BUG ---------- */
+  var bugScripts=[
+    function(){
+      log('WARNING:',true);
+      setTimeout(function(){log('EXPECTED BEHAVIOR NOT FOUND.',true);},900);
+    },
+    function(){
+      log('ERROR 0x00000000',true);
+      setTimeout(function(){log('CAUSE: UNKNOWN');},800);
+      setTimeout(function(){log('STATUS: NORMAL');},1600);
+    },
+    function(){
+      log('NO ERROR DETECTED.',true);
+      setTimeout(function(){log('ERROR: USER LOOKING FOR ERROR.',true);},1100);
+    },
+    function(){
+      log('EXCEPTION IN OBSERVER',true);
+      setTimeout(function(){log('STACK: [redacted]');},900);
+      setTimeout(function(){log('CONTINUE ANYWAY.');},1800);
+    }
+  ];
+  function bugSequence(){
+    narrFree();
+    if(bugBusy||document.hidden||nullBusy||conflictBusy||narrBusy)return;
+    bugBusy=true;narrLock(5500);
+    var fn=bugScripts[Math.floor(Math.random()*bugScripts.length)];
+    fn();
+    setTimeout(function(){bugBusy=false;},4500);
+  }
+  function bugSchedule(){
+    var wait=90000+Math.floor(Math.random()*180000);
+    setTimeout(function(){
+      if(!document.hidden&&Math.random()<0.16)bugSequence();
+      bugSchedule();
+    },wait);
+  }
+  setTimeout(bugSchedule,80000);
+  /* refresh after fake "EXPECTED BEHAVIOR NOT FOUND" → soft callback on visibility if flagged */
+  var expectBehavior=false;
+  var _bugLog=log;
+  /* patch: when WARNING path fires, mark flag; on return show BEHAVIOR FOUND */
+  var origBug0=bugScripts[0];
+  bugScripts[0]=function(){
+    expectBehavior=true;
+    origBug0();
+  };
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden&&expectBehavior){
+      expectBehavior=false;
+      setTimeout(function(){log('BEHAVIOR FOUND.',true);},600);
+    }
+  });
+
+  /* ---------- TRACK MEMORY (jejak digital, bukan chart) ---------- */
+  var traceShown=false;
+  function barsFor(name){
+    /* intensitas dari urutan penemuan di tracksPlayed */
+    var idx=playedIdx(st.tracksPlayed,name);
+    if(idx<0)return '\u00b7'; /* · belum */
+    var n=1+(idx%3); /* 1–3 */
+    return Array(n+1).join('\u25a0'); /* ■ */
+  }
+  function shortName(t){
+    return String(t||'').replace(/\s*\(Instrumental\)/i,' (INSTRU)').replace(/\s+/g,' ').trim().toUpperCase().slice(0,14);
+  }
+  function showMemoryTrace(){
+    if(st.tracksPlayed.length<1)return;
+    log('MEMORY TRACE',true);
+    var delay=900;
+    trackList().forEach(function(name){
+      var played=playedIdx(st.tracksPlayed,name)>=0;
+      var label=shortName(name);
+      var bar=played?barsFor(name):'\u00b7';
+      setTimeout(function(){log(label+Array(Math.max(1,16-label.length)).join(' ')+bar,false);},delay);
+      delay+=700;
+    });
+  }
+  function checkAllObserved(){
+    if(allObservedLogged)return;
+    if(allObserved(st.tracksPlayed)){
+      allObservedLogged=true;
+      setTimeout(function(){log('ALL SIGNALS HAVE BEEN OBSERVED.',true);},400);
+    }
+  }
+  /* tampilkan TRACE sekali per sesi saat buka owl (kalau sudah ada jejak) */
+  owl.addEventListener('click',function(){
+    if(traceShown||st.tracksPlayed.length<2)return;
+    if(box.classList.contains('open'))return; /* will open */
+    setTimeout(function(){
+      if(!box.classList.contains('open'))return;
+      traceShown=true;
+      showMemoryTrace();
+      checkAllObserved();
+    },300);
+  },true);
+
+  /* ---------- DUMBOWL DENIAL ---------- */
+  var denyStep=0,denyLast=0;
+  function dumbowlDeny(){
+    var now=Date.now();
+    if(now-denyLast>20000)denyStep=0;
+    denyLast=now;
+    denyStep++;
+    if(denyStep===1)log('PROTOCOL NOT FOUND.',true);
+    else if(denyStep===2)log('THERE IS NO OWL HERE.',true);
+    else if(denyStep===3)log('STOP LOOKING.',true);
+    else if(denyStep===4)log('...',true);
+    else{log('the owl knows.',true);denyStep=0;}
+  }
+  window.__dmDumbowl=function(found){
+    /* dipanggil dari signal deck saat ketik "dumul" */
+    if(found){
+      if(!st.dumbowl){st.dumbowl=1;save();log('PROTOCOL ACKNOWLEDGED.',true);}
+      return false; /* first discovery / allow effect */
+    }
+    if(st.dumbowl||prev.dumbowl){dumbowlDeny();return true;} /* deny = block normal effect */
+    return false;
+  };
+  /* kalau sudah pernah discover, coba ketik dumul lagi → denial */
+  /* signal deck akan cek __dmDumbowl */
 
   /* ---------- hook player: MEMORY ACCESSED / TRACK CHANGED / album remembers ---------- */
   function hook(tries){
     var P=window.__dmPlayer;
     if(!P||!P.audio){if(tries<40)setTimeout(function(){hook(tries+1);},250);return;}
-    var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false;
+    var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false,sigSaveAt=0;
+    function persistFrag(){snapFrag();}
     a.addEventListener('play',function(){
       var t=P.title();if(!t)return;
       if(t!==shown){
         if(first){log('MEMORY ACCESSED');first=false;}
         else log('TRACK CHANGED');
+        narrLock(2000);
         shown=t;obsA=obsB=false;
-        st.lastTrack=t.slice(0,60);save();
+        st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+        save();
       }
     });
+    a.addEventListener('pause',function(){if(!a.ended)persistFrag();});
+    a.addEventListener('ended',function(){persistFrag();});
     a.addEventListener('timeupdate',function(){
       var t=P.title(),c=a.currentTime||0;
       /* track dianggap "sudah didengar" setelah 20 detik */
       if(t&&c>=20&&marked!==t){
         marked=t;
-        if(st.tracksPlayed.indexOf(t)<0){st.tracksPlayed.push(t);save();}
+        if(st.tracksPlayed.indexOf(t)<0){st.tracksPlayed.push(t);save();checkAllObserved();}
       }
+      /* autosave signal position ~ tiap 8 detik */
+      var n=Date.now();
+      if(n-sigSaveAt>8000){sigSaveAt=n;snapFrag();}
       /* sinkron dengan catatan Glitch (Instrumental): "Something is already watching..." */
       if(/instrumental/i.test(t||'')){
-        if(!obsA&&c>=212&&c<226){obsA=true;log('OBSERVER DETECTED',true);}
-        if(!obsB&&c>=218&&c<232){obsB=true;log('OBSERVER IS YOU',true);}
+        if(!obsA&&c>=212&&c<226){obsA=true;narrFree();var qa=!narrBusy;if(qa)narrLock(4000);setObs('DETECTED',qa);}
+        if(!obsB&&c>=218&&c<232){obsB=true;narrFree();var qb=!narrBusy;if(qb)narrLock(4000);setObs('YOU',qb);}
       }
     });
   }
@@ -2353,6 +3089,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   var chips={};
 
   function toast(m){
+    try{if(window.__dmToast){window.__dmToast(m,false,3000);return;}}catch(e){}
     var t=q('dm-toast');
     if(!t){t=document.createElement('div');t.id='dm-toast';document.body.appendChild(t);}
     t.textContent=m;t.style.display='block';
@@ -2399,7 +3136,6 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
       var ok=false;try{ok=navigator.vibrate([60,80,60]);}catch(e){}
       toast(ok?'Haptic bass on. You should feel two buzzes now':'Vibration blocked. Check Android vibration / battery saver settings');
     }));
-    if(hasKb)deck.appendChild(chip('keys','Keyboard shortcuts',null,function(){keys(true);}));
     notes.appendChild(deck);
   }
 
@@ -2444,11 +3180,17 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
       typed=(typed+k.toLowerCase()).slice(-5);
       if(typed==='dumul'){
         typed='';
+        try{
+          var known=false;
+          try{var raw=localStorage.getItem('dm_album');if(raw){var o=JSON.parse(raw);known=!!(o&&o.dumbowl);}}catch(e1){}
+          if(known&&window.__dmDumbowl){window.__dmDumbowl(false);return;}
+          if(window.__dmDumbowl)window.__dmDumbowl(true);
+        }catch(e2){}
         var h=document.querySelector('h1.display');
-        if(h){h.dispatchEvent(new Event('pointerdown',{bubbles:true}));toast('signal locked');}
+        if(h){if(window.__dmGlitch)window.__dmGlitch(h);toast('signal locked');}
       }
     }
-    var digit=/^[1-5]$/.test(k);
+    var digit=/^[1-9]$/.test(k)&&+k<=document.querySelectorAll(ROWS).length;
     if(!digit&&!barOn())return;
     var interactive=t&&t.closest&&t.closest('button,a,[role="slider"],[role="button"],[tabindex]');
     if(k===' '){if(interactive)return;press('dm-pp');e.preventDefault();}
@@ -2487,11 +3229,25 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   function tick(now){
     raf=0;
     var p=playing(),a=A();
-    var b=(a&&a.beatAt&&p)?Math.max(0,1-(now-a.beatAt)/240):0;
+    var b=(a&&a.beatAt&&p)?Math.max(0,1-(now-a.beatAt)/320):0;
     if(root.classList.contains('dm-fx'))setBeat(b);
     if(hap&&p&&a&&a.beatAt&&a.beatAt!==lastBeat){
       lastBeat=a.beatAt;
-      if(now-(window.__dmLV||0)>110){window.__dmLV=now;var st=a.beatStr||.5,ms=Math.round(24+st*46);try{navigator.vibrate(st>.8?[ms,26,Math.round(ms*.6)]:ms);}catch(e){}}
+      if(now-(window.__dmLV||0)>130){
+        window.__dmLV=now;
+        var st=a.beatStr||.5,kind=a.beatKind||'kick';
+        try{
+          if(kind==='snare'){
+            /* snare: short sharp click */
+            var sn=Math.round(12+st*18);
+            navigator.vibrate(sn);
+          }else{
+            /* kick: deeper pulse — longer first hit, optional second thump */
+            var k1=Math.round(28+st*42),k2=Math.round(14+st*22);
+            navigator.vibrate(st>.55?[k1,38,k2]:k1);
+          }
+        }catch(e){}
+      }
     }
     if(((++tickN)&15)===0)tint();
     /* governor: 2 jendela x 2.5 detik di bawah 40fps (setelah 4 detik pemanasan) => hemat daya otomatis */
