@@ -354,11 +354,12 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   left: 0;
   top: 0;
   width: 100%;
-  height: 282px;
+  height: 292px;
   overflow: hidden;
   background: #0a1218 url('./og.jpg') center/cover no-repeat;
   z-index: 0;
 }
+@media (min-width:640px){.tesseract-stage{height:346px}}
 .tesseract-og {
   position:absolute;
   inset:0;
@@ -3377,23 +3378,16 @@ function drawHole(now,age){
 /* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
-  var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
-  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=24,meshH=132;
-  var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
+  /* SINGLE SOURCE OF TRUTH for the hero crop + mesh coordinate space.
+     Do not read/write localStorage here: a stale rect from another render
+     was the reason the handoff could use a different og.jpg crop than dumul.html.
+     These heights mirror the final dumul hero layout after its compact-layout CSS. */
+  var W=document.documentElement.clientWidth||window.innerWidth||360;
+  var meshH=132;
+  var h=W>=640?346:292;
   var mw=Math.round(Math.min(W*.92,640));
-  try{
-    var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
-    if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
-      h=s.h;m=s.m;
-    }
-  }catch(e){}
-  if(!h)h=hEst;
-  if(!m){
-    /* Same band as transition: top at (H-meshH)*0.38 → mesh centered on og.jpg chest. */
-    var y=Math.max(0,Math.round((h-meshH)*0.38));
-    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
-  }
-  return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
+  var y=Math.max(0,Math.round((h-meshH)*0.38));
+  return{x:0,y:0,w:W,h:h,m:{x:Math.round((W-mw)/2),y:y,w:mw,h:meshH}};
 }
 var DM_NN_DUR=5600;
 var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_X=0,DM_TR_MESH_Y=0,DM_TR_GLITCH_V=0,DM_TR_GLITCH_S=0,DM_TR_GLITCH_SEEN=0;
