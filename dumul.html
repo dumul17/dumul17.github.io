@@ -738,7 +738,8 @@ div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
 75%{text-shadow:1.5px 0 rgba(255,43,214,.4),-1.5px 0 rgba(34,230,255,.4);transform:translate(-1px,0);clip-path:inset(0 0 0 0)}
 100%{transform:none;clip-path:inset(0 0 0 0);text-shadow:0 0 12px rgba(110,229,255,.35);letter-spacing:.06em}}
 @media (prefers-reduced-motion:reduce){#dm-hl .dm-hl-t.dm-hl-hard{animation:none}}
-#dm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:50;max-width:90vw;padding:10px 16px;border-radius:999px;background:rgba(18,29,38,.95);border:1px solid rgba(110,229,255,.25);color:#e6eef8;font-size:12px;letter-spacing:.05em}
+/* #dm-toast center retired — semua toast lewat #dm-log-toast (nempel dock). Fallback no-style only. */
+#dm-toast{display:none!important}
 /* mini player */
 body.dm-has-bar{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px));background:#0a1218}
 #dm-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;align-items:center;gap:6px;padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(8,14,20,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
@@ -832,6 +833,8 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   function srcOf(r){var s=slugOf(r);if(s==='limerence'||s==='glitch'||s==='nastenka'||s==='larung')return s+'.opus';return s+'.opus';}
   function fmt(s){if(!isFinite(s)||s<0)return '--:--';s=Math.floor(s);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
   function toast(msg){
+    try{if(window.__dmToast){window.__dmToast(msg,false,3200);return;}}catch(e){}
+    /* fallback sebelum dock script siap */
     var t=document.getElementById('dm-toast');
     if(!t){t=document.createElement('div');t.id='dm-toast';document.body.appendChild(t);}
     t.textContent=msg;t.style.display='block';
@@ -1873,18 +1876,15 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     7:  ['STOP.', true],
     10: ['WHY ARE YOU DOING THIS', true]
   };
-  /* Satu kanal: toast dock (#dm-log-toast via __dmLog). Tidak pakai #dm-toast center. */
+  /* Satu kanal: toast dock (__dmLog / __dmToast). Tidak pakai #dm-toast center. */
   function tapToast(msg, hot){
     var line = String(msg||'').replace(/\s+/g,' ').trim().slice(0,52);
     if(!line)return;
     try{
-      if(window.__dmLog){ window.__dmLog(line, !!hot, false); return; }
+      if(hot && window.__dmLog){ window.__dmLog(line, true, false); return; }
+      if(window.__dmToast){ window.__dmToast(line, false, 2200); return; }
+      if(window.__dmLog){ window.__dmLog(line, false, false); return; }
     }catch(e){}
-    /* fallback sebelum session-log script siap */
-    var t=document.getElementById('dm-toast');
-    if(!t){ t=document.createElement('div'); t.id='dm-toast'; document.body.appendChild(t); }
-    t.textContent=line; t.style.display='block';
-    clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; }, 2200);
   }
   /* Expose for player loop */
   window.__dmLastInteract = function(){ return lastInteract; };
@@ -2011,42 +2011,40 @@ body.dm-has-bar #dm-dock:not([data-parked]){bottom:calc(76px + env(safe-area-ins
 }
 #dm-owl svg{width:22px;height:22px;display:block;pointer-events:none}
 #dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.14)}
-/* OBSERVER STATUS */
+/* OBSERVER STATUS — posisi di-set JS (placeObs) nempel dock */
 #dm-obs{
   position:fixed;left:60px;bottom:calc(48px + env(safe-area-inset-bottom,0px));z-index:34;
-  font:500 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;
+  font:500 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.12em;
   color:rgba(110,229,255,.45);text-shadow:0 0 6px rgba(0,0,0,.85);
   pointer-events:none;user-select:none;-webkit-user-select:none;
-  opacity:0;transform:translateY(4px);transition:opacity .35s ease,transform .35s ease,color .4s ease;
-  white-space:nowrap;max-width:min(50vw,200px);overflow:hidden;text-overflow:ellipsis;
+  opacity:0;transition:opacity .35s ease,color .4s ease,left .12s ease,top .12s ease;
+  white-space:nowrap;max-width:min(42vw,160px);overflow:hidden;text-overflow:ellipsis;
 }
-body.dm-has-bar #dm-obs{bottom:calc(112px + env(safe-area-inset-bottom,0px))}
-#dm-obs.on{opacity:1;transform:none}
+#dm-obs.on{opacity:1}
 #dm-obs[data-st="ACTIVE"]{color:rgba(110,229,255,.7)}
 #dm-obs[data-st="SILENT"]{color:rgba(184,198,214,.4)}
 #dm-obs[data-st="ABSENT"]{color:rgba(184,198,214,.28)}
 #dm-obs[data-st="RETURNED"]{color:rgba(255,122,217,.75)}
 #dm-obs[data-st="YOU"]{color:rgba(255,122,217,.9)}
 #dm-obs[data-st="DETECTED"]{color:rgba(110,229,255,.85)}
-#dm-log-toast.on ~ #dm-obs, body:has(#dm-log-toast.on) #dm-obs{opacity:.2}
+#dm-log-toast.on ~ #dm-obs, body:has(#dm-log-toast.on) #dm-obs{opacity:.15}
 @media (prefers-reduced-motion:reduce){#dm-obs{transition-duration:.01s!important}}
-/* Toast dock: posisi default kiri-bawah; JS placeToast() menempelkan ke #dm-dock saat parkir */
+/* Toast dock: selalu di-anchor JS ke #dm-dock (placeNearDock) */
 #dm-log-toast{
   position:fixed;left:60px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
-  max-width:min(62vw,300px);
+  max-width:min(56vw,240px);
   font:400 9px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;
   color:rgba(110,229,255,.85);text-shadow:0 0 6px rgba(0,0,0,.9);
   pointer-events:none;user-select:none;-webkit-user-select:none;
   padding:7px 11px;border-radius:6px;
-  border:1px solid rgba(110,229,255,.18);background:rgba(6,14,20,.9);
+  border:1px solid rgba(110,229,255,.18);background:rgba(6,14,20,.92);
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  opacity:0;transform:translateY(6px);
-  transition:opacity .28s ease,transform .28s ease,left .15s ease,top .15s ease,bottom .15s ease,right .15s ease;
+  opacity:0;
+  transition:opacity .28s ease,left .12s ease,top .12s ease;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   box-shadow:0 4px 16px rgba(0,0,0,.35);
 }
-body.dm-has-bar #dm-log-toast:not([data-anchored]){bottom:calc(80px + env(safe-area-inset-bottom,0px))}
-#dm-log-toast.on{opacity:1;transform:none}
+#dm-log-toast.on{opacity:1}
 #dm-log-toast.x{color:rgba(255,122,217,.9);border-color:rgba(255,122,217,.28)}
 #dm-log-toast .t{color:rgba(184,198,214,.5);margin-right:8px}
 html.dm-lowfx #dm-log-toast{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
@@ -2246,6 +2244,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     }
     if(box.classList.contains('open'))placePanel();
     if(toastEl.classList.contains('on'))placeToast();
+    placeObs();
   });
 
   function placePanel(){
@@ -2272,25 +2271,52 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
       box.style.maxHeight=Math.min(window.innerHeight*0.48,Math.max(140,spaceBelow-gap))+'px';
     }
   }
-  /* Toast menempel di samping dock (kanan, atau kiri kalau mepet edge) */
-  function placeToast(){
+  /* Anchor UI ke dock: pilih sisi terdekat yang muat — jangan pernah loncat ke ujung layar jauh. */
+  function placeNearDock(el, tw, th){
     var r=dock.getBoundingClientRect();
-    var gap=8,pad=8;
-    var tw=Math.min(window.innerWidth*0.62,300);
-    var left=r.right+gap;
-    if(left+tw>window.innerWidth-pad){
-      left=r.left-tw-gap;
-      if(left<pad)left=pad;
+    var gap=6,pad=8;
+    var vw=window.innerWidth||360,vh=window.innerHeight||640;
+    tw=Math.min(tw,vw-pad*2);
+    th=th||32;
+    var cx=r.left+r.width/2,cy=r.top+r.height/2;
+    var mid=vw/2;
+    /* kandidat: kanan, kiri, atas, bawah — skor = jarak ke pusat dock + penalti out-of-bounds */
+    var cands=[
+      {left:r.right+gap, top:cy-th/2},
+      {left:r.left-tw-gap, top:cy-th/2},
+      {left:cx-tw/2, top:r.top-th-gap},
+      {left:cx-tw/2, top:r.bottom+gap}
+    ];
+    /* prefer sisi menghadap pusat layar */
+    if(cx>=mid){cands=[cands[1],cands[0],cands[2],cands[3]];}
+    var best=null,bestScore=1e15;
+    for(var i=0;i<cands.length;i++){
+      var c=cands[i];
+      var L=Math.min(vw-tw-pad,Math.max(pad,c.left));
+      var T=Math.min(vh-th-pad,Math.max(pad,c.top));
+      /* penalti besar kalau clamp menjauh dari dock (>28px = “kepisah”) */
+      var drift=Math.abs(L-c.left)+Math.abs(T-c.top);
+      var dx=(L+tw/2)-cx,dy=(T+th/2)-cy;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      var score=dist+drift*4+(drift>28?200:0);
+      if(score<bestScore){bestScore=score;best={left:L,top:T};}
     }
-    var top=r.top+Math.max(0,(r.height-32)/2);
-    if(top+40>window.innerHeight-pad)top=window.innerHeight-40-pad;
-    if(top<pad)top=pad;
-    toastEl.style.left=left+'px';
-    toastEl.style.top=top+'px';
-    toastEl.style.bottom='auto';
-    toastEl.style.right='auto';
-    toastEl.style.maxWidth=tw+'px';
+    el.style.left=best.left+'px';
+    el.style.top=best.top+'px';
+    el.style.bottom='auto';
+    el.style.right='auto';
+    el.style.maxWidth=tw+'px';
+    return best;
+  }
+  function placeToast(){
+    var tw=Math.min(window.innerWidth*0.56,240);
+    placeNearDock(toastEl,tw,34);
     toastEl.setAttribute('data-anchored','1');
+  }
+  function placeObs(){
+    if(!obsEl||!obsEl.classList.contains('on'))return;
+    /* compact label di atas/samping dock */
+    placeNearDock(obsEl,Math.min(window.innerWidth*0.42,160),18);
   }
 
   var drag={on:false,moved:false,pid:0,ox:0,oy:0,sx:0,sy:0};
@@ -2311,6 +2337,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     if(box.classList.contains('open'))setOpen(false);
     var p=applyDock(e.clientX-drag.ox,e.clientY-drag.oy,true);
     if(toastEl.classList.contains('on'))placeToast();
+    placeObs();
     /* live-save light: only on end */
     drag._lx=p.x;drag._ly=p.y;
   }
@@ -2323,6 +2350,8 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
       var r=dock.getBoundingClientRect();
       var p=applyDock(r.left,r.top,true);
       saveDock(p.x,p.y);
+      placeObs();
+      if(toastEl.classList.contains('on'))placeToast();
     }
   }
   owl.addEventListener('pointerdown',onDragStart);
@@ -2350,7 +2379,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
       list.appendChild(l);
     }
   }
-  function showToast(msg,hot){
+  function showToast(msg,hot,holdMs){
     placeToast();
     toastEl.textContent='';
     var t=document.createElement('span');t.className='t';t.textContent=stamp();
@@ -2362,8 +2391,13 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     toastTimer=setTimeout(function(){
       toastEl.classList.remove('on');
       toastEl.setAttribute('aria-hidden','true');
-    },2800);
+    },holdMs||2800);
   }
+  /* Toast UI saja (tanpa hist) — dipakai player/deck/settings. Selalu nempel ke dock. */
+  window.__dmToast=function(msg,hot,holdMs){
+    if(box.classList.contains('open'))return; /* panel terbuka = jangan ganggu */
+    showToast(msg,!!hot,holdMs||2600);
+  };
   function setOpen(on){
     box.classList.toggle('open',on);
     box.setAttribute('aria-hidden',on?'false':'true');
@@ -2497,6 +2531,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     obsEl.setAttribute('data-st',stName);
     obsEl.classList.add('on');
     obsEl.setAttribute('aria-hidden','false');
+    placeObs();
     if(toastIt&&OBS_TOAST[stName])log('OBSERVER: '+stName,stName==='YOU'||stName==='RETURNED'||stName==='DETECTED');
   }
   function obsPlaying(){
@@ -2616,7 +2651,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   });
   setTimeout(function(){log('SIGNAL FOUND');},700);
   /* indikator idle awal — menunggu deteksi */
-  setTimeout(function(){if(!obsDetected){obsEl.textContent='OBSERVER: —';obsEl.classList.add('on');}},900);
+  setTimeout(function(){if(!obsDetected){obsEl.textContent='OBSERVER: —';obsEl.classList.add('on');placeObs();}},900);
 
   /* ---------- TIME LOST (dwell) ---------- */
   var dwellVisible=0,visStart=document.hidden?0:Date.now(),timeLostShown=false,dwellMilestone=false;
@@ -2706,7 +2741,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
           /* kembali normal tanpa penjelasan */
           if(nullPrevObs&&nullPrevObs!=='ABSENT')setObs(nullPrevObs,false);
           else if(obsDetected)setObs('ACTIVE',false);
-          else{obsEl.textContent='OBSERVER: —';obsEl.removeAttribute('data-st');}
+          else{obsEl.textContent='OBSERVER: —';obsEl.removeAttribute('data-st');placeObs();}
           nullBusy=false;
           return;
         }
@@ -2716,6 +2751,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
           obsEl.setAttribute('data-st','YOU');
           obsEl.classList.add('on');
           obsState='NULL';
+          placeObs();
         }
       },step[0]);
     });
@@ -3034,6 +3070,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   var chips={};
 
   function toast(m){
+    try{if(window.__dmToast){window.__dmToast(m,false,3000);return;}}catch(e){}
     var t=q('dm-toast');
     if(!t){t=document.createElement('div');t.id='dm-toast';document.body.appendChild(t);}
     t.textContent=m;t.style.display='block';
