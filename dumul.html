@@ -1539,7 +1539,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       var a=window.__dmA;if(a){a.fracture=Math.max(a.fracture||0,.7);a.fracX=.2+Math.random()*.6;}
       if(hlT){hlT.classList.remove('dm-hl-hard');void hlT.offsetWidth;hlT.classList.add('dm-hl-hard');}
       seekGlitch(320);
-      if(KW2.test(text)){var hh=document.querySelector('h1.display');if(hh)hh.dispatchEvent(new Event('pointerdown',{bubbles:true}));}
+      if(KW2.test(text)){var hh=document.querySelector('h1.display');if(hh&&window.__dmGlitch)window.__dmGlitch(hh);}
     }catch(e){}
   }
 
@@ -1651,7 +1651,9 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     clearTimeout(h._g);
     h._g=setTimeout(function(){h.classList.remove('dm-glitching');},700);
   }
+  window.__dmGlitch=glitch;
   document.addEventListener('pointerdown',function(e){
+    if(!e.isTrusted)return;
     var h=e.target.closest&&e.target.closest('h1.display');
     if(h)glitch(h);
   });
@@ -1940,7 +1942,7 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     clearTimeout(t._h);
     t._h = setTimeout(function(){ t.style.display='none'; t.style.borderRadius=''; }, ms);
   }
-  function tapLog(msg){ try{ if(window.__dmLog) window.__dmLog(msg, true); }catch(e){} }
+  function tapLog(msg){ try{ if(window.__dmLog) window.__dmLog(msg, true, true); }catch(e){} }
   /* Expose for player loop */
   window.__dmLastInteract = function(){ return lastInteract; };
   /* Patch into A if player already defined lastInteract — we sync via property */
@@ -2012,7 +2014,8 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     }
   }
   bind();
-  var mo = new MutationObserver(function(){ bind(); });
+  var moQ = false;
+  var mo = new MutationObserver(function(){ if(moQ) return; moQ = true; requestAnimationFrame(function(){ moQ = false; bind(); }); });
   mo.observe(document.getElementById('root')||document.body, {childList:true, subtree:true});
   /* Sync lastInteract into player loop variable via periodic bridge */
   setInterval(function(){
@@ -2063,14 +2066,14 @@ body.dm-has-bar #dm-owl{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
 #dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.12)}
 /* OBSERVER STATUS — indikator kecil, cost hampir nol */
 #dm-obs{
-  position:fixed;left:56px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:34;
+  position:fixed;left:56px;bottom:calc(46px + env(safe-area-inset-bottom,0px));z-index:34;
   font:500 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;
   color:rgba(110,229,255,.45);text-shadow:0 0 6px rgba(0,0,0,.85);
   pointer-events:none;user-select:none;-webkit-user-select:none;
   opacity:0;transform:translateY(4px);transition:opacity .35s ease,transform .35s ease,color .4s ease;
   white-space:nowrap;max-width:min(50vw,200px);overflow:hidden;text-overflow:ellipsis;
 }
-body.dm-has-bar #dm-obs{bottom:calc(82px + env(safe-area-inset-bottom,0px))}
+body.dm-has-bar #dm-obs{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 #dm-obs.on{opacity:1;transform:none}
 #dm-obs[data-st="ACTIVE"]{color:rgba(110,229,255,.7)}
 #dm-obs[data-st="SILENT"]{color:rgba(184,198,214,.4)}
@@ -2266,24 +2269,30 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   var lastToastAt=0,TOAST_GAP=2400,narrBusy=false,narrUntil=0;
   function narrLock(ms){narrBusy=true;narrUntil=Date.now()+(ms||4000);}
   function narrFree(){if(Date.now()>=narrUntil)narrBusy=false;}
-  function log(msg,hot){
+  /* Antrian toast: urutan terjaga, hot selalu masuk, non-hot dibuang kalau antrian sudah >=2 */
+  var toastQ=[],toastBusy=false,TOAST_HOLD=1400;
+  function drainToast(){
+    if(toastBusy)return;
+    var e=toastQ.shift();
+    if(!e)return;
+    if(box.classList.contains('open')){toastQ.length=0;return;}
+    toastBusy=true;lastToastAt=Date.now();
+    showToast(e.msg,e.hot);
+    setTimeout(function(){toastBusy=false;drainToast();},TOAST_HOLD);
+  }
+  function log(msg,hot,silent){
     var entry={ts:stamp(),msg:String(msg).slice(0,60),hot:!!hot};
     hist.push(entry);
     while(hist.length>MAXHIST)hist.shift();
     if(box.classList.contains('open')){renderList();return;}
-    var now=Date.now();
-    if(now-lastToastAt<TOAST_GAP&&!hot)return;
-    if(now-lastToastAt<1200&&hot){
-      setTimeout(function(){
-        if(!box.classList.contains('open')){lastToastAt=Date.now();showToast(entry.msg,true);}
-      },Math.max(200,TOAST_GAP-(now-lastToastAt)));
-      return;
-    }
-    lastToastAt=now;
-    showToast(entry.msg,entry.hot);
+    if(silent)return;
+    if(!hot&&toastQ.length>=2)return;
+    if(toastQ.length>=6)toastQ.shift();
+    toastQ.push(entry);
+    drainToast();
   }
   function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1400);}
-  window.__dmLog=function(msg,hot){log(msg,hot);};
+  window.__dmLog=function(msg,hot,silent){log(msg,hot,silent);};
 
   /* ---------- sambutan + MEMORY FRAGMENT (hero via return; session log ringkas) ---------- */
   var welcomed=false,allObservedLogged=false;
@@ -2394,12 +2403,12 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
       setObs('ACTIVE',obsState==='RETURNED');
     }
   }
-  ['pointerdown','touchstart'].forEach(function(ev){
-    window.addEventListener(ev,function(){
-      if(!seen){seen=true;log('LISTENER DETECTED');}
-      act(true,false);
-    },{passive:true,capture:true});
-  });
+  /* pointerdown saja: touchstart ikut nembak di HP -> tap kehitung dobel. isTrusted: abaikan event sintetis. */
+  window.addEventListener('pointerdown',function(e){
+    if(!e.isTrusted)return;
+    if(!seen){seen=true;log('LISTENER DETECTED');}
+    act(true,false);
+  },{passive:true,capture:true});
   ['keydown'].forEach(function(ev){
     window.addEventListener(ev,function(){
       if(!seen){seen=true;log('LISTENER DETECTED');}
@@ -2468,7 +2477,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   setTimeout(function(){if(!obsDetected){obsEl.textContent='OBSERVER: —';obsEl.classList.add('on');}},900);
 
   /* ---------- TIME LOST (dwell) ---------- */
-  var sessStart=Date.now(),dwellVisible=0,dwellHiddenAt=0,timeLostShown=false,dwellMilestone=false;
+  var dwellVisible=0,visStart=document.hidden?0:Date.now(),timeLostShown=false,dwellMilestone=false;
   function fmtHMS(ms){
     ms=Math.max(0,Math.floor(+ms||0));
     var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
@@ -2481,10 +2490,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     function p(n){return n<10?'0'+n:''+n;}
     return p(m)+':'+p(sec);
   }
+  /* dwell = akumulasi waktu tab visible saja (bukan jam dinding) */
   function dwellNow(){
-    var extra=dwellHiddenAt?0:(Date.now()-sessStart);
-    /* only count time while tab roughly "alive"; simple: wall clock from sessStart minus last continuous hidden gap is overkill — use wall clock */
-    return Date.now()-sessStart;
+    return dwellVisible+(visStart?Date.now()-visStart:0);
   }
   function persistDwell(){
     st.lastDwell=dwellNow();
@@ -2523,7 +2531,12 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   /* augment existing pagehide via additional listener (already have one above — this is fine, multiple ok) */
   window.addEventListener('pagehide',persistDwell);
   document.addEventListener('visibilitychange',function(){
-    if(document.hidden)persistDwell();
+    if(document.hidden){
+      if(visStart){dwellVisible+=Date.now()-visStart;visStart=0;}
+      persistDwell();
+    }else if(!visStart){
+      visStart=Date.now();
+    }
   });
 
   /* ---------- NULL STATE (semantic glitch, sporadis) ---------- */
@@ -3002,7 +3015,7 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
           if(window.__dmDumbowl)window.__dmDumbowl(true);
         }catch(e2){}
         var h=document.querySelector('h1.display');
-        if(h){h.dispatchEvent(new Event('pointerdown',{bubbles:true}));toast('signal locked');}
+        if(h){if(window.__dmGlitch)window.__dmGlitch(h);toast('signal locked');}
       }
     }
     var digit=/^[1-5]$/.test(k);
