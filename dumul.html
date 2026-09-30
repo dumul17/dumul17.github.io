@@ -72,7 +72,7 @@
   left: 0;
   top: 0;
   width: 100%;
-  height: 264px;
+  height: 282px;
   overflow: hidden;
   background: #0a1218 url('og.jpg') center/cover no-repeat;
 }
@@ -255,24 +255,21 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
   var W=document.documentElement.clientWidth||window.innerWidth||360,h=0,m=null;
-  /* Compact hero (CSS overrides): padTop + title + gap + 132 canvas + subtitle + discover. */
-  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=6,meshH=132;
+  /* Compact hero (CSS overrides). gap = margin-top canvas — naikkan = mesh turun ke dada siluet. */
+  var padTop=W>=640?56:30,titleH=W>=640?40:30,gap=24,meshH=132;
   var hEst=padTop+titleH+gap+meshH+6+16.5+14+9+16+(W>=640?12:4);
   var mw=Math.round(Math.min(W*.92,640));
-  /* Mesh band centered on ~45% of hero = chest of silhouettes in og.jpg (cover/center). */
-  var yEst=Math.max(0,Math.round(hEst*0.45-meshH/2));
+  var yFlow=padTop+titleH+gap;
   try{
     var s=JSON.parse(localStorage.getItem('dm_hero_rect')||'null');
-    /* Only trust storage when BOTH height and mesh rect exist — stale h-only data misaligns crop vs mesh. */
+    /* Only trust storage when BOTH height and mesh rect exist — stale h-only misaligns crop vs mesh. */
     if(s&&Math.abs(s.w-W)<2&&s.h>60&&s.h<2000&&s.m&&s.m.w>60&&s.m.h>20&&s.m.h<400){
       h=s.h;m=s.m;
     }
   }catch(e){}
   if(!h)h=hEst;
   if(!m){
-    /* Scale meshY with actual H so chest alignment holds when height differs. */
-    var y=Math.max(0,Math.round(h*0.45-meshH/2));
-    m={x:Math.round((W-mw)/2),y:y,w:mw,h:meshH};
+    m={x:Math.round((W-mw)/2),y:yFlow,w:mw,h:meshH};
   }
   return{x:0,y:0,w:W,h:Math.round(h*10)/10,m:m};
 }
@@ -689,7 +686,7 @@ return o=requestAnimationFrame(k),()=>{cancelAnimationFrame(o),_io&&_io.disconne
 /* layout: hero dirapetin, daftar lagu langsung di bawah spektrum */
 section.dm-hero{height:auto!important;min-height:0!important}
 section.dm-hero > div[class*="justify-center"]{height:auto!important;justify-content:flex-start!important;padding-top:30px;padding-bottom:4px}
-section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:6px!important}
+section.dm-hero div[class*="w-[min(92vw,640px)]"]{margin-top:24px!important}
 section.dm-hero p[class*="tracking-[0.32em]"]{margin-top:6px!important}
 section.dm-hero div[class*="bottom-8"]{position:static!important;transform:none!important;margin-top:14px!important;gap:6px!important}
 section.dm-hero div[class*="h-[28px]"]{height:16px!important}
