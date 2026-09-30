@@ -1673,50 +1673,26 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
 </script>
 
 <style>
-#dm-home{
-  position:fixed;top:max(8px,env(safe-area-inset-top,0px));left:10px;z-index:30;
-  display:inline-flex;align-items:center;gap:8px;
-  padding:8px 12px 8px 10px;
-  border:1px solid rgba(110,229,255,.2);
-  border-radius:8px;
-  background:rgba(6,14,20,.78);
-  box-shadow:0 4px 18px rgba(0,0,0,.28),0 0 12px rgba(110,229,255,.05);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  font:600 9px/1 'Space Grotesk',system-ui,sans-serif;
-  letter-spacing:.18em;text-transform:uppercase;
-  color:rgba(214,228,240,.78);text-decoration:none;
-  -webkit-tap-highlight-color:transparent;
-  transition:color .25s ease,border-color .25s ease,background .25s ease,box-shadow .25s ease,transform .2s ease;
-}
-#dm-home svg{width:14px;height:14px;flex-shrink:0;opacity:.9}
-#dm-home:hover,#dm-home:focus-visible{
-  color:#6ee5ff;border-color:rgba(110,229,255,.5);
-  background:rgba(110,229,255,.1);
-  box-shadow:0 4px 20px rgba(0,0,0,.3),0 0 16px rgba(110,229,255,.12);
-  outline:none;
-}
-#dm-home:active{transform:translateY(1px)}
-/* Hero title: smaller + cleared below the fixed back panel */
+/* Home chip digabung ke dock 🦉 (session log). Fallback no-JS tetap ada, disembunyikan. */
+#dm-home{display:none!important}
+/* Hero: tidak perlu margin besar untuk chip top-left lagi */
 h1.display{
   font-size:clamp(26px,6.5vw,42px)!important;
   letter-spacing:.12em!important;
   line-height:1.08!important;
-  margin-top:max(52px,env(safe-area-inset-top,0px) + 44px)!important;
+  margin-top:max(12px,env(safe-area-inset-top,0px) + 8px)!important;
 }
-/* Nudge whole hero column down so centered content clears the chip */
 #root section.relative > .relative.z-10{
-  padding-top:max(28px,env(safe-area-inset-top,0px) + 12px);
+  padding-top:max(12px,env(safe-area-inset-top,0px) + 4px);
   box-sizing:border-box;
 }
 html{scroll-behavior:smooth}
 html.dm-from-swallow{scroll-behavior:auto!important}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
-  #dm-home{transition-duration:.01s!important}
 }
 </style>
 <a id="dm-home" href="/" aria-label="Back to Dumul's Observatory">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
   <span>DUMUL'S OBSERVATORY</span>
 </a>
 <style>
@@ -1889,25 +1865,27 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
   var lastInteract = performance.now();
   var tapN = 0, lastTap = 0, tapH = 0;
   /* Signal interruption bertingkat: combo tap (reset kalau jeda >700ms) → [pesan, durasi ms, tulis ke log?] */
+  /* Tier tap → pesan dock toast. hot=true masuk hist + toast pink; false = toast saja (bisa di-drop antrean). */
   var TAPS = {
-    1:  ['SIGNAL RECEIVED', 1100, false],
-    2:  ['SIGNAL RECEIVED\nSIGNAL RECEIVED', 1300, false],
-    4:  ['SIGNAL INTERRUPTED', 2400, true],
-    7:  ['STOP.', 2200, true],
-    10: ['WHY ARE YOU DOING THIS', 3200, true]
+    1:  ['SIGNAL RECEIVED', false],
+    2:  ['SIGNAL RECEIVED ×2', false],
+    4:  ['SIGNAL INTERRUPTED', true],
+    7:  ['STOP.', true],
+    10: ['WHY ARE YOU DOING THIS', true]
   };
-  function tapToast(msg, ms){
-    var t = document.getElementById('dm-toast');
+  /* Satu kanal: toast dock (#dm-log-toast via __dmLog). Tidak pakai #dm-toast center. */
+  function tapToast(msg, hot){
+    var line = String(msg||'').replace(/\s+/g,' ').trim().slice(0,52);
+    if(!line)return;
+    try{
+      if(window.__dmLog){ window.__dmLog(line, !!hot, false); return; }
+    }catch(e){}
+    /* fallback sebelum session-log script siap */
+    var t=document.getElementById('dm-toast');
     if(!t){ t=document.createElement('div'); t.id='dm-toast'; document.body.appendChild(t); }
-    t.textContent = msg;
-    t.style.whiteSpace = 'pre-line';
-    t.style.textAlign = 'center';
-    t.style.borderRadius = msg.indexOf('\n') > -1 ? '18px' : '';
-    t.style.display = 'block';
-    clearTimeout(t._h);
-    t._h = setTimeout(function(){ t.style.display='none'; t.style.borderRadius=''; }, ms);
+    t.textContent=line; t.style.display='block';
+    clearTimeout(t._h); t._h=setTimeout(function(){ t.style.display='none'; }, 2200);
   }
-  function tapLog(msg){ try{ if(window.__dmLog) window.__dmLog(msg, true, true); }catch(e){} }
   /* Expose for player loop */
   window.__dmLastInteract = function(){ return lastInteract; };
   /* Patch into A if player already defined lastInteract — we sync via property */
@@ -1958,16 +1936,14 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     tapN++;
     if(tapN === 13){
       tapN = 0;
-      tapToast('...', 1300);
+      tapToast('...', false);
       clearTimeout(tapH);
       tapH = setTimeout(function(){
-        tapToast('YOU FOUND NOTHING.', 3600);
-        tapLog('YOU FOUND NOTHING.');
+        tapToast('YOU FOUND NOTHING.', true);
       }, 1500);
     }else if(TAPS[tapN]){
       var tier = TAPS[tapN];
       tapToast(tier[0], tier[1]);
-      if(tier[2]) tapLog(tier[0]);
     }
     bump();
   }
@@ -1987,9 +1963,9 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
 </script>
 
 <!-- ===== DUMUL // SESSION LOG + THE ALBUM REMEMBERS (add-on, non-destruktif) =====
-     - #dm-owl: tombol ikon burung hantu → buka/tutup panel log penuh
+     - #dm-dock / #dm-owl: chip 🦉 dragable (parkir bebas, pos di localStorage dm_dock_pos)
+     - #dm-log: panel = Back to Observatory (atas) + SESSION LOG (bawah)
      - #dm-log-toast: notif sebaris saat log aktif, auto-hilang (~2.8s)
-     - #dm-log: panel penuh (hidden default), timestamp UTC 12 jam
      - #dm-obs: indikator OBSERVER STATUS (DETECTED/ACTIVE/SILENT/ABSENT/RETURNED/YOU)
      - MEMORY FRAGMENT: lastObserved / lastSignal / lastInterruption di localStorage dm_album
      - NULL STATE: semantic glitch sporadis (SIGNAL/MEMORY/OBSERVER: NULL → ... → normal)
@@ -2004,36 +1980,47 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
      - localStorage 'dm_album' {tracksPlayed, lastTrack, lastPos, lastTs, timesVisited, lastObserved, lastSignal, lastInterruption, taps, lastDwell}
      - window.__dmWelcome(): daftar pesan sambutan + memory fragments, tampil di hero lirik -->
 <style>
-/* SESSION LOG: panel hidden by default; single-line toast when active; owl opens full log */
-#dm-owl{
-  position:fixed;left:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:36;
-  width:40px;height:40px;border-radius:10px;
-  border:1px solid rgba(110,229,255,.22);
-  background:rgba(6,14,20,.82);color:rgba(214,228,240,.75);
-  display:grid;place-items:center;
-  cursor:pointer;-webkit-tap-highlight-color:transparent;
-  transition:color .2s,border-color .2s,background .2s,box-shadow .2s,transform .15s;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  padding:0;margin:0;
+/* DOCK 🦉: back + session log, dragable, parkir bebas */
+#dm-dock{
+  position:fixed;z-index:36;
+  left:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  width:44px;height:44px;
+  touch-action:none;user-select:none;-webkit-user-select:none;
 }
-body.dm-has-bar #dm-owl{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+body.dm-has-bar #dm-dock:not([data-parked]){bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+#dm-owl{
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid rgba(110,229,255,.22);
+  background:rgba(6,14,20,.88);color:rgba(214,228,240,.82);
+  display:grid;place-items:center;
+  cursor:grab;-webkit-tap-highlight-color:transparent;
+  transition:color .2s,border-color .2s,background .2s,box-shadow .2s;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  padding:0;margin:0;
+  box-shadow:0 4px 18px rgba(0,0,0,.32),0 0 12px rgba(110,229,255,.06);
+}
 #dm-owl:hover,#dm-owl:focus-visible{
   color:#6ee5ff;border-color:rgba(110,229,255,.5);
-  background:rgba(110,229,255,.1);box-shadow:0 0 14px rgba(110,229,255,.12);outline:none;
+  background:rgba(110,229,255,.12);box-shadow:0 0 16px rgba(110,229,255,.14);outline:none;
 }
-#dm-owl:active{transform:translateY(1px)}
-#dm-owl svg{width:20px;height:20px;display:block}
-#dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.12)}
-/* OBSERVER STATUS — indikator kecil, cost hampir nol */
+#dm-owl:active, #dm-dock.dm-dragging #dm-owl{cursor:grabbing}
+#dm-dock.dm-dragging #dm-owl{
+  color:#6ee5ff;border-color:rgba(110,229,255,.55);
+  background:rgba(110,229,255,.14);box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 18px rgba(110,229,255,.18);
+  transform:scale(1.06);
+}
+#dm-owl svg{width:22px;height:22px;display:block;pointer-events:none}
+#dm-owl[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.14)}
+/* OBSERVER STATUS */
 #dm-obs{
-  position:fixed;left:56px;bottom:calc(46px + env(safe-area-inset-bottom,0px));z-index:34;
+  position:fixed;left:60px;bottom:calc(48px + env(safe-area-inset-bottom,0px));z-index:34;
   font:500 9px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.14em;
   color:rgba(110,229,255,.45);text-shadow:0 0 6px rgba(0,0,0,.85);
   pointer-events:none;user-select:none;-webkit-user-select:none;
   opacity:0;transform:translateY(4px);transition:opacity .35s ease,transform .35s ease,color .4s ease;
   white-space:nowrap;max-width:min(50vw,200px);overflow:hidden;text-overflow:ellipsis;
 }
-body.dm-has-bar #dm-obs{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+body.dm-has-bar #dm-obs{bottom:calc(112px + env(safe-area-inset-bottom,0px))}
 #dm-obs.on{opacity:1;transform:none}
 #dm-obs[data-st="ACTIVE"]{color:rgba(110,229,255,.7)}
 #dm-obs[data-st="SILENT"]{color:rgba(184,198,214,.4)}
@@ -2041,46 +2028,68 @@ body.dm-has-bar #dm-obs{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 #dm-obs[data-st="RETURNED"]{color:rgba(255,122,217,.75)}
 #dm-obs[data-st="YOU"]{color:rgba(255,122,217,.9)}
 #dm-obs[data-st="DETECTED"]{color:rgba(110,229,255,.85)}
-/* toast naik sedikit kalau obs label aktif di area yang sama — toast sudah di left:56px; obs di bawah toast saat toast on */
 #dm-log-toast.on ~ #dm-obs, body:has(#dm-log-toast.on) #dm-obs{opacity:.2}
 @media (prefers-reduced-motion:reduce){#dm-obs{transition-duration:.01s!important}}
+/* Toast dock: posisi default kiri-bawah; JS placeToast() menempelkan ke #dm-dock saat parkir */
 #dm-log-toast{
-  position:fixed;left:56px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
-  max-width:min(58vw,280px);
+  position:fixed;left:60px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
+  max-width:min(62vw,300px);
   font:400 9px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;
   color:rgba(110,229,255,.85);text-shadow:0 0 6px rgba(0,0,0,.9);
   pointer-events:none;user-select:none;-webkit-user-select:none;
   padding:7px 11px;border-radius:6px;
-  border:1px solid rgba(110,229,255,.18);background:rgba(6,14,20,.88);
+  border:1px solid rgba(110,229,255,.18);background:rgba(6,14,20,.9);
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   opacity:0;transform:translateY(6px);
-  transition:opacity .28s ease,transform .28s ease;
+  transition:opacity .28s ease,transform .28s ease,left .15s ease,top .15s ease,bottom .15s ease,right .15s ease;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
 }
-body.dm-has-bar #dm-log-toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+body.dm-has-bar #dm-log-toast:not([data-anchored]){bottom:calc(80px + env(safe-area-inset-bottom,0px))}
 #dm-log-toast.on{opacity:1;transform:none}
-#dm-log-toast.x{color:rgba(255,122,217,.9);border-color:rgba(255,122,217,.25)}
+#dm-log-toast.x{color:rgba(255,122,217,.9);border-color:rgba(255,122,217,.28)}
 #dm-log-toast .t{color:rgba(184,198,214,.5);margin-right:8px}
+html.dm-lowfx #dm-log-toast{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+/* Panel: posisi di-set JS mengikuti dock */
 #dm-log{
-  position:fixed;left:10px;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:35;
-  max-width:min(72vw,280px);max-height:min(42vh,320px);overflow:auto;
+  position:fixed;z-index:35;
+  width:min(78vw,300px);max-height:min(48vh,360px);overflow:auto;
   font:400 9px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;
   color:rgba(110,229,255,.6);text-shadow:0 0 6px rgba(0,0,0,.9);
   pointer-events:none;user-select:none;-webkit-user-select:none;display:none;
-  padding:8px 10px;border-radius:8px;border:1px solid rgba(110,229,255,.18);
-  background:rgba(6,14,20,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  box-shadow:0 8px 28px rgba(0,0,0,.4);
+  padding:0;border-radius:10px;border:1px solid rgba(110,229,255,.2);
+  background:rgba(6,14,20,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:0 10px 32px rgba(0,0,0,.45),0 0 16px rgba(110,229,255,.06);
 }
-body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
-#dm-log.open{display:block;pointer-events:auto;user-select:text;-webkit-user-select:text}
-#dm-log .h{color:rgba(184,198,214,.5);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-#dm-log .h span{letter-spacing:.12em}
+#dm-log.open{display:flex;flex-direction:column;pointer-events:auto;user-select:text;-webkit-user-select:text}
+#dm-log .dm-back{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(110,229,255,.12);
+  color:rgba(214,228,240,.88);text-decoration:none;
+  font:600 10px/1 'Space Grotesk',system-ui,sans-serif;
+  letter-spacing:.14em;text-transform:uppercase;
+  -webkit-tap-highlight-color:transparent;
+  transition:color .2s,background .2s;
+}
+#dm-log .dm-back svg{width:14px;height:14px;flex-shrink:0;opacity:.85}
+#dm-log .dm-back:hover,#dm-log .dm-back:focus-visible{
+  color:#6ee5ff;background:rgba(110,229,255,.07);outline:none;
+}
+#dm-log .h{
+  color:rgba(184,198,214,.5);padding:8px 12px 6px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border-bottom:1px solid rgba(184,198,214,.08);
+  flex-shrink:0;
+}
+#dm-log .h span{letter-spacing:.12em;font:600 9px/1 'Space Grotesk',system-ui,sans-serif}
 #dm-log .dm-log-close{
   flex-shrink:0;width:22px;height:22px;border-radius:5px;border:1px solid rgba(110,229,255,.2);
   background:transparent;color:rgba(214,228,240,.7);cursor:pointer;font:600 12px/1 system-ui,sans-serif;
   display:grid;place-items:center;padding:0;-webkit-tap-highlight-color:transparent;
 }
 #dm-log .dm-log-close:hover,#dm-log .dm-log-close:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.5);outline:none}
+#dm-log .dm-log-list{padding:6px 12px 10px;overflow:auto;flex:1;min-height:0}
 #dm-log .l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:dmLogIn .4s ease-out both}
 #dm-log .l:nth-last-child(n+5){opacity:.4}
 #dm-log .l:nth-last-child(n+4){opacity:.6}
@@ -2091,7 +2100,9 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   #dm-log .l{animation:none}
   #dm-log-toast{transition-duration:.01s!important}
   #dm-owl{transition-duration:.01s!important}
+  #dm-dock.dm-dragging #dm-owl{transform:none}
 }
+html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 </style>
 <script>
 (function(){
@@ -2156,19 +2167,23 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   try{newSession=!sessionStorage.getItem('dm_sess');sessionStorage.setItem('dm_sess','1');}catch(e){}
   if(newSession){st.timesVisited++;save();}
 
-  /* ---------- SESSION LOG (UTC 12h, toast-only UI, owl opens full panel) ---------- */
+  /* ---------- SESSION LOG + OBSERVATORY DOCK (UTC 12h, dragable 🦉) ---------- */
   var MAXHIST=40;
   var hist=[]; /* {ts,msg,hot} */
   var bodyRoot=document.body||document.documentElement;
+  var DOCK_KEY='dm_dock_pos';
 
-  /* Owl toggle button */
+  /* Dock wrapper — posisi bebas, default kiri-bawah */
+  var dock=document.createElement('div');
+  dock.id='dm-dock';
   var owl=document.createElement('button');
   owl.id='dm-owl';owl.type='button';
-  owl.setAttribute('aria-label','Open session log');
-  owl.setAttribute('title','Session log');
+  owl.setAttribute('aria-label','Open session log and observatory');
+  owl.setAttribute('title','Drag to move · tap to open');
   owl.setAttribute('aria-expanded','false');
   owl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 14.2c.9.9 2.1 1.3 3 1.3s2.1-.4 3-1.3"/><path d="M7.2 7.8C8.4 6.6 10 6 12 6s3.6.6 4.8 1.8"/><path d="M4.8 11.2c.3-1.6 1-2.8 1.8-3.6"/><path d="M19.2 11.2c-.3-1.6-1-2.8-1.8-3.6"/></svg>';
-  bodyRoot.appendChild(owl);
+  dock.appendChild(owl);
+  bodyRoot.appendChild(dock);
 
   /* Single-line toast (auto-hide) */
   var toastEl=document.createElement('div');
@@ -2176,17 +2191,144 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   bodyRoot.appendChild(toastEl);
   var toastTimer=0;
 
-  /* Full panel (hidden until owl opens it) */
+  /* Panel: Back to Observatory di atas, session log di bawah */
   var box=document.createElement('div');
-  box.id='dm-log';box.setAttribute('aria-hidden','true');box.setAttribute('role','dialog');box.setAttribute('aria-label','Session log');
+  box.id='dm-log';box.setAttribute('aria-hidden','true');box.setAttribute('role','dialog');box.setAttribute('aria-label','Observatory and session log');
+  var backLink=document.createElement('a');
+  backLink.className='dm-back';backLink.href='/';
+  backLink.setAttribute('aria-label','Back to Dumul\'s Observatory');
+  backLink.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Back to Observatory</span>';
   var head=document.createElement('div');head.className='h';
   var headLbl=document.createElement('span');headLbl.textContent='DUMUL // SESSION LOG';
   var closeBtn=document.createElement('button');closeBtn.type='button';closeBtn.className='dm-log-close';
-  closeBtn.setAttribute('aria-label','Close session log');closeBtn.textContent='\u00d7';
+  closeBtn.setAttribute('aria-label','Close');closeBtn.textContent='\u00d7';
   head.appendChild(headLbl);head.appendChild(closeBtn);
-  var list=document.createElement('div');
-  box.appendChild(head);box.appendChild(list);
+  var list=document.createElement('div');list.className='dm-log-list';
+  box.appendChild(backLink);box.appendChild(head);box.appendChild(list);
   bodyRoot.appendChild(box);
+
+  /* ---- drag / parkir dock ---- */
+  function dockSize(){return {w:dock.offsetWidth||44,h:dock.offsetHeight||44};}
+  function clampDock(x,y){
+    var s=dockSize(),pad=6;
+    var maxX=Math.max(pad,(window.innerWidth||360)-s.w-pad);
+    var maxY=Math.max(pad,(window.innerHeight||640)-s.h-pad);
+    return {x:Math.min(maxX,Math.max(pad,x)),y:Math.min(maxY,Math.max(pad,y))};
+  }
+  function applyDock(x,y,parked){
+    var p=clampDock(x,y);
+    dock.style.left=p.x+'px';
+    dock.style.top=p.y+'px';
+    dock.style.right='auto';
+    dock.style.bottom='auto';
+    if(parked)dock.setAttribute('data-parked','1');
+    else dock.removeAttribute('data-parked');
+    return p;
+  }
+  function saveDock(x,y){
+    try{localStorage.setItem(DOCK_KEY,JSON.stringify({x:Math.round(x),y:Math.round(y)}));}catch(e){}
+  }
+  function loadDock(){
+    try{
+      var o=JSON.parse(localStorage.getItem(DOCK_KEY)||'null');
+      if(o&&isFinite(+o.x)&&isFinite(+o.y)){
+        applyDock(+o.x,+o.y,true);
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  loadDock();
+  window.addEventListener('resize',function(){
+    if(dock.hasAttribute('data-parked')){
+      var r=dock.getBoundingClientRect();
+      applyDock(r.left,r.top,true);
+    }
+    if(box.classList.contains('open'))placePanel();
+    if(toastEl.classList.contains('on'))placeToast();
+  });
+
+  function placePanel(){
+    var r=dock.getBoundingClientRect();
+    var pw=Math.min(window.innerWidth*0.78,300);
+    var gap=8,pad=8;
+    var left=r.left;
+    if(left+pw>window.innerWidth-pad)left=Math.max(pad,window.innerWidth-pw-pad);
+    if(left<pad)left=pad;
+    /* prefer open above dock; fallback below */
+    var spaceAbove=r.top-pad;
+    var spaceBelow=window.innerHeight-r.bottom-pad;
+    var preferAbove=spaceAbove>=160||spaceAbove>=spaceBelow;
+    box.style.left=left+'px';
+    box.style.width=pw+'px';
+    box.style.right='auto';
+    if(preferAbove){
+      box.style.bottom=(window.innerHeight-r.top+gap)+'px';
+      box.style.top='auto';
+      box.style.maxHeight=Math.min(window.innerHeight*0.48,Math.max(140,spaceAbove-gap))+'px';
+    }else{
+      box.style.top=(r.bottom+gap)+'px';
+      box.style.bottom='auto';
+      box.style.maxHeight=Math.min(window.innerHeight*0.48,Math.max(140,spaceBelow-gap))+'px';
+    }
+  }
+  /* Toast menempel di samping dock (kanan, atau kiri kalau mepet edge) */
+  function placeToast(){
+    var r=dock.getBoundingClientRect();
+    var gap=8,pad=8;
+    var tw=Math.min(window.innerWidth*0.62,300);
+    var left=r.right+gap;
+    if(left+tw>window.innerWidth-pad){
+      left=r.left-tw-gap;
+      if(left<pad)left=pad;
+    }
+    var top=r.top+Math.max(0,(r.height-32)/2);
+    if(top+40>window.innerHeight-pad)top=window.innerHeight-40-pad;
+    if(top<pad)top=pad;
+    toastEl.style.left=left+'px';
+    toastEl.style.top=top+'px';
+    toastEl.style.bottom='auto';
+    toastEl.style.right='auto';
+    toastEl.style.maxWidth=tw+'px';
+    toastEl.setAttribute('data-anchored','1');
+  }
+
+  var drag={on:false,moved:false,pid:0,ox:0,oy:0,sx:0,sy:0};
+  function onDragStart(e){
+    if(e.button!=null&&e.button!==0)return;
+    drag.on=true;drag.moved=false;drag.pid=e.pointerId;
+    var r=dock.getBoundingClientRect();
+    drag.ox=e.clientX-r.left;drag.oy=e.clientY-r.top;
+    drag.sx=e.clientX;drag.sy=e.clientY;
+    try{owl.setPointerCapture(e.pointerId);}catch(err){}
+  }
+  function onDragMove(e){
+    if(!drag.on||e.pointerId!==drag.pid)return;
+    var dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+    if(!drag.moved&&(dx*dx+dy*dy)<64)return; /* threshold ~8px */
+    drag.moved=true;
+    dock.classList.add('dm-dragging');
+    if(box.classList.contains('open'))setOpen(false);
+    var p=applyDock(e.clientX-drag.ox,e.clientY-drag.oy,true);
+    if(toastEl.classList.contains('on'))placeToast();
+    /* live-save light: only on end */
+    drag._lx=p.x;drag._ly=p.y;
+  }
+  function onDragEnd(e){
+    if(!drag.on||(e.pointerId!=null&&e.pointerId!==drag.pid))return;
+    drag.on=false;
+    dock.classList.remove('dm-dragging');
+    try{owl.releasePointerCapture(drag.pid);}catch(err){}
+    if(drag.moved){
+      var r=dock.getBoundingClientRect();
+      var p=applyDock(r.left,r.top,true);
+      saveDock(p.x,p.y);
+    }
+  }
+  owl.addEventListener('pointerdown',onDragStart);
+  owl.addEventListener('pointermove',onDragMove);
+  owl.addEventListener('pointerup',onDragEnd);
+  owl.addEventListener('pointercancel',onDragEnd);
 
   function pad(n){return n<10?'0'+n:''+n;}
   /* UTC 12-hour clock, e.g. 02:15:30 PM UTC */
@@ -2209,9 +2351,10 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     }
   }
   function showToast(msg,hot){
+    placeToast();
     toastEl.textContent='';
     var t=document.createElement('span');t.className='t';t.textContent=stamp();
-    toastEl.appendChild(t);toastEl.appendChild(document.createTextNode(String(msg).slice(0,48)));
+    toastEl.appendChild(t);toastEl.appendChild(document.createTextNode(String(msg).replace(/\s+/g,' ').trim().slice(0,52)));
     toastEl.classList.toggle('x',!!hot);
     toastEl.classList.add('on');
     toastEl.setAttribute('aria-hidden','false');
@@ -2225,10 +2368,14 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
     box.classList.toggle('open',on);
     box.setAttribute('aria-hidden',on?'false':'true');
     owl.setAttribute('aria-expanded',on?'true':'false');
-    owl.setAttribute('aria-label',on?'Close session log':'Open session log');
-    if(on)renderList();
+    owl.setAttribute('aria-label',on?'Close panel':'Open session log and observatory');
+    if(on){renderList();placePanel();}
   }
-  owl.addEventListener('click',function(e){e.stopPropagation();setOpen(!box.classList.contains('open'));});
+  owl.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(drag.moved){drag.moved=false;return;} /* selesai drag → jangan toggle */
+    setOpen(!box.classList.contains('open'));
+  });
   closeBtn.addEventListener('click',function(e){e.stopPropagation();setOpen(false);});
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'&&box.classList.contains('open')){setOpen(false);}
@@ -2237,7 +2384,7 @@ body.dm-has-bar #dm-log{bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   document.addEventListener('pointerdown',function(e){
     if(!box.classList.contains('open'))return;
     var t=e.target;
-    if(box.contains(t)||owl.contains(t))return;
+    if(box.contains(t)||dock.contains(t))return;
     setOpen(false);
   },true);
   var scrollCloseT=0;
