@@ -659,6 +659,23 @@ body.tesseract-running { background:#0a1218 !important; }
   opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;
   transition:opacity .3s ease,transform .35s ease,visibility 0s;
 }
+#cam-focus{display:flex;align-items:stretch;justify-content:center;gap:4px;margin-top:7px;pointer-events:auto;touch-action:manipulation}
+#cam-focus button{font:600 10px/1 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);border-radius:4px;min-height:30px;padding:0 10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#cam-focus button:active{background:rgba(110,229,255,.22)}
+#cf-name{min-width:132px;color:#eafcff!important}
+#cam-whisper{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));z-index:6;width:min(80vw,270px);box-sizing:border-box;transform:translateX(-50%) translateY(-8px);pointer-events:none;padding:7px 10px 8px;border:1px solid rgba(110,229,255,.2);border-left:2px solid var(--cc,#6ee5ff);border-radius:5px;background:rgba(2,7,12,.74);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 22px rgba(0,0,0,.5),0 0 14px color-mix(in srgb,var(--cc,#6ee5ff) 18%,transparent);opacity:0;visibility:hidden;transition:opacity .7s ease,transform .7s ease,visibility 0s linear .7s}
+#cam-whisper.on{opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;transition:opacity .7s ease,transform .7s ease,visibility 0s}
+#cam-whisper .ci-i{opacity:0;transform:translateY(4px);animation:ciIn .6s ease forwards;animation-delay:var(--d,0s)}
+@keyframes ciIn{to{opacity:1;transform:none}}
+#cam-whisper .ci-tag{font:600 7px/1 'Courier New',monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--cc,#6ee5ff);opacity:.85}
+#cam-whisper .ci-name{margin-top:3px;font:600 12.5px/1.1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#eafcff;text-shadow:0 0 12px var(--cc,#6ee5ff)}
+#cam-whisper .ci-rows{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin-top:6px;font:500 8.5px/1.3 'Courier New',monospace;letter-spacing:.04em}
+#cam-whisper .ci-rows b{font-weight:500;color:rgba(184,224,238,.5);text-transform:uppercase;letter-spacing:.14em;font-size:7.5px}
+#cam-whisper .ci-rows span{color:#d6eefa;text-align:right}
+#cam-whisper .ci-fact{margin-top:6px;padding-top:5px;border-top:1px solid rgba(110,229,255,.12);font:400 9.5px/1.35 'Space Grotesk',system-ui,sans-serif;color:rgba(214,238,250,.82)}
+#cam-whisper .ci-fact em{font-style:normal;font:600 7px/1 'Courier New',monospace;letter-spacing:.18em;color:var(--cc,#6ee5ff);margin-right:5px}
+#cam-whisper .ci-wh{margin-top:6px;text-align:center;font:italic 400 10.5px/1.4 'Space Grotesk',system-ui,sans-serif;letter-spacing:.04em;color:rgba(214,238,250,.95);text-shadow:0 0 10px var(--cc,#6ee5ff),0 1px 6px rgba(0,0,0,.9)}
+@media (prefers-reduced-motion:reduce){#cam-whisper .ci-i{animation:none;opacity:1;transform:none}}
 #cam-zoom .cz-val{color:#eafcff;letter-spacing:.08em}
 #cam-zoom .cz-hint{display:block;margin-top:4px;font-size:7px;letter-spacing:.1em;color:rgba(184,224,238,.45);font-weight:500}
 
@@ -846,8 +863,10 @@ body.observe-mode #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
 </div>
 <div id="cam-zoom" aria-live="polite" aria-hidden="true">
   <span class="cz-label">CAM </span><span class="cz-val" id="cam-zoom-val">1×</span>
-  <span class="cz-hint">PINCH / WHEEL · 1×–3×</span>
+  <span class="cz-hint">TAP ‹ › TO FOCUS · PINCH / WHEEL · 1×–3×</span>
+  <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous focus target">‹</button><button type="button" id="cf-name" aria-label="Next focus target">FOCUS · FREE</button><button type="button" id="cf-next" aria-label="Next focus target">›</button></div>
 </div>
+<div id="cam-whisper" aria-live="polite"></div>
 <div id="mode-toast" aria-live="polite" aria-hidden="true"></div>
 <button id="music-toggle" type="button" aria-label="Buka music player" aria-expanded="false" title="Music">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -910,10 +929,12 @@ function skyXF(x,y){
   _skyT[0]=cx+dx;_skyT[1]=cy+dy;return _skyT;
 }
 function gSky(x,y){var t=skyXF(x,y);return gravityPos(t[0],t[1]);}
+var BHZ=1,BHK=0;
 function camBH(){
-  if(skyZoom===1)return [BH.x,BH.y];
+  var px=BH.x+skyPan.x*BHK,py=BH.y+skyPan.y*BHK;
+  if(skyZoom===1)return [px,py];
   var cx=W*.5,cy=H*.5;
-  return [cx+(BH.x-cx)*skyZoom,cy+(BH.y-cy)*skyZoom];
+  return [cx+(px-cx)*skyZoom,cy+(py-cy)*skyZoom];
 }
 function formatZoom(z){
   if(Math.abs(z-1)<.01)return '1×';
@@ -983,13 +1004,196 @@ function setCameraMode(on){
     btn.setAttribute('aria-label',CAMERA_MODE?'Exit Constellation Camera':'Constellation Camera');
     btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   }
-  if(!CAMERA_MODE)setSkyZoom(1,false);
+  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;setSkyZoom(1,false);}
+  else{if(!FOCUS.list)FOCUS.list=focusList();FOCUS.i=0;}
+  if(!CAMERA_MODE){FFX.id=null;hideWhisper();}
+  focusUI();
   updateCamZoomUI();
   if(typeof showModeToast==='function'){
-    if(CAMERA_MODE)showModeToast('CONSTELLATION CAMERA\nZOOM 1×–3× · PINCH / WHEEL',null,2200);
+    if(CAMERA_MODE)showModeToast('CONSTELLATION CAMERA\nTAP ‹ › TO FOCUS · PINCH / WHEEL',null,2200);
     else if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)showModeToast('CAMERA OFF',null,1400);
   }
 }
+/* ---------- Constellation Camera: focus targets (tap to lock + auto-fit zoom) ---------- */
+var FOCUS={i:0,anim:false,list:null};
+function focusList(){
+  var nm={orion:'Orion',taurus:'Taurus',virgo:'Virgo',canis:'Canis Major',bootes:'Boötes',scorpius:'Scorpius'};
+  var L=[{id:'free',n:'Free'},{id:'bh',n:'Gargantua'}];
+  CONS.forEach(function(c){L.push({id:c.id,n:nm[c.id]||c.id});});
+  L.push({id:'pleiades',n:'Pleiades'});
+  return L;
+}
+/* Free band of screen between the caption panel (top) and the CAM controls (bottom). */
+var _cb={t:0,cy:0,h:0};
+function camBox(){
+  var n=performance.now();
+  if(n-_cb.t>250||!_cb.h){
+    _cb.t=n;var top=0,bot=H,a=document.getElementById('cam-whisper'),b=document.getElementById('cam-zoom'),r;
+    if(a){r=a.getBoundingClientRect();if(r.height>0)top=r.bottom+14;}
+    if(b){r=b.getBoundingClientRect();if(r.height>0)bot=r.top-14;}
+    if(bot-top<H*.3){top=H*.22;bot=H*.8;}
+    _cb.cy=(top+bot)/2;_cb.h=bot-top;
+  }
+  return _cb;
+}
+function focusGeom(id){
+  var x,y,w,h;
+  if(id==='bh')return {x:BH.x,y:BH.y,z:1};
+  if(id==='pleiades'){
+    if(!PLEIADES.ready||!PLEIADES.scale)return null;
+    x=PLEIADES.x+.53*PLEIADES.scale;y=PLEIADES.y+.42*PLEIADES.scale;w=.7*PLEIADES.scale;h=.5*PLEIADES.scale;
+  }else{
+    var c=cons(id);if(!c||c.maxX<-1e8)return null;
+    x=(c.minX+c.maxX)/2;y=(c.minY+c.maxY)/2;w=c.maxX-c.minX;h=c.maxY-c.minY;
+  }
+  var z=Math.min(W*.8/Math.max(w,1),camBox().h*.94/Math.max(h,1));
+  return {x:x,y:y,z:Math.max(1,Math.min(3,z))};
+}
+function focusUI(){
+  var b=document.getElementById('cf-name');if(!b||!FOCUS.list)return;
+  var f=FOCUS.list[FOCUS.i];b.textContent=f.id==='free'?'FOCUS · FREE':'◎ '+f.n.toUpperCase();
+}
+function focusCycle(d){
+  if(!FOCUS.list)FOCUS.list=focusList();
+  var n=FOCUS.list.length,i=FOCUS.i,t=0;
+  do{i=(i+d+n)%n;t++;}while(t<n&&FOCUS.list[i].id!=='free'&&!focusGeom(FOCUS.list[i].id));
+  FOCUS.i=i;FOCUS.anim=FOCUS.list[i].id!=='free';
+  focusUI();focusFx(FOCUS.list[i].id);haptic(8);
+}
+var FOCUS_WHISPER={
+  bh:['Everything here is a question that never got answered.','Even light stops to think about it.'],
+  orion:['The hunter never moved. We just kept looking.','Three stars in a row, and somehow it became a story.'],
+  taurus:['The bull is not charging. It has simply waited a very long time.','Seven sisters ride on its shoulder.'],
+  virgo:['Spica burns quietly, like it knows something.','Spring sleeps here, folded in blue light.'],
+  canis:['The brightest dog in the sky, and it still follows.','Sirius answers if you wait long enough.'],
+  bootes:['The herdsman holds a lantern called Arcturus.','Amber light, older than the question.'],
+  scorpius:['Antares glows red, a heart that never settled.','The scorpion waits where the summer sky is thickest.'],
+  pleiades:['Seven voices, one soft cluster.','Lean closer. They only whisper.']
+};
+var FOCUS_INFO={
+  bh:{tag:'Supermassive black hole · Fiction',rgb:'255,170,90',rows:[['Source','Interstellar (2014)'],['Mass','~100 million suns'],['Horizon','~1 AU across'],['Spin','Near-maximal (Kerr)']],fact:'One hour near Miller\u2019s planet equals about seven years back on Earth.'},
+  orion:{tag:'Constellation · The Hunter',rows:[['Brightest','Rigel · mag 0.13'],['Betelgeuse','~550\u2013700 ly'],['Orion Nebula','M42 · ~1,350 ly'],['Area','594 sq\u00b0']],fact:'Betelgeuse is a red supergiant so vast it would swallow Mars\u2019s orbit if it sat where the Sun does.'},
+  taurus:{tag:'Constellation · The Bull',rows:[['Brightest','Aldebaran · ~65 ly'],['Cluster','Pleiades M45'],['Crab Nebula','M1 · ~6,500 ly'],['Area','797 sq\u00b0']],fact:'The Crab Nebula is the remnant of a supernova that Chinese astronomers recorded in 1054.'},
+  virgo:{tag:'Constellation · The Maiden',rows:[['Brightest','Spica · ~250 ly'],['Rank','2nd largest of 88'],['Cluster','Virgo \u00b7 ~1,300 galaxies'],['Area','1,294 sq\u00b0']],fact:'Galaxy M87 hides here, home of the first black hole ever photographed.'},
+  canis:{tag:'Constellation · The Great Dog',rows:[['Brightest','Sirius · mag \u22121.46'],['Distance','8.6 ly'],['Companion','Sirius B, white dwarf'],['Area','380 sq\u00b0']],fact:'Sirius is the brightest star in the night sky, and one of our nearest neighbours.'},
+  bootes:{tag:'Constellation · The Herdsman',rows:[['Brightest','Arcturus · ~37 ly'],['Type','Orange giant'],['Rank','4th brightest star'],['Area','907 sq\u00b0']],fact:'Nearby lies the Bo\u00f6tes Void, an emptiness about 330 million light-years wide.'},
+  scorpius:{tag:'Constellation · The Scorpion',rows:[['Brightest','Antares · ~550 ly'],['Type','Red supergiant'],['Size','~700\u00d7 the Sun'],['Area','497 sq\u00b0']],fact:'Antares means \u201crival of Mars\u201d, named for its matching red glow.'},
+  pleiades:{tag:'Open cluster · M45',rgb:'145,170,255',rows:[['Distance','~444 ly'],['Age','~100 million years'],['Members','1,000+ stars'],['Naked eye','6\u20137 visible']],fact:'Blue light from its young stars is lighting a haze of dust around the cluster.'}
+};
+var FFX={id:null,t0:0},_whT=0;
+function hideWhisper(){var w=document.getElementById('cam-whisper');if(w)w.classList.remove('on');clearTimeout(_whT);}
+function showWhisper(id){
+  var w=document.getElementById('cam-whisper'),a=FOCUS_WHISPER[id],d=FOCUS_INFO[id],f=FOCUS.list&&FOCUS.list[FOCUS.i];
+  if(!w||!d||!f)return;
+  clearTimeout(_whT);w.classList.remove('on');
+  var rows=d.rows.slice(0,3);
+  var wh=a?a[(Math.random()*a.length)|0]:'',n=rows.length;
+  var h='<div class="ci-i ci-tag" style="--d:.15s">'+d.tag+'</div><div class="ci-i ci-name" style="--d:.3s">'+f.n+'</div><div class="ci-rows">';
+  for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+rows[i][0]+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+rows[i][1]+'</span>';
+  var t=.55+n*.14+.15;
+  h+='</div><div class="ci-i ci-fact" style="--d:'+t+'s"><em>FACT</em>'+d.fact+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+wh+'\u201d</div>';
+  w.style.setProperty('--cc','rgb('+(d.rgb||'110,229,255')+')');
+  setTimeout(function(){if(FFX.id!==id)return;w.innerHTML=h;w.classList.add('on');},260);
+}
+function focusFx(id){
+  if(id==='free'){FFX.id=null;hideWhisper();return;}
+  FFX.id=id;FFX.t0=performance.now();showWhisper(id);
+  if(id==='bh'){[350,650,950].forEach(function(d){setTimeout(function(){if(FFX.id==='bh'){var p=camBH();createBHShockwave(p[0],p[1]);}},d);});}
+}
+function drawFocusFx(now){
+  var id=FFX.id;if(!id||!CAMERA_MODE||reduce)return;
+  var t=now-FFX.t0,i,q,A,B,segs=[],rgb='110,229,255';
+  g.save();g.globalCompositeOperation='lighter';g.lineCap='round';
+  if(id==='bh'){
+    var bp=camBH(),R=BH.Rr*BHZ;
+    if(R>=1&&t<2800){
+      var u=Math.min(1,t/1200),e=u*u*(3-2*u),al=t<1200?1:Math.max(0,1-(t-1200)/1600),a0=-1.5708,a1=a0+6.2832*e;
+      g.strokeStyle='rgba(110,229,255,'+(.16*al)+')';g.lineWidth=7;g.beginPath();g.arc(bp[0],bp[1],R*1.2,a0,a1);g.stroke();
+      g.strokeStyle='rgba(234,252,255,'+(.85*al)+')';g.lineWidth=1.6;g.beginPath();g.arc(bp[0],bp[1],R*1.2,a0,a1);g.stroke();
+      if(u<1){g.fillStyle='rgba(255,255,255,.95)';g.beginPath();g.arc(bp[0]+Math.cos(a1)*R*1.2,bp[1]+Math.sin(a1)*R*1.2,3.2,0,6.2832);g.fill();}
+    }
+    g.restore();return;
+  }
+  if(id==='pleiades'){
+    /* Cluster, not a constellation: no lines. Stars twinkle one by one, then idle-shimmer softly. */
+    if(!PLEIADES.ready){g.restore();return;}
+    var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y,pts=PLEIADES.bright.slice().sort(function(a,b){return a.x-b.x;}),nn=pts.length,per=Math.min(320,2400/Math.max(nn,1)),dur=1100;
+    for(i=0;i<nn;i++){
+      q=gSky(PLEIADES.x+pts[i].x*PLEIADES.scale+ox,PLEIADES.y+pts[i].y*PLEIADES.scale+oy);
+      if(!q||q[2]>=1)continue;
+      var ts=t-420-i*per,al=0,sc=1;if(ts<0)continue;
+      if(ts<dur){var u=ts/dur;al=Math.sin(u*Math.PI);sc=1+.9*al;}
+      else al=.2+.14*Math.sin(t*.0021+i*1.9);
+      var r=(3+7*al)*sc,L=(7+16*al)*sc;
+      var gr=g.createRadialGradient(q[0],q[1],0,q[0],q[1],r*2.6);
+      gr.addColorStop(0,'rgba(235,242,255,'+(.55*al)+')');gr.addColorStop(.4,'rgba(145,170,255,'+(.22*al)+')');gr.addColorStop(1,'rgba(145,170,255,0)');
+      g.fillStyle=gr;g.beginPath();g.arc(q[0],q[1],r*2.6,0,6.2832);g.fill();
+      g.strokeStyle='rgba(225,236,255,'+(.8*al)+')';g.lineWidth=1;g.beginPath();
+      g.moveTo(q[0]-L,q[1]);g.lineTo(q[0]+L,q[1]);g.moveTo(q[0],q[1]-L);g.lineTo(q[0],q[1]+L);g.stroke();
+    }
+    g.restore();return;
+  }else{
+    var c=cons(id);if(!c){g.restore();return;}
+    for(i=0;i<c.lines.length;i++){
+      A=c.stars[c.lines[i][0]];B=c.stars[c.lines[i][1]];if(!A||!B)continue;
+      var qa=gSky(A.x+c.ox,A.y+c.oy),qb=gSky(B.x+c.ox,B.y+c.oy);
+      if(qa&&qb)segs.push([[qa[0],qa[1],qa[2]],[qb[0],qb[1],qb[2]]]);
+    }
+  }
+  var n=segs.length;if(!n){g.restore();return;}
+  var per=Math.min(190,1900/n),dur=per*1.5,tEnd=420+(n-1)*per+dur;
+  var glow=t<tEnd?1:Math.max(.32,1-(t-tEnd)/1600*.68);
+  for(i=0;i<n;i++){
+    var s0=segs[i][0],s1=segs[i][1];if(s0[2]>=1||s1[2]>=1)continue;
+    var ts=t-420-i*per;if(ts<0)continue;
+    var p=Math.min(1,ts/dur);p=p*p*(3-2*p);
+    var ex=s0[0]+(s1[0]-s0[0])*p,ey=s0[1]+(s1[1]-s0[1])*p;
+    g.strokeStyle='rgba('+rgb+','+(.13*glow)+')';g.lineWidth=4.2;g.beginPath();g.moveTo(s0[0],s0[1]);g.lineTo(ex,ey);g.stroke();
+    g.strokeStyle='rgba(225,248,255,'+(.78*glow)+')';g.lineWidth=1.1;g.beginPath();g.moveTo(s0[0],s0[1]);g.lineTo(ex,ey);g.stroke();
+    if(ts<520){var pu=ts/520;g.strokeStyle='rgba('+rgb+','+(.7*(1-pu))+')';g.lineWidth=1;g.beginPath();g.arc(s0[0],s0[1],3+11*pu,0,6.2832);g.stroke();}
+    if(p<1){g.fillStyle='rgba(255,255,255,.95)';g.beginPath();g.arc(ex,ey,2.6,0,6.2832);g.fill();}
+    else if(ts-dur<520){var pu2=(ts-dur)/520;g.strokeStyle='rgba('+rgb+','+(.7*(1-pu2))+')';g.lineWidth=1;g.beginPath();g.arc(s1[0],s1[1],3+11*pu2,0,6.2832);g.stroke();}
+  }
+  g.restore();
+}
+function bhDragAllowed(){return !CAMERA_MODE||!FOCUS.list||FOCUS.list[FOCUS.i].id==='bh';}
+function syncBHDom(){
+  try{
+    var bhEl=document.getElementById('bh');if(!bhEl||!W)return;
+    var p=camBH();
+    bhEl.style.transform='translate('+Math.round(p[0]-BH.R*8)+'px,'+Math.round(p[1]-BH.R*5)+'px)';
+    if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)';
+  }catch(e){}
+}
+function focusStep(){
+  var want=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
+  var f=want&&FOCUS.list?FOCUS.list[FOCUS.i]:null,id=f?f.id:'free';
+  var tZ=(want&&id!=='free'&&id!=='bh')?Math.min(skyZoom,1.25):skyZoom,tK=want?1:0,ch=false;
+  if(Math.abs(BHZ-tZ)>.002||Math.abs(BHK-tK)>.002){BHZ+=(tZ-BHZ)*.14;BHK+=(tK-BHK)*.14;ch=true;}
+  else if(BHZ!==tZ||BHK!==tK){BHZ=tZ;BHK=tK;ch=true;}
+  if(want&&id!=='free'){
+    var g=focusGeom(id);
+    if(g){
+      if(skyPinch.on)FOCUS.anim=false;
+      if(FOCUS.anim||(!skyDrag.on&&!skyRotDrag.on&&!skyPinch.on&&!drag.on)){
+        var lim=skyPanLimits(),k=FOCUS.anim?.12:.07;
+        var tx=Math.max(-lim.x,Math.min(lim.x,W*.5-g.x)),ty=Math.max(-lim.y,Math.min(lim.y,camBox().cy-g.y));
+        if(Math.abs(tx-skyPan.x)+Math.abs(ty-skyPan.y)>.3){skyPan.x+=(tx-skyPan.x)*k;skyPan.y+=(ty-skyPan.y)*k;ch=true;}
+      }
+      if(FOCUS.anim){
+        if(Math.abs(g.z-skyZoom)>.004)setSkyZoom(skyZoom+(g.z-skyZoom)*.12,false);
+        else{setSkyZoom(g.z,false);FOCUS.anim=false;}
+      }
+    }
+  }
+  if(ch){try{syncSkyPanHits();}catch(e){}syncBHDom();}
+}
+(function(){
+  function bind(id,d){var b=document.getElementById(id);if(!b)return;
+    b.addEventListener('pointerdown',function(e){e.stopPropagation();});
+    b.addEventListener('click',function(e){e.stopPropagation();focusCycle(d);});}
+  bind('cf-prev',-1);bind('cf-name',1);bind('cf-next',1);
+})();
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
 var SW=null,swP=0;
@@ -2879,7 +3083,7 @@ function layout(){
   var bhEl=$('#bh');bhEl.style.width=Math.round(BH.R*16)+'px';bhEl.style.height=Math.round(BH.R*10)+'px';
   var bhp=camBH();
   bhEl.style.transform='translate('+Math.round(bhp[0]-BH.R*8)+'px,'+Math.round(bhp[1]-BH.R*5)+'px)';
-  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*skyZoom)+'px)';
+  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*BHZ)+'px)';
   var rg=cons('orion').stars.rigel,rfx=$('#rigel-fx');
   rfx.style.width=rfx.style.height='52px';rfx.style.marginLeft=rfx.style.marginTop='-26px';
   rfx.style.transform='translate('+Math.round(rg.x+skyPan.x)+'px,'+Math.round(rg.y+skyPan.y)+'px)';
@@ -3070,7 +3274,7 @@ function pull(x,y){                       /* posisi benda saat disedot: berputar
   return [bx+Math.cos(t2)*r2,by+Math.sin(t2)*r2,k];
 }
 function lens(x,y){                       /* smooth gravitational lens: bounded, continuous, no visual explosions */
-  var R=BH.Rr*(skyZoom||1);if(R<1)return [x,y];
+  var R=BH.Rr*(BHZ||1);if(R<1)return [x,y];
   var bp=camBH(),bx=bp[0],by=bp[1];
   var dx=x-bx,dy=y-by,d2=dx*dx+dy*dy;
   var inner=R*1.08,outer=R*9.5,i2=inner*inner,o2=outer*outer;
@@ -3213,7 +3417,7 @@ function drawHoleFallback(now,age){
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
      primitives so one unsupported effect cannot make the whole scene vanish. */
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  var R=Math.max(.1,BH.R*sc*(1+1.6*e)*skyZoom);
+  var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ);
   if(R<.5)return;
   var bp=camBH();
   g.save();g.translate(bp[0],bp[1]);
@@ -3247,7 +3451,7 @@ function drawHole(now,age){
   if(BH.Rr<1||!BH.sprite)return;
 
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
-  var R=BH.Rr*skyZoom,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016))),S=BH.S*k*skyZoom;
+  var R=BH.Rr*BHZ,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016))),S=BH.S*k*BHZ;
   var bp=camBH();
 
   g.save();
@@ -4680,7 +4884,7 @@ function asteroidScreenAt(x,y){
   var best=-1,bd=Infinity,now=performance.now();
   var bp=camBH();
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom;
+    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed))*BHZ;
     var ax=bp[0]+Math.cos(t)*rr,ay=bp[1]+Math.sin(t)*rr*a.e;
     var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*skyZoom;
     if(SW){var q=pull(ax,ay);ax=q[0];ay=q[1];sz*=1-.45*q[2];}
@@ -4759,8 +4963,8 @@ function drawAsteroids(now){
   for(var i=0;i<AST.length;i++){
     var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
     var bp=camBH();
-    var x=bp[0]+Math.cos(t)*rr*skyZoom;
-    var y=bp[1]+Math.sin(t)*rr*a.e*skyZoom;
+    var x=bp[0]+Math.cos(t)*rr*BHZ;
+    var y=bp[1]+Math.sin(t)*rr*a.e*BHZ;
     var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z;
     if(SW){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
     /* Damped spring: the rock gets one impulse, flies a little, then settles back. */
@@ -5244,6 +5448,7 @@ function frame(now){
     if(!drag.on&&(Math.abs(BH.x-BH.hx)>.05||Math.abs(BH.y-BH.hy)>.05)){
       BH.x+=(BH.hx-BH.x)*.065;BH.y+=(BH.hy-BH.y)*.065;
     }
+    focusStep();
     /* Sky pan + rot springback when fingers are up.
        Disabled in Constellation Camera so the observer can explore freely. */
     if(!CAMERA_MODE&&!skyDrag.on&&!skyRotDrag.on&&!skyPinch.on){
@@ -5288,6 +5493,7 @@ function frame(now){
     CONS.forEach(function(c){drawStars(c,age,now);});
     drawPleiades(age,now);
     drawTriggerVisuals(now);
+    drawFocusFx(now);
     drawSupernovaBursts(now);
 
     // RENDER EFEK KOSMIK BARU:
@@ -5843,11 +6049,12 @@ function beginBHDrag(e){
   if(reduce||SW||drag.on)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
-  if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
   if(constellationTargetAt(e.clientX,e.clientY))return false;
+  if(!bhDragAllowed())return false;
   var bp=camBH();
   var d=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]);
   if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
@@ -5892,6 +6099,7 @@ document.addEventListener('pointercancel',endBHDrag,{passive:false});
 /* ---------- mobile constellation pan + 2-finger rotate (±180°) ---------- */
 function skyPanLimits(){
   var z=skyZoom||1;
+  if(CAMERA_MODE)return {x:Math.max(W*.62,Math.max(80,W*.38)*z),y:Math.max(H*.62,Math.max(70,H*.32)*z)};
   return {x:Math.max(80,W*.38)*z,y:Math.max(70,H*.32)*z};
 }
 function skyHitXY(x,y){
@@ -5965,12 +6173,12 @@ function skyTwoDist(){
 function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
-  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
   var dBH=Math.hypot(e.clientX-bpSky[0],e.clientY-bpSky[1]);
-  if(dBH<=bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
+  if(bhDragAllowed()&&dBH<=bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   skyPtrs[e.pointerId]={x:e.clientX,y:e.clientY};
   var n=Object.keys(skyPtrs).length;
   if(n>=2){
@@ -6136,7 +6344,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
