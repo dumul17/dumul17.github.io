@@ -2308,8 +2308,17 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     }
   }
   /* Anchor UI ke dock: pilih sisi terdekat yang muat — jangan pernah loncat ke ujung layar jauh. */
-  function placeNearDock(el, tw, th){
+  function placeNearDock(el, tw, th, fit){
     var r=dock.getBoundingClientRect();
+    if(fit){
+      /* Pakai ukuran teks ASLI (bukan lebar maksimum) supaya sisi kiri dock tidak renggang. */
+      el.style.maxWidth=Math.max(0,tw)+'px';
+      /* reset ke (0,0) dulu: elemen fixed dengan left lama dekat tepi kanan bakal ke-shrink dan keukur terlalu sempit */
+      el.style.left='0px';el.style.top='0px';el.style.right='auto';el.style.bottom='auto';
+      var br=el.getBoundingClientRect();
+      if(br.width>0)tw=Math.min(tw,Math.ceil(br.width));
+      if(br.height>0)th=Math.ceil(br.height);
+    }
     var gap=6,pad=8;
     var vw=window.innerWidth||360,vh=window.innerHeight||640;
     tw=Math.min(tw,vw-pad*2);
@@ -2346,13 +2355,13 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   }
   function placeToast(){
     var tw=Math.min(window.innerWidth*0.56,240);
-    placeNearDock(toastEl,tw,34);
+    placeNearDock(toastEl,tw,34,true);
     toastEl.setAttribute('data-anchored','1');
   }
   function placeObs(){
     if(!obsEl||!obsEl.classList.contains('on'))return;
     /* compact label di atas/samping dock */
-    placeNearDock(obsEl,Math.min(window.innerWidth*0.42,160),18);
+    placeNearDock(obsEl,Math.min(window.innerWidth*0.42,160),18,true);
   }
 
   var drag={on:false,moved:false,pid:0,ox:0,oy:0,sx:0,sy:0};
@@ -2416,11 +2425,11 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     }
   }
   function showToast(msg,hot,holdMs){
-    placeToast();
     toastEl.textContent='';
     var t=document.createElement('span');t.className='t';t.textContent=stamp();
     toastEl.appendChild(t);toastEl.appendChild(document.createTextNode(String(msg).replace(/\s+/g,' ').trim().slice(0,52)));
     toastEl.classList.toggle('x',!!hot);
+    placeToast(); /* setelah isi terpasang, supaya ukuran yang diukur = ukuran toast sebenarnya */
     toastEl.classList.add('on');
     toastEl.setAttribute('aria-hidden','false');
     clearTimeout(toastTimer);
