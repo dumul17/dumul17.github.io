@@ -20,7 +20,7 @@
 <meta name="twitter:title" content="Dumul's Observatory">
 <meta name="twitter:description" content="A modder and music composer's little universe: original soundtracks, gameplay, mods, and the music project DUMUL.">
 <meta name="twitter:image" content="https://dumul17.github.io/og-constellation.jpg">
-<link rel="preload" as="image" href="og.jpg">
+<link rel="preload" as="image" href="og.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -347,7 +347,7 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   overflow: hidden;
   font-family: 'Courier New', monospace;
 }
-/* Panggung hero: og.jpg + lapisan gelap yang SAMA dengan <section class="dm-hero"> di dumul.html.
+/* Panggung hero: og.webp + lapisan gelap yang SAMA dengan <section class="dm-hero"> di dumul.html.
    Ukuran/posisinya diisi lewat JS dari dmHeroRect(). Di luar panggung = latar polos #0a1218 seperti halaman aslinya. */
 .tesseract-stage {
   position: absolute;
@@ -356,7 +356,7 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   width: 100%;
   height: 282px;
   overflow: hidden;
-  background: #0a1218 url('./og.jpg') center/cover no-repeat;
+  background: #0a1218 url('./og.webp') center/cover no-repeat;
   z-index: 0;
 }
 .tesseract-og {
@@ -466,8 +466,8 @@ body.tesseract-running { background:#0a1218 !important; }
   box-shadow: 0 0 12px #ff7ad9;
   transition: width 0.1s linear;
 }
-/* ===== Teks "WELCOME TO THE GLITCH" — mengisi area kosong di bawah og.jpg, di atas bar.
-   Murni lapisan tambahan: stage/og.jpg/mesh/node TIDAK disentuh. Posisi dihitung JS (tpLayout). ===== */
+/* ===== Teks "WELCOME TO THE GLITCH" — mengisi area kosong di bawah og.webp, di atas bar.
+   Murni lapisan tambahan: stage/og.webp/mesh/node TIDAK disentuh. Posisi dihitung JS (tpLayout). ===== */
 .tesseract-pre{position:absolute;left:0;right:0;top:0;height:0;z-index:4;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:'Courier New',monospace}
 .tp-inner{display:flex;flex-direction:column;align-items:center;gap:14px;transform-origin:50% 50%}
 /* Judul: SAMA dengan h1 "DUMUL" di dumul.html (Syne 800, clamp(26px,6.5vw,42px), spasi .12em, glow cyan + glitch slice RGB) */
@@ -3398,7 +3398,7 @@ function drawHole(now,age){
 /* ===== DUMUL neural network (kode SAMA di index.html & dumul.html — jangan diubah sebelah saja) =====
    Layout deterministik (seed tetap, koordinat relatif ke viewport) → posisi node & garis
    di index.html (saat masuk) identik dengan di dumul.html (saat tiba). */
-/* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
+/* Kotak hero dumul.html (posisi & ukuran og.webp + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (tidak ada lagi: sekarang murni dihitung dari lebar layar). */
 function dmHeroRect(){
   /* DETERMINISTIK: semua angka turunan dari lebar layar saja (tanpa pengukuran DOM / localStorage),
@@ -3407,7 +3407,7 @@ function dmHeroRect(){
   var wide=W>=640;
   var padTop=wide?56:30,titleH=wide?46:30,gap0=24,meshH=132;
   var tb=padTop+titleH;                       /* dasar judul DUMUL */
-  /* Titik jembatan cahaya di og.jpg (fraksi 720x720) & puncak kepala siluet. */
+  /* Titik jembatan cahaya di og.webp (fraksi 720x720) & puncak kepala siluet. */
   var BX=.49,BY=.527,HEADY=.165,IW=720,IH=720;
   /* Skala gambar = lebar layar (kepala tetap utuh); bawah gambar dipudarkan lewat mask. */
   var s=Math.max(W/IW,(W/2)/(BX*IW),(W/2)/((1-BX)*IW));
@@ -3429,11 +3429,11 @@ function dmHeroRect(){
 var DM_NN_DUR=5600;
 var DM_MESH_H=132,DM_TR_MESH_W=0,DM_TR_MESH_H=0,DM_TR_MESH_X=0,DM_TR_MESH_Y=0,DM_TR_GLITCH_V=0,DM_TR_GLITCH_S=0,DM_TR_GLITCH_SEEN=0;
 function dmNeuralBuild(W,H){
-  /* Mesh neural horizontal (referensi og.jpg): pita di antara dua siluet,
+  /* Mesh neural horizontal (referensi og.webp): pita di antara dua siluet,
      node mengambang, garis menyambung seperti koneksi di gambar. */
   function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
   var R=rng(1717),pts=[],i,j,k;
-  /* [u, v, colFlag] — colFlag 0=cyan, 1=pink. Posisi relatif ke hero (og.jpg). */
+  /* [u, v, colFlag] — colFlag 0=cyan, 1=pink. Posisi relatif ke hero (og.webp). */
   var layout=[
     /* left cluster (dekat siluet kiri) */
     [.08,.48,0],[.14,.34,0],[.16,.58,1],[.22,.44,0],[.24,.62,0],
@@ -3515,7 +3515,7 @@ function dmNeuralDraw(g,W,H,net,t){
   g.clearRect(0,0,W,H);
   var nodes=net.nodes,edges=net.edges,i,e,a,b;
   function eo(u){return 1-Math.pow(1-u,3);}
-  /* Drift node: ngambang pelan di atas og.jpg */
+  /* Drift node: ngambang pelan di atas og.webp */
   for(i=0;i<nodes.length;i++){
     var n=nodes[i];
     var dx=Math.sin(t*.0011+n.ph)*n.drift*1.6;
@@ -3734,9 +3734,9 @@ function dmSpectrumMeshDraw(g,W,H,p,phase,level,beat,now,revealMs){
   g.restore();
 }
 function dmTransitionSpectrum(g,W,H,t,fade){
-  /* IMPORTANT: this canvas is transparent over og.jpg. Clear every frame so
+  /* IMPORTANT: this canvas is transparent over og.webp. Clear every frame so
      the radial glow/waveform cannot accumulate into the giant pink/cyan
-     'sphere' that was hiding the actual og.jpg on mobile. */
+     'sphere' that was hiding the actual og.webp on mobile. */
   g.clearRect(0,0,W,H);
   /* Dari sini W = lebar kanvas mesh hero (bukan lebar stage), dan digeser ke x kanvas aslinya. */
   var meshX=(typeof DM_TR_MESH_X==='number'?DM_TR_MESH_X:0);
@@ -3808,7 +3808,7 @@ function dmTransitionStop(){
 }
 
 /* ---------- Neural Network Overlay: node menyambung satu per satu → lanjut di dumul.html ---------- */
-/* ===== Teks decode/glitch "WELCOME TO THE GLITCH" di area kosong bawah og.jpg (hanya overlay; stage/mesh tak disentuh) ===== */
+/* ===== Teks decode/glitch "WELCOME TO THE GLITCH" di area kosong bawah og.webp (hanya overlay; stage/mesh tak disentuh) ===== */
 var TP=null,TP_SCR='#%&*+=<>/\\|01';
 function tpEase(x){return 1-(1-x)*(1-x);}
 function tpFlash(el,cls,ms){el.classList.add(cls);setTimeout(function(){el.classList.remove(cls);},ms);}
@@ -3825,7 +3825,7 @@ function tpInit(){
   if(red){head.style.visibility='visible';for(i=0;i<TP.rows.length;i++)TP.rows[i].t.el.style.visibility='visible';}
   for(i=0;i<TP.head.lines.length;i++)TP.head.lines[i].gl.setAttribute('data-text',TP.head.lines[i].text);
 }
-/* Posisi: antara dasar stage (og.jpg) dan atas kotak bar. Kalau sempit → diskalakan; terlalu sempit → disembunyikan (layout lama aman). */
+/* Posisi: antara dasar stage (og.webp) dan atas kotak bar. Kalau sempit → diskalakan; terlalu sempit → disembunyikan (layout lama aman). */
 function tpLayout(H){
   var pre=document.getElementById('tesseract-pre'),inner=document.getElementById('tp-inner');
   var ui=document.querySelector('#tesseract-warp .tesseract-ui');
@@ -3895,7 +3895,7 @@ function startTesseractWarp(targetUrl) {
   var W, H, net;
   DM_TR_NET=null; DM_TR_MESH_LAST=0;
   function resizeNeural() {
-    /* Stage = full hero section (og.jpg). Mesh lives in the 132px band = dumul hero canvas. */
+    /* Stage = full hero section (og.webp). Mesh lives in the 132px band = dumul hero canvas. */
     var hr = dmHeroRect();
     var newW = hr.w, newH = hr.h;
     var meshH = (typeof DM_MESH_H==='number'?DM_MESH_H:132);
@@ -6513,14 +6513,14 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
   <div class="tesseract-stage" id="tesseract-stage">
-    <img class="tesseract-og" src="./og.jpg" alt="" aria-hidden="true" decoding="async">
+    <img class="tesseract-og" src="./og.webp" alt="" aria-hidden="true" decoding="async">
     <div class="tesseract-shade s1"></div>
     <div class="tesseract-shade s2"></div>
     <div class="tesseract-shade s3"></div>
     <canvas id="tesseract-canvas"></canvas>
   </div>
   <div class="tesseract-scan"></div>
-  <!-- Judul + daftar 5 track (area kosong di bawah og.jpg), tanpa persen. Posisi diatur tpLayout(). -->
+  <!-- Judul + daftar 5 track (area kosong di bawah og.webp), tanpa persen. Posisi diatur tpLayout(). -->
   <div class="tesseract-pre" id="tesseract-pre">
     <div class="tp-inner" id="tp-inner">
       <div class="tp-head" id="tp-head"><span class="tp-hl">WELCOME TO</span><span class="tp-hl">THE GLITCH</span></div>

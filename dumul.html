@@ -65,7 +65,7 @@
   overflow: hidden;
   font-family: 'Courier New', monospace;
 }
-/* Panggung hero: og.jpg + lapisan gelap yang SAMA dengan <section class="dm-hero"> di dumul.html.
+/* Panggung hero: og.webp + lapisan gelap yang SAMA dengan <section class="dm-hero"> di dumul.html.
    Ukuran/posisinya diisi lewat JS dari dmHeroRect(). Di luar panggung = latar polos #0a1218 seperti halaman aslinya. */
 .tesseract-stage {
   position: absolute;
@@ -74,7 +74,7 @@
   width: 100%;
   height: 282px;
   overflow: hidden;
-  background: #0a1218 url('og.jpg') center/cover no-repeat;
+  background: #0a1218 url('og.webp') center/cover no-repeat;
 }
 .tesseract-shade { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .tesseract-shade.s1 { background: rgba(10, 18, 24, 0.6); }
@@ -251,7 +251,7 @@ div[class*="sm:grid-cols-[1.2fr_0.8fr]"]{content-visibility:auto;contain-intrins
 /* ===== DUMUL neural network (kode SAMA di index.html & dumul.html — jangan diubah sebelah saja) =====
    Layout deterministik (seed tetap, koordinat relatif ke viewport) → posisi node & garis
    di index.html (saat masuk) identik dengan di dumul.html (saat tiba). */
-/* Kotak hero dumul.html (posisi & ukuran og.jpg + neural network). Dipakai SAMA di index.html & dumul.html.
+/* Kotak hero dumul.html (posisi & ukuran og.webp + neural network). Dipakai SAMA di index.html & dumul.html.
    dumul.html mengukur hero aslinya lalu menyimpannya (localStorage 'dm_hero_rect'); kalau belum ada, dipakai estimasi. */
 function dmHeroRect(){
   /* DETERMINISTIK: semua angka turunan dari lebar layar saja (tanpa pengukuran DOM / localStorage),
@@ -260,7 +260,7 @@ function dmHeroRect(){
   var wide=W>=640;
   var padTop=wide?56:30,titleH=wide?46:30,gap0=24,meshH=132;
   var tb=padTop+titleH;                       /* dasar judul DUMUL */
-  /* Titik jembatan cahaya di og.jpg (fraksi 720x720) & puncak kepala siluet. */
+  /* Titik jembatan cahaya di og.webp (fraksi 720x720) & puncak kepala siluet. */
   var BX=.49,BY=.527,HEADY=.165,IW=720,IH=720;
   /* Skala gambar = lebar layar (kepala tetap utuh); bawah gambar dipudarkan lewat mask. */
   var s=Math.max(W/IW,(W/2)/(BX*IW),(W/2)/((1-BX)*IW));
@@ -281,11 +281,11 @@ function dmHeroRect(){
 }
 var DM_NN_DUR=5600;
 function dmNeuralBuild(W,H){
-  /* Mesh neural horizontal (referensi og.jpg): pita di antara dua siluet,
+  /* Mesh neural horizontal (referensi og.webp): pita di antara dua siluet,
      node mengambang, garis menyambung seperti koneksi di gambar. */
   function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
   var R=rng(1717),pts=[],i,j,k;
-  /* [u, v, colFlag] — colFlag 0=cyan, 1=pink. Posisi relatif ke hero (og.jpg). */
+  /* [u, v, colFlag] — colFlag 0=cyan, 1=pink. Posisi relatif ke hero (og.webp). */
   var layout=[
     /* left cluster (dekat siluet kiri) */
     [.08,.48,0],[.14,.34,0],[.16,.58,1],[.22,.44,0],[.24,.62,0],
@@ -367,7 +367,7 @@ function dmNeuralDraw(g,W,H,net,t){
   g.clearRect(0,0,W,H);
   var nodes=net.nodes,edges=net.edges,i,e,a,b;
   function eo(u){return 1-Math.pow(1-u,3);}
-  /* Drift node: ngambang pelan di atas og.jpg */
+  /* Drift node: ngambang pelan di atas og.webp */
   for(i=0;i<nodes.length;i++){
     var n=nodes[i];
     var dx=Math.sin(t*.0011+n.ph)*n.drift*1.6;
@@ -479,7 +479,7 @@ function dmNeuralDraw(g,W,H,net,t){
   </script>
   
   <script>
-  /* Hero deterministik: tinggi hero, posisi mesh & crop og.jpg semuanya dari dmHeroRect(W). */
+  /* Hero deterministik: tinggi hero, posisi mesh & crop og.webp semuanya dari dmHeroRect(W). */
   (function(){
     function apply(){
       var r=dmHeroRect(),d=document.documentElement.style;
@@ -1670,7 +1670,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
       if(!ms||!window.MediaMetadata)return;
       var t=curTitle();if(!t||t===lastMeta)return;lastMeta=t;
       try{ms.metadata=new MediaMetadata({title:t,artist:'DUMUL',album:'Limerence',
-        artwork:[{src:'og.jpg',sizes:'720x720',type:'image/jpeg'}]});}catch(e){}
+        artwork:[{src:'og.webp',sizes:'720x720',type:'image/webp'}]});}catch(e){}
     }
     function setPos(){
       if(!ms||!ms.setPositionState)return;
