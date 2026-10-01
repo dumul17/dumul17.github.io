@@ -466,6 +466,27 @@ body.tesseract-running { background:#0a1218 !important; }
   box-shadow: 0 0 12px #ff7ad9;
   transition: width 0.1s linear;
 }
+/* ===== Preload 10% per track — mengisi area kosong di bawah og.jpg, di atas bar.
+   Murni lapisan tambahan: stage/og.jpg/mesh/node TIDAK disentuh. Posisi dihitung JS (tpLayout). ===== */
+.tesseract-pre{position:absolute;left:0;right:0;top:0;height:0;z-index:4;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:'Courier New',monospace}
+.tp-inner{display:flex;flex-direction:column;align-items:center;gap:9px;transform-origin:50% 50%}
+.tp-head{font-size:clamp(11px,3.3vw,14px);font-weight:700;letter-spacing:.22em;color:#eafcff;text-shadow:0 0 10px rgba(110,229,255,.8),2px 0 #ff7ad9,-2px 0 #6ee5ff;visibility:hidden;white-space:nowrap}
+.tp-list{display:flex;flex-direction:column;align-items:center;gap:5px}
+.tp-row{position:relative;display:flex;align-items:baseline;justify-content:center;gap:9px;padding:0 2px 4px;white-space:nowrap}
+.tp-t{font-size:clamp(11px,3vw,13px);letter-spacing:.06em;color:rgba(214,238,248,.78);visibility:hidden}
+.tp-p{font-size:10px;letter-spacing:.08em;color:rgba(142,238,255,.5);font-variant-numeric:tabular-nums;min-width:3ch}
+.tp-b{position:absolute;left:0;right:0;bottom:0;height:1px;background:rgba(110,229,255,.12);overflow:hidden}
+.tp-b b{display:block;width:100%;height:100%;background:linear-gradient(90deg,#6ee5ff,#ff7ad9);box-shadow:0 0 6px rgba(255,122,217,.7);transform-origin:0 50%;transform:scaleX(0)}
+.tp-row.ld .tp-t{animation:tp-jit 1.15s steps(1,end) infinite}
+.tp-row.ld:nth-child(2n) .tp-t{animation-duration:1.4s;animation-delay:-.35s}
+.tp-row.ld .tp-p{color:rgba(142,238,255,.85)}
+.tp-row.ok .tp-t{color:#eafcff;text-shadow:0 0 8px rgba(110,229,255,.45)}
+.tp-row.ok .tp-p{color:#ff7ad9;text-shadow:0 0 6px rgba(255,122,217,.5)}
+.tp-row.tp-burst .tp-t{animation:tp-burst .38s steps(1,end) 1}
+.tp-head.tp-gl{animation:tp-burst .26s steps(1,end) 1}
+@keyframes tp-jit{0%,84%,100%{transform:none;text-shadow:none}87%{transform:translateX(-1px);text-shadow:1px 0 #ff7ad9,-1px 0 #6ee5ff}92%{transform:translateX(1px);text-shadow:-1px 0 #ff7ad9,1px 0 #6ee5ff}96%{transform:none;text-shadow:none}}
+@keyframes tp-burst{0%{transform:translateX(-2px) skewX(-6deg);text-shadow:2px 0 #ff7ad9,-2px 0 #6ee5ff}25%{transform:translateX(2px) skewX(4deg);opacity:.65}50%{transform:translateX(-1px);opacity:1;text-shadow:-1px 0 #ff7ad9,1px 0 #6ee5ff}75%{transform:translateX(1px)}100%{transform:none}}
+@media (prefers-reduced-motion:reduce){.tp-row.ld .tp-t,.tp-row.tp-burst .tp-t,.tp-head.tp-gl{animation:none}}
 @media (max-width: 520px) {
   .tesseract-ui {
     padding: 10px 14px 12px;
@@ -3785,6 +3806,95 @@ function dmTransitionStop(){
 }
 
 /* ---------- Neural Network Overlay: node menyambung satu per satu → lanjut di dumul.html ---------- */
+/* ===== Preload 10% per track + teks decode/glitch di area kosong bawah og.jpg (hanya overlay; stage/mesh tak disentuh) ===== */
+var TP=null,TP_SCR='#%&*+=<>/\\|01';
+function tpEase(x){return 1-(1-x)*(1-x);}
+function tpFlash(el,cls,ms){el.classList.add(cls);setTimeout(function(){el.classList.remove(cls);},ms);}
+function tpInit(){
+  var pre=document.getElementById('tesseract-pre'),head=document.getElementById('tp-head');
+  if(!pre||!head){TP=null;return;}
+  var red=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+  TP={red:red,lastGl:0,head:{el:head,text:head.textContent,start:150,dur:720,lastSw:0,done:red},rows:[]};
+  var rows=pre.querySelectorAll('.tp-row'),i,rw,t;
+  for(i=0;i<rows.length;i++){
+    rw=rows[i];t=rw.querySelector('.tp-t');
+    TP.rows.push({el:rw,t:{el:t,text:t.textContent,start:520+i*250,dur:520,lastSw:0,done:red},p:rw.querySelector('.tp-p'),b:rw.querySelector('.tp-b b'),
+      slug:rw.getAttribute('data-s'),real:0,sim:false,pstart:620+i*300,pramp:2800,shown:-1,ok:false});
+  }
+  if(red){head.style.visibility='visible';for(i=0;i<TP.rows.length;i++)TP.rows[i].t.el.style.visibility='visible';}
+}
+/* Posisi: antara dasar stage (og.jpg) dan atas kotak bar. Kalau sempit → diskalakan; terlalu sempit → disembunyikan (layout lama aman). */
+function tpLayout(H){
+  var pre=document.getElementById('tesseract-pre'),inner=document.getElementById('tp-inner');
+  var ui=document.querySelector('#tesseract-warp .tesseract-ui');
+  if(!pre||!inner||!ui)return;
+  var top=Math.round(H)+6,avail=Math.floor(ui.getBoundingClientRect().top-6-top);
+  if(avail<64){pre.style.display='none';return;}
+  pre.style.display='flex';pre.style.top=top+'px';pre.style.height=avail+'px';
+  inner.style.transform='none';
+  var nat=inner.offsetHeight||1,sc=Math.min(1,avail/nat);
+  if(sc<.6){pre.style.display='none';return;}
+  inner.style.transform=sc<1?'scale('+sc.toFixed(3)+')':'none';
+}
+function tpDec(o,el,red){
+  if(o.done){return;}
+  var p=(el-o.start)/o.dur;
+  if(p<0){o.el.style.visibility='hidden';return;}
+  o.el.style.visibility='visible';
+  if(p>=1){o.el.textContent=o.text;o.done=true;return;}
+  if(el-o.lastSw<45)return;
+  o.lastSw=el;
+  var n=o.text.length,rev=Math.floor(p*p*n*1.1),out='',i,c;
+  for(i=0;i<n;i++){c=o.text.charAt(i);out+=(i<rev||c===' ')?c:TP_SCR.charAt(Math.floor(Math.random()*TP_SCR.length));}
+  o.el.textContent=out;
+}
+function tpTick(el){
+  if(!TP)return;
+  tpDec(TP.head,el,TP.red);
+  if(!TP.red&&el>1500&&el-TP.lastGl>1800){TP.lastGl=el;tpFlash(TP.head.el,'tp-gl',260);}
+  var i,r,started,cap,tgt,v,n;
+  for(i=0;i<TP.rows.length;i++){
+    r=TP.rows[i];
+    tpDec(r.t,el,TP.red);
+    started=el>=r.pstart;
+    cap=started?10*tpEase(Math.min(1,(el-r.pstart)/r.pramp)):0;
+    tgt=r.sim?10:r.real;
+    v=Math.min(tgt,cap);                       /* tampilan TIDAK PERNAH melebihi byte yang benar-benar sudah ke-load */
+    if(Math.abs(v-r.shown)>=0.02){
+      r.shown=v;
+      r.b.style.transform='scaleX('+(v/10).toFixed(3)+')';
+      n=Math.round(v);r.p.textContent=(n<10?'0':'')+n+'%';
+    }
+    if(started&&v<9.999)r.el.classList.add('ld');
+    if(v>=9.999&&!r.ok){r.ok=true;r.el.classList.remove('ld');r.el.classList.add('ok');if(!TP.red)tpFlash(r.el,'tp-burst',380);}
+  }
+}
+/* Pemanasan nyata: ambil ~10% byte pertama tiap track (Range). Gagal (offline / file://) → baris itu disimulasikan. */
+function tpWarm(){
+  if(!TP||!window.fetch)return;
+  TP.rows.forEach(function(r){
+    var url=r.slug+'.opus';
+    fetch(url,{method:'HEAD'}).then(function(res){return +res.headers.get('content-length')||0;},function(){return 0;})
+    .then(function(len){
+      var want=len?Math.ceil(len*0.10):300000;
+      return fetch(url,{headers:{Range:'bytes=0-'+(want-1)}}).then(function(res){
+        if(!res.ok&&res.status!==206)throw new Error('bad');
+        if(!res.body||!res.body.getReader)return res.arrayBuffer().then(function(){r.real=10;});
+        var rd=res.body.getReader(),got=0;
+        function pump(){
+          return rd.read().then(function(d){
+            if(d.done){r.real=10;return;}
+            got+=d.value.length;r.real=Math.min(10,got/want*10);
+            if(got>=want){try{rd.cancel();}catch(e){}r.real=10;return;}
+            return pump();
+          });
+        }
+        return pump();
+      });
+    }).catch(function(){r.sim=true;});
+  });
+}
+
 function startTesseractWarp(targetUrl) {
   var warpOverlay = document.getElementById('tesseract-warp');
   if (!warpOverlay) { location.href = targetUrl; return; }
@@ -3845,8 +3955,11 @@ function startTesseractWarp(targetUrl) {
     }
     DM_TR_MESH_W = meshW; DM_TR_MESH_H = meshH;
     net = DM_TR_NET;
+    tpLayout(H);
   }
+  tpInit();
   resizeNeural();
+  tpWarm();
   var onResize = function() { resizeNeural(); };
   window.addEventListener('resize', onResize);
 
@@ -3875,6 +3988,7 @@ function startTesseractWarp(targetUrl) {
       statusText.textContent = statusMessages[msgIdx];
     }
     dmTransitionSpectrum(tctx, W, H, elapsed, 1);
+    tpTick(elapsed);
 
     if (progress < 1) {
       requestAnimationFrame(render);
@@ -6439,6 +6553,19 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
     <canvas id="tesseract-canvas"></canvas>
   </div>
   <div class="tesseract-scan"></div>
+  <!-- Preload 10% per track (area kosong di bawah og.jpg). Posisi diatur tpLayout(). -->
+  <div class="tesseract-pre" id="tesseract-pre">
+    <div class="tp-inner" id="tp-inner">
+      <div class="tp-head" id="tp-head">WELCOME TO THE GLITCH</div>
+      <div class="tp-list">
+        <div class="tp-row" data-s="glitch-instrumental"><span class="tp-t">Glitch (Instrumental)</span><span class="tp-p">00%</span><i class="tp-b"><b></b></i></div>
+        <div class="tp-row" data-s="limerence"><span class="tp-t">Limerence</span><span class="tp-p">00%</span><i class="tp-b"><b></b></i></div>
+        <div class="tp-row" data-s="glitch"><span class="tp-t">Glitch</span><span class="tp-p">00%</span><i class="tp-b"><b></b></i></div>
+        <div class="tp-row" data-s="nastenka"><span class="tp-t">Nastenka</span><span class="tp-p">00%</span><i class="tp-b"><b></b></i></div>
+        <div class="tp-row" data-s="larung"><span class="tp-t">Larung</span><span class="tp-p">00%</span><i class="tp-b"><b></b></i></div>
+      </div>
+    </div>
+  </div>
   <div class="tesseract-ui">
     <div class="tesseract-title">DUMUL // NEURAL INTERFERENCE</div>
     <div class="tesseract-status" id="tesseract-status">&gt; INITIALIZING NEURAL CORE...</div>
