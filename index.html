@@ -4374,6 +4374,10 @@ function drawFloatingTelescope(now){
   TELESCOPE.last=now;
 
   /* --- Movement logic by mode --- */
+  if((TELESCOPE.mode==='warp'||TELESCOPE.mode==='orbit')&&TELESCOPE.follow){
+    var fq=TELESCOPE.follow();
+    if(fq){TELESCOPE.targetX=fq[0];TELESCOPE.targetY=fq[1];}
+  }
   if(TELESCOPE.mode==='warp'){
     /* Fast glide toward the target star */
     var dx=TELESCOPE.targetX-TELESCOPE.x;
@@ -4387,6 +4391,7 @@ function drawFloatingTelescope(now){
     /* Arrived near the star (< 25px) */
     if(dist<25){
       TELESCOPE.mode='orbit';
+      TELESCOPE.ocx=TELESCOPE.targetX;TELESCOPE.ocy=TELESCOPE.targetY;
       TELESCOPE.orbitAngle=Math.atan2(dy,dx);
       if(typeof TELESCOPE.onWarpComplete==='function'){
         TELESCOPE.onWarpComplete();
@@ -4398,7 +4403,7 @@ function drawFloatingTelescope(now){
     var sfxActive=activeSfx&&!activeSfx.paused&&!activeSfx.ended;
     if(!sfxActive){
       /* SFX finished/paused → free drift again */
-      TELESCOPE.mode='drift';
+      TELESCOPE.mode='drift';TELESCOPE.follow=null;
       TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.4+Math.random()*1.8);
       TELESCOPE.vy=(Math.random()<.5?-1:1)*(1.0+Math.random()*1.4);
       TELESCOPE.tx=TELESCOPE.vx;
@@ -4407,8 +4412,10 @@ function drawFloatingTelescope(now){
       /* Orbit the active star */
       TELESCOPE.orbitAngle+=dt*1.2;
       var orbitRadius=38;
-      TELESCOPE.x=TELESCOPE.targetX+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
-      TELESCOPE.y=TELESCOPE.targetY+Math.sin(TELESCOPE.orbitAngle)*orbitRadius;
+      var ok=Math.min(1,dt*9);
+      TELESCOPE.ocx+=(TELESCOPE.targetX-TELESCOPE.ocx)*ok;TELESCOPE.ocy+=(TELESCOPE.targetY-TELESCOPE.ocy)*ok;
+      TELESCOPE.x=TELESCOPE.ocx+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
+      TELESCOPE.y=TELESCOPE.ocy+Math.sin(TELESCOPE.orbitAngle)*orbitRadius;
       TELESCOPE.ang=TELESCOPE.orbitAngle+Math.PI/2; /* Face tangent to orbit */
     }
   }else{
@@ -5883,8 +5890,13 @@ function triggerSupernova(key){
 
   /* 2. Warp telescope to the star; SFX + haptic fire on arrival. */
   TELESCOPE.mode='warp';
-  TELESCOPE.targetX=sx;
-  TELESCOPE.targetY=sy;
+  /* Track the star in sky space: camera pan/zoom/focus moves it on screen, so re-project every frame. */
+  TELESCOPE.follow=function(){
+    var fx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),
+        fy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy);
+    return skyXF(fx,fy); /* pre-gravity: the telescope draw applies lens() itself */
+  };
+  var ft=TELESCOPE.follow();TELESCOPE.targetX=ft[0];TELESCOPE.targetY=ft[1];
   TELESCOPE.onWarpComplete=function(){
     playSfx(SFX[key]);
     haptic(key==='betel'?20:18);
