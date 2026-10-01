@@ -1038,14 +1038,14 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     return first?[first].concat(a):a;
   }
   /* baris tujuan untuk next(+1)/prev(-1); null = berhenti */
-  function pickRow(delta){
+  function pickRow(delta,peek){
     var list=rows();if(!list.length)return null;
     if(SHUF){
       var ok=shufOrder.length===list.length&&list.every(function(r){return shufOrder.indexOf(r)>-1;});
       if(!ok||shufOrder.indexOf(current)<0)shufOrder=reshuffle(list,current);
       var k=shufOrder.indexOf(current)+delta;
       if(k>=0&&k<shufOrder.length)return shufOrder[k];
-      if(REP!==1)return null;
+      if(REP!==1||peek)return null;
       if(delta>0){shufOrder=reshuffle(list,null);if(shufOrder[0]===current&&list.length>1)shufOrder.push(shufOrder.shift());return shufOrder[0];}
       return shufOrder[shufOrder.length-1];
     }
@@ -1565,6 +1565,44 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   ['playing','canplay'].forEach(function(ev){audio.addEventListener(ev,function(){if(seekGlitchUntil>0)seekGlitchUntil=performance.now()+220;});});
   audio.addEventListener('seeking',function(){seekGlitch(260);});
   audio.addEventListener('loadstart',function(){seekGlitch(380);});
+
+  /* ---------- preload ~10% track berikutnya (di belakang layar) ----------
+     Begitu track yang lagi diputar sudah 100% ke-load (termasuk glitch-instrumental hasil handoff),
+     ambil ~10% byte pertama track yang akan diputar berikutnya — ikut mode normal / acak / ulangi semua.
+     Sekali per track per sesi; ulangi-1-lagu tidak ada "berikutnya"; hemat-data / 2G dilewati. */
+  var WARM={};
+  function fullyLoaded(){
+    var d=audio.duration;if(!isFinite(d)||d<=0)return false;
+    var b=audio.buffered,s=0,i;
+    for(i=0;i<b.length;i++)s+=b.end(i)-b.start(i);
+    return s>=d-0.5;
+  }
+  function warmNext(){
+    try{
+      if(!current||!window.fetch||!fullyLoaded())return;
+      var nx=pickRow(1,true);if(!nx||nx===current)return;
+      var slug=slugOf(nx);if(!slug||WARM[slug])return;
+      var c=navigator.connection;if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return;
+      WARM[slug]=1;
+      fetch(srcOf(nx),{headers:{Range:'bytes=0-'}}).then(function(res){
+        if(!res.ok&&res.status!==206)throw 0;
+        var cr=res.headers.get('content-range'),m=cr&&/\/(\d+)$/.exec(cr);
+        var total=m?+m[1]:(+res.headers.get('content-length')||0);
+        if(!res.body||!res.body.getReader||!total){if(res.body&&res.body.cancel)res.body.cancel();return;}
+        var want=Math.ceil(total*0.10),got=0,rd=res.body.getReader();
+        function pump(){return rd.read().then(function(r){
+          if(r.done)return;
+          got+=r.value.length;
+          if(got>=want){try{rd.cancel();}catch(e){}return;}
+          return pump();
+        });}
+        return pump();
+      }).catch(function(){delete WARM[slug];});
+    }catch(e){}
+  }
+  ['progress','suspend','loadedmetadata','canplaythrough'].forEach(function(ev){audio.addEventListener(ev,warmNext);});
+  elRep.addEventListener('click',function(){setTimeout(warmNext,0);});
+  elShuf.addEventListener('click',function(){setTimeout(warmNext,0);});
 
   /* ---------- glitch ngikutin kata kunci di lirik ---------- */
   var KW=/tanpamu|bersamamu|hantui|belenggu|error|loop|corrupt|glitch|watching/i,KW2=/tanpamu|glitch|loop|error|corrupt/i,kwLast=0;
