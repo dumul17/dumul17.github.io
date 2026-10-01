@@ -765,8 +765,6 @@ div[class*="mt-8"][class*="space-y-[1px]"]{margin-top:12px!important}
 75%{text-shadow:1.5px 0 rgba(255,43,214,.4),-1.5px 0 rgba(34,230,255,.4);transform:translate(-1px,0);clip-path:inset(0 0 0 0)}
 100%{transform:none;clip-path:inset(0 0 0 0);text-shadow:0 0 12px rgba(110,229,255,.35);letter-spacing:.06em}}
 @media (prefers-reduced-motion:reduce){#dm-hl .dm-hl-t.dm-hl-hard{animation:none}}
-/* #dm-toast center retired — semua toast lewat #dm-log-toast (nempel dock). Fallback no-style only. */
-#dm-toast{display:none!important}
 /* mini player */
 body.dm-has-bar{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px));background:#0a1218}
 #dm-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;align-items:center;gap:6px;padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(8,14,20,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
@@ -860,12 +858,9 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
   function srcOf(r){var s=slugOf(r);if(s==='limerence'||s==='glitch'||s==='nastenka'||s==='larung')return s+'.opus';return s+'.opus';}
   function fmt(s){if(!isFinite(s)||s<0)return '--:--';s=Math.floor(s);var m=Math.floor(s/60),r=s%60;return(m<10?'0':'')+m+':'+(r<10?'0':'')+r;}
   function toast(msg){
-    try{if(window.__dmToast){window.__dmToast(msg,false,3200);return;}}catch(e){}
-    /* fallback sebelum dock script siap */
-    var t=document.getElementById('dm-toast');
-    if(!t){t=document.createElement('div');t.id='dm-toast';document.body.appendChild(t);}
-    t.textContent=msg;t.style.display='block';
-    clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none';},3500);
+    try{if(window.__dmToast){window.__dmToast(msg,false,3200,'ui');return;}}catch(e){}
+    /* dock belum siap: titip, dikirim begitu __dmToast ada */
+    (window.__dmToastPending=window.__dmToastPending||[]).push([msg,3200]);
   }
   function safePlay(){var p=audio.play();if(p&&p.catch)p.catch(function(){});}
   window.__dmPlayer={audio:audio,rows:rows,title:function(r){try{var x=r||current;return x?titleOf(x):'';}catch(e){return '';}}};
@@ -1281,6 +1276,7 @@ h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
     var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
     hlT.classList.remove('dm-hl-hard');hlT.classList.remove('dm-hl-glitch');void hlT.offsetWidth;
     el.classList.add('on');
+    try{if(window.__dmReplaceToast)window.__dmReplaceToast();}catch(e){}
     if(reduce){hlT.textContent=text;return;}
     hlT.classList.add('dm-hl-glitch');
     var n=text.length,dur=Math.min(750,320+n*14),t0=performance.now(),lastSw=0;
@@ -1917,9 +1913,14 @@ section.dm-hero canvas { cursor: crosshair; touch-action: manipulation; }
     var line = String(msg||'').replace(/\s+/g,' ').trim().slice(0,52);
     if(!line)return;
     try{
-      if(hot && window.__dmLog){ window.__dmLog(line, true, false); return; }
-      if(window.__dmToast){ window.__dmToast(line, false, 2200); return; }
-      if(window.__dmLog){ window.__dmLog(line, false, false); return; }
+      if(hot){
+        /* hist saja (silent) + toast lewat jalur depan antrean → muncul seketika, gak nunggu toast lain */
+        if(window.__dmLog) window.__dmLog(line, true, true);
+        if(window.__dmToast) window.__dmToast(line, true, 2200, 'front');
+        return;
+      }
+      /* tier ringan: antre biasa, boleh di-drop / basi, gak nimpa toast lain */
+      if(window.__dmToast) window.__dmToast(line, false, 2200, 'soft');
     }catch(e){}
   }
   /* Expose for player loop */
@@ -2067,7 +2068,7 @@ body.dm-has-bar #dm-dock:not([data-parked]){bottom:calc(76px + env(safe-area-ins
 @media (prefers-reduced-motion:reduce){#dm-obs{transition-duration:.01s!important}}
 /* Toast dock: selalu di-anchor JS ke #dm-dock (placeNearDock) */
 #dm-log-toast{
-  position:fixed;left:60px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;
+  position:fixed;left:60px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:41; /* di atas #dm-bar (40) supaya gak ketutup bar */
   max-width:min(56vw,240px);
   font:400 9px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;
   color:rgba(110,229,255,.85);text-shadow:0 0 6px rgba(0,0,0,.9);
@@ -2307,6 +2308,30 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
       box.style.maxHeight=Math.min(window.innerHeight*0.48,Math.max(140,spaceBelow-gap))+'px';
     }
   }
+  /* Area yang gak boleh ditimpa toast/obs: bar player (+ mini spektrum), baris lirik hero, panel lirik terbuka. */
+  function avoidRects(){
+    var out={rects:[],barTop:null},vh=window.innerHeight||640,vw=window.innerWidth||360;
+    function add(el){
+      if(!el)return null;
+      var r=el.getBoundingClientRect();
+      if(r.width<2||r.height<2||r.bottom<0||r.top>vh||r.right<0||r.left>vw)return null;
+      out.rects.push(r);return r;
+    }
+    var bar=document.getElementById('dm-bar');
+    if(bar&&bar.classList.contains('dm-show')){
+      var br=add(bar);
+      if(br)out.barTop=br.top;
+      var mini=document.getElementById('dm-mini');
+      if(mini&&parseFloat(getComputedStyle(mini).opacity)>0.05){
+        var mr=add(mini);
+        if(mr&&(out.barTop===null||mr.top<out.barTop))out.barTop=mr.top;
+      }
+    }
+    var hl=document.getElementById('dm-hl');
+    if(hl&&hl.classList.contains('on'))add(hl);
+    add(document.querySelector('.dm-lyrics.dm-open'));
+    return out;
+  }
   /* Anchor UI ke dock: pilih sisi terdekat yang muat — jangan pernah loncat ke ujung layar jauh. */
   function placeNearDock(el, tw, th, fit){
     var r=dock.getBoundingClientRect();
@@ -2334,6 +2359,9 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     ];
     /* prefer sisi menghadap pusat layar */
     if(cx>=mid){cands=[cands[1],cands[0],cands[2],cands[3]];}
+    var avoid=avoidRects();
+    /* dock ketutup bar player? kandidat tambahan: tepat di atas bar */
+    if(avoid.barTop!==null)cands.push({left:cx-tw/2, top:avoid.barTop-th-gap});
     var best=null,bestScore=1e15;
     for(var i=0;i<cands.length;i++){
       var c=cands[i];
@@ -2344,6 +2372,15 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
       var dx=(L+tw/2)-cx,dy=(T+th/2)-cy;
       var dist=Math.sqrt(dx*dx+dy*dy);
       var score=dist+drift*4+(drift>28?200:0);
+      /* penalti kalau nimpa bar / lirik */
+      var ov=0;
+      for(var j=0;j<avoid.rects.length;j++){
+        var a=avoid.rects[j];
+        var ix=Math.min(L+tw,a.right)-Math.max(L,a.left);
+        var iy=Math.min(T+th,a.bottom)-Math.max(T,a.top);
+        if(ix>0&&iy>0)ov+=ix*iy;
+      }
+      if(ov>0)score+=Math.min(1,ov/Math.max(1,tw*th))*500;
       if(score<bestScore){bestScore=score;best={left:L,top:T};}
     }
     el.style.left=best.left+'px';
@@ -2439,10 +2476,21 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     },holdMs||2800);
   }
   /* Toast UI saja (tanpa hist) — dipakai player/deck/settings. Selalu nempel ke dock. */
-  window.__dmToast=function(msg,hot,holdMs){
+  /* mode: 'ui'/'front' = feedback langsung (depan antrean, gak di-drop) · 'soft' = antre biasa, bisa di-drop/basi · kosong = antre biasa */
+  window.__dmToast=function(msg,hot,holdMs,mode){
     if(box.classList.contains('open'))return; /* panel terbuka = jangan ganggu */
-    showToast(msg,!!hot,holdMs||2600);
+    var m=String(msg||'');if(!m)return;
+    var fr=(mode==='ui'||mode==='front');
+    enqueueToast({msg:m,hot:!!hot,hold:holdMs||2600,at:Date.now(),keep:fr,front:fr,soft:mode==='soft'});
   };
+  window.__dmReplaceToast=function(){if(toastEl.classList.contains('on'))placeToast();};
+  /* toast yang dititip sebelum dock siap */
+  setTimeout(function(){
+    try{
+      var pend=window.__dmToastPending;window.__dmToastPending=null;
+      if(pend)for(var i=0;i<pend.length;i++)window.__dmToast(pend[i][0],false,pend[i][1],'ui');
+    }catch(e){}
+  },0);
   function setOpen(on){
     box.classList.toggle('open',on);
     box.setAttribute('aria-hidden',on?'false':'true');
@@ -2485,16 +2533,42 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   var nullBusy=false,conflictBusy=false,bugBusy=false;
   function narrLock(ms){narrBusy=true;narrUntil=Date.now()+(ms||4000);}
   function narrFree(){if(Date.now()>=narrUntil)narrBusy=false;}
-  /* Antrian toast: urutan terjaga, hot selalu masuk, non-hot dibuang kalau antrian sudah >=2 */
-  var toastQ=[],toastBusy=false,TOAST_HOLD=1400;
+  /* Antrian toast TUNGGAL (log() + __dmToast lewat sini). Urutan terjaga.
+     - hot / keep selalu masuk; non-hot dibuang kalau antrean sudah >=2
+     - front (feedback user: settings, error audio, tap hot) disisipkan di depan, dan memotong toast yang sudah tampil >=700ms
+     - soft yang sudah basi (>2.5s di antrean) dilewati */
+  var toastQ=[],toastBusy=false,toastSlotT=0,toastSlotAt=0,toastCur='',TOAST_HOLD=1400,TOAST_MIN=700;
   function drainToast(){
     if(toastBusy)return;
-    var e=toastQ.shift();
+    var e=null;
+    while(toastQ.length){
+      var c=toastQ.shift();
+      if(c.soft&&Date.now()-c.at>2500)continue;
+      e=c;break;
+    }
     if(!e)return;
     if(box.classList.contains('open')){toastQ.length=0;return;}
-    toastBusy=true;
-    showToast(e.msg,e.hot);
-    setTimeout(function(){toastBusy=false;drainToast();},TOAST_HOLD);
+    toastBusy=true;toastSlotAt=Date.now();toastCur=e.msg;
+    showToast(e.msg,e.hot,e.hold);
+    clearTimeout(toastSlotT);
+    toastSlotT=setTimeout(function(){toastBusy=false;drainToast();},e.keep?Math.min(e.hold||1800,1800):TOAST_HOLD);
+  }
+  function enqueueToast(entry){
+    if(box.classList.contains('open'))return;
+    var last=toastQ.length?toastQ[toastQ.length-1]:null;
+    if(last&&last.msg===entry.msg)return;
+    if(toastBusy&&!toastQ.length&&toastCur===entry.msg)return;
+    if(entry.front){
+      toastQ.unshift(entry);
+    }else{
+      if(!entry.hot&&!entry.keep&&toastQ.length>=2)return;
+      if(toastQ.length>=6)toastQ.shift();
+      toastQ.push(entry);
+    }
+    if(!toastBusy)drainToast();
+    else if(entry.front&&Date.now()-toastSlotAt>=TOAST_MIN){
+      clearTimeout(toastSlotT);toastBusy=false;drainToast();
+    }
   }
   function log(msg,hot,silent){
     var entry={ts:stamp(),msg:String(msg).slice(0,60),hot:!!hot};
@@ -2502,10 +2576,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     while(hist.length>MAXHIST)hist.shift();
     if(box.classList.contains('open')){renderList();return;}
     if(silent)return;
-    if(!hot&&toastQ.length>=2)return;
-    if(toastQ.length>=6)toastQ.shift();
-    toastQ.push(entry);
-    drainToast();
+    enqueueToast({msg:entry.msg,hot:entry.hot,hold:2800,at:Date.now()});
   }
   function pair(a,b,gap,hotB){log(a,true);setTimeout(function(){log(b,hotB!==false);},gap||1400);}
   window.__dmLog=function(msg,hot,silent){log(msg,hot,silent);};
@@ -3115,11 +3186,8 @@ html.dm-lowfx section.dm-hero{box-shadow:none!important}
   var chips={};
 
   function toast(m){
-    try{if(window.__dmToast){window.__dmToast(m,false,3000);return;}}catch(e){}
-    var t=q('dm-toast');
-    if(!t){t=document.createElement('div');t.id='dm-toast';document.body.appendChild(t);}
-    t.textContent=m;t.style.display='block';
-    clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none';},3000);
+    try{if(window.__dmToast){window.__dmToast(m,false,3000,'ui');return;}}catch(e){}
+    (window.__dmToastPending=window.__dmToastPending||[]).push([m,3000]);
   }
 
   /* ---------- mode hemat daya ---------- */
