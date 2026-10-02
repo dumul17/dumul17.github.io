@@ -1944,7 +1944,6 @@ function ensureAVGraph(){
       AV.an.maxDecibels=-12;
       AV.data=new Uint8Array(AV.an.frequencyBinCount);
       AV.prev=new Uint8Array(AV.an.frequencyBinCount);
-      try{AV.an.connect(AV.ctx.destination);}catch(eConn){}
     }
     if(!AV.lpf){
       try{
@@ -1952,9 +1951,12 @@ function ensureAVGraph(){
         AV.lpf.type='lowpass';
         AV.lpf.frequency.value=16000;
         AV.lpf.Q.value=0.707;
-        AV.lpf.connect(AV.an);
+        AV.lpf.connect(AV.ctx.destination);
       }catch(eLpf){AV.lpf=null;}
     }
+    /* Analyser is a pure tap (never muffled) so the Gargantua spikes keep full spectrum;
+       audible output goes src -> lpf -> destination (or src -> an -> destination w/o lpf). */
+    if(!AV.lpf&&!AV._anOut){try{AV.an.connect(AV.ctx.destination);AV._anOut=true;}catch(eConn){}}
     if(AV.ctx.state!=='running'&&AV.ctx.resume){
       try{
         var rp=AV.ctx.resume();
@@ -1988,8 +1990,8 @@ function audioVizInit(a){
     if(!AV.sources[key]){
       try{
         var src=AV.ctx.createMediaElementSource(a);
-        if(AV.lpf){try{src.connect(AV.lpf);}catch(e1){src.connect(AV.an);}}
-        else src.connect(AV.an);
+        src.connect(AV.an);
+        if(AV.lpf){try{src.connect(AV.lpf);}catch(e1){try{AV.an.connect(AV.ctx.destination);AV._anOut=true;}catch(e2){}}}
         AV.sources[key]=src;
       }catch(srcErr){
         /* Element may already be wired from a previous session attempt. */
@@ -1998,8 +2000,8 @@ function audioVizInit(a){
     }else{
       /* Re-assert graph connection after a suspended/resumed context. */
       try{
+        AV.sources[key].connect(AV.an);
         if(AV.lpf)AV.sources[key].connect(AV.lpf);
-        else AV.sources[key].connect(AV.an);
       }catch(eRe){}
     }
     unlockAudioGraph();
@@ -2031,6 +2033,12 @@ function activeStarScreenPos(){
 }
 function updateSpatialAttenuation(){
   if(!AV.lpf||!AV.ctx||AV.fallback||!activeSfx||activeSfx.paused||activeSfx.ended){AV.atten=0;return;}
+  if(!CAMERA_MODE){
+    if(AV.atten<.004){AV.atten=0;return;}
+    AV.atten*=.9;
+    try{AV.lpf.frequency.setTargetAtTime(400+15600*Math.pow(1-AV.atten,1.65),AV.ctx.currentTime,.06);}catch(e0){}
+    return;
+  }
   var p=activeStarScreenPos();
   if(!p||p[2]>=1){AV.atten=Math.min(1,AV.atten*.92+.55*.08);}
   else{
@@ -2052,7 +2060,7 @@ function updateAudioViz(now){
     var ph=(t*2.35)%1;
     var pulse=Math.pow(Math.max(0,1-Math.abs(ph-.10)/.14),1.7);
     var swing=.5+.5*Math.sin(t*2.7);
-    var att=1-.55*AV.atten;
+    var att=1;
     AV.bass+=((.10+.58*pulse+.08*swing)*att-AV.bass)*.34;
     AV.mid+=((.07+.32*(.5+.5*Math.sin(t*7.1+1.2)))*att-AV.mid)*.25;
     AV.high+=((.04+.22*(.5+.5*Math.sin(t*12.7+2.4)))*att-AV.high)*.22;
@@ -2062,8 +2070,7 @@ function updateAudioViz(now){
     return;
   }
   if(!AV.ready||!AV.an||!AV.data)return;
-  var period=AV.atten>0.55?4:(AV.atten>0.28?3:2);
-  if(IS_POTATO)period=Math.max(period,3);
+  var period=IS_POTATO?3:2;
   AV._tick=(AV._tick+1)%period;
   if(AV._tick){AV.beat*=.94;return;}
   try{
@@ -2097,7 +2104,7 @@ function updateAudioViz(now){
       if(i<=bn)bass+=v;else if(i<=mn)mid+=v;else high+=v;
     }
     bass/=bn;mid/=Math.max(1,mn-bn);high/=Math.max(1,lim-mn);
-    var att=1-.48*AV.atten;
+    var att=1;
     AV.bass+=(bass*att-AV.bass)*.30;
     AV.mid+=(mid*att-AV.mid)*.24;
     AV.high+=(high*att-AV.high)*.20;
@@ -3002,7 +3009,7 @@ function alignmentSequence(c){
   }
   return order;
 }
-var ALIGN_IDLE_MS=8000;
+var ALIGN_IDLE_MS=15000;
 function beginAlignment(c){
   if(!c)return;
   ALIGN.cid=c.id;ALIGN.seq=alignmentSequence(c);ALIGN.next=0;ALIGN.lit=Object.create(null);ALIGN.dim=1;ALIGN.last=performance.now();
@@ -3016,7 +3023,7 @@ function endAlignment(ok){
   var cid=ALIGN.cid;ALIGN.cid=null;ALIGN.seq=[];ALIGN.next=0;ALIGN.lit=null;ALIGN.dim=ok?0:.35;return cid;
 }
 /* Alignment only starts when the first star of the sequence is tapped (so random taps never
-   dim the sky), restarts on that star, aborts on a wrong tap, and times out when idle. */
+   dim the sky), restarts on that star, ignores wrong taps, and times out when idle. */
 function alignTapStar(c,starKey){
   if(!c||!starKey||!c.stars||!c.stars[starKey])return false;
   var seq=alignmentSequence(c);if(!seq.length)return false;
@@ -3045,10 +3052,21 @@ function alignTapStar(c,starKey){
     return true;
   }
   if(ALIGN.lit&&ALIGN.lit[starKey])return false; /* re-tap of an already lit star: ignore */
-  endAlignment(false);
-  if(typeof showModeToast==='function')showModeToast('SEQUENCE LOST\nTAP THE FIRST STAR TO RETRY',null,1600);
+  /* Forgiving: a wrong / audio-trigger star tap is ignored (no reset). Progress is only lost
+     by the idle timeout, or by re-tapping the first star to restart. */
   if(typeof haptic==='function')haptic(4);
   return false;
+}
+/* Bintang audio-trigger (Rigel, Betelgeuse, Sirius, Aldebaran, Arcturus, Antares) punya tombol
+   DOM sendiri (#xxx-fx) yang nangkep tap sebelum handler canvas. Tanpa jembatan ini, tap di situ
+   cuma bunyiin SFX dan nggak pernah dihitung sebagai langkah alignment. */
+function alignFx(key){
+  try{
+    var tr=(typeof TRIGGERS!=='undefined')?TRIGGERS[key]:null;
+    if(!tr||tr.cons==='pleiades')return;
+    var c=cons(tr.cons);if(!c)return;
+    alignTapStar(c,tr.star);
+  }catch(err){}
 }
 function updateAlignmentDim(now){
   if(ALIGN.cid){
@@ -5474,7 +5492,6 @@ function drawTriggerVisuals(now){
     var breathe=reduce?0.5:(.5+.5*Math.sin(now*.0025+s.ph));
     var strength=((selected?1:.42)+(hovered?.42:0))*focus;
     if(typeof lastSignalKey!=='undefined'&&key===lastSignalKey&&typeof lastSignalGlowUntil!=='undefined'&&now<lastSignalGlowUntil)strength=Math.max(strength,.85);
-    if(selected&&typeof AV!=='undefined')strength*=(1-.38*AV.atten);
     var base=TRIGGER_PULSE_BASE;
     var pulseR=base+2.2+6.5*phase;
     var outerR=base+5.5+7.5*phase;
@@ -6469,8 +6486,10 @@ function updateHover(px,py){
 }
 document.addEventListener('pointerdown',function(e){
   if(SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
-  var now=performance.now(),hit=null,best=18;
-  var ph=pleiadesHitAt(e.clientX,e.clientY);
+  var now=performance.now(),hit=null,best=40;
+  var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
+  /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
+  var ph=aligning?null:pleiadesHitAt(e.clientX,e.clientY);
   if(ph){
     tapFlash={until:now+420,cons:'pleiades'};
     triggerSupernova('pleione');
@@ -6481,7 +6500,12 @@ document.addEventListener('pointerdown',function(e){
       /* Same gSky projection as drawing/hover, so a tap still lands on the
          star after the sky has been rotated with a 2-finger twist. */
       var s=c.stars[k],q=gSky(s.x+c.ox,s.y+c.oy),d=Math.hypot(e.clientX-q[0],e.clientY-q[1]);
-      if(d<Math.max(13,s.r*4)&&d<best)hit={c:c,star:k},best=d;
+      var hr=Math.min(18,Math.max(13,s.r*4)); /* perilaku lama: cap 18px */
+      /* Alignment: bintang target berikutnya dapet hit radius gede (mobile-friendly). */
+      var isNext=aligning&&ALIGN.cid===c.id&&ALIGN.seq[ALIGN.next]===k;
+      if(isNext)hr=Math.max(26,s.r*8);
+      /* Target berikutnya selalu menang kalau tap-nya masuk radiusnya, walau ada bintang lain yang lebih dekat. */
+      if(d<hr&&(isNext||d<best)){hit={c:c,star:k};best=isNext?-1:d;}
     });
   });
   if(hit){
@@ -6535,7 +6559,7 @@ function bhGrabRadius(){
   var base=Math.min(W,H);
   return Math.max(BH.R*2.8,Math.min(base*.18,110));
 }
-function constellationTargetAt(x,y){
+function constellationTargetAt(x,y,skipTelescope){
   var found=false;
   if(pleiadesHitAt(x,y))found=true;
   CONS.forEach(function(c){
@@ -6549,7 +6573,7 @@ function constellationTargetAt(x,y){
       if(d<Math.max(14,s.r*4.5))found=true;
     });
   });
-  if(telescopeHitAt(x,y))found=true;
+  if(!skipTelescope&&telescopeHitAt(x,y))found=true;
   return found;
 }
 function beginBHDrag(e){
@@ -6774,41 +6798,41 @@ document.addEventListener('wheel',function(e){
 var rgFx=$('#rigel-fx');
 rgFx.addEventListener('mouseenter',function(){hot='rigel';});
 rgFx.addEventListener('mouseleave',function(){if(hot==='rigel')hot=null;});
-rgFx.addEventListener('click',function(){if(!SW)triggerSupernova('rigel');});
+rgFx.addEventListener('click',function(){if(!SW){alignFx('rigel');triggerSupernova('rigel');}});
 
 var btFx=$('#betel-fx');
 btFx.addEventListener('mouseenter',function(){hot='betel';});
 btFx.addEventListener('mouseleave',function(){if(hot==='betel')hot=null;});
-btFx.addEventListener('click',function(){if(!SW)triggerSupernova('betel');});
+btFx.addEventListener('click',function(){if(!SW){alignFx('betel');triggerSupernova('betel');}});
 
 var srFx=$('#sirius-fx');
 srFx.addEventListener('mouseenter',function(){hot='sirius';});
 srFx.addEventListener('mouseleave',function(){if(hot==='sirius')hot=null;});
-srFx.addEventListener('click',function(){if(!SW)triggerSupernova('sirius');});
+srFx.addEventListener('click',function(){if(!SW){alignFx('sirius');triggerSupernova('sirius');}});
 
 var plFx=$('#pleione-fx');
 if(plFx){
   plFx.addEventListener('mouseenter',function(){hot='pleione';});
   plFx.addEventListener('mouseleave',function(){if(hot==='pleione')hot=null;});
-  plFx.addEventListener('click',function(){if(!SW)triggerSupernova('pleione');});
+  plFx.addEventListener('click',function(){if(!SW){alignFx('pleione');triggerSupernova('pleione');}});
 }
 var adFx=$('#aldebaran-fx');
 if(adFx){
   adFx.addEventListener('mouseenter',function(){hot='aldebaran';});
   adFx.addEventListener('mouseleave',function(){if(hot==='aldebaran')hot=null;});
-  adFx.addEventListener('click',function(){if(!SW)triggerSupernova('aldebaran');});
+  adFx.addEventListener('click',function(){if(!SW){alignFx('aldebaran');triggerSupernova('aldebaran');}});
 }
 var arcFx=$('#arcturus-fx');
 if(arcFx){
   arcFx.addEventListener('mouseenter',function(){hot='arcturus';});
   arcFx.addEventListener('mouseleave',function(){if(hot==='arcturus')hot=null;});
-  arcFx.addEventListener('click',function(){if(!SW)triggerSupernova('arcturus');});
+  arcFx.addEventListener('click',function(){if(!SW){alignFx('arcturus');triggerSupernova('arcturus');}});
 }
 var antFx=$('#antares-fx');
 if(antFx){
   antFx.addEventListener('mouseenter',function(){hot='antares';});
   antFx.addEventListener('mouseleave',function(){if(hot==='antares')hot=null;});
-  antFx.addEventListener('click',function(){if(!SW)triggerSupernova('antares');});
+  antFx.addEventListener('click',function(){if(!SW){alignFx('antares');triggerSupernova('antares');}});
 }
 
 /* ---------- easter eggs ---------- */
@@ -6912,6 +6936,11 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
 document.addEventListener('pointerdown',function(e){
   if(SW)return;
   if(telescopeHitAt(e.clientX,e.clientY)){
+    /* Priority: bintang menang dari teleskop. Saat alignment aktif, teleskop pasif total
+       (tidak muncul bubble, tidak makan tap). Tap di bintang yang lagi ketimpa teleskop
+       tetap diproses sebagai tap bintang. */
+    if(typeof ALIGN!=='undefined'&&ALIGN.cid)return;
+    if(constellationTargetAt(e.clientX,e.clientY,true))return;
     e.stopPropagation();
     /* Cancel any sky-pan that capture-phase may have started on a near miss. */
     if(skyDrag.on&&skyDrag.pid===e.pointerId){
