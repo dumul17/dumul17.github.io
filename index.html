@@ -106,6 +106,9 @@ footer nav svg{width:15px;height:15px;display:block}
 ,.hit{position:fixed;left:0;top:0;z-index:4}
 .portal{display:block;margin-top:-20px;color:#eaf6ff;text-decoration:none;opacity:0;transition:opacity .9s;will-change:transform;pointer-events:auto}
 .portal.on{opacity:1}
+/* Alignment aktif: portal (panel + tombol hit sabuk Orion) & Pleione ngalah, biar tap jatuh ke bintang. */
+body.aligning .portal,body.aligning .portal-hit,body.aligning #pleione-fx{pointer-events:none!important}
+body.aligning .portal{opacity:0!important}
 .portal .lab{display:block;padding:5px 9px;border-left:1px solid rgba(110,229,255,.55);background:linear-gradient(90deg,rgba(6,11,17,.6),transparent)}
 .portal b{display:block;font:700 11px/1.1 'Syne',sans-serif;letter-spacing:.16em;text-transform:uppercase}
 .portal small{display:block;margin-top:3px;font-size:9px;letter-spacing:.05em;color:rgba(184,198,214,.82)}
@@ -2007,7 +2010,7 @@ function audioVizInit(a){
     unlockAudioGraph();
     AV.fallback=false;
     AV.ready=true;
-    AV.skip=0;AV.avgFlux=0;AV.lastBeatT=0;
+    AV.skip=0;AV.avgFlux=0;AV.lastBeatT=0;AVP.stamp=-1;if(AVP.sm)AVP.sm.fill(0);
     return true;
   }catch(e){AV.fallback=true;AV.ready=false;return true;}
 }
@@ -2075,6 +2078,7 @@ function updateAudioViz(now){
   if(AV._tick){AV.beat*=.94;return;}
   try{
     AV.an.getByteFrequencyData(AV.data);
+    AV.skip=(AV.skip+1)&0x3fffffff; /* invalidate AVP so the ring profile follows the live spectrum */
     var n=AV.data.length,i,e=0,flux=0;
     /* Read a slightly wider low-frequency band so big kicks/bass drops are
        caught even when their energy is spread across neighbouring FFT bins. */
@@ -2185,6 +2189,7 @@ function ensureAVProfile(){
   if(AVP.N===N&&AVP.pts)return N;
   AVP.N=N;
   AVP.pts=new Float32Array(N*3);
+  AVP.raw=new Float32Array(N);AVP.sm=new Float32Array(N);
   for(var j=0;j<N;j++){
     var ang=(j/N)*6.28318530718-Math.PI*.5;
     AVP.pts[j*3]=Math.cos(ang);
@@ -2223,7 +2228,16 @@ function buildAVProfile(){
 
     /* A tiny floor keeps quiet music visible without creating fake spikes. */
     fv=Math.max(.025,Math.min(1,fv));
-    pts[j*3+2]=fv;
+    AVP.raw[j]=fv;
+  }
+  /* Calm the ring: 3-tap spatial blend (neighbouring FFT bins are noisy) then fast-attack /
+     slow-release per bar, so spikes ride the music instead of jittering all over the circle. */
+  var raw=AVP.raw,sm=AVP.sm;
+  for(var j2=0;j2<N;j2++){
+    var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
+    var tgt=a0*.25+a1*.5+a2*.25;
+    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.6:.22);
+    pts[j2*3+2]=sm[j2];
   }
   AVP.stamp=AV.skip;
 }
@@ -3013,6 +3027,7 @@ var ALIGN_IDLE_MS=15000;
 function beginAlignment(c){
   if(!c)return;
   ALIGN.cid=c.id;ALIGN.seq=alignmentSequence(c);ALIGN.next=0;ALIGN.lit=Object.create(null);ALIGN.dim=1;ALIGN.last=performance.now();
+  document.body.classList.add('aligning'); /* UI lain ngalah: portal/teleskop/pleione pasif */
   if(typeof showModeToast==='function'&&performance.now()-ALIGN.toastAt>900){
     ALIGN.toastAt=performance.now();
     var lab=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[c.id])?CONS_LABELS[c.id]:c.id;
@@ -3020,7 +3035,8 @@ function beginAlignment(c){
   }
 }
 function endAlignment(ok){
-  var cid=ALIGN.cid;ALIGN.cid=null;ALIGN.seq=[];ALIGN.next=0;ALIGN.lit=null;ALIGN.dim=ok?0:.35;return cid;
+  var cid=ALIGN.cid;ALIGN.cid=null;ALIGN.seq=[];ALIGN.next=0;ALIGN.lit=null;ALIGN.dim=ok?0:.35;
+  document.body.classList.remove('aligning');return cid;
 }
 /* Alignment only starts when the first star of the sequence is tapped (so random taps never
    dim the sky), restarts on that star, ignores wrong taps, and times out when idle. */
@@ -3223,7 +3239,7 @@ PORTALS.forEach(function(p){
   a.querySelector('b').textContent=p.title;a.querySelector('small').textContent=p.sub;
   var h=document.createElement('button');
   h.type='button';
-  h.className='hit';
+  h.className='hit portal-hit';
   h.setAttribute('aria-label','Toggle portal '+p.title);
   if(p.ext){a.target='_blank';a.rel='noopener';}
   [a,h].forEach(function(el){
@@ -3267,6 +3283,34 @@ var AST_SPRITES=null,AST_SPRITE_R=24;
 var bgCanvas=null,bgCtx=null,bgDirty=true;
 /* Astrophotography plate: deep layer (dust/band/galaxies) + mid layer (stars/HUD/grid), both baked offscreen. */
 var plateDeep=null,plateM=28,plateDPR=0;
+/* Dust depth layers: 2 transparent plates baked ONCE at low res, drifting on sine paths with
+   their own parallax speed. Per-frame cost = 2 drawImage; nothing is re-rendered. */
+var plateDust=[];
+function bakeDustLayers(M,EW,EH){
+  plateDust=[];
+  if(IS_POTATO)return; /* low-end devices: keep the single deep plate, no extra layers */
+  var ds=Math.min(DPR,.5);
+  /* far = cool/slow/wide, near = warm/faster/tighter. Parallax stays below the star layer (.35)
+     so depth ordering matches speed ordering. */
+  var defs=[
+    {seed:0xD0571,n:6,rmin:.38,rmax:.62,a:[.035,.055],cols:['110,160,255','140,120,230','110,229,255'],par:.21,amp:10,per:95,zf:.70},
+    {seed:0xD0572,n:7,rmin:.22,rmax:.42,a:[.030,.050],cols:['255,122,217','255,196,140','140,120,230'],par:.29,amp:18,per:62,zf:.85}
+  ];
+  for(var li=0;li<defs.length;li++){
+    var d=defs[li],rnd=plateRng(d.seed),cvs=document.createElement('canvas');
+    cvs.width=Math.max(1,Math.round(EW*ds));cvs.height=Math.max(1,Math.round(EH*ds));
+    var c=cvs.getContext('2d');c.setTransform(ds,0,0,ds,M*ds,M*ds);
+    for(var i=0;i<d.n;i++){
+      var x=(.12+rnd()*.76)*W,y=(.10+rnd()*.80)*H,r=(d.rmin+rnd()*(d.rmax-d.rmin))*Math.max(W,H)*.5;
+      var col=d.cols[(rnd()*d.cols.length)|0],al=d.a[0]+rnd()*(d.a[1]-d.a[0]);
+      c.save();c.translate(x,y);c.rotate((rnd()-.5)*1.6);c.scale(1,.35+rnd()*.3);
+      var gr=c.createRadialGradient(0,0,0,0,0,r);
+      gr.addColorStop(0,'rgba('+col+','+al+')');gr.addColorStop(.5,'rgba('+col+','+(al*.42)+')');gr.addColorStop(1,'rgba('+col+',0)');
+      c.fillStyle=gr;c.beginPath();c.arc(0,0,r,0,6.283);c.fill();c.restore();
+    }
+    plateDust.push({c:cvs,par:d.par,amp:d.amp,per:d.per,zf:d.zf,ph:li*2.1});
+  }
+}
 var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null,sx:0,sy:0,hitR:40};
 function telescopeHitRadius(){
   /* Generous mobile-friendly target; scales a bit with viewport. */
@@ -3451,6 +3495,7 @@ function bakeAstroPlates(){
       bgCtx.restore();
     })();
 
+  bakeDustLayers(M,EW,EH);
 }
 /* One layer blit: zoom about screen centre (deep layer zooms less => parallax depth) + offset. */
 function plateBlit(c,m,pw,ph,z,ox,oy){
@@ -5350,9 +5395,9 @@ function drawShooting(now){
   if(reduce||IS_POTATO)return;
   if(!idleMode&&(now-lastActivity)>IDLE_MS)idleMode=true;
   if(idleMode)return; /* Energy saver: no new shooting stars while idle */
-  var ssDim=typeof secondaryFxScale==='function'&&secondaryFxScale()>0.55;
-  if(ssDim&&!SS.length)return;
-  if(!ssDim&&now>nextSS&&!SW){nextSS=now+6000+Math.random()*7000;
+  /* Shooting stars stay alive during star SFX and constellation alignment too
+     (they used to be gated by secondaryFxScale, which only heavier FX like asteroids should obey). */
+  if(now>nextSS&&!SW){nextSS=now+6000+Math.random()*7000;
     var ang=(.14+Math.random()*.14)*Math.PI,sp=560+Math.random()*320,dir=Math.random()<.5?1:-1;
     SS.push({x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850});}
   for(var i=SS.length-1;i>=0;i--){
@@ -5919,6 +5964,7 @@ function drawPortals(age,now){
       p.hitEl.style.transform='translate('+(hp[0]).toFixed(1)+'px,'+(hp[1]).toFixed(1)+'px)';
     }
     if(na<=0)return;
+    if(typeof ALIGN!=='undefined'&&ALIGN.cid){p.el.classList.remove('mobile-show');return;}
     if(!p.el.classList.contains('on'))p.el.classList.add('on');
 
     /* Desktop always visible; mobile only when .mobile-show is toggled on. */
@@ -5998,6 +6044,13 @@ function frame(now){
       var pM=plateM,pW=W+2*pM,pH=H+2*pM;
       var pmx=0,pmy=0;
       if(plateDeep)plateBlit(plateDeep,pM,pW,pH,1+(skyZoom-1)*.55,skyPan.x*.14+pmx*4,skyPan.y*.14+pmy*3);
+      /* Drifting dust depth layers (static when prefers-reduced-motion). */
+      for(var dli=0;dli<plateDust.length;dli++){
+        var dl=plateDust[dli],dt2=reduce?0:now*.001,
+            ddx=reduce?0:Math.sin(dt2*6.2832/dl.per+dl.ph)*dl.amp,
+            ddy=reduce?0:Math.cos(dt2*6.2832/(dl.per*1.37)+dl.ph)*dl.amp*.6;
+        plateBlit(dl.c,pM,pW,pH,1+(skyZoom-1)*dl.zf,skyPan.x*dl.par+ddx,skyPan.y*dl.par+ddy);
+      }
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
     }
     drawFloatingTelescope(now);
@@ -6523,7 +6576,7 @@ document.addEventListener('pointerdown',function(e){
       playStarChime(hit.c.stars[hit.star]);
 
       /* Toggle portal DUMUL jika pengguna nge-tap bintang Sabuk Orion (Mintaka/Alnilam/Alnitak) */
-      if(hit.c.id==='orion'&&(hit.star==='mintaka'||hit.star==='alnilam'||hit.star==='alnitak')){
+      if(!aligning&&hit.c.id==='orion'&&(hit.star==='mintaka'||hit.star==='alnilam'||hit.star==='alnitak')){
         var bandP=PORTALS[0];
         if(bandP&&bandP.el)bandP.el.classList.toggle('mobile-show');
       }
@@ -6534,6 +6587,7 @@ document.addEventListener('pointerdown',function(e){
 document.addEventListener('pointerdown',function(e){
   if(SW||reduce)return;
   var ai=asteroidScreenAt(e.clientX,e.clientY);
+  if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
     e.preventDefault();e.stopPropagation();
     scatterAsteroid(ai,e.clientX,e.clientY);
