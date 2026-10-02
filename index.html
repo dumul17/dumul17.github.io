@@ -175,6 +175,10 @@ body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
   }
 }
 
+/* Phone in landscape / desktop-site mode: same behaviour as portrait — DUMUL panel hidden until the Orion belt is tapped */
+body.touch-short .portal{opacity:0!important;pointer-events:none!important;transition:opacity .35s ease,transform .35s ease}
+body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!important}
+
 @media (prefers-reduced-motion:reduce){h1.gl .big,h1.gl .kicker{animation-duration:.01s}}
 
 /* ---------- v41.4 boot / vertical matrix rain on every load ---------- */
@@ -751,6 +755,27 @@ body.camera-mode #mode-toast{bottom:calc(148px + env(safe-area-inset-bottom,0px)
   #last-signal,#mode-toast,#mode-observe,#mode-silence,#mode-camera,#cam-zoom,#sector-scan{transition-duration:.01s!important}
 }
 
+/* ---- Patch 2: render containment + perf tier ----
+   contain:layout style paint isolates DOM panels from page-wide reflow/repaint. Panels with an outer
+   glow/shadow use layout+style only (paint containment would clip the shadow). No contain:strict and
+   no content-visibility anywhere near the canvas. */
+#mode-toast{contain:layout style paint}
+#music-player,#mp-now-playing,#cam-whisper,#cam-zoom,#sector-scan{contain:layout style}
+/* tier 0 (low-end / saveData, tied to IS_POTATO): drop the expensive backdrop blur, use a more opaque panel */
+.perf-tier-0 *,.perf-tier-0 *::before,.perf-tier-0 *::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.perf-tier-0 #cam-whisper,.perf-tier-0 #cam-zoom,.perf-tier-0 #sector-scan,.perf-tier-0 #music-player{background-color:rgba(2,7,12,.93)!important}
+
+/* Compact camera layout (mobile landscape / desktop-site on phone): dock info panels to the right
+   so the focused constellation / cluster / black hole stays visible in the free left area. */
+body.cam-compact #cam-whisper{left:auto;right:calc(8px + env(safe-area-inset-right,0px));width:min(236px,38vw);transform:translateY(-8px);max-height:calc(100vh - 118px);overflow:hidden}
+body.cam-compact #cam-whisper.on{transform:translateY(0)}
+body.cam-compact #cam-zoom{left:auto;right:calc(8px + env(safe-area-inset-right,0px));transform:translateY(6px);width:min(236px,38vw);box-sizing:border-box;padding:5px 6px;text-align:center;bottom:calc(42px + env(safe-area-inset-bottom,0px))}
+body.cam-compact #cam-zoom.on{transform:translateY(0)}
+body.cam-compact #cam-focus button{padding:0 7px;min-height:26px}
+body.cam-compact #cf-name{min-width:0;flex:1 1 auto}
+body.cam-compact #sector-scan{left:calc(8px + env(safe-area-inset-left,0px));top:auto;bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+body.cam-compact.camera-mode #mode-toast{left:calc((100vw - min(236px,38vw)) / 2 - 4px)}
+
 /* Deep Space Sector Scan — radar HUD for Spatial Viewport Culling (camera mode only) */
 #sector-scan{
   position:fixed;left:10px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;pointer-events:none;
@@ -943,6 +968,7 @@ var $=function(s){return document.querySelector(s);};
 var cv=$('#sky'),g=cv.getContext('2d');
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
+try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');}catch(e){}
 var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
 var lastActivity=performance.now(),idleMode=false,IDLE_MS=60000;
@@ -1247,15 +1273,24 @@ function focusList(){
   return L;
 }
 /* Free band of screen between the caption panel (top) and the CAM controls (bottom). */
-var _cb={t:0,cy:0,h:0};
+var _cb={t:0,cx:0,cy:0,h:0,w:0};
 function camBox(){
   var n=performance.now();
   if(n-_cb.t>250||!_cb.h){
     _cb.t=n;var top=0,bot=H,a=document.getElementById('cam-whisper'),b=document.getElementById('cam-zoom'),r;
+    if(document.body.classList.contains('cam-compact')){
+      /* Short/wide screens: panels are docked on the right, so the free area is the left band. */
+      var rt=W;
+      if(a){r=a.getBoundingClientRect();if(r.height>0&&r.width>0)rt=Math.min(rt,r.left-12);}
+      if(b){r=b.getBoundingClientRect();if(r.height>0&&r.width>0)rt=Math.min(rt,r.left-12);}
+      if(rt<W*.4)rt=W*.6;
+      _cb.cx=rt/2;_cb.w=rt;_cb.cy=H/2;_cb.h=H-24;
+      return _cb;
+    }
     if(a){r=a.getBoundingClientRect();if(r.height>0)top=r.bottom+14;}
     if(b){r=b.getBoundingClientRect();if(r.height>0)bot=r.top-14;}
     if(bot-top<H*.3){top=H*.22;bot=H*.8;}
-    _cb.cy=(top+bot)/2;_cb.h=bot-top;
+    _cb.cx=W*.5;_cb.w=W;_cb.cy=(top+bot)/2;_cb.h=bot-top;
   }
   return _cb;
 }
@@ -1269,7 +1304,7 @@ function focusGeom(id){
     var c=cons(id);if(!c||c.maxX<-1e8)return null;
     x=(c.minX+c.maxX)/2;y=(c.minY+c.maxY)/2;w=c.maxX-c.minX;h=c.maxY-c.minY;
   }
-  var z=Math.min(W*.8/Math.max(w,1),camBox().h*.94/Math.max(h,1));
+  var cb=camBox(),z=Math.min((cb.w||W)*.8/Math.max(w,1),cb.h*.94/Math.max(h,1));
   return {x:x,y:y,z:Math.max(1,Math.min(3,z))};
 }
 function focusUI(){
@@ -1400,7 +1435,10 @@ function focusStep(){
       if(skyPinch.on)FOCUS.anim=false;
       if(FOCUS.anim||(!skyDrag.on&&!skyRotDrag.on&&!skyPinch.on&&!drag.on)){
         var lim=skyPanLimits(),k=FOCUS.anim?.12:.07;
-        var tx=Math.max(-lim.x,Math.min(lim.x,W*.5-g.x)),ty=Math.max(-lim.y,Math.min(lim.y,camBox().cy-g.y));
+        /* Solve pan so the focus lands on the free-area centre: screen = c + z*Rot(pt+pan-c) (BH: no rotation). */
+        var cb=camBox(),zz=Math.max(.2,FOCUS.anim?g.z:skyZoom),ccx=W*.5,ccy=H*.5,ddx=(cb.cx-ccx)/zz,ddy=(cb.cy-ccy)/zz;
+        if(id!=='bh'&&skyRot*skyRot>=1e-8){var rc=Math.cos(skyRot),rs=Math.sin(skyRot),qx=ddx*rc+ddy*rs;ddy=-ddx*rs+ddy*rc;ddx=qx;}
+        var tx=Math.max(-lim.x,Math.min(lim.x,ccx+ddx-g.x)),ty=Math.max(-lim.y,Math.min(lim.y,ccy+ddy-g.y));
         if(Math.abs(tx-skyPan.x)+Math.abs(ty-skyPan.y)>.3){skyPan.x+=(tx-skyPan.x)*k;skyPan.y+=(ty-skyPan.y)*k;ch=true;}
       }
       if(FOCUS.anim){
@@ -3505,7 +3543,9 @@ function plateBlit(c,m,pw,ph,z,ox,oy){
 
 function layout(){
   if(SW)return;
-  W=innerWidth;H=innerHeight;DPR=IS_POTATO?1:Math.min(window.devicePixelRatio||1,2);
+  W=innerWidth;H=innerHeight;
+  try{document.body.classList.toggle('cam-compact',H<=560&&W>=H*1.3);_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
+  DPR=IS_POTATO?1:Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
   fitTitle();
   var hb=$('#header').getBoundingClientRect().bottom,ft=$('#footer').getBoundingClientRect().top;
@@ -5968,7 +6008,7 @@ function drawPortals(age,now){
     if(!p.el.classList.contains('on'))p.el.classList.add('on');
 
     /* Desktop always visible; mobile only when .mobile-show is toggled on. */
-    var isVisible=(W>600)||p.el.classList.contains('mobile-show');
+    var isVisible=!(W<=600||document.body.classList.contains('touch-short'))||p.el.classList.contains('mobile-show');
 
     /* Connector: only drawn while the portal panel is actually visible. */
     if(isVisible){
