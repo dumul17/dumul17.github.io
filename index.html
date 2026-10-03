@@ -8,6 +8,8 @@
 <link rel="canonical" href="https://dumul17.github.io/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23060b11'/%3E%3Cpath d='M32 8l6 18 18 6-18 6-6 18-6-18-18-6 18-6z' fill='%236ee5ff'/%3E%3C/svg%3E">
 <meta name="theme-color" content="#060b11">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Dumul's Observatory">
 <meta property="og:title" content="Dumul's Observatory">
@@ -204,5 +206,35 @@
     <div class="tesseract-bar"><div id="tesseract-progress"></div></div>
   </div>
 </div>
+<script>
+/* PWA: daftar service worker + lapor lagu yang sudah didengar >50% biar disimpan buat revisit */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('service-worker.js').catch(function () {});
+  });
+  (function () {
+    var seen = new WeakSet(), sent = {};
+    function hook(a) {
+      if (seen.has(a)) return;
+      seen.add(a);
+      a.addEventListener('timeupdate', function () {
+        var src = a.currentSrc, d = a.duration;
+        if (!src || sent[src] || !isFinite(d) || d <= 0 || a.currentTime / d < 0.5) return;
+        var c = navigator.connection;
+        if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return;
+        var ctl = navigator.serviceWorker.controller;
+        if (!ctl) return;
+        sent[src] = 1;
+        ctl.postMessage({ type: 'CACHE_AUDIO', url: src });
+      });
+    }
+    var play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      try { hook(this); } catch (e) {}
+      return play.apply(this, arguments);
+    };
+  })();
+}
+</script>
 </body>
 </html>
