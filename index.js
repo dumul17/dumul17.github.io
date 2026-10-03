@@ -1017,6 +1017,15 @@ function potatoAudioFocus(){return !!(IS_POTATO&&activeSfx&&!activeSfx.paused&&!
    The visualizer taps the currently playing star SFX through Web Audio.
    It never owns playback state: pause/stop simply makes the spectrum decay
    back to the normal Gargantua ring. */
+/* Mode visualizer responsif: sampling tiap frame + attack cepat. Otomatis mati di HP RAM kecil / potato.
+   Override manual: localStorage.dumul_av_fast = '1' (paksa nyala) atau '0' (paksa mati). */
+var AV_FAST=(function(){
+  var o=null;try{o=localStorage.getItem('dumul_av_fast');}catch(e){}
+  if(o==='1')return true;if(o==='0')return false;
+  if(IS_POTATO)return false;
+  if(navigator.deviceMemory&&navigator.deviceMemory<4)return false;
+  return true;
+})();
 var AV={ctx:null,an:null,lpf:null,sources:{},data:null,prev:null,ready:false,fallback:false,level:0,bass:0,mid:0,high:0,beat:0,peak:0,glitchUntil:0,avgFlux:0,lastBeatT:0,skip:0,atten:0,_tick:0};
 /* The analyser path intentionally follows the proven dumul.html recipe:
    one AudioContext + one AnalyserNode, FFT 1024, smoothed spectrum and a
@@ -1034,7 +1043,7 @@ function ensureAVGraph(){
     if(!AV.an){
       AV.an=AV.ctx.createAnalyser();
       AV.an.fftSize=1024;
-      AV.an.smoothingTimeConstant=.46;
+      AV.an.smoothingTimeConstant=AV_FAST?.32:.46;
       AV.an.minDecibels=-90;
       AV.an.maxDecibels=-12;
       AV.data=new Uint8Array(AV.an.frequencyBinCount);
@@ -1168,9 +1177,10 @@ function updateAudioViz(now){
     return;
   }
   if(!AV.ready||!AV.an||!AV.data)return;
-  var period=IS_POTATO?3:2;
+  var period=IS_POTATO?3:(AV_FAST?1:2);
   AV._tick=(AV._tick+1)%period;
   if(AV._tick){AV.beat*=.94;return;}
+  var bDec=AV_FAST?.95:.91;
   try{
     AV.an.getByteFrequencyData(AV.data);
     AV.skip=(AV.skip+1)&0x3fffffff; /* invalidate AVP so the ring profile follows the live spectrum */
@@ -1179,7 +1189,7 @@ function updateAudioViz(now){
        caught even when their energy is spread across neighbouring FFT bins. */
     for(i=1;i<=18&&i<n;i++){var d=AV.data[i]-AV.prev[i];if(d>0)flux+=d;}
     flux/=Math.max(1,Math.min(18,n-1))*255;
-    AV.avgFlux+=(flux-AV.avgFlux)*.075;
+    AV.avgFlux+=(flux-AV.avgFlux)*(AV_FAST?.04:.075);
     var bassNow=0,bassLim=Math.min(18,n-1);
     for(i=1;i<=bassLim;i++)bassNow+=AV.data[i]/255;
     bassNow/=Math.max(1,bassLim);
@@ -1191,7 +1201,7 @@ function updateAudioViz(now){
       AV.lastBeatT=now;
       AV.beat=Math.max(AV.beat,.92+Math.min(.22,Math.max(0,flux-AV.avgFlux)*2.5));
       AV.glitchUntil=now+(Math.random()<.16?75:0);
-    }else AV.beat*=.91;
+    }else AV.beat*=bDec;
     AV.prev.set(AV.data);
     for(i=1;i<=120&&i<n;i++)e+=AV.data[i];
     e/=Math.max(1,Math.min(120,n-1))*255;
@@ -1203,12 +1213,21 @@ function updateAudioViz(now){
       if(i<=bn)bass+=v;else if(i<=mn)mid+=v;else high+=v;
     }
     bass/=bn;mid/=Math.max(1,mn-bn);high/=Math.max(1,lim-mn);
-    var att=1;
-    AV.bass+=(bass*att-AV.bass)*.30;
-    AV.mid+=(mid*att-AV.mid)*.24;
-    AV.high+=(high*att-AV.high)*.20;
-    AV.level+=(Math.max(0,(e-.12)*2.7)*att-AV.level)*.30;
-    AV.peak+=(AV.bass-AV.peak)*.10;
+    var att=1,lvT=Math.max(0,(e-.12)*2.7)*att;
+    if(AV_FAST){
+      /* Attack cepat (naik), release lebih lambat (turun) -> nempel ke beat tapi nggak kedip. */
+      AV.bass+=(bass-AV.bass)*(bass>AV.bass?.60:.20);
+      AV.mid+=(mid-AV.mid)*(mid>AV.mid?.50:.18);
+      AV.high+=(high-AV.high)*(high>AV.high?.45:.16);
+      AV.level+=(lvT-AV.level)*(lvT>AV.level?.60:.20);
+      AV.peak+=(AV.bass-AV.peak)*.06;
+    }else{
+      AV.bass+=(bass*att-AV.bass)*.30;
+      AV.mid+=(mid*att-AV.mid)*.24;
+      AV.high+=(high*att-AV.high)*.20;
+      AV.level+=(lvT-AV.level)*.30;
+      AV.peak+=(AV.bass-AV.peak)*.10;
+    }
   }catch(e){AV.fallback=true;AV.ready=false;}
 }
 /* Dense, audio-reactive ripple rings around Gargantua, built for phones:
