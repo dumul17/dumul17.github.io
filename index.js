@@ -2,6 +2,24 @@
 'use strict';
 var $=function(s){return document.querySelector(s);};
 var cv=$('#sky'),g=cv.getContext('2d');
+/* Canvas-state guard: count save()/restore() depth so frame() can always
+   unwind a leak (an exception between save() and restore() used to leave
+   globalCompositeOperation='lighter' stuck, making the whole sky additive,
+   brighter and bluer until the next resize). */
+var G_DEPTH=0;
+(function(){
+  var sv=g.save,rs=g.restore;
+  g.save=function(){G_DEPTH++;return sv.call(g);};
+  g.restore=function(){if(G_DEPTH>0)G_DEPTH--;return rs.call(g);};
+})();
+function resetCanvasState(){
+  while(G_DEPTH>0){G_DEPTH--;try{CanvasRenderingContext2D.prototype.restore.call(g);}catch(e){break;}}
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.globalCompositeOperation='source-over';
+  g.globalAlpha=1;
+  g.shadowBlur=0;
+  g.setLineDash([]);
+}
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
 try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');}catch(e){}
@@ -2618,7 +2636,7 @@ function layout(){
   W=innerWidth;H=innerHeight;
   try{document.body.classList.toggle('cam-compact',H<=560&&W>=H*1.3);_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
   DPR=IS_POTATO?1:Math.min(window.devicePixelRatio||1,2);
-  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
+  G_DEPTH=0;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
   fitTitle();
   var hb=$('#header').getBoundingClientRect().bottom,ft=$('#footer').getBoundingClientRect().top;
   var top=hb+10,bot=ft-8,ah=Math.max(120,bot-top),portrait=W<H*1.05;
@@ -5153,6 +5171,7 @@ function frame(now){
         syncSkyPanHits();
       }
     }
+    resetCanvasState();
     g.clearRect(0,0,W,H);
     if(bgCanvas){
       // 1. Warna dasar ruang angkasa agar pinggiran layar tidak bocor saat background bergeser
@@ -5203,6 +5222,7 @@ function frame(now){
     /* If a burst or particle state caused this, clearing it is safer than
        repeating the same crash every frame forever. */
     PU.length=0;SN_BURSTS.length=0;
+    try{resetCanvasState();}catch(e2){}
   }finally{
     /* Only reschedule if this generation is still current and the tab is
        visible. Stale RAF callbacks (after watchdog cancel + restart) exit
