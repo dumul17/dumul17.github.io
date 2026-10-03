@@ -1290,7 +1290,13 @@ function updateAVColor(now){
   AV_COLOR=''+(AV_COLOR_RGB[0]|0)+','+(AV_COLOR_RGB[1]|0)+','+(AV_COLOR_RGB[2]|0);
 }
 
+var AV_RHINT=0;
 function avBarCount(){
+  if(AV_DOTS&&AV_RHINT>0){
+    /* Jarak antar kolom titik ~4.8px di tepi lubang hitam -> kerapatan sama di portrait, landscape, dan zoom cam. */
+    var nd=Math.round(6.28318*AV_RHINT*1.06/4.8/12)*12;
+    return Math.max(60,Math.min(IS_POTATO?72:132,nd));
+  }
   var w=W||innerWidth||360;
   var n=Math.round(w/9);
   n=Math.max(48,Math.min(96,n));
@@ -1330,7 +1336,30 @@ function buildAVProfile(){
   var data=AV.data,n=data?data.length:0;
   var b=AV.bass,m=AV.mid,h=AV.high;
   var lim=Math.min(120,n-1);
-  for(var j=0;j<N;j++){
+  if(AV_DOTS){
+    if(!AVP.bmax)AVP.bmax=new Float32Array(130).fill(.3);
+    var nowT=performance.now(),dtp=Math.min(.1,(nowT-(AVP.t||nowT))/1000);AVP.t=nowT;
+    AVP.rot=((AVP.rot||0)+dtp*.022+AV.beat*dtp*.10)%1;
+    var lim2=Math.min(96,n-1),bm=AVP.bmax,bi2;
+    if(n&&lim2>1){
+      /* Whitening: tiap bin dinormalisasi ke puncaknya sendiri (turun pelan), jadi treble
+         juga bisa menjulang, bukan cuma bass di bawah. */
+      for(bi2=1;bi2<=lim2;bi2++){
+        var vv=data[bi2]/255,mm=bm[bi2]*.996;
+        if(vv>mm)mm=vv;if(mm<.22)mm=.22;bm[bi2]=mm;
+      }
+    }
+    for(var jd=0;jd<N;jd++){
+      var ud=(jd/N+AVP.rot)%1,qd=Math.abs(ud-.5)*2,fvd;
+      if(n&&lim2>1){
+        var bd=1+((Math.pow(qd,1.2)*(lim2-1))|0);
+        var vd=data[bd]/255;
+        fvd=vd/bm[bd]*.8+vd*.3;
+      }else fvd=.45*b+.35*m+.20*h;
+      AVP.raw[jd]=Math.max(.025,Math.min(1,fvd));
+    }
+  }
+  for(var j=0;AV_DOTS?false:j<N;j++){
     /* Mirror the spectrum around the circle. Low frequencies sit near the
        vertical axis and highs spread toward the sides, like a classic radial
        spectrum while remaining cheap to sample. */
@@ -1365,7 +1394,8 @@ function drawAudioVisualizer(now,R){
   if(reduce||!activeSfx||activeSfx.paused||activeSfx.ended)return;
   try{
     if(!R||R<1)return;
-    if(AVP.stamp!==AV.skip||!AVP.pts||AV.fallback)buildAVProfile();
+    AV_RHINT=R;
+    if(AVP.stamp!==AV.skip||!AVP.pts||AV.fallback||AVP.N!==avBarCount())buildAVProfile();
     var pts=AVP.pts,N=AVP.N;
     var lv=AV.level,beat=AV.beat;
     var inner=R*1.06;
