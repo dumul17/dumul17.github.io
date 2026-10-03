@@ -1349,14 +1349,60 @@ function buildAVProfile(){
   var raw=AVP.raw,sm=AVP.sm;
   for(var j2=0;j2<N;j2++){
     var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
-    var tgt=a0*.25+a1*.5+a2*.25;
+    var tgt=AV_DOTS?(a0*.12+a1*.76+a2*.12):(a0*.25+a1*.5+a2*.25);
     sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.6:.22);
     pts[j2*3+2]=sm[j2];
   }
   AVP.stamp=AV.skip;
 }
 
+/* Bentuk visualizer: titik-titik radial (dotted) dengan bagian dalam lebih transparan.
+   Set localStorage.dumul_av_shape='bars' buat balik ke bar garis lama. */
+var AV_DOTS=(function(){var o=null;try{o=localStorage.getItem('dumul_av_shape');}catch(e){}return o!=='bars';})();
 function drawAudioVisualizer(now,R){
+  if(!AV_DOTS)return drawAudioVisualizerBars(now,R);
+  updateAVColor(now);
+  if(reduce||!activeSfx||activeSfx.paused||activeSfx.ended)return;
+  try{
+    if(!R||R<1)return;
+    if(AVP.stamp!==AV.skip||!AVP.pts||AV.fallback)buildAVProfile();
+    var pts=AVP.pts,N=AVP.N;
+    var lv=AV.level,beat=AV.beat;
+    var inner=R*1.06;
+    var ampBase=R*(.035+.04*lv)*.5;
+    var ampSpec=R*(.34+.46*lv+.30*beat)*.5;
+    var lw=Math.max(IS_POTATO?1.3:1.5,Math.min(2.6,R*.011));
+    var gap=lw*2.5;
+    var boost=Math.min(1,.78+.18*lv+.22*beat);
+    /* 3 lapis per bar: dalam (transparan), tengah, ujung (terang & lebih tipis).
+       Masing-masing satu path = satu stroke. */
+    var pA=new Path2D(),pB=new Path2D(),pC=new Path2D();
+    for(var j=0;j<N;j++){
+      var fv=pts[j*3+2];
+      fv=Math.min(1.3,Math.pow(fv,1.6)*1.15*(1+.45*beat));   /* kontras tinggi: puncak jadi duri, beat cuma nambah tinggi duri */
+      var rr=inner+ampBase+fv*ampSpec;
+      if(fv>.7)rr+=(fv-.7)*ampSpec*1.3;          /* duri tipis di puncak */
+      var cx=pts[j*3],cy=pts[j*3+1];
+      var len=rr-inner;
+      if(len<lw)continue;
+      var s1=inner+len*.34,s2=inner+len*.68;
+      pA.moveTo(cx*inner,cy*inner);pA.lineTo(cx*s1,cy*s1);
+      pB.moveTo(cx*s1,cy*s1);pB.lineTo(cx*s2,cy*s2);
+      pC.moveTo(cx*s2,cy*s2);pC.lineTo(cx*rr,cy*rr);
+    }
+    g.save();
+    g.globalCompositeOperation='lighter';
+    g.lineCap=IS_POTATO?'butt':'round';
+    if(!IS_POTATO)g.setLineDash([.01,gap]);else g.setLineDash([lw*1.2,gap*.8]);
+    g.lineWidth=lw;
+    g.strokeStyle='rgba('+AV_COLOR+','+(.26*boost)+')';g.stroke(pA);
+    g.strokeStyle='rgba('+AV_COLOR+','+(.62*boost)+')';g.stroke(pB);
+    g.lineWidth=lw*.85;
+    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,.98*boost)+')';g.stroke(pC);
+    g.restore();
+  }catch(err){}
+}
+function drawAudioVisualizerBars(now,R){
   updateAVColor(now);
   if(reduce||!activeSfx||activeSfx.paused||activeSfx.ended)return;
   try{
