@@ -1295,7 +1295,9 @@ function avBarCount(){
   if(AV_DOTS&&AV_RHINT>0){
     /* Jarak antar kolom titik ~4.8px di tepi lubang hitam -> kerapatan sama di portrait, landscape, dan zoom cam. */
     var nd=Math.round(6.28318*AV_RHINT*1.06/4.8/12)*12;
-    return Math.max(60,Math.min(IS_POTATO?72:132,nd));
+    /* Lantai 36 (bukan 60): lubang hitam kecil (tanpa zoom) tetap dapat jarak kolom ~5px,
+       sama seperti saat di-zoom. Lantai 60 bikin kolom cuma ~3px -> dot numpuk/moire. */
+    return Math.max(36,Math.min(IS_POTATO?72:132,nd));
   }
   var w=W||innerWidth||360;
   var n=Math.round(w/9);
@@ -1368,15 +1370,18 @@ function buildAVProfile(){
     /* 2) Cari puncak yang MENONJOL dibanding rata-rata sekitarnya (±6 kolom) dan yang
           tertinggi dalam ±3 kolom. Cuma puncak seperti ini yang jadi duri. */
     var base=wv; /* dipakai ulang sebagai buffer profil */
-    for(ii=0;ii<N;ii++)base[ii]=.10+.10*env[ii]; /* badan cincin: rendah, sedikit bergelombang */
-    var HW=Math.max(2,Math.round(N/26)); /* lebar separuh duri (kolom) -> duri melebar ke tetangga */
+    for(ii=0;ii<N;ii++)base[ii]=.22+.12*env[ii]; /* badan cincin: lembah dangkal, sedikit bergelombang */
+    /* Semua jendela proporsional ke jumlah kolom N, jadi bentuk sama di semua ukuran/zoom. */
+    var HW=Math.max(1,Math.round(N*.04));   /* lebar separuh duri (kolom) -> duri melebar ke tetangga */
+    var WM=Math.max(2,Math.round(N*.05));   /* jendela rata-rata untuk ukur "menonjol" */
+    var WP=Math.max(2,Math.round(N*.033));  /* puncak harus tertinggi dalam ±WP kolom */
     for(ii=0;ii<N;ii++){
       var ev=env[ii],loc=0,isMax=true;
-      for(kk=-6;kk<=6;kk++)loc+=env[(ii+kk+N)%N];
-      loc/=13;
+      for(kk=-WM;kk<=WM;kk++)loc+=env[(ii+kk+N)%N];
+      loc/=(2*WM+1);
       var prom=ev-loc;
       if(prom<.09||ev<.38)continue;
-      for(kk=-4;kk<=4;kk++){
+      for(kk=-WP;kk<=WP;kk++){
         if(!kk)continue;
         var ov=env[(ii+kk+N)%N];
         if(ov>ev||(ov===ev&&kk<0)){isMax=false;break;}
@@ -1385,7 +1390,7 @@ function buildAVProfile(){
       var hp=Math.min(1,.40+prom*2.6+(ev-.3)*.9); /* tinggi duri: makin menonjol makin tinggi */
       for(kk=-HW;kk<=HW;kk++){
         var tri=1-Math.abs(kk)/(HW+1);       /* segitiga: duri runcing, sisi melebar ke tetangga */
-        var vv2=.10+(hp-.10)*Math.pow(tri,1.35);
+        var vv2=.22+(hp-.22)*Math.pow(tri,1.2);
         var idx=(ii+kk+N)%N;
         if(vv2>base[idx])base[idx]=vv2;
       }
@@ -1434,7 +1439,9 @@ function drawAudioVisualizer(now,R){
     var inner=R*1.06;
     var ampBase=R*(.035+.04*lv)*.5;
     var ampSpec=R*(.34+.46*lv+.30*beat)*.95;
-    var lw=Math.max(IS_POTATO?1.3:1.5,Math.min(2.6,R*.011));
+    /* Ukuran dot ikut R: saat di-zoom (R≈80+) tetap 1.5px persis seperti sebelumnya, tapi
+       saat lubang hitam kecil dot lebih halus (min 1.05px) -> lebih banyak dot per kolom. */
+    var lw=Math.max(IS_POTATO?1.2:1.05,Math.min(2.6,R*.0167));
     var boost=Math.min(1,.78+.18*lv+.22*beat);
     /* 5 zona berdasarkan JARAK ABSOLUT dari tepi lubang hitam (bukan persen panjang bar):
        - ALPHA: transparan di dekat lingkaran hitam, makin ke luar makin terang (fading di dalam).
