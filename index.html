@@ -3181,9 +3181,12 @@ function updateTimeDilation(now){
   if(gm&&BH.R>0){
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
        moved off its home spot (idle = everything stays at normal speed). */
-    var d=Math.hypot(gm.x-BH.x,gm.y-BH.y),ratio=(BH.R*.35)/Math.max(d,1e-3);
+    /* Relative geometry on screen: dragging the sky moves the constellation toward Gargantua too, unless
+       Gargantua rides along with the sky (camera mode, BHK=1) - then the pan cancels out. */
+    var px=skyPan.x*(1-BHK),py=skyPan.y*(1-BHK);
+    var d=Math.hypot(gm.x+px-BH.x,gm.y+py-BH.y),ratio=(BH.R*.35)/Math.max(d,1e-3);
     target=ratio>=1?0:Math.sqrt(1-ratio);
-    var disp=Math.hypot(BH.x-BH.hx,BH.y-BH.hy),k=Math.max(0,Math.min(1,(disp-10)/50));
+    var disp=Math.hypot(px-(BH.x-BH.hx),py-(BH.y-BH.hy)),k=Math.max(0,Math.min(1,(disp-10)/50));
     target=1-(1-target)*k;
   }
   target=Math.max(.25,Math.min(1,target));
