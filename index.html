@@ -3160,6 +3160,35 @@ function playingConstellationId(){
   if(activeSfx===SFX.antares)return 'scorpius';
   return null;
 }
+/* ---------- Gravitational time dilation (Schwarzschild) ----------
+   Gargantua is the massive body, the constellation whose SFX is playing is the clock.
+   Static-observer factor  dtau/dt = sqrt(1 - rs/r)   (r = distance BH <-> constellation centre, rs = BH.R).
+   The factor drives the SFX playbackRate (pitch follows - preservesPitch off) and a per-constellation
+   visual clock (twinkle / sway / pulse phases). Floor 0.25 = lowest rate browsers play reliably. */
+var TD={rate:1,a:null,last:0,lag:{},f:1};
+function tdRelease(){
+  if(TD.a){try{TD.a.playbackRate=1;}catch(e){}}
+  TD.a=null;TD.rate=1;TD.f=1;
+}
+function updateTimeDilation(now){
+  var dt=Math.min(50,Math.max(0,now-(TD.last||now)));TD.last=now;
+  var cid=playingConstellationId(),a=cid?activeSfx:null;
+  if(TD.a&&TD.a!==a)tdRelease();
+  if(!a){return;}
+  if(TD.a!==a){TD.a=a;TD.rate=1;
+    try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
+  var gm=focusGeom(cid),target=1;
+  if(gm&&BH.R>0){
+    var d=Math.hypot(gm.x-BH.x,gm.y-BH.y),ratio=BH.R/Math.max(d,1e-3);
+    target=ratio>=1?0:Math.sqrt(1-ratio);
+  }
+  target=Math.max(.25,Math.min(1,target));
+  TD.f=target;
+  /* frame-rate independent smoothing */
+  TD.rate+=(target-TD.rate)*(1-Math.pow(.001,dt/1000));
+  if(Math.abs(a.playbackRate-TD.rate)>.004){try{a.playbackRate=TD.rate;}catch(e){}}
+  if(!IS_POTATO)TD.lag[cid]=(TD.lag[cid]||0)+(1-TD.rate)*dt;
+}
 function updateConstellationFocus(now){
   var playing=playingConstellationId();
   /* Strict focus: only the constellation whose SFX is currently playing is lit.
@@ -5597,11 +5626,12 @@ function drawTriggerVisuals(now){
 
 function nebulaIn(x,y,r){var t=skyXF(x,y);CULL.tot++;if(cullIn(t[0],t[1],r)){CULL.drawn++;return true;}CULL.saved+=2;return false;}
 function drawCons(c,age,now){
+  var tn=now-(TD.lag[c.id]||0); /* time-dilated clock */
   var audioFocus=potatoAudioFocus();
   var focus=constellationFocus(c);
   var sway=(reduce||audioFocus)?0:1;
   var wildField=(drag.on&&drag.moved)?1:0;
-  var ox=Math.sin(now*.00031+c.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(now*.00027+c.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;
+  var ox=Math.sin(tn*.00031+c.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(tn*.00027+c.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;
   if(now<glitchUntil){ox+=(Math.random()-.5)*7;oy+=(Math.random()-.5)*4;}
   c.ox=ox;c.oy=oy;
   if(c.nebula){
@@ -5652,7 +5682,7 @@ function drawCons(c,age,now){
         g.lineWidth=(lineHot?6:4) + audioPulse * 2.0;
       }
       else{
-        g.strokeStyle='rgba(150,212,255,'+(((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*Math.sin(now*.0014+i)))*focus)+')';
+        g.strokeStyle='rgba(150,212,255,'+(((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*Math.sin(tn*.0014+i)))*focus)+')';
         g.lineWidth=(lineHot?1.8:1.1) + audioPulse * 1.2;
       }
       g.globalAlpha=kk;g.beginPath();drawing2=false;
@@ -5736,6 +5766,7 @@ function drawStarGlow(x,y,r,rgbStr,alpha){
 }
 
 function drawStars(c,age,now){
+  var tn=now-(TD.lag[c.id]||0);
   c._vis=0;
   var k2=W<500?.95:1.2;
   var audioFocus=potatoAudioFocus();
@@ -5761,7 +5792,7 @@ function drawStars(c,age,now){
       g.strokeStyle='rgba(110,229,255,'+(.55*a)+')';g.lineWidth=1;
       g.beginPath();g.arc(x,y,Math.max(3.2,r*2.1),0,6.283);g.stroke();
     }else if(typeof ALIGN!=='undefined'&&ALIGN.cid===c.id&&ALIGN.seq[ALIGN.next]===k){
-      var hp=.5+.5*Math.sin(now*.008);
+      var hp=.5+.5*Math.sin(tn*.008);
       g.strokeStyle='rgba(255,226,140,'+((.45+.4*hp)*a)+')';g.lineWidth=1.1;
       g.beginPath();g.arc(x,y,Math.max(5,r*2.6)+2*hp,0,6.283);g.stroke();
     }
@@ -5806,7 +5837,7 @@ function drawStars(c,age,now){
         }
         g.save();g.globalCompositeOperation='lighter';
         for(var bi=0;bi<bars;bi++){
-          var wave=.5+.5*Math.sin(now*.009+bi*1.17+s.ph);
+          var wave=.5+.5*Math.sin(tn*.009+bi*1.17+s.ph);
           var center=1-Math.abs((bi-(bars-1)/2)/((bars-1)/2));
           var bhh=2+7.2*wave*(.35+.65*center);
           var ba=.38+.52*wave;
@@ -5819,6 +5850,7 @@ function drawStars(c,age,now){
   });
 }
 function drawPleiades(age,now){
+  var tn=now-(TD.lag.pleiades||0);
   if(!PLEIADES.ready)return;
   PLEIADES._vis=0;
   var k2=W<500?.95:1.1;
@@ -5835,7 +5867,7 @@ function drawPleiades(age,now){
     var a=(dim?.48:.88)*clusterFade*(1+.40*twBoost);
     var rgbc=star.interactive?'145,170,255':(dim?'110,145,205':'190,218,255');
     /* Soft ambient shimmer when not in sweep; sweep _tw is the main flash. */
-    var pulse=star.interactive?1:(1+.045*Math.sin(now*.0015+star.x*9));
+    var pulse=star.interactive?1:(1+.045*Math.sin(tn*.0015+star.x*9));
     r*=pulse;
     if(selected&&!reduce)a*=(1+twBoost*(.30+1.4*.12));
     var q=gSkyC(x,y,72);
@@ -5850,8 +5882,8 @@ function drawPleiades(age,now){
     if(star.interactive){
       var hotP=(hot==='pleione'),tr=TRIGGERS.pleione;
       /* Exact same compact pulse geometry as Betelgeuse/Rigel/Spica/Sirius (TRIGGER_PULSE_BASE). */
-      var phase=(now*.00135+(star.ph||0))%1;
-      var breathe=reduce?0.5:(.5+.5*Math.sin(now*.0025+(star.ph||0)));
+      var phase=(tn*.00135+(star.ph||0))%1;
+      var breathe=reduce?0.5:(.5+.5*Math.sin(tn*.0025+(star.ph||0)));
       var strength=(selected?1:.42)+(hotP?.42:0);
       var fade=(1-.85*q[2])*clusterFade;
       var base=TRIGGER_PULSE_BASE;
@@ -5886,7 +5918,7 @@ function drawPleiades(age,now){
           var sx=labelX+labelW+gapFromText,sy=labelY-7;
           g.save();g.globalCompositeOperation='lighter';
           for(var bi=0;bi<bars;bi++){
-            var wave=.5+.5*Math.sin(now*.009+bi*1.17+(star.ph||0));
+            var wave=.5+.5*Math.sin(tn*.009+bi*1.17+(star.ph||0));
             var center=1-Math.abs((bi-(bars-1)/2)/((bars-1)/2));
             var bhh=2+7.2*wave*(.35+.65*center);
             var ba=.38+.52*wave;
@@ -6051,6 +6083,7 @@ function frame(now){
     mouse.x+=(mouse.tx-mouse.x)*.05;mouse.y+=(mouse.ty-mouse.y)*.05;
     updateAudioViz(now);
     updateConstellationFocus(now);
+    updateTimeDilation(now);
     if(hoverDirty&&mouse.px!=null&&!drag.on&&(now-lastHoverAt)>=HOVER_MIN_MS){
       updateHover(mouse.px,mouse.py);
       hoverDirty=false;lastHoverAt=now;
