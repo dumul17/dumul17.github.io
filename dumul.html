@@ -2163,7 +2163,7 @@ html.dm-lowfx #dm-log-toast{-webkit-backdrop-filter:none!important;backdrop-filt
 }
 #dm-log .dm-log-close:hover,#dm-log .dm-log-close:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.5);outline:none}
 #dm-log .dm-log-list{padding:6px 12px 10px;overflow:auto;flex:1;min-height:0}
-#dm-log .l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:dmLogIn .4s ease-out both}
+#dm-log .l{white-space:pre;overflow:hidden;text-overflow:ellipsis;animation:dmLogIn .4s ease-out both}
 #dm-log .l:nth-last-child(n+5){opacity:.4}
 #dm-log .l:nth-last-child(n+4){opacity:.6}
 #dm-log .l.x{color:rgba(255,122,217,.85)}
@@ -2179,9 +2179,12 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
 </style>
 <script>
 (function(){
-  var KEY='dm_album',MAXL=5;
+  var KEY='dm_album',MAXL=5,pH=0,pL=0; /* pH/pL = delta ms (here/listened) yang belum ditulis ke storage */
+  function slugT(t){return String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
   /* ---------- state lokal: tracks + memory fragments ---------- */
-  var st={tracksPlayed:[],lastTrack:'',timesVisited:0,lastObserved:'',lastSignal:'',lastInterruption:0,taps:0,lastDwell:0,dumbowl:0,lastPos:0,lastTs:0};
+  /* tr[slug] = {l: detik didengar total, f: posisi terjauh (detik), d: durasi, p: berapa kali diputar >=20 dtk, ts: terakhir didengar}
+     tHere = total ms ada di halaman (visible ATAU audio main di background) · tListen = total ms audio benar-benar main */
+  var st={tracksPlayed:[],lastTrack:'',timesVisited:0,lastObserved:'',lastSignal:'',lastInterruption:0,taps:0,lastDwell:0,dumbowl:0,lastPos:0,lastTs:0,tr:{},tHere:0,tListen:0};
   try{
     var o=JSON.parse(localStorage.getItem(KEY)||'null');
     if(o&&typeof o==='object'){
@@ -2196,6 +2199,14 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
       if(+o.dumbowl>0)st.dumbowl=1;
       if(+o.lastTs>0)st.lastTs=Math.floor(+o.lastTs);
       if(isFinite(+o.lastPos)&&+o.lastPos>=-1)st.lastPos=Math.floor(+o.lastPos);
+      if(+o.tHere>0)st.tHere=Math.min(Math.floor(+o.tHere),3.6e9*24);
+      if(+o.tListen>0)st.tListen=Math.min(Math.floor(+o.tListen),3.6e9*24);
+      if(o.tr&&typeof o.tr==='object'){
+        Object.keys(o.tr).slice(0,12).forEach(function(k){
+          var r=o.tr[k];if(!r||typeof r!=='object'||!/^[a-z0-9-]{1,40}$/.test(k))return;
+          st.tr[k]={l:Math.max(0,+r.l||0),f:Math.max(0,+r.f||0),d:Math.max(0,+r.d||0),p:Math.max(0,Math.floor(+r.p||0)),ts:Math.max(0,Math.floor(+r.ts||0))};
+        });
+      }
     }
   }catch(e){}
   /* migrasi sekali jalan: dm_mem (store lama) -> dm_album, supaya pengunjung lama tidak kehilangan memori */
@@ -2215,16 +2226,27 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   var prev={
     tracksPlayed:st.tracksPlayed.slice(),lastTrack:st.lastTrack,timesVisited:st.timesVisited,
     lastObserved:st.lastObserved,lastSignal:st.lastSignal,lastInterruption:st.lastInterruption,taps:st.taps,
-    lastDwell:st.lastDwell,dumbowl:st.dumbowl,lastPos:st.lastPos,lastTs:st.lastTs
+    lastDwell:st.lastDwell,dumbowl:st.dumbowl,lastPos:st.lastPos,lastTs:st.lastTs,
+    tHere:st.tHere,tListen:st.tListen,tr:JSON.parse(JSON.stringify(st.tr))
   };
   window.__dmMemPrev=function(){return {t:prev.lastTrack,s:prev.lastPos,ts:prev.lastTs};};
-  function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+  /* save: total waktu DIAKUMULASI (stored + delta), bukan ditimpa — aman buat reload cepat & banyak tab */
+  function save(){
+    try{
+      try{flushHere();}catch(e0){}
+      var s=JSON.parse(localStorage.getItem(KEY)||'null');
+      var bH=s&&+s.tHere>0?Math.floor(+s.tHere):0,bL=s&&+s.tListen>0?Math.floor(+s.tListen):0;
+      st.tHere=bH+Math.round(pH);st.tListen=bL+Math.round(pL);pH=0;pL=0;
+      Object.keys(st.tr).forEach(function(k){var r=st.tr[k];r.l=Math.round(r.l*10)/10;r.f=Math.round(r.f);});
+      localStorage.setItem(KEY,JSON.stringify(st));
+    }catch(e){}
+  }
   /* saver tunggal fragmen memori: lagu terakhir, posisi, waktu. Posisi/track hanya ditulis setelah >=3 detik atau saat lagu selesai. */
   function snapFrag(){
     var P=window.__dmPlayer,t=P&&P.title?P.title():'';
     if(!t)return;
     var a=P.audio,c=a?(a.currentTime||0):0,end=!!(a&&a.ended);
-    st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+    st.lastObserved=String(t).replace(/\s+/g,' ').trim().slice(0,40); /* judul utuh: "Glitch" ≠ "Glitch (Instrumental)" */
     if(a)st.lastSignal=end?'END':fmtSig(c);
     if(end||c>=3){st.lastTrack=String(t).slice(0,60);st.lastPos=end?-1:Math.floor(c);st.lastTs=Date.now();}
     st.lastInterruption=st.taps||st.lastInterruption||0;
@@ -2658,7 +2680,8 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     }
     try{
       var all=allObserved(prev.tracksPlayed);
-      if(/^glitch/i.test(prev.lastTrack||prev.lastObserved||''))out.push('YOU LEFT THE SIGNAL UNFINISHED.');
+      /* hanya kalau lagu "Glitch*" berhenti di tengah (lastPos -1 = sudah tamat) */
+      if(/^glitch/.test(slugT(prev.lastTrack))&&prev.lastPos>=0)out.push('YOU LEFT THE SIGNAL UNFINISHED.');
       if(all){out.push('ALL SIGNALS HAVE BEEN OBSERVED.');allObservedLogged=true;}
     }catch(e){}
     if(prev.timesVisited>=2&&Math.random()<0.12){
@@ -2809,6 +2832,10 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
 
   /* ---------- TIME LOST (dwell) ---------- */
   var dwellVisible=0,visStart=document.hidden?0:Date.now(),timeLostShown=false,dwellMilestone=false;
+  /* hereMark: jam mulai hitung TIME HERE (visible, atau hidden tapi audio masih main). sessL: ms didengar di sesi ini. */
+  var hereMark=document.hidden?0:Date.now(),sessL=0;
+  function flushHere(){if(hereMark){var n=Date.now();pH+=Math.max(0,n-hereMark);hereMark=n;}}
+  function audioOn(){var P=window.__dmPlayer;return !!(P&&P.audio&&!P.audio.paused&&!P.audio.ended);}
   function fmtHMS(ms){
     ms=Math.max(0,Math.floor(+ms||0));
     var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
@@ -2827,14 +2854,25 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   }
   function persistDwell(){
     st.lastDwell=dwellNow();
-    save();
+    save(); /* save() sudah flush TIME HERE & menambahkannya ke total */
   }
-  /* TIME LOST dari sesi sebelumnya (reload / tab baru setelah kunjungan) */
-  if(newSession&&prev.lastDwell>=5000){
+  /* TIME LOST = TIME HERE − TIME LISTENED (akumulasi semua kunjungan sebelum ini):
+     waktu kamu ada di sini tapi tidak mendengarkan. Panel log: 3 baris; toast: baris TIME LOST saja. */
+  (function(){
+    var H=prev.tHere,L=Math.min(prev.tListen,H),lost=Math.max(0,H-L);
+    if(H<60000)return;
     setTimeout(function(){
-      log('TIME LOST: '+fmtHMS(prev.lastDwell),true);
+      log('TIME HERE      '+fmtHMS(H),false,true);
+      log('TIME LISTENED  '+fmtHMS(L),false,true);
+      log('TIME LOST      '+fmtHMS(lost),true);
+      /* total durasi album dari durasi yang pernah terekam; hanya kalau semua lagu sudah diketahui */
+      var tot=0,ok=true;
+      trackList().forEach(function(n){var r=prev.tr[slugT(n)];if(r&&r.d>0)tot+=r.d;else ok=false;});
+      if(ok&&tot>0&&prev.tListen/1000>=tot){
+        setTimeout(function(){log('YOU HAVE HEARD THIS ALBUM '+(prev.tListen/1000/tot).toFixed(1)+' TIMES.',true);},2600);
+      }
     },3200);
-  }
+  })();
   /* milestone ~20 menit */
   function dwellTick(){
     setTimeout(dwellTick,15000);
@@ -2851,14 +2889,14 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
         log('YOU HAVE BEEN HERE FOR '+fmtMS(d)+'.',true);
         setTimeout(function(){log('DID YOU NOTICE?',true);},2200);
       }else{
-        log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
+        log('TIME LOST: '+fmtHMS(Math.max(0,d-sessL)),true); /* sesi ini: ada di sini − mendengarkan */
       }
     }
     /* soft reminders tiap ~15 menit setelah milestone, jarang */
     else if(dwellMilestone&&d>=35*60*1000&&!timeLostShown&&Math.random()<0.08){
       timeLostShown=true;
       narrLock(2800);
-      log('TIME SINCE SIGNAL: '+fmtHMS(d),true);
+      log('TIME LOST: '+fmtHMS(Math.max(0,d-sessL)),true);
     }
   }
   setTimeout(dwellTick,12000);
@@ -2870,8 +2908,10 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
     if(document.hidden){
       if(visStart){dwellVisible+=Date.now()-visStart;visStart=0;}
       persistDwell();
-    }else if(!visStart){
-      visStart=Date.now();
+      if(!audioOn())hereMark=0; /* musik masih main di background → TIME HERE tetap jalan */
+    }else{
+      if(!visStart)visStart=Date.now();
+      if(!hereMark)hereMark=Date.now();
     }
   });
 
@@ -3073,25 +3113,35 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
 
   /* ---------- TRACK MEMORY (jejak digital, bukan chart) ---------- */
   var traceShown=false;
+  function rep(ch,n){return n>0?Array(n+1).join(ch):'';}
+  /* Bar = ingatan per lagu, dari data asli:
+     ■ panjang = sejauh mana kamu benar-benar mendengar (min(posisi terjauh, total didengar) / durasi)
+     ▒░ = titik kamu berhenti, sisanya belum didengar
+     □ = bagian yang memudar karena lama tidak didengar (maks 75%, tidak pernah hilang total)
+     ×N = berapa kali diputar · · = belum pernah · ▒▒▒▒▒▒▒▒ = jejak lama tanpa data (versi sebelumnya) */
   function barsFor(name){
-    /* intensitas dari urutan penemuan di tracksPlayed */
-    var idx=playedIdx(st.tracksPlayed,name);
-    if(idx<0)return '\u00b7'; /* · belum */
-    var n=1+(idx%3); /* 1–3 */
-    return Array(n+1).join('\u25a0'); /* ■ */
+    var N=8,r=st.tr[slugT(name)];
+    if(!r||!(r.l>=5))return playedIdx(st.tracksPlayed,name)>=0?rep('▒',N):'·';
+    var d=r.d>0?r.d:0,cov=Math.min(r.f||0,r.l||0);
+    var done=d>0&&r.f>=d-2&&r.l>=d*0.8;
+    var n=done||!d?N:Math.max(1,Math.min(N,Math.round(cov/d*N)));
+    var age=(Date.now()-(r.ts||Date.now()))/864e5; /* hari sejak terakhir didengar */
+    var k=Math.floor(n*Math.min(0.75,age/12));
+    var out=rep('■',n-k)+rep('□',k);
+    if(n<N)out+='▒'+rep('░',N-n-1);
+    if(r.p>1)out+='  ×'+r.p;
+    return out;
   }
   function shortName(t){
-    return String(t||'').replace(/\s*\(Instrumental\)/i,' (INSTRU)').replace(/\s+/g,' ').trim().toUpperCase().slice(0,14);
+    return String(t||'').replace(/\s*\(Instrumental\)/i,' (INSTRU)').replace(/\s+/g,' ').trim().toUpperCase().slice(0,15);
   }
   function showMemoryTrace(){
-    if(st.tracksPlayed.length<1)return;
+    if(!st.tracksPlayed.length&&!Object.keys(st.tr).length)return;
     log('MEMORY TRACE',true);
     var delay=900;
     trackList().forEach(function(name){
-      var played=playedIdx(st.tracksPlayed,name)>=0;
       var label=shortName(name);
-      var bar=played?barsFor(name):'\u00b7';
-      setTimeout(function(){log(label+Array(Math.max(1,16-label.length)).join(' ')+bar,false);},delay);
+      setTimeout(function(){log(label+rep(' ',Math.max(1,17-label.length))+barsFor(name),false);},delay);
       delay+=700;
     });
   }
@@ -3104,7 +3154,7 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   }
   /* tampilkan TRACE sekali per sesi saat buka owl (kalau sudah ada jejak) */
   owl.addEventListener('click',function(){
-    if(traceShown||st.tracksPlayed.length<2)return;
+    if(traceShown||Math.max(st.tracksPlayed.length,Object.keys(st.tr).length)<2)return;
     if(box.classList.contains('open'))return; /* will open */
     setTimeout(function(){
       if(!box.classList.contains('open'))return;
@@ -3143,26 +3193,52 @@ html.dm-lowfx #dm-owl,html.dm-lowfx #dm-log{-webkit-backdrop-filter:none!importa
   function hook(tries){
     var P=window.__dmPlayer;
     if(!P||!P.audio){if(tries<40)setTimeout(function(){hook(tries+1);},250);return;}
-    var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false,sigSaveAt=0;
+    var a=P.audio,shown='',first=true,marked='',obsA=false,obsB=false,sigSaveAt=0,lastC=-1,lastT='';
     function persistFrag(){snapFrag();}
+    function trRec(t){var k=slugT(t);if(!k)return null;return st.tr[k]||(st.tr[k]={l:0,f:0,d:0,p:0,ts:0});}
+    /* posisi pembanding untuk menghitung waktu dengar: dibuang saat seek/pause/ganti lagu supaya scrub tidak dihitung sebagai "didengar" */
+    ['seeking','pause','loadstart'].forEach(function(ev){a.addEventListener(ev,function(){lastC=-1;});});
+    a.addEventListener('seeked',function(){lastC=a.currentTime||0;});
     a.addEventListener('play',function(){
+      if(!hereMark)hereMark=Date.now(); /* audio main di background → TIME HERE tetap jalan */
       var t=P.title();if(!t)return;
       if(t!==shown){
         if(first){log('MEMORY ACCESSED');first=false;}
         else log('TRACK CHANGED');
         narrLock(2000);
         shown=t;obsA=obsB=false;
-        st.lastObserved=String(t).replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,40);
+        st.lastObserved=String(t).replace(/\s+/g,' ').trim().slice(0,40);
         save();
       }
     });
-    a.addEventListener('pause',function(){if(!a.ended)persistFrag();});
-    a.addEventListener('ended',function(){persistFrag();});
+    a.addEventListener('pause',function(){
+      if(!a.ended)persistFrag();
+      if(document.hidden){flushHere();hereMark=0;save();} /* tab hidden + audio berhenti → stop hitung */
+    });
+    a.addEventListener('ended',function(){
+      /* handler player sudah memindah current ke lagu berikutnya, jadi pakai judul yang terakhir dicatat (lastT) */
+      var r=lastT?trRec(lastT):null;
+      if(r){if(r.d>0)r.f=r.d;r.ts=Date.now();}
+      if(lastT){st.lastObserved=String(lastT).replace(/\s+/g,' ').trim().slice(0,40);st.lastTrack=String(lastT).slice(0,60);st.lastPos=-1;st.lastSignal='END';st.lastTs=Date.now();}
+      marked='';lastC=-1;
+      save();
+    });
     a.addEventListener('timeupdate',function(){
       var t=P.title(),c=a.currentTime||0;
-      /* track dianggap "sudah didengar" setelah 20 detik */
+      var rec=(t&&!a.paused)?trRec(t):null;
+      if(rec){
+        lastT=t;
+        if(isFinite(a.duration)&&a.duration>0)rec.d=Math.round(a.duration);
+        if(lastC>=0){
+          var dd=c-lastC;
+          if(dd>0&&dd<6){rec.l+=dd;pL+=dd*1000;sessL+=dd*1000;if(c>rec.f)rec.f=c;}
+        }else if(c>rec.f&&c<=1)rec.f=c;
+        lastC=c;rec.ts=Date.now();
+      }
+      /* track dianggap "sudah didengar" setelah 20 detik; p = berapa kali diputar */
       if(t&&c>=20&&marked!==t){
         marked=t;
+        var r2=trRec(t);if(r2)r2.p++;
         if(st.tracksPlayed.indexOf(t)<0){st.tracksPlayed.push(t);save();checkAllObserved();}
       }
       /* autosave signal position ~ tiap 8 detik */
