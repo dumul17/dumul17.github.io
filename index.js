@@ -1295,9 +1295,7 @@ function avBarCount(){
   if(AV_DOTS&&AV_RHINT>0){
     /* Jarak antar kolom titik ~4.8px di tepi lubang hitam -> kerapatan sama di portrait, landscape, dan zoom cam. */
     var nd=Math.round(6.28318*AV_RHINT*1.06/4.8/12)*12;
-    /* Lantai 36 (bukan 60): lubang hitam kecil (tanpa zoom) tetap dapat jarak kolom ~5px,
-       sama seperti saat di-zoom. Lantai 60 bikin kolom cuma ~3px -> dot numpuk/moire. */
-    return Math.max(36,Math.min(IS_POTATO?72:132,nd));
+    return Math.max(60,Math.min(IS_POTATO?72:132,nd));
   }
   var w=W||innerWidth||360;
   var n=Math.round(w/9);
@@ -1351,51 +1349,15 @@ function buildAVProfile(){
         if(vv>mm)mm=vv;if(mm<.22)mm=.22;bm[bi2]=mm;
       }
     }
-    /* 1) Spektrum per kolom, DIINTERPOLASI antar bin (dulu: satu bin dibaca beberapa kolom
-          sekaligus -> plateau datar -> siluet bulet). */
-    var env=(AVP.env&&AVP.env.length===N)?AVP.env:(AVP.env=new Float32Array(N));
-    var wv=(AVP.wv&&AVP.wv.length===N)?AVP.wv:(AVP.wv=new Float32Array(N));
-    var jd,ii,kk;
-    for(jd=0;jd<N;jd++){
+    for(var jd=0;jd<N;jd++){
       var ud=(jd/N+AVP.rot)%1,qd=Math.abs(ud-.5)*2,fvd;
       if(n&&lim2>1){
-        var pos=Math.pow(qd,1.2)*(lim2-1),pf=Math.floor(pos),fr=pos-pf;
-        var b0=1+pf,b1=Math.min(lim2,b0+1);
-        var v0=data[b0]/255,v1=data[b1]/255;
-        var f0=v0/bm[b0]*.8+v0*.3,f1=v1/bm[b1]*.8+v1*.3;
-        fvd=f0+(f1-f0)*fr;
+        var bd=1+((Math.pow(qd,1.2)*(lim2-1))|0);
+        var vd=data[bd]/255;
+        fvd=vd/bm[bd]*.8+vd*.3;
       }else fvd=.45*b+.35*m+.20*h;
-      env[jd]=Math.max(0,Math.min(1,fvd));
+      AVP.raw[jd]=Math.max(.025,Math.min(1,fvd));
     }
-    /* 2) Cari puncak yang MENONJOL dibanding rata-rata sekitarnya (±6 kolom) dan yang
-          tertinggi dalam ±3 kolom. Cuma puncak seperti ini yang jadi duri. */
-    var base=wv; /* dipakai ulang sebagai buffer profil */
-    for(ii=0;ii<N;ii++)base[ii]=.22+.12*env[ii]; /* badan cincin: lembah dangkal, sedikit bergelombang */
-    /* Semua jendela proporsional ke jumlah kolom N, jadi bentuk sama di semua ukuran/zoom. */
-    var HW=Math.max(1,Math.round(N*.04));   /* lebar separuh duri (kolom) -> duri melebar ke tetangga */
-    var WM=Math.max(2,Math.round(N*.05));   /* jendela rata-rata untuk ukur "menonjol" */
-    var WP=Math.max(2,Math.round(N*.033));  /* puncak harus tertinggi dalam ±WP kolom */
-    for(ii=0;ii<N;ii++){
-      var ev=env[ii],loc=0,isMax=true;
-      for(kk=-WM;kk<=WM;kk++)loc+=env[(ii+kk+N)%N];
-      loc/=(2*WM+1);
-      var prom=ev-loc;
-      if(prom<.09||ev<.38)continue;
-      for(kk=-WP;kk<=WP;kk++){
-        if(!kk)continue;
-        var ov=env[(ii+kk+N)%N];
-        if(ov>ev||(ov===ev&&kk<0)){isMax=false;break;}
-      }
-      if(!isMax)continue;
-      var hp=Math.min(1,.40+prom*2.6+(ev-.3)*.9); /* tinggi duri: makin menonjol makin tinggi */
-      for(kk=-HW;kk<=HW;kk++){
-        var tri=1-Math.abs(kk)/(HW+1);       /* segitiga: duri runcing, sisi melebar ke tetangga */
-        var vv2=.22+(hp-.22)*Math.pow(tri,1.2);
-        var idx=(ii+kk+N)%N;
-        if(vv2>base[idx])base[idx]=vv2;
-      }
-    }
-    for(ii=0;ii<N;ii++)AVP.raw[ii]=Math.max(.04,Math.min(1,base[ii]));
   }
   for(var j=0;AV_DOTS?false:j<N;j++){
     /* Mirror the spectrum around the circle. Low frequencies sit near the
@@ -1416,8 +1378,8 @@ function buildAVProfile(){
   var raw=AVP.raw,sm=AVP.sm;
   for(var j2=0;j2<N;j2++){
     var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
-    var tgt=AV_DOTS?(a0*.06+a1*.88+a2*.06):(a0*.25+a1*.5+a2*.25);
-    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?(AV_DOTS?.5:.6):(AV_DOTS?.15:.22));
+    var tgt=AV_DOTS?(a0*.12+a1*.76+a2*.12):(a0*.25+a1*.5+a2*.25);
+    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.6:.22);
     pts[j2*3+2]=sm[j2];
   }
   AVP.stamp=AV.skip;
@@ -1438,55 +1400,35 @@ function drawAudioVisualizer(now,R){
     var lv=AV.level,beat=AV.beat;
     var inner=R*1.06;
     var ampBase=R*(.035+.04*lv)*.5;
-    var ampSpec=R*(.34+.46*lv+.30*beat)*.95;
-    /* Ukuran dot ikut R: saat di-zoom (R≈80+) tetap 1.5px persis seperti sebelumnya, tapi
-       saat lubang hitam kecil dot lebih halus (min 1.05px) -> lebih banyak dot per kolom. */
-    var lw=Math.max(IS_POTATO?1.2:1.05,Math.min(2.6,R*.0167));
+    var ampSpec=R*(.34+.46*lv+.30*beat)*.5;
+    var lw=Math.max(IS_POTATO?1.3:1.5,Math.min(2.6,R*.011));
+    var gap=lw*2.5;
     var boost=Math.min(1,.78+.18*lv+.22*beat);
-    /* 5 zona berdasarkan JARAK ABSOLUT dari tepi lubang hitam (bukan persen panjang bar):
-       - ALPHA: transparan di dekat lingkaran hitam, makin ke luar makin terang (fading di dalam).
-       - JARAK DOT: makin ke luar makin renggang (ujung duri paling jarang).
-       - Tebal dot menipis sedikit di ujung.
-       Satu zona = satu Path2D = satu stroke. */
-    var zb=[R*.09,R*.20,R*.34,R*.52];
-    var ZN=5,Z=[
-      {a:.14,w:.90,g:lw*1.7},
-      {a:.36,w:.96,g:lw*1.9},
-      {a:.68,w:1.00,g:lw*2.3},
-      {a:.92,w:.90,g:lw*3.1},
-      {a:.95,w:.76,g:lw*4.6}
-    ];
-    var zp=[new Path2D(),new Path2D(),new Path2D(),new Path2D(),new Path2D()],zi;
+    /* 3 lapis per bar: dalam (transparan), tengah, ujung (terang & lebih tipis).
+       Masing-masing satu path = satu stroke. */
+    var pA=new Path2D(),pB=new Path2D(),pC=new Path2D();
     for(var j=0;j<N;j++){
       var fv=pts[j*3+2];
-      fv=Math.min(1.2,fv*(1+.25*beat));   /* bentuk sudah dibentuk di buildAVProfile; beat cuma nambah tinggi */
+      fv=Math.min(1.3,Math.pow(fv,1.6)*1.15*(1+.45*beat));   /* kontras tinggi: puncak jadi duri, beat cuma nambah tinggi duri */
       var rr=inner+ampBase+fv*ampSpec;
+      if(fv>.7)rr+=(fv-.7)*ampSpec*1.3;          /* duri tipis di puncak */
       var cx=pts[j*3],cy=pts[j*3+1];
       var len=rr-inner;
       if(len<lw)continue;
-      var s0=0;
-      for(zi=0;zi<ZN;zi++){
-        var e=zi<ZN-1?Math.min(len,zb[zi]):len;
-        /* mulai zona berikutnya setengah gap di depan supaya dot batas zona nggak dobel */
-        var st=zi?s0+Z[zi].g*.5:s0;
-        if(e>st){
-          zp[zi].moveTo(cx*(inner+st),cy*(inner+st));
-          zp[zi].lineTo(cx*(inner+e),cy*(inner+e));
-        }
-        if(e>=len)break;
-        s0=e;
-      }
+      var s1=inner+len*.34,s2=inner+len*.68;
+      pA.moveTo(cx*inner,cy*inner);pA.lineTo(cx*s1,cy*s1);
+      pB.moveTo(cx*s1,cy*s1);pB.lineTo(cx*s2,cy*s2);
+      pC.moveTo(cx*s2,cy*s2);pC.lineTo(cx*rr,cy*rr);
     }
     g.save();
     g.globalCompositeOperation='lighter';
     g.lineCap=IS_POTATO?'butt':'round';
-    for(zi=0;zi<ZN;zi++){
-      var zz=Z[zi];
-      if(!IS_POTATO)g.setLineDash([.01,zz.g]);else g.setLineDash([lw*1.2,zz.g*.8]);
-      g.lineWidth=Math.max(.8,lw*zz.w);
-      g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,zz.a*boost)+')';
-      g.stroke(zp[zi]);
-    }
+    if(!IS_POTATO)g.setLineDash([.01,gap]);else g.setLineDash([lw*1.2,gap*.8]);
+    g.lineWidth=lw;
+    g.strokeStyle='rgba('+AV_COLOR+','+(.26*boost)+')';g.stroke(pA);
+    g.strokeStyle='rgba('+AV_COLOR+','+(.62*boost)+')';g.stroke(pB);
+    g.lineWidth=lw*.85;
+    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,.98*boost)+')';g.stroke(pC);
     g.restore();
   }catch(err){}
 }
