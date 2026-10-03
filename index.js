@@ -4514,10 +4514,10 @@ function drawShooting(now){
     SS.push({x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850});}
   for(var i=SS.length-1;i>=0;i--){
     var s=SS[i],u=(now-s.t)/s.life;if(u>1){SS.splice(i,1);continue;}
-    var x=s.x+s.vx*(now-s.t)/1000,y=s.y+s.vy*(now-s.t)/1000,tl=.07;
+    var x=s.x+s.vx*(now-s.t)/1000,y=s.y+s.vy*(now-s.t)/1000,tl=s.tl||.07;
     var gr=g.createLinearGradient(x,y,x-s.vx*tl,y-s.vy*tl);
-    gr.addColorStop(0,'rgba(234,246,255,'+(1-u)+')');gr.addColorStop(1,'rgba(110,229,255,0)');
-    g.strokeStyle=gr;g.lineWidth=1.4;g.beginPath();g.moveTo(x,y);g.lineTo(x-s.vx*tl,y-s.vy*tl);g.stroke();
+    gr.addColorStop(0,'rgba('+(s.c0||'234,246,255')+','+(1-u)+')');gr.addColorStop(1,'rgba('+(s.c1||'110,229,255')+',0)');
+    g.strokeStyle=gr;g.lineWidth=s.lw||1.4;g.beginPath();g.moveTo(x,y);g.lineTo(x-s.vx*tl,y-s.vy*tl);g.stroke();
   }
 }
 function asteroidScreenAt(x,y){
@@ -6006,10 +6006,32 @@ if(antFx){
 }
 
 /* ---------- easter eggs ---------- */
+/* Konami: meteor shower reusing the SS shooting-star pool (drawShooting renders it). */
+function konamiMeteors(){
+  if(reduce||IS_POTATO||SW)return;
+  markActivity(); /* keyboard input doesn't count as activity; drawShooting bails out in idleMode */
+  for(var i=0;i<18;i++){
+    (function(i){
+      setTimeout(function(){
+        if(SW)return;
+        var now=performance.now(),
+            ang=(.16+Math.random()*.16)*Math.PI,
+            sp=700+Math.random()*500;
+        SS.push({
+          x:Math.random()*W*1.1-W*.1,y:-20+Math.random()*H*.25,
+          vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,
+          t:now,life:900+Math.random()*500,
+          tl:.12,lw:2,c0:'255,122,217',c1:'34,230,255'
+        });
+      },i*110+Math.random()*90);
+    })(i);
+  }
+}
 function triggerKonami(){
   document.body.classList.add('konami');
   haptic(18);
   showSecret('SYSTEM OVERRIDE · DUMUL//OBSERVATORY',1800);
+  konamiMeteors();
   clearTimeout(triggerKonami._t);
   triggerKonami._t=setTimeout(function(){document.body.classList.remove('konami');},2100);
 }
