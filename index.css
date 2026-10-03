@@ -1,0 +1,787 @@
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(120% 80% at 50% 28%,#10222f 0%,#08121b 55%,#04080d 100%);color:#dbe7f3;font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+#sky{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.scan{position:fixed;inset:0;pointer-events:none;z-index:2;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
+header{position:fixed;top:0;left:0;right:0;z-index:3;text-align:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px 0;pointer-events:none}
+h1{position:relative;margin:0;display:inline-block;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+h1::before{content:'';position:absolute;top:50%;left:50%;width:0%;height:2px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:width .3s ease,opacity .3s ease;z-index:-1}
+h1.gl::before{width:140%;opacity:.85}
+.kicker{display:block;font:600 12px/1 'Syne',sans-serif;letter-spacing:.55em;padding-left:.55em;text-transform:uppercase;color:#6ee5ff}
+.big{display:block;margin-top:9px;white-space:nowrap;font:800 clamp(20px,min(7vw,10vh),56px)/1.02 'Syne',sans-serif;letter-spacing:.06em;padding-left:.06em;text-transform:uppercase;color:#eaf6ff;text-shadow:0 0 22px rgba(110,229,255,.45),0 0 2px rgba(255,255,255,.35)}
+.sub{margin:10px 0 0;font-size:11px;letter-spacing:.32em;padding-left:.32em;text-transform:uppercase;color:rgba(184,198,214,.72)}
+h1.gl .big{animation:gl .65s steps(1,end)}
+h1.gl .kicker{animation:gk .65s steps(1,end)}
+@keyframes gl{
+0%{transform:translate(-3px,1px) skewX(-8deg);text-shadow:4px 0 #ff2bd6,-4px 0 #22e6ff}
+12%{transform:translate(4px,-1px) skewX(6deg);text-shadow:-4px 0 #ff2bd6,4px 0 #22e6ff;clip-path:inset(0 0 55% 0)}
+24%{transform:translate(-2px,0);clip-path:inset(45% 0 0 0);text-shadow:0 0 18px rgba(110,229,255,.9)}
+36%{transform:translate(3px,2px) skewX(-4deg);clip-path:none;text-shadow:5px 0 #ff2bd6,-5px 0 #22e6ff}
+50%{transform:translate(-4px,-1px);opacity:.55;clip-path:inset(20% 0 40% 0)}
+58%{transform:none;opacity:1;clip-path:none;text-shadow:-3px 0 #ff2bd6,3px 0 #22e6ff}
+72%{transform:translate(2px,1px) skewX(5deg)}
+86%{transform:translate(-1px,0);text-shadow:2px 0 #ff2bd6,-2px 0 #22e6ff}
+100%{transform:none}}
+@keyframes gk{0%{transform:translateX(4px);color:#ff7ad9}30%{transform:translateX(-4px);color:#6ee5ff}60%{transform:translateX(3px);color:#ff7ad9}100%{transform:none}}
+#music-player{position:fixed;right:12px;bottom:58px;z-index:12;width:min(258px,calc(100vw - 34px));max-height:min(300px,calc(100vh - 120px));display:flex;flex-direction:column;overflow:hidden;padding:10px 10px 8px;border:1px solid rgba(110,229,255,.24);border-radius:8px;background:rgba(3,8,13,.88);box-shadow:0 10px 28px rgba(0,0,0,.34),0 0 18px rgba(110,229,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .28s ease,transform .28s cubic-bezier(.22,.7,.3,1)}
+#music-player.open{opacity:1;transform:none;pointer-events:auto;will-change:transform,opacity}
+.mp-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px}
+.mp-scroll::-webkit-scrollbar{width:3px}
+.mp-scroll::-webkit-scrollbar-thumb{background:rgba(110,229,255,.3);border-radius:2px}
+.mp-foot{flex:0 0 auto;padding-top:8px;margin-top:2px;border-top:1px solid rgba(110,229,255,.1);background:rgba(3,8,13,.96)}
+.mp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex:0 0 auto}
+.mp-kicker{display:block;font-size:6.5px;line-height:1;text-transform:uppercase;letter-spacing:.2em;color:rgba(184,198,214,.4);margin-bottom:3px}.mp-head strong{font:600 12px/1 'Syne',sans-serif;letter-spacing:.04em;color:#dff7ff}
+#music-close{width:24px;height:24px;border:1px solid rgba(110,229,255,.12);border-radius:4px;background:rgba(110,229,255,.035);color:rgba(214,228,240,.65);font:300 17px/1 system-ui;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,transform .15s ease}
+#music-close:hover,#music-close:focus-visible{border-color:rgba(110,229,255,.4);background:rgba(110,229,255,.08);color:#eafcff}
+.mp-tracks{display:grid;gap:3px}.mp-track{display:grid;grid-template-columns:18px minmax(0,1fr) 12px auto 9px;align-items:center;width:100%;padding:5px 7px;border:1px solid rgba(110,229,255,.09);border-radius:5px;background:rgba(110,229,255,.018);color:rgba(214,228,240,.62);text-align:left;cursor:pointer;gap:0 3px;transition:border-color .28s ease,background .28s ease,color .28s ease,box-shadow .28s ease}.mp-track.active{border-color:rgba(110,229,255,.38);background:rgba(110,229,255,.055);color:#eafcff;box-shadow:0 0 12px rgba(110,229,255,.06)}.mp-track.observed{border-color:rgba(110,229,255,.18)}.mp-num{font:600 7.5px/1 'Courier New',monospace;color:rgba(110,229,255,.5);transition:color .28s ease}.mp-name{font:500 9px/1.2 'Courier New',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .28s ease}.mp-obs{font:600 8px/1 'Courier New',monospace;letter-spacing:0;color:rgba(184,198,214,.28);white-space:nowrap;min-width:8px;text-align:center;transition:color .28s ease}.mp-track.observed .mp-obs{color:#6ee5ff;text-shadow:0 0 6px rgba(110,229,255,.45)}.mp-track.playing .mp-obs{opacity:0;max-width:0;overflow:hidden;margin:0;padding:0;font-size:0;min-width:0}.mp-track[data-type="bgm"]{grid-template-columns:20px minmax(0,1fr) auto 9px}.mp-state{font-size:6px;opacity:0;color:#6ee5ff;transition:opacity .3s ease}.mp-track.playing .mp-state{opacity:1}
+.mp-spec{display:inline-flex;align-items:flex-end;gap:1.4px;height:11px;margin-left:2px;opacity:0;max-width:0;overflow:hidden;pointer-events:none;transition:opacity .32s ease,max-width .32s ease,margin .32s ease}.mp-track.playing .mp-spec{opacity:1;max-width:28px;margin-left:2px}.mp-spec i{display:block;width:1.6px;height:3px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 4px rgba(110,229,255,.55);transform-origin:bottom center;will-change:height;transition:height .12s ease-out}
+.mp-play{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:30px;margin:0;border:1px solid rgba(110,229,255,.22);border-radius:5px;background:rgba(110,229,255,.045);color:#dffaff;font:600 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,box-shadow .25s ease}.mp-play:hover,.mp-play:focus-visible{border-color:rgba(110,229,255,.45);background:rgba(110,229,255,.09);box-shadow:0 0 14px rgba(110,229,255,.1)}.mp-play:active,.mp-track:active,#music-close:active{transform:translateY(1px)}.mp-play-icon{font-size:8px;color:#6ee5ff;transition:color .25s ease}
+#music-toggle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;display:grid;place-items:center;width:32px;height:32px;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.7);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .3s ease,border-color .3s ease,background .3s ease,box-shadow .3s ease;overflow:hidden}#music-toggle:hover,#music-toggle:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.07)}#music-toggle svg{width:15px;height:15px;display:block;grid-area:1/1;transition:opacity .28s ease,transform .28s ease}#music-toggle.playing-closed{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.1);box-shadow:0 0 12px rgba(110,229,255,.18)}#music-toggle.playing-closed svg{opacity:0;transform:scale(.55)}
+.mp-spec-mini{grid-area:1/1;display:inline-flex;align-items:flex-end;justify-content:center;gap:1.5px;height:14px;opacity:0;pointer-events:none;transform:scale(.7);transition:opacity .3s ease,transform .3s ease}.mp-spec-mini i{display:block;width:2px;height:4px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 5px rgba(110,229,255,.65);transform-origin:bottom center;will-change:height;transition:height .12s ease-out}#music-toggle.playing-closed .mp-spec-mini{opacity:1;transform:scale(1)}
+/* Now-playing title: beside logo when HUD closed, then slides into logo after 2s */
+#mp-now-playing{position:fixed;right:50px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;height:32px;display:flex;align-items:center;max-width:min(160px,calc(100vw - 72px));padding:0 10px;border:1px solid rgba(110,229,255,.22);border-radius:5px;background:rgba(3,8,13,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 12px rgba(110,229,255,.08);font:500 9px/1 'Courier New',monospace;letter-spacing:.06em;color:#dff7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateX(10px) scale(.96);pointer-events:none;visibility:hidden;transition:opacity .38s ease,transform .42s cubic-bezier(.22,.7,.3,1),visibility 0s linear .42s}
+#mp-now-playing.show{opacity:1;transform:none;visibility:visible;transition:opacity .38s ease,transform .42s cubic-bezier(.22,.7,.3,1),visibility 0s}
+#mp-now-playing.absorb{opacity:0;transform:translateX(28px) scale(.55);visibility:hidden;transition:opacity .55s ease,transform .6s cubic-bezier(.4,0,.2,1),visibility 0s linear .55s}
+.mp-section-title{font-size:7.5px;line-height:1;text-transform:uppercase;letter-spacing:.14em;color:rgba(110,229,255,.65);margin:10px 0 4px 2px;font-weight:600;display:flex;align-items:baseline;flex-wrap:wrap;gap:0 4px}.mp-section-title:first-of-type{margin-top:2px}.mp-rec-count{color:rgba(184,198,214,.45);font-weight:500;letter-spacing:.1em}.mp-rec-count em{color:#6ee5ff;font-style:normal;font-weight:600}
+/* music-player max-height owned by primary rule (~signals viewport) */
+#music-player::-webkit-scrollbar{width:3px}
+#music-player::-webkit-scrollbar-thumb{background:rgba(110,229,255,.3);border-radius:2px}
+@media (prefers-reduced-motion:reduce){
+  .mp-track,.mp-spec,.mp-spec i,.mp-state,.mp-play,#music-close,#music-toggle,#music-toggle svg,.mp-spec-mini,.mp-spec-mini i,#mp-now-playing{transition-duration:.01s!important}
+}
+footer{position:fixed;left:0;right:0;bottom:0;z-index:3;padding:0 12px calc(10px + env(safe-area-inset-bottom,0px));pointer-events:none}
+footer nav{display:flex;align-items:center;justify-content:flex-start;gap:7px}.footer-left{display:flex;gap:7px}
+footer nav a{display:grid;place-items:center;width:32px;height:32px;border-radius:5px;border:1px solid rgba(110,229,255,.17);background:rgba(6,11,17,.34);color:rgba(214,228,240,.7);text-decoration:none;-webkit-tap-highlight-color:transparent;transition:color .2s,border-color .2s,background .2s;pointer-events:auto}
+footer nav a:hover,footer nav a:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.07)}
+footer nav svg{width:15px;height:15px;display:block}
+.quote{display:none}
+@media(max-width:520px){#music-player{right:10px;bottom:52px;width:min(244px,calc(100vw - 30px));padding:9px}.mp-name{font-size:8.5px}footer{padding-left:10px;padding-right:10px}#music-toggle{right:10px;width:31px;height:31px}#mp-now-playing{right:47px;height:31px;font-size:8px;padding:0 8px;max-width:min(140px,calc(100vw - 64px))}}
+
+.cap{display:none;position:fixed;left:0;top:0;z-index:3;font-size:10px;letter-spacing:.5em;text-transform:uppercase;color:rgba(184,198,214,.42);pointer-events:none;white-space:nowrap}
+#bh-clock{position:fixed;pointer-events:auto;cursor:pointer;left:0;top:0;z-index:5;font:500 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.08em;color:rgba(196,226,240,.58);pointer-events:auto;white-space:nowrap;text-shadow:0 0 7px rgba(110,229,255,.16);text-transform:uppercase}
+#bh-clock .clock-time{font:600 10.5px/1 'Courier New',monospace;letter-spacing:.045em;color:#6ee5ff;text-shadow:0 0 6px rgba(110,229,255,.24)}
+#bh-clock .clock-sep{opacity:.3;padding:0 3px}
+@media (max-width:520px){#bh-clock{font-size:7.5px;letter-spacing:.06em}#bh-clock .clock-time{font-size:9.5px;letter-spacing:.025em}#bh-clock .clock-sep{padding:0 2px}}
+#betel-fx{position:fixed;left:0;top:0;z-index:4;width:52px;height:52px;margin:-26px 0 0 -26px;border:0;border-radius:50%;padding:0;background:transparent;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
+#betel-fx:focus-visible{outline:2px solid #ff7ad9;outline-offset:2px}
+/* Observatory instrument reticle: native CSS cursor, no JS/render-loop work. */
+#betel-fx,#rigel-fx,#sirius-fx,#pleione-fx,#aldebaran-fx,#arcturus-fx,#antares-fx,.hit,#bh{cursor:crosshair}
+/* Tactical HUD corner brackets for portal labels. */
+.portal .lab{position:relative}
+.portal .lab::before,.portal .lab::after{content:'';position:absolute;top:0;width:5px;height:5px;pointer-events:none}
+.portal .lab::before{left:0;border-top:1px solid rgba(110,229,255,.6);border-left:1px solid rgba(110,229,255,.6)}
+.portal .lab::after{right:0;bottom:0;top:auto;border-bottom:1px solid rgba(110,229,255,.6);border-right:1px solid rgba(110,229,255,.6)}
+.portal:hover .lab::before,.portal:hover .lab::after,.portal.hot .lab::before,.portal.hot .lab::after,.portal:focus-visible .lab::before,.portal:focus-visible .lab::after{border-color:#6ee5ff}
+.portal:hover .lab::before,.portal.hot .lab::before,.portal:focus-visible .lab::before{box-shadow:1px -1px 4px rgba(110,229,255,.5)}
+.portal:hover .lab::after,.portal.hot .lab::after,.portal:focus-visible .lab::after{box-shadow:-1px 1px 4px rgba(110,229,255,.5)}
+/* visual trigger bintang: ring pulse dirender di canvas, hit area tetap transparan */
+.portal
+,.hit{position:fixed;left:0;top:0;z-index:4}
+.portal{display:block;margin-top:-20px;color:#eaf6ff;text-decoration:none;opacity:0;transition:opacity .9s;will-change:transform;pointer-events:auto}
+.portal.on{opacity:1}
+/* Alignment aktif: portal (panel + tombol hit sabuk Orion) & Pleione ngalah, biar tap jatuh ke bintang. */
+body.aligning .portal,body.aligning .portal-hit,body.aligning #pleione-fx{pointer-events:none!important}
+body.aligning .portal{opacity:0!important}
+.portal .lab{display:block;padding:5px 9px;border-left:1px solid rgba(110,229,255,.55);background:linear-gradient(90deg,rgba(6,11,17,.6),transparent)}
+.portal b{display:block;font:700 11px/1.1 'Syne',sans-serif;letter-spacing:.16em;text-transform:uppercase}
+.portal small{display:block;margin-top:3px;font-size:9px;letter-spacing:.05em;color:rgba(184,198,214,.82)}
+.portal:hover .lab,.portal:focus-visible .lab,.portal.hot .lab{border-color:#6ee5ff;background:linear-gradient(90deg,rgba(110,229,255,.18),transparent)}
+.portal:focus-visible{outline:2px solid #ff7ad9;outline-offset:3px}
+.hit{width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;-webkit-tap-highlight-color:transparent;background:transparent;border:0;padding:0;cursor:pointer;outline:none}
+.hit:focus-visible{outline:2px solid #ff7ad9;outline-offset:2px}
+#bh{position:fixed;left:0;top:0;z-index:4;border-radius:50%;-webkit-tap-highlight-color:transparent;outline:none;pointer-events:none}
+#bh:focus-visible{outline:2px solid #ff7ad9;outline-offset:2px}
+#veil{position:fixed;inset:0;z-index:20;background:#000;opacity:0;pointer-events:none;transition:opacity .55s ease-in}
+#veil.on{opacity:1}
+body.sw{pointer-events:none}
+
+/* ---------- v4 interaction layer ---------- | v25 mobile canvas compatibility */
+#owl-source{position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;width:34px;height:34px;display:grid;place-items:center;color:rgba(184,198,214,.46);text-decoration:none;border:1px solid rgba(110,229,255,.12);border-radius:50%;background:rgba(6,11,17,.32);backdrop-filter:blur(4px);transition:color .2s,border-color .2s,transform .2s,box-shadow .2s}
+#owl-source:hover,#owl-source:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);box-shadow:0 0 16px rgba(110,229,255,.16);transform:translateY(-1px)}
+#owl-source svg{width:19px;height:19px}
+#secret-msg{position:fixed;left:50%;top:50%;z-index:30;transform:translate(-50%,-50%);font:600 9px/1.5 'Courier New',monospace;letter-spacing:.05em;color:#eafcff;text-shadow:0 0 3px #fff,0 0 8px rgba(110,229,255,.9),0 0 16px rgba(110,229,255,.55);opacity:0;pointer-events:none;transition:opacity .25s;white-space:pre-line;max-width:min(72vw,220px);text-align:center;padding:7px 10px;border:1px solid rgba(110,229,255,.28);border-radius:4px;background:rgba(2,7,12,.78);box-shadow:0 0 12px rgba(110,229,255,.12),inset 0 0 9px rgba(110,229,255,.04)}
+#secret-msg.on{opacity:1}
+/* Bottom-anchored to telescope: bubble grows upward, stays tight above the optic. */
+#secret-msg[data-type="telescope"]{transform:translate(-50%,-100%);margin-top:0}
+#secret-msg.tele-short{white-space:nowrap;max-width:none;padding:5px 8px}
+#secret-msg.tele-wrap{white-space:pre-line;max-width:min(72vw,220px)}
+#terminal{position:fixed;left:50%;bottom:74px;z-index:10;width:min(88vw,430px);padding:14px 16px;border:1px solid rgba(110,229,255,.38);background:rgba(3,8,12,.92);box-shadow:0 0 30px rgba(110,229,255,.12),inset 0 0 22px rgba(110,229,255,.035);font:11px/1.65 'Courier New',monospace;color:#8eeeff;opacity:0;transform:translate(-50%,18px);pointer-events:none;transition:opacity .35s,transform .35s}
+#terminal.on{opacity:1;transform:translate(-50%,0)}
+#terminal .term-title{color:#eaf6ff;letter-spacing:.14em}
+#terminal .cursor{display:inline-block;width:7px;height:12px;background:#6ee5ff;vertical-align:-2px;animation:blink .8s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}
+.supernova-flash{position:fixed;inset:0;z-index:7;pointer-events:none;background:radial-gradient(circle at var(--sx) var(--sy),rgba(255,255,255,.98) 0,rgba(var(--sn-rgb),.82) 4%,rgba(var(--sn-rgb),.24) 13%,transparent 42%);opacity:0}
+.supernova-flash.on{animation:snflash .85s ease-out forwards}
+@keyframes snflash{0%{opacity:0}12%{opacity:1}30%{opacity:.78}100%{opacity:0}}
+body.konami #sky{filter:none}
+body.konami .scan{background:repeating-linear-gradient(0deg,rgba(255,43,214,.08) 0 1px,transparent 1px 3px)}
+body.konami #title .big,body.konami #title .kicker{color:#ff7ad9;text-shadow:0 0 18px rgba(255,43,214,.7),0 0 10px rgba(34,230,255,.45)}
+body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
+@keyframes cyberGlitch{0%,100%{transform:none;filter:none}20%{transform:translateX(-3px);filter:hue-rotate(-40deg) saturate(1.8)}45%{transform:translateX(4px);filter:hue-rotate(160deg) saturate(2.2)}70%{transform:translateX(-1px);filter:hue-rotate(-20deg) saturate(1.6)}}
+.portal .lab-open{display:block;margin-top:3px;font:600 7px/1 'Courier New',monospace;letter-spacing:.12em;color:rgba(110,229,255,.42);transition:color .2s,transform .2s}
+.portal:hover .lab-open,.portal.hot .lab-open,.portal:focus-visible .lab-open{color:#6ee5ff;transform:translateX(3px)}
+/* tap/hover feedback for constellation geometry */
+.cons-hot-line{filter:drop-shadow(0 0 4px rgba(110,229,255,.45))}
+@media (max-width:600px){
+  #owl-source{right:10px;width:31px;height:31px}
+  #terminal{bottom:68px;font-size:10px}
+  /* Keep the transient Konami override inside narrow phone viewports.
+     The desktop minimum font-size (15px) plus wide letter-spacing can make
+     this one-line message exceed a 360px screen. */
+  #secret-msg{font-size:8px;letter-spacing:.04em;padding:6px 8px;max-width:min(78vw,200px)}
+  #secret-msg.tele-wrap{max-width:min(78vw,200px)}
+  /* Compact portals so DUMUL never covers interactive stars (Sirius etc.) */
+  .portal{margin-top:-16px}
+  .portal .lab{padding:4px 7px}
+  .portal b{font-size:10px;letter-spacing:.12em}
+  .portal small{font-size:8px;margin-top:2px}
+  .portal .lab-open{font-size:6.5px;margin-top:2px}
+  /* Sembunyikan portal DUMUL secara default di HP; tampil saat Sabuk Orion diklik */
+  .portal{
+    opacity:0 !important;
+    pointer-events:none !important;
+    transition:opacity .35s ease,transform .35s ease;
+  }
+  .portal.mobile-show{
+    opacity:1 !important;
+    pointer-events:auto !important;
+  }
+}
+
+/* Phone in landscape / desktop-site mode: same behaviour as portrait — DUMUL panel hidden until the Orion belt is tapped */
+body.touch-short .portal{opacity:0!important;pointer-events:none!important;transition:opacity .35s ease,transform .35s ease}
+body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!important}
+
+@media (prefers-reduced-motion:reduce){h1.gl .big,h1.gl .kicker{animation-duration:.01s}}
+
+/* ---------- v41.4 boot / vertical matrix rain on every load ---------- */
+#boot-screen{position:fixed;inset:0;z-index:100;background:#02070b;color:#8eeeff;display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:'Courier New',monospace;opacity:1;visibility:visible;pointer-events:auto;transition:opacity .8s ease,visibility .8s ease}
+#boot-screen.off{opacity:0;visibility:hidden;pointer-events:none}
+#boot-matrix{position:absolute;inset:0;opacity:.72;overflow:hidden;pointer-events:none}
+#boot-matrix canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#boot-core{position:relative;width:min(88vw,520px);padding:24px 20px 20px;border:1px solid rgba(110,229,255,.30);background:rgba(2,8,13,.82);box-shadow:0 0 34px rgba(110,229,255,.10),inset 0 0 26px rgba(110,229,255,.035);backdrop-filter:blur(3px)}
+#boot-title{font-size:clamp(17px,5vw,27px);font-weight:700;letter-spacing:.16em;color:#eafcff;text-shadow:0 0 9px rgba(110,229,255,.55);margin-bottom:18px}
+#boot-status{font-size:clamp(10px,2.8vw,13px);line-height:1.85;letter-spacing:.08em;color:rgba(184,224,238,.82);white-space:pre}
+#boot-status .ok{color:#8eeeff;text-shadow:0 0 7px rgba(110,229,255,.35)}
+#boot-bar{height:7px;margin-top:16px;border:1px solid rgba(110,229,255,.30);background:rgba(110,229,255,.035);overflow:hidden}
+#boot-fill{height:100%;width:0;background:linear-gradient(90deg,rgba(110,229,255,.28),#6ee5ff,rgba(110,229,255,.72));box-shadow:0 0 13px rgba(110,229,255,.45);transition:width .16s linear}
+#boot-pct{margin-top:8px;text-align:right;font-size:10px;letter-spacing:.16em;color:rgba(184,224,238,.62)}
+#boot-signal{margin-top:18px;font-size:11px;letter-spacing:.13em;color:#eafcff;opacity:0;transform:translateY(4px);transition:opacity .35s,transform .35s;text-shadow:0 0 8px rgba(110,229,255,.65)}
+#boot-signal.on{opacity:1;transform:none}
+#boot-quote{
+  margin-top:14px;text-align:center;
+  font-size:10px;letter-spacing:.14em;line-height:1.5;
+  color:rgba(184,224,238,.38);font-style:italic;
+  opacity:0;transform:translateY(4px);
+  transition:opacity .7s ease,transform .7s ease;
+}
+#boot-quote.on{opacity:1;transform:none}
+#boot-choices{
+  display:none;margin-top:22px;gap:14px;justify-content:center;align-items:flex-start;
+  opacity:0;transform:translateY(8px);
+  transition:opacity .45s ease,transform .45s ease;
+}
+#boot-choices.on{display:flex;opacity:1;transform:none}
+.boot-choice{display:flex;flex-direction:column;align-items:center;gap:7px}
+.boot-cap{
+  position:relative;width:52px;height:22px;padding:0;border:0;border-radius:999px;
+  cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;
+  transition:transform .18s ease,box-shadow .25s ease,filter .25s ease;
+}
+.boot-cap::before{
+  content:'';position:absolute;inset:0;border-radius:999px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.25);
+}
+.boot-cap::after{
+  content:'';position:absolute;top:50%;left:50%;width:1px;height:70%;
+  transform:translate(-50%,-50%);background:rgba(0,0,0,.18);border-radius:1px;
+}
+.boot-cap.blue{
+  background:linear-gradient(180deg,#7ef0ff 0%,#2ec8e8 42%,#1890b8 100%);
+  box-shadow:0 0 14px rgba(110,229,255,.35),0 2px 6px rgba(0,0,0,.35);
+}
+.boot-cap.blue:hover,.boot-cap.blue:focus-visible{
+  filter:brightness(1.12);transform:translateY(-2px) scale(1.06);
+  box-shadow:0 0 22px rgba(110,229,255,.55),0 4px 10px rgba(0,0,0,.3);
+}
+.boot-cap.red{
+  background:linear-gradient(180deg,#ff7ab8 0%,#ff2b6e 42%,#c01048 100%);
+  box-shadow:0 0 14px rgba(255,43,120,.35),0 2px 6px rgba(0,0,0,.35);
+}
+.boot-cap.red:hover,.boot-cap.red:focus-visible{
+  filter:brightness(1.12);transform:translateY(-2px) scale(1.06);
+  box-shadow:0 0 22px rgba(255,43,120,.55),0 4px 10px rgba(0,0,0,.3);
+}
+.boot-cap:active{transform:translateY(1px) scale(.97);filter:brightness(.95)}
+.boot-cap-label{
+  font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(184,224,238,.38);font-style:italic;line-height:1;
+  pointer-events:none;user-select:none;
+}
+.boot-or{
+  align-self:center;padding-top:4px;
+  font-size:9px;letter-spacing:.14em;
+  color:rgba(184,224,238,.28);font-style:italic;line-height:1;
+  pointer-events:none;user-select:none;
+}
+#boot-scan{
+  position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0,transparent 2px,
+    rgba(0,0,0,.11) 2px,rgba(0,0,0,.11) 3px
+  );
+  opacity:.35;mix-blend-mode:multiply;
+}
+@media(prefers-reduced-motion:reduce){
+  #boot-quote,#boot-choices{transition-duration:.01s}
+}
+@media(max-width:600px){
+  #boot-core{padding:20px 15px 16px}#boot-status{font-size:9px;letter-spacing:.045em}#boot-bar{height:6px}
+  #boot-matrix{opacity:.62}#boot-quote{font-size:9px}
+  .boot-cap{width:48px;height:20px}
+  #boot-choices{gap:12px;margin-top:18px}
+  .boot-cap-label,.boot-or{font-size:8px;letter-spacing:.12em}
+}
+
+
+/* ---------- mobile landscape: compact 4-zone observatory layout ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  header {
+    padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  .kicker { font-size: 8px !important; letter-spacing: .3em !important; }
+  .big {
+    margin-top: 2px !important;
+    font-size: clamp(15px, 5vh, 22px) !important;
+  }
+  /* Sembunyikan subtitle agar kanvas bintang mendapat ruang vertikal maksimal */
+  .sub { display: none !important; }
+
+  /* Boot Screen compact landscape fix (agar tidak terpotong vertikal) */
+  #boot-core {
+    padding: 12px 16px 10px !important;
+  }
+  #boot-title {
+    font-size: 15px !important;
+    margin-bottom: 6px !important;
+  }
+  #boot-status {
+    font-size: 8.5px !important;
+    line-height: 1.4 !important;
+  }
+  #boot-bar { margin-top: 6px !important; height: 5px !important; }
+  #boot-pct { margin-top: 2px !important; font-size: 8.5px !important; }
+  #boot-signal { margin-top: 6px !important; font-size: 9px !important; }
+  #boot-quote { margin-top: 4px !important; font-size: 8px !important; }
+  #boot-choices { margin-top: 8px !important; gap: 10px !important; }
+  .boot-cap { width: 44px !important; height: 18px !important; }
+
+  /* Portal & HUD */
+  .portal { margin-top: -12px !important; }
+  .portal .lab { padding: 3px 6px !important; }
+  .portal b { font-size: 9px !important; }
+  .portal small { font-size: 7.5px !important; }
+  .portal .lab-open { font-size: 6px !important; }
+  #bh-clock { font-size: 7.2px !important; }
+  #bh-clock .clock-time { font-size: 9px !important; }
+  footer {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  footer nav a, #music-toggle {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  #music-toggle {
+    right: 8px !important;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  #mp-now-playing {
+    right: 42px !important;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+    height: 28px !important;
+    font-size: 8px !important;
+    padding: 0 7px !important;
+  }
+  #music-player {
+    bottom: 48px !important;
+    max-height: min(280px, calc(100vh - 56px)) !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Isolated Style untuk Neural Network Overlay (Transisi Gargantua -> DUMUL) */
+#tesseract-warp {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  isolation: isolate;
+  background: #0a1218 !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+/* Panggung hero: og.webp + lapisan gelap yang SAMA dengan <section class="dm-hero"> di dumul.html.
+   Ukuran/posisinya diisi lewat JS dari dmHeroRect(). Di luar panggung = latar polos #0a1218 seperti halaman aslinya. */
+.tesseract-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 282px;
+  overflow: hidden;
+  background: #0a1218 url('./og.webp') center/cover no-repeat;
+  z-index: 0;
+}
+.tesseract-og {
+  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 70%,transparent 100%);mask-image:linear-gradient(to bottom,#000 0,#000 70%,transparent 100%);
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  object-position:center;
+  z-index:0;
+}
+.tesseract-shade { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.tesseract-shade.s1 { background: rgba(10, 18, 24, 0.6); }
+.tesseract-shade.s2 { background: linear-gradient(to bottom, rgba(10, 18, 24, 0.3), transparent, rgba(10, 18, 24, 0.9)); }
+.tesseract-shade.s3 { opacity: 0.6; background: radial-gradient(70% 60% at 50% 45%, transparent 40%, rgba(10, 18, 24, 0.85) 100%); }
+#tesseract-warp.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Hard cut the old Gargantua renderer behind the transition. The transition owns the screen now. */
+body.tesseract-running > #sky,
+body.tesseract-running > .scan,
+body.tesseract-running > #header,
+body.tesseract-running > footer,
+body.tesseract-running > #bh,
+body.tesseract-running > #bh-clock,
+body.tesseract-running > .portal,
+body.tesseract-running > .hit,
+body.tesseract-running > #owl-source,
+body.tesseract-running > #music-toggle,
+body.tesseract-running > #mp-now-playing,
+body.tesseract-running > #music-player,
+body.tesseract-running > #veil,
+body.tesseract-running > #terminal,
+body.tesseract-running > #secret-msg,
+body.tesseract-running > .supernova-flash { visibility:hidden !important; }
+body.tesseract-running { background:#0a1218 !important; }
+#tesseract-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  z-index: 2;
+}
+.tesseract-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(110, 229, 255, 0.04) 0px,
+    rgba(110, 229, 255, 0.04) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  z-index: 3;
+}
+.tesseract-ui {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom, 0px) + 14px);
+  transform: translateX(-50%);
+  z-index: 4;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(10, 18, 24, 0.82);
+  padding: 12px 22px 14px;
+  border: 1px solid rgba(110, 229, 255, 0.28);
+  box-shadow: 0 0 24px rgba(110, 229, 255, 0.14), 0 8px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: min(92vw, 420px);
+  width: min(92vw, 420px);
+  box-sizing: border-box;
+}
+.tesseract-title {
+  font-size: clamp(11px, 3.2vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #eafcff;
+  text-shadow: 0 0 10px rgba(110, 229, 255, 0.8), 2px 0 #ff7ad9, -2px 0 #6ee5ff;
+  margin-bottom: 6px;
+}
+.tesseract-status {
+  font-size: clamp(9px, 2.2vw, 11px);
+  letter-spacing: 0.1em;
+  color: #8eeeff;
+  text-shadow: 0 0 6px rgba(110, 229, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tesseract-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(110, 229, 255, 0.1);
+  border: 1px solid rgba(110, 229, 255, 0.28);
+  margin-top: 10px;
+  overflow: hidden;
+}
+#tesseract-progress {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #6ee5ff, #ff7ad9);
+  box-shadow: 0 0 12px #ff7ad9;
+  transition: width 0.1s linear;
+}
+/* ===== Teks "WELCOME TO THE GLITCH" — mengisi area kosong di bawah og.webp, di atas bar.
+   Murni lapisan tambahan: stage/og.webp/mesh/node TIDAK disentuh. Posisi dihitung JS (tpLayout). ===== */
+.tesseract-pre{position:absolute;left:0;right:0;top:0;height:0;z-index:4;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:'Courier New',monospace}
+.tp-inner{display:flex;flex-direction:column;align-items:center;gap:14px;transform-origin:50% 50%}
+/* Judul: SAMA dengan h1 "DUMUL" di dumul.html (Syne 800, clamp(26px,6.5vw,42px), spasi .12em, glow cyan + glitch slice RGB) */
+.tp-head{position:relative;display:flex;flex-direction:column;align-items:center;font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(26px,6.5vw,42px);line-height:1.08;letter-spacing:.12em;color:#e6eef8;text-shadow:0 0 18px rgba(110,229,255,.85),0 0 42px rgba(110,229,255,.35),0 2px 0 rgba(0,0,0,.6);text-align:center;white-space:nowrap;visibility:hidden;will-change:transform}
+.tp-hl{position:relative;display:block;padding-left:.12em}
+.tp-hl::before,.tp-hl::after{content:attr(data-text);position:absolute;left:0;right:0;top:0;bottom:0;padding-left:.12em;text-align:center;white-space:nowrap;pointer-events:none;opacity:0;text-shadow:none;mix-blend-mode:screen}
+.tp-hl::before{color:#ff2bd6}
+.tp-hl::after{color:#22e6ff}
+.tp-head.tp-gl{animation:tp-shake .65s steps(1,end) 1}
+.tp-head.tp-gl .tp-hl::before{animation:tp-sa .65s steps(1,end) 1}
+.tp-head.tp-gl .tp-hl::after{animation:tp-sb .65s steps(1,end) 1}
+.tp-list{display:flex;flex-direction:column;align-items:center;gap:6px}
+.tp-row{display:block;white-space:nowrap}
+.tp-t{display:block;font-family:'Courier New',monospace;font-size:clamp(11px,3vw,13px);letter-spacing:.06em;color:rgba(214,238,248,.78);visibility:hidden}
+.tp-row.ld .tp-t{animation:tp-jit 1.15s steps(1,end) infinite}
+.tp-row.ld:nth-child(2n) .tp-t{animation-duration:1.4s;animation-delay:-.35s}
+@keyframes tp-shake{0%{transform:translate(-3px,1px) skewX(-8deg);text-shadow:4px 0 #ff2bd6,-4px 0 #22e6ff}12%{transform:translate(4px,-1px) skewX(6deg);text-shadow:-4px 0 #ff2bd6,4px 0 #22e6ff}24%{transform:translate(-2px,0);text-shadow:0 0 18px rgba(110,229,255,.85)}36%{transform:translate(3px,2px) skewX(-4deg);text-shadow:5px 0 #ff2bd6,-5px 0 #22e6ff}50%{transform:translate(-4px,-1px);opacity:.55}58%{transform:none;opacity:1;text-shadow:-3px 0 #ff2bd6,3px 0 #22e6ff}72%{transform:translate(2px,1px) skewX(5deg)}86%{transform:translate(-1px,0);text-shadow:2px 0 #ff2bd6,-2px 0 #22e6ff}100%{transform:none}}
+@keyframes tp-sa{0%{opacity:1;transform:translate(-6px,0);clip-path:inset(10% 0 70% 0)}12%{clip-path:inset(55% 0 20% 0);transform:translate(7px,0)}25%{clip-path:inset(30% 0 45% 0);transform:translate(-9px,1px)}38%{clip-path:inset(75% 0 5% 0);transform:translate(6px,0)}52%{clip-path:inset(0 0 85% 0);transform:translate(-7px,0)}66%{clip-path:inset(40% 0 35% 0);transform:translate(8px,-1px)}80%{clip-path:inset(60% 0 15% 0);transform:translate(-4px,0)}92%{clip-path:inset(20% 0 60% 0);transform:translate(5px,0)}100%{opacity:0;clip-path:inset(0 0 100% 0)}}
+@keyframes tp-sb{0%{opacity:1;transform:translate(6px,0);clip-path:inset(60% 0 15% 0)}14%{clip-path:inset(15% 0 65% 0);transform:translate(-8px,0)}28%{clip-path:inset(80% 0 0 0);transform:translate(7px,1px)}40%{clip-path:inset(35% 0 40% 0);transform:translate(-6px,0)}55%{clip-path:inset(5% 0 80% 0);transform:translate(9px,0)}68%{clip-path:inset(50% 0 25% 0);transform:translate(-7px,-1px)}82%{clip-path:inset(70% 0 10% 0);transform:translate(4px,0)}94%{clip-path:inset(25% 0 55% 0);transform:translate(-5px,0)}100%{opacity:0;clip-path:inset(0 0 100% 0)}}
+@keyframes tp-jit{0%,84%,100%{transform:none;text-shadow:none}87%{transform:translateX(-1px);text-shadow:1px 0 #ff7ad9,-1px 0 #6ee5ff}92%{transform:translateX(1px);text-shadow:-1px 0 #ff7ad9,1px 0 #6ee5ff}96%{transform:none;text-shadow:none}}
+@media (prefers-reduced-motion:reduce){.tp-row.ld .tp-t,.tp-head.tp-gl,.tp-head.tp-gl .tp-hl::before,.tp-head.tp-gl .tp-hl::after{animation:none}}
+@media (max-width: 520px) {
+  .tesseract-ui {
+    padding: 10px 14px 12px;
+    bottom: max(14px, env(safe-area-inset-bottom, 0px) + 10px);
+  }
+  .tesseract-title { letter-spacing: 0.12em; }
+  .tesseract-status { letter-spacing: 0.06em; }
+}
+
+/* ---------- Stellar Memory / Discovery Log / Signal Fragments ---------- */
+/* Compact constellation log inside music HUD (star progress lives on track rows). */
+.sr-list{display:grid;gap:2px;margin:0 0 4px}
+.sr-cons-row{
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px;
+  padding:4px 7px;border:1px solid rgba(110,229,255,.07);border-radius:4px;
+  background:rgba(110,229,255,.012);font-size:8px;
+}
+.sr-cons-row.archived{border-color:rgba(255,122,217,.28);background:rgba(255,122,217,.05)}
+.sr-cons-name{font:600 8px/1 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(214,228,240,.48)}
+.sr-cons-row.archived .sr-cons-name{color:#ff9ad9}
+.sr-cons-state{font-size:5.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(184,198,214,.28)}
+.sr-cons-row.archived .sr-cons-state{color:rgba(255,122,217,.85)}
+/* Tiny progress badge on music toggle when any signal captured */
+#music-toggle .sr-badge{
+  position:absolute;top:-3px;right:-3px;min-width:12px;height:12px;padding:0 3px;
+  border-radius:6px;background:#6ee5ff;color:#041018;font:700 7px/12px 'Courier New',monospace;
+  text-align:center;letter-spacing:0;opacity:0;transform:scale(.6);
+  transition:opacity .25s ease,transform .25s ease;pointer-events:none;z-index:1;
+}
+#music-toggle.has-stellar .sr-badge{opacity:1;transform:scale(1)}
+
+/* Signal fragment toast */
+#signal-fragment{
+  position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:14;
+  width:min(92vw,340px);transform:translateX(-50%) translateY(12px);
+  padding:14px 16px 12px;border:1px solid rgba(110,229,255,.32);border-radius:6px;
+  background:rgba(2,7,12,.92);box-shadow:0 0 28px rgba(110,229,255,.12),inset 0 0 18px rgba(110,229,255,.03);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .4s ease,transform .45s cubic-bezier(.22,.7,.3,1),visibility 0s linear .45s;
+  font-family:'Courier New',monospace;color:#8eeeff;
+}
+#signal-fragment.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;pointer-events:auto;
+  transition:opacity .4s ease,transform .45s cubic-bezier(.22,.7,.3,1),visibility 0s;
+}
+.sf-tag{font-size:7px;letter-spacing:.18em;text-transform:uppercase;color:rgba(110,229,255,.65);margin-bottom:6px}
+.sf-title{font:700 12px/1.2 'Syne',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#eafcff;margin-bottom:6px;text-shadow:0 0 10px rgba(110,229,255,.35)}
+.sf-body{font-size:10px;line-height:1.55;letter-spacing:.03em;color:rgba(184,224,238,.82);margin-bottom:8px}
+.sf-meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:7.5px;letter-spacing:.08em;color:rgba(110,229,255,.55);text-transform:uppercase}
+.sf-meta span{opacity:.9}
+.sf-close{
+  position:absolute;top:8px;right:8px;width:22px;height:22px;border:0;background:transparent;
+  color:rgba(214,228,240,.45);font:300 16px/1 system-ui;cursor:pointer;
+}
+.sf-close:hover{color:#eafcff}
+
+/* Constellation archive banner (one-shot) */
+#cons-archive{
+  position:fixed;left:50%;top:18%;z-index:16;transform:translate(-50%,-8px);
+  padding:16px 22px;border:1px solid rgba(255,122,217,.4);border-radius:4px;
+  background:rgba(6,4,12,.9);box-shadow:0 0 32px rgba(255,122,217,.18),inset 0 0 20px rgba(255,43,214,.05);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .5s ease,transform .55s cubic-bezier(.22,.7,.3,1),visibility 0s linear .55s;
+  text-align:center;font-family:'Courier New',monospace;
+}
+#cons-archive.on{
+  opacity:1;transform:translate(-50%,0);visibility:visible;
+  transition:opacity .5s ease,transform .55s cubic-bezier(.22,.7,.3,1),visibility 0s;
+}
+.ca-line{font-size:7px;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,122,217,.55);margin-bottom:8px}
+.ca-name{font:800 18px/1.1 'Syne',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#ff9ad9;text-shadow:0 0 16px rgba(255,43,214,.45),2px 0 #6ee5ff,-2px 0 #ff2bd6}
+.ca-sub{margin-top:8px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(234,246,255,.7)}
+.ca-rule{margin:10px auto 0;width:48px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,122,217,.7),transparent)}
+
+@media (max-width:600px){
+  #signal-fragment{bottom:calc(70px + env(safe-area-inset-bottom,0px));padding:12px 14px 10px}
+  .sf-title{font-size:11px}
+  .sf-body{font-size:9.5px}
+  #cons-archive{top:14%;padding:14px 16px}
+  .ca-name{font-size:15px;letter-spacing:.12em}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #signal-fragment{bottom:52px}
+  #cons-archive{top:10%}
+}
+@media (prefers-reduced-motion:reduce){
+  #signal-fragment,#cons-archive,#music-toggle .sr-badge{transition-duration:.01s!important}
+}
+
+
+
+/* ---------- Last Signal / Observe Mode / Radio Silence ---------- */
+#last-signal{
+  position:fixed;left:50%;top:max(56px,env(safe-area-inset-top,0px) + 48px);z-index:14;
+  transform:translateX(-50%) translateY(-6px);
+  width:min(92vw,280px);padding:12px 14px 11px;
+  border:1px solid rgba(110,229,255,.32);border-radius:6px;
+  background:rgba(2,7,12,.9);box-shadow:0 0 24px rgba(110,229,255,.12),inset 0 0 16px rgba(110,229,255,.03);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  font-family:'Courier New',monospace;text-align:center;
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .45s ease,transform .5s cubic-bezier(.22,.7,.3,1),visibility 0s linear .5s;
+}
+#last-signal.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;pointer-events:none;
+  transition:opacity .45s ease,transform .5s cubic-bezier(.22,.7,.3,1),visibility 0s;
+}
+.ls-tag{font-size:7px;letter-spacing:.22em;text-transform:uppercase;color:rgba(110,229,255,.65);margin-bottom:7px}
+.ls-name{font:800 15px/1.1 'Syne',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#eafcff;text-shadow:0 0 12px rgba(110,229,255,.4)}
+.ls-meta{margin-top:6px;font-size:9px;letter-spacing:.12em;color:rgba(184,224,238,.7);text-transform:uppercase}
+.ls-meta span{opacity:.85}
+.ls-meta span+span::before{content:'·';margin:0 6px;opacity:.4}
+
+/* Track glow for last signal */
+.mp-track.last-signal{
+  border-color:rgba(110,229,255,.45)!important;
+  background:rgba(110,229,255,.08)!important;
+  box-shadow:0 0 14px rgba(110,229,255,.14),inset 0 0 10px rgba(110,229,255,.04);
+}
+.mp-track.last-signal .mp-name{color:#eafcff}
+
+/* Mode toggles — horizontal icon row beside music toggle */
+#mode-cluster{
+  position:fixed;right:calc(12px + 32px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;
+  display:flex;flex-direction:row-reverse;align-items:center;gap:6px;
+}
+#mode-observe,#mode-silence,#mode-camera{
+  width:32px;height:32px;padding:0;
+  display:grid;place-items:center;
+  border:1px solid rgba(110,229,255,.17);border-radius:5px;
+  background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);
+  font:500 15px/1 system-ui,sans-serif;letter-spacing:0;text-transform:none;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:color .25s,border-color .25s,background .25s,box-shadow .25s,transform .15s;
+}
+#mode-camera{display:none;font-size:14px}
+#mode-observe:hover,#mode-observe:focus-visible,
+#mode-silence:hover,#mode-silence:focus-visible,
+#mode-camera:hover,#mode-camera:focus-visible{
+  color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.08);
+}
+#mode-observe:active,#mode-silence:active,#mode-camera:active{transform:translateY(1px)}
+#mode-observe.on{
+  color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);
+  box-shadow:0 0 12px rgba(110,229,255,.15);
+}
+#mode-silence.on{
+  color:#ff9ad9;border-color:rgba(255,122,217,.5);background:rgba(255,122,217,.1);
+  box-shadow:0 0 12px rgba(255,122,217,.14);
+}
+#mode-camera.on{
+  color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);
+  box-shadow:0 0 12px rgba(110,229,255,.15);
+}
+/* Zoom readout — sky-layer camera only, fixed UI chrome */
+#cam-zoom{
+  position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:6;
+  transform:translateX(-50%) translateY(6px);
+  padding:6px 12px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
+  background:rgba(2,7,12,.88);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  font:600 10px/1 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;
+  color:#8eeeff;text-shadow:0 0 8px rgba(110,229,255,.35);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .3s ease,transform .35s ease,visibility 0s linear .35s;
+}
+#cam-zoom.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;
+  transition:opacity .3s ease,transform .35s ease,visibility 0s;
+}
+#cam-focus{display:flex;align-items:stretch;justify-content:center;gap:4px;margin-top:7px;pointer-events:auto;touch-action:manipulation}
+#cam-focus button{font:600 10px/1 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);border-radius:4px;min-height:30px;padding:0 10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#cam-focus button:active{background:rgba(110,229,255,.22)}
+#cf-name{min-width:132px;color:#eafcff!important}
+#cam-whisper{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));z-index:6;width:min(80vw,270px);box-sizing:border-box;transform:translateX(-50%) translateY(-8px);pointer-events:none;padding:7px 10px 8px;border:1px solid rgba(110,229,255,.2);border-left:2px solid var(--cc,#6ee5ff);border-radius:5px;background:rgba(2,7,12,.74);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 22px rgba(0,0,0,.5),0 0 14px color-mix(in srgb,var(--cc,#6ee5ff) 18%,transparent);opacity:0;visibility:hidden;transition:opacity .7s ease,transform .7s ease,visibility 0s linear .7s}
+#cam-whisper.on{opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;transition:opacity .7s ease,transform .7s ease,visibility 0s}
+body:not(.camera-mode) #cam-whisper{opacity:0!important;visibility:hidden!important;transition:none!important}
+#cam-whisper .ci-i{opacity:0;transform:translateY(4px);animation:ciIn .6s ease forwards;animation-delay:var(--d,0s)}
+@keyframes ciIn{to{opacity:1;transform:none}}
+#cam-whisper .ci-tag{font:600 7px/1 'Courier New',monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--cc,#6ee5ff);opacity:.85}
+#cam-whisper .ci-name{margin-top:3px;font:600 12.5px/1.1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#eafcff;text-shadow:0 0 12px var(--cc,#6ee5ff)}
+#cam-whisper .ci-rows{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin-top:6px;font:500 8.5px/1.3 'Courier New',monospace;letter-spacing:.04em}
+#cam-whisper .ci-rows b{font-weight:500;color:rgba(184,224,238,.5);text-transform:uppercase;letter-spacing:.14em;font-size:7.5px}
+#cam-whisper .ci-rows span{color:#d6eefa;text-align:right}
+#cam-whisper .ci-fact{margin-top:6px;padding-top:5px;border-top:1px solid rgba(110,229,255,.12);font:400 9.5px/1.35 'Space Grotesk',system-ui,sans-serif;color:rgba(214,238,250,.82)}
+#cam-whisper .ci-fact em{font-style:normal;font:600 7px/1 'Courier New',monospace;letter-spacing:.18em;color:var(--cc,#6ee5ff);margin-right:5px}
+#cam-whisper .ci-wh{margin-top:6px;text-align:center;font:italic 400 10.5px/1.4 'Space Grotesk',system-ui,sans-serif;letter-spacing:.04em;color:rgba(214,238,250,.95);text-shadow:0 0 10px var(--cc,#6ee5ff),0 1px 6px rgba(0,0,0,.9)}
+@media (prefers-reduced-motion:reduce){#cam-whisper .ci-i{animation:none;opacity:1;transform:none}}
+#cam-zoom .cz-val{color:#eafcff;letter-spacing:.08em}
+#cam-zoom .cz-hint{display:block;margin-top:4px;font-size:7px;letter-spacing:.1em;color:rgba(184,224,238,.45);font-weight:500}
+
+/* Now-playing title sits left of the mode cluster + music button */
+#mp-now-playing{right:calc(12px + 32px + 6px + 32px + 6px + 32px + 8px)!important}
+
+/* Observe mode: strip HUD chrome, keep sky + hole + telescope */
+body.observe-mode #header,
+body.observe-mode #footer,
+body.observe-mode #owl-source,
+body.observe-mode #bh-clock,
+body.observe-mode #music-toggle,
+body.observe-mode #music-player,
+body.observe-mode #mp-now-playing,
+body.observe-mode #mode-silence,
+body.observe-mode .portal,
+body.observe-mode .cap,
+body.observe-mode #signal-fragment,
+body.observe-mode #cons-archive,
+body.observe-mode #terminal,
+body.observe-mode #sr-badge{
+  opacity:0!important;pointer-events:none!important;visibility:hidden!important;
+}
+/* Telescope voice stays visible in observation mode (sky interaction). */
+body.observe-mode #mode-cluster{right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+body.observe-mode #mode-observe{opacity:1!important;visibility:visible!important;pointer-events:auto!important}
+body.observe-mode #mode-silence{display:none!important}
+body.observe-mode #mode-camera{display:grid!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important}
+body.observe-mode #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+
+/* Mode status toast (radio silence / observe) */
+#mode-toast{
+  position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:15;
+  transform:translateX(-50%) translateY(8px);
+  padding:10px 16px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
+  background:rgba(2,7,12,.9);font:600 9px/1.45 'Courier New',monospace;
+  letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;text-align:center;
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .35s ease,transform .4s ease,visibility 0s linear .4s;
+  white-space:pre-line;
+}
+body.camera-mode #mode-toast{bottom:calc(148px + env(safe-area-inset-bottom,0px))}
+#mode-toast.on{
+  opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;
+  transition:opacity .35s ease,transform .4s ease,visibility 0s;
+}
+#mode-toast.silence{border-color:rgba(255,122,217,.35);color:#ffb3e0}
+
+@media (max-width:520px){
+  #mode-cluster{right:calc(10px + 31px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  #mode-observe,#mode-silence,#mode-camera{width:31px;height:31px;padding:0;font-size:14px}
+  #cam-zoom{font-size:9px;padding:5px 10px}
+  body.observe-mode #mode-cluster{right:10px}
+  #mp-now-playing{right:calc(10px + 31px + 6px + 31px + 6px + 31px + 8px)!important}
+  #last-signal{top:max(48px,env(safe-area-inset-top,0px) + 40px);padding:10px 12px}
+  .ls-name{font-size:13px;letter-spacing:.12em}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #mode-cluster{right:calc(8px + 28px + 5px);bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  #mode-observe,#mode-silence,#mode-camera{width:28px;height:28px;padding:0;font-size:13px}
+  #cam-zoom{bottom:calc(42px + env(safe-area-inset-bottom,0px));font-size:8px}
+  body.observe-mode #mode-cluster{right:8px;bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  #last-signal{top:max(36px,env(safe-area-inset-top,0px) + 28px)}
+  #mode-toast{bottom:calc(42px + env(safe-area-inset-bottom,0px))}
+  body.camera-mode #mode-toast{bottom:calc(118px + env(safe-area-inset-bottom,0px))}
+  body.camera-mode #sector-scan{top:calc(8px + env(safe-area-inset-top,0px));bottom:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  #last-signal,#mode-toast,#mode-observe,#mode-silence,#mode-camera,#cam-zoom,#sector-scan{transition-duration:.01s!important}
+}
+
+/* ---- Patch 2: render containment + perf tier ----
+   contain:layout style paint isolates DOM panels from page-wide reflow/repaint. Panels with an outer
+   glow/shadow use layout+style only (paint containment would clip the shadow). No contain:strict and
+   no content-visibility anywhere near the canvas. */
+#mode-toast{contain:layout style paint}
+#music-player,#mp-now-playing,#cam-whisper,#cam-zoom,#sector-scan{contain:layout style}
+/* tier 0 (low-end / saveData, tied to IS_POTATO): drop the expensive backdrop blur, use a more opaque panel */
+.perf-tier-0 *,.perf-tier-0 *::before,.perf-tier-0 *::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.perf-tier-0 #cam-whisper,.perf-tier-0 #cam-zoom,.perf-tier-0 #sector-scan,.perf-tier-0 #music-player{background-color:rgba(2,7,12,.93)!important}
+
+/* Compact camera layout (mobile landscape / desktop-site on phone): dock info panels to the right
+   so the focused constellation / cluster / black hole stays visible in the free left area. */
+body.cam-compact #cam-whisper{left:auto;right:calc(8px + env(safe-area-inset-right,0px));width:min(236px,38vw);transform:translateY(-8px);max-height:calc(100vh - 118px);overflow:hidden}
+body.cam-compact #cam-whisper.on{transform:translateY(0)}
+body.cam-compact #cam-zoom{left:auto;right:calc(8px + env(safe-area-inset-right,0px));transform:translateY(6px);width:min(236px,38vw);box-sizing:border-box;padding:5px 6px;text-align:center;bottom:calc(42px + env(safe-area-inset-bottom,0px))}
+body.cam-compact #cam-zoom.on{transform:translateY(0)}
+body.cam-compact #cam-focus button{padding:0 7px;min-height:26px}
+body.cam-compact #cf-name{min-width:0;flex:1 1 auto}
+body.cam-compact #sector-scan{left:calc(8px + env(safe-area-inset-left,0px));top:auto;bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+body.cam-compact.camera-mode #mode-toast{left:calc((100vw - min(236px,38vw)) / 2 - 4px)}
+
+/* Deep Space Sector Scan — radar HUD for Spatial Viewport Culling (camera mode only) */
+#sector-scan{
+  position:fixed;left:10px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;pointer-events:none;
+  box-sizing:border-box;width:98px;overflow:hidden;padding:6px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
+  background:rgba(2,7,12,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 0 14px rgba(110,229,255,.08);
+  font:600 8px/1.4 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#8eeeff;
+  opacity:0;visibility:hidden;transform:translateY(-6px);
+  transition:opacity .3s ease,transform .35s ease,visibility 0s linear .35s;
+}
+#sector-scan.on{opacity:1;visibility:visible;transform:none;transition:opacity .3s ease,transform .35s ease,visibility 0s}
+#sector-scan .ss-head{display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;color:rgba(110,229,255,.62);white-space:nowrap;overflow:hidden}
+#sector-scan .ss-sec{color:#eafcff;text-shadow:0 0 8px rgba(110,229,255,.45)}
+#sector-radar{display:block;width:84px;height:84px;border-radius:3px}
+#sector-scan .ss-stat{margin-top:3px;color:rgba(184,224,238,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sector-scan .ss-stat+.ss-stat{margin-top:0;color:rgba(110,229,255,.62)}
+@media(max-width:520px){
+  #sector-scan{left:3px;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));width:64px;padding:4px;font-size:6px;letter-spacing:.06em;transform:translateY(6px)}
+  #sector-scan.on{transform:none}
+  #sector-scan .ss-head span:first-child{display:none}
+  #sector-scan .ss-head{justify-content:center}
+  #sector-radar{width:54px;height:54px}
+}
+/* Constellation Camera layout guards (v41.13) */
+/* Last-signal banner shares the top band with the focus caption: yield to it while the camera is on. */
+body.camera-mode #last-signal{opacity:0!important;visibility:hidden!important;transition:none!important}
+/* Narrow phones: CAM panel (~220px) would collide with the bottom-left scan HUD, so lift the HUD above it. */
+@media(max-width:380px){
+  #sector-scan{bottom:calc(168px + env(safe-area-inset-bottom,0px))}
+}
+@media(max-width:320px){
+  #sector-scan{bottom:calc(176px + env(safe-area-inset-bottom,0px));width:58px;padding:3px}
+  #sector-radar{width:48px;height:48px}
+  #cam-focus button{min-height:28px;padding:0 7px;font-size:9px}
+  #cf-name{min-width:108px}
+}
