@@ -1349,32 +1349,48 @@ function buildAVProfile(){
         if(vv>mm)mm=vv;if(mm<.22)mm=.22;bm[bi2]=mm;
       }
     }
-    for(var jd=0;jd<N;jd++){
+    /* 1) Spektrum per kolom, DIINTERPOLASI antar bin (dulu: satu bin dibaca beberapa kolom
+          sekaligus -> plateau datar -> siluet bulet). */
+    var env=(AVP.env&&AVP.env.length===N)?AVP.env:(AVP.env=new Float32Array(N));
+    var wv=(AVP.wv&&AVP.wv.length===N)?AVP.wv:(AVP.wv=new Float32Array(N));
+    var jd,ii,kk;
+    for(jd=0;jd<N;jd++){
       var ud=(jd/N+AVP.rot)%1,qd=Math.abs(ud-.5)*2,fvd;
       if(n&&lim2>1){
-        var bd=1+((Math.pow(qd,1.2)*(lim2-1))|0);
-        var vd=data[bd]/255;
-        fvd=vd/bm[bd]*.8+vd*.3;
+        var pos=Math.pow(qd,1.2)*(lim2-1),pf=Math.floor(pos),fr=pos-pf;
+        var b0=1+pf,b1=Math.min(lim2,b0+1);
+        var v0=data[b0]/255,v1=data[b1]/255;
+        var f0=v0/bm[b0]*.8+v0*.3,f1=v1/bm[b1]*.8+v1*.3;
+        fvd=f0+(f1-f0)*fr;
       }else fvd=.45*b+.35*m+.20*h;
-      AVP.raw[jd]=Math.max(.025,Math.min(1,fvd));
+      env[jd]=Math.max(0,Math.min(1,fvd));
     }
-    /* Bentuk gerigi: (1) pertajam kontras supaya lembah beneran rendah (cekungan),
-       (2) puncak kuat "menyebar" ke tetangga dengan falloff segitiga -> duri melebar
-       ke beberapa kolom sebelah, bukan satu kolom doang. Pakai max (bukan jumlah)
-       jadi bentuknya tetap runcing dan lembah antar duri tetap ada. */
-    var rw=AVP.raw,sp=(AVP.spr&&AVP.spr.length===N)?AVP.spr:(AVP.spr=new Float32Array(N)),SPK=[.74,.50,.30,.14],ki,ii;
-    for(ii=0;ii<N;ii++){var s0=rw[ii];s0=Math.min(1,Math.pow(s0,2.3)*1.7);sp[ii]=s0;}
-    for(ii=0;ii<N;ii++)rw[ii]=sp[ii];
+    /* 2) Cari puncak yang MENONJOL dibanding rata-rata sekitarnya (±6 kolom) dan yang
+          tertinggi dalam ±3 kolom. Cuma puncak seperti ini yang jadi duri. */
+    var base=wv; /* dipakai ulang sebagai buffer profil */
+    for(ii=0;ii<N;ii++)base[ii]=.10+.10*env[ii]; /* badan cincin: rendah, sedikit bergelombang */
+    var HW=Math.max(2,Math.round(N/26)); /* lebar separuh duri (kolom) -> duri melebar ke tetangga */
     for(ii=0;ii<N;ii++){
-      var pv=rw[ii];
-      if(pv<.38)continue;
-      for(ki=1;ki<=SPK.length;ki++){
-        var sv=pv*SPK[ki-1],l=(ii-ki+N)%N,r=(ii+ki)%N;
-        if(sv>sp[l])sp[l]=sv;
-        if(sv>sp[r])sp[r]=sv;
+      var ev=env[ii],loc=0,isMax=true;
+      for(kk=-6;kk<=6;kk++)loc+=env[(ii+kk+N)%N];
+      loc/=13;
+      var prom=ev-loc;
+      if(prom<.09||ev<.38)continue;
+      for(kk=-4;kk<=4;kk++){
+        if(!kk)continue;
+        var ov=env[(ii+kk+N)%N];
+        if(ov>ev||(ov===ev&&kk<0)){isMax=false;break;}
+      }
+      if(!isMax)continue;
+      var hp=Math.min(1,.40+prom*2.6+(ev-.3)*.9); /* tinggi duri: makin menonjol makin tinggi */
+      for(kk=-HW;kk<=HW;kk++){
+        var tri=1-Math.abs(kk)/(HW+1);       /* segitiga: duri runcing, sisi melebar ke tetangga */
+        var vv2=.10+(hp-.10)*Math.pow(tri,1.35);
+        var idx=(ii+kk+N)%N;
+        if(vv2>base[idx])base[idx]=vv2;
       }
     }
-    for(ii=0;ii<N;ii++)rw[ii]=Math.max(.02,sp[ii]);
+    for(ii=0;ii<N;ii++)AVP.raw[ii]=Math.max(.04,Math.min(1,base[ii]));
   }
   for(var j=0;AV_DOTS?false:j<N;j++){
     /* Mirror the spectrum around the circle. Low frequencies sit near the
@@ -1395,8 +1411,8 @@ function buildAVProfile(){
   var raw=AVP.raw,sm=AVP.sm;
   for(var j2=0;j2<N;j2++){
     var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
-    var tgt=AV_DOTS?(a0*.05+a1*.90+a2*.05):(a0*.25+a1*.5+a2*.25);
-    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.65:.24);
+    var tgt=AV_DOTS?(a0*.06+a1*.88+a2*.06):(a0*.25+a1*.5+a2*.25);
+    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?(AV_DOTS?.5:.6):(AV_DOTS?.15:.22));
     pts[j2*3+2]=sm[j2];
   }
   AVP.stamp=AV.skip;
@@ -1417,26 +1433,27 @@ function drawAudioVisualizer(now,R){
     var lv=AV.level,beat=AV.beat;
     var inner=R*1.06;
     var ampBase=R*(.035+.04*lv)*.5;
-    var ampSpec=R*(.34+.46*lv+.30*beat)*.62;
+    var ampSpec=R*(.34+.46*lv+.30*beat)*.95;
     var lw=Math.max(IS_POTATO?1.3:1.5,Math.min(2.6,R*.011));
     var boost=Math.min(1,.78+.18*lv+.22*beat);
-    /* 4 zona berdasarkan JARAK ABSOLUT dari tepi lubang hitam (bukan persen panjang bar):
-       dekat = dot rapat, terang, tebal; makin jauh = dot makin jarang, tipis, pudar.
-       Jadi duri tertinggi otomatis punya ujung yang renggang + fading, persis referensi.
+    /* 5 zona berdasarkan JARAK ABSOLUT dari tepi lubang hitam (bukan persen panjang bar):
+       - ALPHA: transparan di dekat lingkaran hitam, makin ke luar makin terang (fading di dalam).
+       - JARAK DOT: makin ke luar makin renggang (ujung duri paling jarang).
+       - Tebal dot menipis sedikit di ujung.
        Satu zona = satu Path2D = satu stroke. */
-    var zb=[R*.15,R*.31,R*.50];
-    var ZN=4,Z=[
-      {a:.88,w:1.00,g:lw*2.1},
-      {a:.56,w:.88,g:lw*3.0},
-      {a:.32,w:.76,g:lw*4.5},
-      {a:.16,w:.64,g:lw*6.8}
+    var zb=[R*.09,R*.20,R*.34,R*.52];
+    var ZN=5,Z=[
+      {a:.14,w:.90,g:lw*1.7},
+      {a:.36,w:.96,g:lw*1.9},
+      {a:.68,w:1.00,g:lw*2.3},
+      {a:.92,w:.90,g:lw*3.1},
+      {a:.95,w:.76,g:lw*4.6}
     ];
-    var zp=[new Path2D(),new Path2D(),new Path2D(),new Path2D()],zi;
+    var zp=[new Path2D(),new Path2D(),new Path2D(),new Path2D(),new Path2D()],zi;
     for(var j=0;j<N;j++){
       var fv=pts[j*3+2];
-      fv=Math.min(1.25,fv*(1+.35*beat));   /* kontras sudah dibentuk di buildAVProfile; beat cuma nambah tinggi */
+      fv=Math.min(1.2,fv*(1+.25*beat));   /* bentuk sudah dibentuk di buildAVProfile; beat cuma nambah tinggi */
       var rr=inner+ampBase+fv*ampSpec;
-      if(fv>.7)rr+=(fv-.7)*ampSpec*1.1;          /* duri makin runcing di puncak */
       var cx=pts[j*3],cy=pts[j*3+1];
       var len=rr-inner;
       if(len<lw)continue;
