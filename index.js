@@ -4515,6 +4515,10 @@ function drawShooting(now){
   for(var i=SS.length-1;i>=0;i--){
     var s=SS[i],u=(now-s.t)/s.life;if(u>1){SS.splice(i,1);continue;}
     var x=s.x+s.vx*(now-s.t)/1000,y=s.y+s.vy*(now-s.t)/1000,tl=s.tl||.07;
+    if(s.comet){
+      if(!s.frag&&!s.split&&u>=s.splitU)cometSplit(s,now,x,y);
+      drawComet(s,now,u,x,y);continue;
+    }
     var gr=g.createLinearGradient(x,y,x-s.vx*tl,y-s.vy*tl);
     gr.addColorStop(0,'rgba('+(s.c0||'234,246,255')+','+(1-u)+')');gr.addColorStop(1,'rgba('+(s.c1||'110,229,255')+',0)');
     g.strokeStyle=gr;g.lineWidth=s.lw||1.4;g.beginPath();g.moveTo(x,y);g.lineTo(x-s.vx*tl,y-s.vy*tl);g.stroke();
@@ -6006,6 +6010,112 @@ if(antFx){
 }
 
 /* ---------- easter eggs ---------- */
+/* ---------- Konami comet: satu komet cyan/pink yang pecah jadi beberapa bagian ----------
+   Tidak ada render loop baru: komet = entri SS (comet:true), digambar oleh drawShooting.
+   Ekor di-bake sekali ke canvas kecil (drawImage + rotate), kepala pakai drawStarGlow (sprite cache). */
+var KCOMET={on:false},COMET_SPR=null;
+function bakeCometSprites(){
+  var Wd=512,Hd=64;
+  function mk(layers){
+    var c=document.createElement('canvas');c.width=Wd;c.height=Hd;
+    var x=c.getContext('2d'),cy=Hd/2;
+    layers.forEach(function(L){
+      var gr=x.createLinearGradient(0,0,Wd,0),hh=Hd*L[0]/2;
+      gr.addColorStop(0,'rgba('+L[2]+',0)');
+      gr.addColorStop(.55,'rgba('+L[2]+','+(L[1]*.4)+')');
+      gr.addColorStop(1,'rgba('+L[2]+','+L[1]+')');
+      x.fillStyle=gr;x.beginPath();x.moveTo(0,cy);
+      x.quadraticCurveTo(Wd*.55,cy-hh*.9,Wd,cy-hh);x.lineTo(Wd,cy+hh);
+      x.quadraticCurveTo(Wd*.55,cy+hh*.9,0,cy);x.closePath();x.fill();
+    });
+    return c;
+  }
+  COMET_SPR={
+    cyan:mk([[1,.20,'110,229,255'],[.6,.38,'140,238,255'],[.28,.85,'235,252,255']]),
+    pink:mk([[1,.17,'255,64,110'],[.6,.30,'255,110,150']])
+  };
+}
+function cometSplit(s,now,x,y){
+  s.split=true;s.splitT=now;s.sx=x;s.sy=y;
+  var base=Math.atan2(s.vy,s.vx),sp0=Math.hypot(s.vx,s.vy),rem=Math.max(800,s.life-(now-s.t));
+  var offs=[-.21,.12,.28];
+  for(var i=0;i<offs.length;i++){
+    var a=base+offs[i]+(Math.random()-.5)*.04,sp=sp0*(.82+Math.random()*.3);
+    SS.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:now,life:rem*(.85+Math.random()*.3),
+      comet:true,frag:true,hr:s.hr*(.58-i*.08),L:s.L*(.64-i*.09),bend:s.bend*.6,seed:Math.random()});
+  }
+  glitchUntil=now+520;
+  haptic(16);
+  try{
+    var fl=document.getElementById('sn-flash');
+    if(fl){
+      fl.style.setProperty('--sx',Math.round(x)+'px');fl.style.setProperty('--sy',Math.round(y)+'px');
+      fl.style.setProperty('--sn-rgb','255,80,120');
+      fl.classList.remove('on');void fl.offsetWidth;fl.classList.add('on');
+    }
+  }catch(e){}
+}
+function drawComet(s,now,u,x,y){
+  if(!COMET_SPR)bakeCometSprites();
+  var a=Math.min(1,u/.07)*Math.min(1,(1-u)/.22);
+  if(a<=.01)return;
+  /* glitch begitu komet masuk layar */
+  if(!s.frag&&!s.entered&&x>0){s.entered=true;glitchUntil=now+550;haptic(10);}
+  if(now<glitchUntil){x+=(Math.random()-.5)*5;y+=(Math.random()-.5)*3;}
+  var ang=Math.atan2(s.vy,s.vx),hr=s.hr,L=s.L,k;
+  g.save();g.globalCompositeOperation='lighter';
+  /* ekor pink-kemerahan (debu, melebar & agak miring) + ekor cyan (ion, lurus & terang) */
+  g.save();g.translate(x,y);g.rotate(ang+s.bend+.02*Math.sin(now*.002+s.seed*6));
+  g.globalAlpha=a*.9;g.drawImage(COMET_SPR.pink,-L*1.08,-hr*3.2,L*1.08,hr*6.4);
+  g.restore();
+  g.save();g.translate(x,y);g.rotate(ang);
+  g.globalAlpha=a;g.drawImage(COMET_SPR.cyan,-L,-hr*1.5,L,hr*3);
+  g.restore();
+  /* percikan di sepanjang ekor */
+  var ux=-Math.cos(ang),uy=-Math.sin(ang),nx=-uy,ny=ux,N=s.frag?5:9;
+  for(k=0;k<N;k++){
+    var p=((k/N)+(now*.00045+s.seed))%1,d=p*L*.95,lat=Math.sin(p*17+k*2.3+s.seed*9)*hr*(.6+p*2.2);
+    g.fillStyle='rgba('+(k&1?'255,120,170':'160,240,255')+','+(a*(1-p)*.75).toFixed(3)+')';
+    g.beginPath();g.arc(x+ux*d+nx*lat,y+uy*d+ny*lat,Math.max(.5,hr*.22*(1-p*.6)),0,6.283);g.fill();
+  }
+  /* kepala */
+  var pulse=.88+.12*Math.sin(now*.011+s.seed*9);
+  drawStarGlow(x,y,hr*1.9,'255,70,120',a*.5*pulse);
+  drawStarGlow(x,y,hr*1.3,'150,240,255',a*.95);
+  g.fillStyle='rgba(255,255,255,'+(.95*a)+')';
+  g.beginPath();g.arc(x,y,Math.max(1,hr*.7),0,6.283);g.fill();
+  g.strokeStyle='rgba(225,250,255,'+(.55*a)+')';g.lineWidth=.9;
+  g.beginPath();g.moveTo(x-hr*3.6,y);g.lineTo(x+hr*3.6,y);g.moveTo(x,y-hr*3.6);g.lineTo(x,y+hr*3.6);g.stroke();
+  /* cincin kejut saat pecah */
+  if(s.split){
+    var q=(now-s.splitT)/650;
+    if(q>=0&&q<1){
+      g.lineWidth=1.5;
+      g.strokeStyle='rgba(255,90,140,'+(.8*(1-q)).toFixed(3)+')';
+      g.beginPath();g.arc(s.sx,s.sy,hr*(3+24*q),0,6.283);g.stroke();
+      g.strokeStyle='rgba(120,235,255,'+(.7*(1-q)).toFixed(3)+')';
+      g.beginPath();g.arc(s.sx,s.sy,hr*(2+15*q),0,6.283);g.stroke();
+    }
+  }
+  g.restore();
+}
+/* Satu komet besar muncul setelah hujan meteor mereda, melintas di area bebas di bawah header
+   (posisi dihitung dari ukuran layar & tinggi header: portrait, landscape, desktop). */
+function konamiComet(){
+  if(reduce||IS_POTATO||SW||KCOMET.on)return;
+  KCOMET.on=true;
+  var DELAY=2600,DUR=5200;
+  setTimeout(function(){
+    if(SW||pageHidden){KCOMET.on=false;return;}
+    var hbEl=document.getElementById('header'),hb=hbEl?hbEl.getBoundingClientRect().bottom:0;
+    var top=Math.max(hb+14,H*.12),bot=H-Math.min(H*.2,90),avail=Math.max(120,bot-top);
+    var x0=-W*.12,y0=top+avail*.08,x1=W*1.12,y1=top+avail*.58,sec=DUR/1000;
+    SS.push({x:x0,y:y0,vx:(x1-x0)/sec,vy:(y1-y0)/sec,t:performance.now(),life:DUR,
+      comet:true,splitU:.38,hr:Math.max(3.2,Math.min(6.5,Math.min(W,H)*.012)),
+      L:Math.max(200,Math.min(480,Math.hypot(W,H)*.3)),bend:.12,seed:Math.random()});
+  },DELAY);
+  setTimeout(function(){KCOMET.on=false;},DELAY+DUR+400);
+}
 /* Konami: meteor shower reusing the SS shooting-star pool (drawShooting renders it). */
 function konamiMeteors(){
   if(reduce||IS_POTATO||SW)return;
@@ -6032,8 +6142,9 @@ function triggerKonami(){
   haptic(18);
   showSecret('SYSTEM OVERRIDE · DUMUL//OBSERVATORY',1800);
   konamiMeteors();
+  konamiComet();
   clearTimeout(triggerKonami._t);
-  triggerKonami._t=setTimeout(function(){document.body.classList.remove('konami');},2100);
+  triggerKonami._t=setTimeout(function(){document.body.classList.remove('konami');},(reduce||IS_POTATO||SW)?2100:5200);
 }
 
 /* Hidden Konami input.
