@@ -1354,7 +1354,7 @@ function buildAVProfile(){
       if(n&&lim2>1){
         var bd=1+((Math.pow(qd,1.2)*(lim2-1))|0);
         var vd=data[bd]/255;
-        fvd=vd/bm[bd]*.5+vd*.4;
+        fvd=vd/bm[bd]*.8+vd*.3;
       }else fvd=.45*b+.35*m+.20*h;
       AVP.raw[jd]=Math.max(.025,Math.min(1,fvd));
     }
@@ -1379,7 +1379,6 @@ function buildAVProfile(){
   for(var j2=0;j2<N;j2++){
     var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
     var tgt=AV_DOTS?(a0*.12+a1*.76+a2*.12):(a0*.25+a1*.5+a2*.25);
-    if(AV_DOTS){var nb=a0>a2?a0:a2;tgt=(a1-.5*nb)*1.6;if(tgt>1)tgt=1;if(tgt<.02)tgt=.02;}
     sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.6:.22);
     pts[j2*3+2]=sm[j2];
   }
@@ -1407,33 +1406,29 @@ function drawAudioVisualizer(now,R){
     var boost=Math.min(1,.78+.18*lv+.22*beat);
     /* 3 lapis per bar: dalam (transparan), tengah, ujung (terang & lebih tipis).
        Masing-masing satu path = satu stroke. */
-    var pA=new Path2D(),pB=new Path2D(),pC=new Path2D(),pD=new Path2D();
+    var pA=new Path2D(),pB=new Path2D(),pC=new Path2D();
     for(var j=0;j<N;j++){
       var fv=pts[j*3+2];
-      fv=Math.min(1.3,Math.pow(fv,2.2)*1.2*(1+.45*beat));   /* kontras tinggi: puncak jadi duri, beat cuma nambah tinggi duri */
+      fv=Math.min(1.3,Math.pow(fv,1.6)*1.15*(1+.45*beat));   /* kontras tinggi: puncak jadi duri, beat cuma nambah tinggi duri */
       var rr=inner+ampBase+fv*ampSpec;
       if(fv>.7)rr+=(fv-.7)*ampSpec*1.3;          /* duri tipis di puncak */
       var cx=pts[j*3],cy=pts[j*3+1];
       var len=rr-inner;
       if(len<lw)continue;
-      /* Fade = separuh bagian dalam tiap duri (seperti referensi): 3 tier transparan di 0-50% panjang,
-         sisanya (50-100%) terang. */
-      var t1=inner+len*.17,t2=inner+len*.33,t3=inner+len*.5;
-      pA.moveTo(cx*inner,cy*inner);pA.lineTo(cx*t1,cy*t1);
-      pB.moveTo(cx*t1,cy*t1);pB.lineTo(cx*t2,cy*t2);
-      pC.moveTo(cx*t2,cy*t2);pC.lineTo(cx*t3,cy*t3);
-      pD.moveTo(cx*t3,cy*t3);pD.lineTo(cx*rr,cy*rr);
+      var s1=inner+len*.34,s2=inner+len*.68;
+      pA.moveTo(cx*inner,cy*inner);pA.lineTo(cx*s1,cy*s1);
+      pB.moveTo(cx*s1,cy*s1);pB.lineTo(cx*s2,cy*s2);
+      pC.moveTo(cx*s2,cy*s2);pC.lineTo(cx*rr,cy*rr);
     }
     g.save();
     g.globalCompositeOperation='lighter';
     g.lineCap=IS_POTATO?'butt':'round';
     if(!IS_POTATO)g.setLineDash([.01,gap]);else g.setLineDash([lw*1.2,gap*.8]);
     g.lineWidth=lw;
-    g.strokeStyle='rgba('+AV_COLOR+','+(.08*boost)+')';g.stroke(pA);
-    g.strokeStyle='rgba('+AV_COLOR+','+(.26*boost)+')';g.stroke(pB);
-    g.strokeStyle='rgba('+AV_COLOR+','+(.50*boost)+')';g.stroke(pC);
+    g.strokeStyle='rgba('+AV_COLOR+','+(.26*boost)+')';g.stroke(pA);
+    g.strokeStyle='rgba('+AV_COLOR+','+(.62*boost)+')';g.stroke(pB);
     g.lineWidth=lw*.85;
-    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,.98*boost)+')';g.stroke(pD);
+    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,.98*boost)+')';g.stroke(pC);
     g.restore();
   }catch(err){}
 }
