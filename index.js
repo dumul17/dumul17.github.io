@@ -1358,6 +1358,23 @@ function buildAVProfile(){
       }else fvd=.45*b+.35*m+.20*h;
       AVP.raw[jd]=Math.max(.025,Math.min(1,fvd));
     }
+    /* Bentuk gerigi: (1) pertajam kontras supaya lembah beneran rendah (cekungan),
+       (2) puncak kuat "menyebar" ke tetangga dengan falloff segitiga -> duri melebar
+       ke beberapa kolom sebelah, bukan satu kolom doang. Pakai max (bukan jumlah)
+       jadi bentuknya tetap runcing dan lembah antar duri tetap ada. */
+    var rw=AVP.raw,sp=(AVP.spr&&AVP.spr.length===N)?AVP.spr:(AVP.spr=new Float32Array(N)),SPK=[.74,.50,.30,.14],ki,ii;
+    for(ii=0;ii<N;ii++){var s0=rw[ii];s0=Math.min(1,Math.pow(s0,2.3)*1.7);sp[ii]=s0;}
+    for(ii=0;ii<N;ii++)rw[ii]=sp[ii];
+    for(ii=0;ii<N;ii++){
+      var pv=rw[ii];
+      if(pv<.38)continue;
+      for(ki=1;ki<=SPK.length;ki++){
+        var sv=pv*SPK[ki-1],l=(ii-ki+N)%N,r=(ii+ki)%N;
+        if(sv>sp[l])sp[l]=sv;
+        if(sv>sp[r])sp[r]=sv;
+      }
+    }
+    for(ii=0;ii<N;ii++)rw[ii]=Math.max(.02,sp[ii]);
   }
   for(var j=0;AV_DOTS?false:j<N;j++){
     /* Mirror the spectrum around the circle. Low frequencies sit near the
@@ -1378,8 +1395,8 @@ function buildAVProfile(){
   var raw=AVP.raw,sm=AVP.sm;
   for(var j2=0;j2<N;j2++){
     var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
-    var tgt=AV_DOTS?(a0*.12+a1*.76+a2*.12):(a0*.25+a1*.5+a2*.25);
-    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.6:.22);
+    var tgt=AV_DOTS?(a0*.05+a1*.90+a2*.05):(a0*.25+a1*.5+a2*.25);
+    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.65:.24);
     pts[j2*3+2]=sm[j2];
   }
   AVP.stamp=AV.skip;
@@ -1400,35 +1417,52 @@ function drawAudioVisualizer(now,R){
     var lv=AV.level,beat=AV.beat;
     var inner=R*1.06;
     var ampBase=R*(.035+.04*lv)*.5;
-    var ampSpec=R*(.34+.46*lv+.30*beat)*.5;
+    var ampSpec=R*(.34+.46*lv+.30*beat)*.62;
     var lw=Math.max(IS_POTATO?1.3:1.5,Math.min(2.6,R*.011));
-    var gap=lw*2.5;
     var boost=Math.min(1,.78+.18*lv+.22*beat);
-    /* 3 lapis per bar: dalam (transparan), tengah, ujung (terang & lebih tipis).
-       Masing-masing satu path = satu stroke. */
-    var pA=new Path2D(),pB=new Path2D(),pC=new Path2D();
+    /* 4 zona berdasarkan JARAK ABSOLUT dari tepi lubang hitam (bukan persen panjang bar):
+       dekat = dot rapat, terang, tebal; makin jauh = dot makin jarang, tipis, pudar.
+       Jadi duri tertinggi otomatis punya ujung yang renggang + fading, persis referensi.
+       Satu zona = satu Path2D = satu stroke. */
+    var zb=[R*.15,R*.31,R*.50];
+    var ZN=4,Z=[
+      {a:.88,w:1.00,g:lw*2.1},
+      {a:.56,w:.88,g:lw*3.0},
+      {a:.32,w:.76,g:lw*4.5},
+      {a:.16,w:.64,g:lw*6.8}
+    ];
+    var zp=[new Path2D(),new Path2D(),new Path2D(),new Path2D()],zi;
     for(var j=0;j<N;j++){
       var fv=pts[j*3+2];
-      fv=Math.min(1.3,Math.pow(fv,1.6)*1.15*(1+.45*beat));   /* kontras tinggi: puncak jadi duri, beat cuma nambah tinggi duri */
+      fv=Math.min(1.25,fv*(1+.35*beat));   /* kontras sudah dibentuk di buildAVProfile; beat cuma nambah tinggi */
       var rr=inner+ampBase+fv*ampSpec;
-      if(fv>.7)rr+=(fv-.7)*ampSpec*1.3;          /* duri tipis di puncak */
+      if(fv>.7)rr+=(fv-.7)*ampSpec*1.1;          /* duri makin runcing di puncak */
       var cx=pts[j*3],cy=pts[j*3+1];
       var len=rr-inner;
       if(len<lw)continue;
-      var s1=inner+len*.34,s2=inner+len*.68;
-      pA.moveTo(cx*inner,cy*inner);pA.lineTo(cx*s1,cy*s1);
-      pB.moveTo(cx*s1,cy*s1);pB.lineTo(cx*s2,cy*s2);
-      pC.moveTo(cx*s2,cy*s2);pC.lineTo(cx*rr,cy*rr);
+      var s0=0;
+      for(zi=0;zi<ZN;zi++){
+        var e=zi<ZN-1?Math.min(len,zb[zi]):len;
+        /* mulai zona berikutnya setengah gap di depan supaya dot batas zona nggak dobel */
+        var st=zi?s0+Z[zi].g*.5:s0;
+        if(e>st){
+          zp[zi].moveTo(cx*(inner+st),cy*(inner+st));
+          zp[zi].lineTo(cx*(inner+e),cy*(inner+e));
+        }
+        if(e>=len)break;
+        s0=e;
+      }
     }
     g.save();
     g.globalCompositeOperation='lighter';
     g.lineCap=IS_POTATO?'butt':'round';
-    if(!IS_POTATO)g.setLineDash([.01,gap]);else g.setLineDash([lw*1.2,gap*.8]);
-    g.lineWidth=lw;
-    g.strokeStyle='rgba('+AV_COLOR+','+(.26*boost)+')';g.stroke(pA);
-    g.strokeStyle='rgba('+AV_COLOR+','+(.62*boost)+')';g.stroke(pB);
-    g.lineWidth=lw*.85;
-    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,.98*boost)+')';g.stroke(pC);
+    for(zi=0;zi<ZN;zi++){
+      var zz=Z[zi];
+      if(!IS_POTATO)g.setLineDash([.01,zz.g]);else g.setLineDash([lw*1.2,zz.g*.8]);
+      g.lineWidth=Math.max(.8,lw*zz.w);
+      g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,zz.a*boost)+')';
+      g.stroke(zp[zi]);
+    }
     g.restore();
   }catch(err){}
 }
