@@ -6010,13 +6010,13 @@ if(antFx){
 }
 
 /* ---------- easter eggs ---------- */
-/* ---------- Konami comet: satu komet cyan/pink yang pecah jadi beberapa bagian ----------
+/* ---------- Konami comet: satu komet pecah jadi dua (biru + merah), ekor panjang berhias aurora ----------
    Tidak ada render loop baru: komet = entri SS (comet:true), digambar oleh drawShooting.
-   Ekor di-bake sekali ke canvas kecil (drawImage + rotate), kepala pakai drawStarGlow (sprite cache). */
+   Ekor + aurora di-bake sekali ke canvas kecil. Aurora digambar sebagai irisan yang bergelombang. */
 var KCOMET={on:false},COMET_SPR=null;
 function bakeCometSprites(){
-  var Wd=512,Hd=64;
-  function mk(layers){
+  var Wd=512,Hd=64,AH=96;
+  function wedge(layers){
     var c=document.createElement('canvas');c.width=Wd;c.height=Hd;
     var x=c.getContext('2d'),cy=Hd/2;
     layers.forEach(function(L){
@@ -6030,20 +6030,43 @@ function bakeCometSprites(){
     });
     return c;
   }
+  function aurora(bands,seed){
+    var c=document.createElement('canvas');c.width=Wd;c.height=AH;
+    var x=c.getContext('2d'),r=seed,i;
+    function rnd(){r=(r*1664525+1013904223)>>>0;return r/4294967296;}
+    x.globalCompositeOperation='lighter';
+    bands.forEach(function(B){
+      var cy=AH*B[0],hh=AH*B[1]/2,gr=x.createLinearGradient(0,cy-hh,0,cy+hh);
+      gr.addColorStop(0,'rgba('+B[2]+',0)');
+      gr.addColorStop(.5,'rgba('+B[2]+','+B[3]+')');
+      gr.addColorStop(1,'rgba('+B[2]+',0)');
+      x.fillStyle=gr;x.fillRect(0,cy-hh,Wd,hh*2);
+    });
+    /* garis-garis sinar vertikal khas aurora: "melubangi" pita */
+    x.globalCompositeOperation='destination-out';
+    for(i=0;i<70;i++){x.fillStyle='rgba(0,0,0,'+(.08+rnd()*.38).toFixed(2)+')';x.fillRect(rnd()*Wd,0,1+rnd()*3,AH);}
+    /* memudar ke ujung ekor */
+    x.globalCompositeOperation='destination-in';
+    var m=x.createLinearGradient(0,0,Wd,0);
+    m.addColorStop(0,'rgba(0,0,0,0)');m.addColorStop(.35,'rgba(0,0,0,.35)');
+    m.addColorStop(.8,'rgba(0,0,0,.85)');m.addColorStop(1,'rgba(0,0,0,1)');
+    x.fillStyle=m;x.fillRect(0,0,Wd,AH);
+    return c;
+  }
   COMET_SPR={
-    cyan:mk([[1,.20,'110,229,255'],[.6,.38,'140,238,255'],[.28,.85,'235,252,255']]),
-    pink:mk([[1,.17,'255,64,110'],[.6,.30,'255,110,150']])
+    cyan:wedge([[1,.20,'110,229,255'],[.6,.38,'140,238,255'],[.28,.85,'235,252,255']]),
+    red:wedge([[1,.20,'255,60,70'],[.6,.36,'255,120,100'],[.28,.85,'255,228,220']]),
+    pink:wedge([[1,.17,'255,64,110'],[.6,.30,'255,110,150']]),
+    aurB:aurora([[.32,.55,'80,200,255',.32],[.50,.45,'120,255,215',.28],[.68,.50,'150,130,255',.28]],11),
+    aurR:aurora([[.32,.55,'255,90,110',.32],[.50,.45,'255,160,90',.28],[.68,.50,'255,70,190',.28]],23)
   };
 }
+/* Komet pecah jadi DUA: induk jadi yang biru (lurus), serpihan jadi yang merah (menyimpang). */
 function cometSplit(s,now,x,y){
-  s.split=true;s.splitT=now;s.sx=x;s.sy=y;
-  var base=Math.atan2(s.vy,s.vx),sp0=Math.hypot(s.vx,s.vy),rem=Math.max(800,s.life-(now-s.t));
-  var offs=[-.21,.12,.28];
-  for(var i=0;i<offs.length;i++){
-    var a=base+offs[i]+(Math.random()-.5)*.04,sp=sp0*(.82+Math.random()*.3);
-    SS.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:now,life:rem*(.85+Math.random()*.3),
-      comet:true,frag:true,hr:s.hr*(.58-i*.08),L:s.L*(.64-i*.09),bend:s.bend*.6,seed:Math.random()});
-  }
+  s.split=true;s.splitT=now;s.sx=x;s.sy=y;s.pal='blue';
+  var base=Math.atan2(s.vy,s.vx),sp0=Math.hypot(s.vx,s.vy),rem=Math.max(900,s.life-(now-s.t)),a=base+.2,sp=sp0*.9;
+  SS.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:now,life:rem*1.08,
+    comet:true,frag:true,pal:'red',grow:900,hr:s.hr*.92,L:s.L*.92,bend:-.1,seed:s.seed+.37});
   glitchUntil=now+520;
   haptic(16);
   try{
@@ -6055,6 +6078,17 @@ function cometSplit(s,now,x,y){
     }
   }catch(e){}
 }
+/* Pita aurora: 14 irisan sprite, tiap irisan bergeser naik-turun mengikuti gelombang. */
+function drawAurora(spr,L,hr,x,y,ang,a,now,seed){
+  var NS=14,sw=512/NS,dw=L/NS,dh=hr*9,j,p;
+  g.save();g.translate(x,y);g.rotate(ang);
+  for(j=0;j<NS;j++){
+    p=j/NS;
+    g.globalAlpha=a*(.78+.22*Math.sin(now*.0031+j*.8+seed*7));
+    g.drawImage(spr,j*sw,0,sw+1,96,-L+j*dw,-dh/2+Math.sin(now*.0019+p*6+seed*6)*hr*1.7*(1-p*.55),dw+1,dh);
+  }
+  g.restore();
+}
 function drawComet(s,now,u,x,y){
   if(!COMET_SPR)bakeCometSprites();
   var a=Math.min(1,u/.07)*Math.min(1,(1-u)/.22);
@@ -6062,29 +6096,37 @@ function drawComet(s,now,u,x,y){
   /* glitch begitu komet masuk layar */
   if(!s.frag&&!s.entered&&x>0){s.entered=true;glitchUntil=now+550;haptic(10);}
   if(now<glitchUntil){x+=(Math.random()-.5)*5;y+=(Math.random()-.5)*3;}
-  var ang=Math.atan2(s.vy,s.vx),hr=s.hr,L=s.L,k;
+  var pal=s.pal,red=pal==='red',mix=pal==='mix',hr=s.hr,k;
+  var L=s.L*(s.grow?(.3+.7*Math.min(1,(now-s.t)/s.grow)):1);
+  var ang=Math.atan2(s.vy,s.vx);
   g.save();g.globalCompositeOperation='lighter';
-  /* ekor pink-kemerahan (debu, melebar & agak miring) + ekor cyan (ion, lurus & terang) */
-  g.save();g.translate(x,y);g.rotate(ang+s.bend+.02*Math.sin(now*.002+s.seed*6));
-  g.globalAlpha=a*.9;g.drawImage(COMET_SPR.pink,-L*1.08,-hr*3.2,L*1.08,hr*6.4);
-  g.restore();
+  /* aurora (di bawah ekor ion). Sebelum pecah: biru + merah menyatu, setelah pecah: masing-masing. */
+  if(mix||!red)drawAurora(COMET_SPR.aurB,L,hr,x,y,ang+(mix?.04:.02),a*(mix?.85:1),now,s.seed);
+  if(mix||red)drawAurora(COMET_SPR.aurR,L,hr,x,y,ang-(mix?.05:.0),a*(mix?.6:1),now,s.seed+1);
+  /* ekor debu pink hanya sebelum pecah */
+  if(mix){
+    g.save();g.translate(x,y);g.rotate(ang+s.bend+.02*Math.sin(now*.002+s.seed*6));
+    g.globalAlpha=a*.8;g.drawImage(COMET_SPR.pink,-L*1.05,-hr*3.2,L*1.05,hr*6.4);
+    g.restore();
+  }
+  /* ekor ion: cyan atau merah, lurus dan terang */
   g.save();g.translate(x,y);g.rotate(ang);
-  g.globalAlpha=a;g.drawImage(COMET_SPR.cyan,-L,-hr*1.5,L,hr*3);
+  g.globalAlpha=a;g.drawImage(red?COMET_SPR.red:COMET_SPR.cyan,-L,-hr*1.5,L,hr*3);
   g.restore();
   /* percikan di sepanjang ekor */
-  var ux=-Math.cos(ang),uy=-Math.sin(ang),nx=-uy,ny=ux,N=s.frag?5:9;
+  var ux=-Math.cos(ang),uy=-Math.sin(ang),nx=-uy,ny=ux,N=9,c1=red?'255,120,110':'160,240,255',c2=red?'255,190,120':'255,120,170';
   for(k=0;k<N;k++){
     var p=((k/N)+(now*.00045+s.seed))%1,d=p*L*.95,lat=Math.sin(p*17+k*2.3+s.seed*9)*hr*(.6+p*2.2);
-    g.fillStyle='rgba('+(k&1?'255,120,170':'160,240,255')+','+(a*(1-p)*.75).toFixed(3)+')';
+    g.fillStyle='rgba('+(k&1?c2:c1)+','+(a*(1-p)*.75).toFixed(3)+')';
     g.beginPath();g.arc(x+ux*d+nx*lat,y+uy*d+ny*lat,Math.max(.5,hr*.22*(1-p*.6)),0,6.283);g.fill();
   }
   /* kepala */
   var pulse=.88+.12*Math.sin(now*.011+s.seed*9);
-  drawStarGlow(x,y,hr*1.9,'255,70,120',a*.5*pulse);
-  drawStarGlow(x,y,hr*1.3,'150,240,255',a*.95);
-  g.fillStyle='rgba(255,255,255,'+(.95*a)+')';
+  drawStarGlow(x,y,hr*1.9,red?'255,60,60':'255,70,120',a*.5*pulse);
+  drawStarGlow(x,y,hr*1.3,red?'255,170,150':'150,240,255',a*.95);
+  g.fillStyle='rgba('+(red?'255,238,232':'255,255,255')+','+(.95*a)+')';
   g.beginPath();g.arc(x,y,Math.max(1,hr*.7),0,6.283);g.fill();
-  g.strokeStyle='rgba(225,250,255,'+(.55*a)+')';g.lineWidth=.9;
+  g.strokeStyle='rgba('+(red?'255,215,205':'225,250,255')+','+(.55*a)+')';g.lineWidth=.9;
   g.beginPath();g.moveTo(x-hr*3.6,y);g.lineTo(x+hr*3.6,y);g.moveTo(x,y-hr*3.6);g.lineTo(x,y+hr*3.6);g.stroke();
   /* cincin kejut saat pecah */
   if(s.split){
@@ -6111,8 +6153,8 @@ function konamiComet(){
     var top=Math.max(hb+14,H*.12),bot=H-Math.min(H*.2,90),avail=Math.max(120,bot-top);
     var x0=-W*.12,y0=top+avail*.08,x1=W*1.12,y1=top+avail*.58,sec=DUR/1000;
     SS.push({x:x0,y:y0,vx:(x1-x0)/sec,vy:(y1-y0)/sec,t:performance.now(),life:DUR,
-      comet:true,splitU:.38,hr:Math.max(3.2,Math.min(6.5,Math.min(W,H)*.012)),
-      L:Math.max(200,Math.min(480,Math.hypot(W,H)*.3)),bend:.12,seed:Math.random()});
+      comet:true,pal:'mix',splitU:.38,hr:Math.max(3.4,Math.min(7,Math.min(W,H)*.013)),
+      L:Math.max(300,Math.min(760,Math.hypot(W,H)*.5)),bend:.12,seed:Math.random()});
   },DELAY);
   setTimeout(function(){KCOMET.on=false;},DELAY+DUR+400);
 }
