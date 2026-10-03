@@ -1108,6 +1108,9 @@ function audioVizInit(a){
 }
 function audioVizOff(){
   AV.level*=.72;AV.bass*=.72;AV.mid*=.72;AV.high*=.72;AV.beat*=.68;AV.peak*=.9;AV.glitchUntil=0;
+  /* Snap ke 0: nilai kecil yang nyangkut bikin garis rasi (audioPulse) kelihatan lebih terang dari idle. */
+  if(AV.level<.012)AV.level=0;if(AV.bass<.012)AV.bass=0;if(AV.mid<.012)AV.mid=0;
+  if(AV.high<.012)AV.high=0;if(AV.beat<.012)AV.beat=0;if(AV.peak<.012)AV.peak=0;
 }
 function activeStarScreenPos(){
   if(!activeSfx||typeof TRIGGERS==='undefined'||typeof keyFromAudio!=='function')return null;
@@ -5559,6 +5562,9 @@ function triggerSupernova(key){
   /* Cooldown before any visual/audio so rapid double-taps don't stack. */
   var t0g=performance.now();
   if(SN_COOLDOWN[key]&&t0g-SN_COOLDOWN[key]<820)return;
+  /* Gate global: klik ganti-ganti bintang cepat (A->B->C) dulu nembus karena cooldown cuma per-key,
+     sehingga flash/partikel/warp/spektrum numpuk di HP RAM kecil. */
+  if(SN_COOLDOWN.__g&&t0g-SN_COOLDOWN.__g<380)return;
   SN_COOLDOWN[key]=t0g;
 
   var flash=$('#sn-flash'),
@@ -5566,12 +5572,27 @@ function triggerSupernova(key){
       sy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy),
       q=gSky(sx,sy);
   if(!q||q[2]>=1)return;
+  SN_COOLDOWN.__g=t0g;
+
+  /* Bintang lain masih bunyi? Matikan SEKARANG (jangan nunggu teleskop mendarat), supaya fokus rasi,
+     spektrum, time-dilation, dan visual burst nggak nunjuk ke dua bintang berbeda sekaligus. */
+  var prevSfx=activeSfx;
+  if(prevSfx&&prevSfx!==SFX[key]){
+    prevSfx.onended=null;safeReset(prevSfx);
+    activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
+  }
+  /* Sisa efek dari klik sebelumnya dibersihin dulu. */
+  SN_BURSTS.length=0;
+  if(typeof WARP_STREAKS!=='undefined')WARP_STREAKS.length=0;
 
   /* 1. Supernova flash & particle burst */
   flash.style.setProperty('--sx',Math.round(q[0])+'px');
   flash.style.setProperty('--sy',Math.round(q[1])+'px');
   flash.style.setProperty('--sn-rgb',tr.rgb);
   flash.classList.remove('on');void flash.offsetWidth;flash.classList.add('on');
+  /* Failsafe: kalau animationend nggak kepanggil (WebView RAM kecil), paksa overlay mati. */
+  clearTimeout(flash._snT);
+  flash._snT=setTimeout(function(){flash.classList.remove('on');},1000);
 
   var t0=performance.now();
   var busy=!!(drag.on||(activeSfx&&!activeSfx.paused&&!activeSfx.ended));
@@ -5617,6 +5638,10 @@ function triggerSupernova(key){
     }
   };
 }
+(function(){
+  var fl=document.getElementById('sn-flash');
+  if(fl)fl.addEventListener('animationend',function(){fl.classList.remove('on');});
+})();
 var SN_BURSTS=[];
 function drawSupernovaBursts(now){
   if(!SN_BURSTS.length)return;
