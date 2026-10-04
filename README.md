@@ -191,7 +191,8 @@ once its files (and, optionally, its music) have been cached.
 │   ├── nastenka.opus
 │   └── larung.opus
 │
-├── og.webp                 # Hero image used on both pages
+├── og.webp                 # Hero image used on both pages (art Limerence di dumul)
+├── collapsars-cover.webp   # Album art Collapsars (Media Session Observatory)
 ├── og.jpg                  # DUMUL Open Graph image
 └── og-constellation.jpg    # Observatory Open Graph image
 ```

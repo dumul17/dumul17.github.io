@@ -5524,9 +5524,48 @@ var SN_COOLDOWN={};
       nowPhase='absorb';
     },2000);
   }
+  /* ---------- Media Session (notif + lock screen) ----------
+     Semua track Observatory satu album: "Collapsars" -> art sendiri
+     (collapsars-cover.webp), beda dari Limerence di dumul.html. */
+  var MS=('mediaSession' in navigator)&&typeof MediaMetadata!=='undefined'?navigator.mediaSession:null;
+  var msKey='';
+  function msTitle(n){return n?n.charAt(0).toUpperCase()+n.slice(1):'';}
+  function msUpdate(playingIdx){
+    if(!MS)return;
+    try{
+      if(playingIdx!==-1){
+        var name=trackNames[playingIdx];
+        if(msKey!==name){
+          msKey=name;
+          var base=new URL('collapsars-cover.webp',location.href).href;
+          MS.metadata=new MediaMetadata({
+            title:msTitle(name),artist:'DUMUL',album:'Collapsars',
+            artwork:[{src:base,sizes:'1024x1024',type:'image/webp'}]
+          });
+        }
+        MS.playbackState='playing';
+      }else if(msKey){
+        MS.playbackState='paused';
+      }
+    }catch(e){}
+  }
+  function msStepBgm(){
+    var cur=getPlayingTrackIndex();
+    if(cur===-1)cur=activeIdx;
+    selectAndPlay(cur===8?9:8);
+  }
+  if(MS){
+    try{
+      MS.setActionHandler('play',function(){if(!isPlaying())toggleCurrentPlay();});
+      MS.setActionHandler('pause',function(){if(isPlaying())toggleCurrentPlay();});
+      MS.setActionHandler('previoustrack',msStepBgm);
+      MS.setActionHandler('nexttrack',msStepBgm);
+    }catch(e){}
+  }
   function sync(){
     var playingIdx=getPlayingTrackIndex();
     var playing=(playingIdx!==-1);
+    msUpdate(playingIdx);
     var open=panelOpen();
     if(playingIdx!==-1)activeIdx=playingIdx;
     rows.forEach(function(row,i){
@@ -5584,6 +5623,7 @@ var SN_COOLDOWN={};
     playBtn.setAttribute('aria-label','Play music');
     playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">▶</span><span class="mp-play-label">Play</span>';
     clearNowPlaying();
+    if(MS&&msKey){try{MS.playbackState='paused';}catch(e){}}
   };
   function openPanel(){
     panel.classList.add('open');panel.setAttribute('aria-hidden','false');toggle.setAttribute('aria-expanded','true');
