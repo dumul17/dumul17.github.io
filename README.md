@@ -36,6 +36,16 @@ DUMUL transition.
     BGM, `collapsars` BGM, observed-state tracking, signal counter, and
     live spectrum indicators
 -   **Observation Mode** and **Radio Silence**
+-   **BGM-reactive sky** (visual only, follows whichever BGM is playing):
+    `constellation` makes the constellation lines and stars "breathe"
+    slowly under a cold-blue tint; `collapsars` brightens and speeds up
+    Gargantua's disk, pulls nearby constellations toward it with a faint
+    shiver, and shifts the sky tint to violet/dark red. Switching BGM
+    cross-fades the tint over ~4 seconds.
+-   While a BGM plays: more frequent (capped) shooting stars, a soft glow
+    on the 8 clickable SFX stars, a star-dust trail behind the cursor /
+    touch colored by the active BGM, and **BGM ducking** (BGM drops to
+    ~28% while a star SFX plays, then rises back after it ends)
 -   **Constellation Camera** with `1×–3×` zoom, pinch/wheel control, and
     two-finger sky rotation
 -   Mobile sky pan and rotation interactions
@@ -51,7 +61,11 @@ DUMUL transition.
 -   Boot sequence with telemetry, matrix-style warm-up, repeat-visit
     shortcut, and **Red / Blue** entry choices
 -   Weak-device (`IS_POTATO`) handling, idle rendering savings, and
-    `prefers-reduced-motion` support
+    `prefers-reduced-motion` support. All BGM-reactive visuals switch off
+    on hidden tabs, `prefers-reduced-motion`, `IS_POTATO`, Radio Silence,
+    the swallow transition and the tesseract; audio keeps playing. BGM
+    ducking is skipped on `IS_POTATO` and where `audio.volume` is
+    read-only (iOS Safari), where the old "BGM pauses" behavior is kept
 -   Mobile-safe pointer/touch handling, haptics where supported, and
     throttled analyser/hover work
 

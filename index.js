@@ -1498,6 +1498,8 @@ function drawAudioVisualizerBars(now,R){
    the instant a star SFX takes over, so the two systems never fight. */
 var musicForceStop=null;
 function pauseMusicForSfx(){
+  /* BGM lagi bunyi -> turunin volumenya (duck) alih-alih pause; naik lagi pas SFX selesai. */
+  if(ofxDuckBgm())return;
   safePause(AMB);
   safePause(MUSIC_COLLAP);
   if(typeof musicForceStop==='function'){
@@ -3205,12 +3207,13 @@ function drawHole(now,age){
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
   var R=BH.Rr*BHZ,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016))),S=BH.S*k*BHZ;
   var bp=camBH();
+  var gk=OFX.pK; /* 0..1: seberapa "hidup" Gargantua saat BGM Collapsars main */
 
   g.save();
   g.translate(bp[0],bp[1]);
 
   /* Core + static portal artwork */
-  g.globalAlpha=Math.min(1,.86+.14*BH.h+.5*e);
+  g.globalAlpha=Math.min(1,.86+.14*BH.h+.5*e+.08*gk);
   g.drawImage(BH.sprite,-S/2,-S/2,S,S);
   g.globalAlpha=1;
 
@@ -3232,10 +3235,10 @@ function drawHole(now,age){
     var ringR=R*(1.022+.012*breathe);
     /* Blur-free breathing ring: wide translucent halo stroke + bright core.
        Avoid dynamic shadowBlur on every frame for mobile canvas performance. */
-    g.strokeStyle='rgba(185,215,245,'+(.09+.06*breathe)+')';
+    g.strokeStyle='rgba(185,215,245,'+(.09+.06*breathe+.05*gk)+')';
     g.lineWidth=Math.max(1,R*(.065+.018*breathe));
     g.beginPath();g.arc(0,0,ringR,0,6.283);g.stroke();
-    g.strokeStyle='rgba(238,245,248,'+(.55+.18*breathe)+')';
+    g.strokeStyle='rgba(238,245,248,'+(.55+.18*breathe+.12*gk)+')';
     g.lineWidth=Math.max(.65,R*(.022+.008*breathe));
     g.beginPath();g.arc(0,0,ringR,0,6.283);g.stroke();
 
@@ -3256,9 +3259,17 @@ function drawHole(now,age){
     var diskAng=-.48;
     var sp=.00024*(1+.55*BH.h+1.8*e);
     g.save();g.rotate(diskAng);
+    if(gk>.01){
+      /* Collapsars: cakram akresi berdenyut pelan (hangat), lebih terang dari biasanya. */
+      var gp=.5+.5*Math.sin(now*.0013);
+      g.fillStyle='rgba(255,176,110,'+(.07*gk*(.65+.35*gp))+')';
+      g.beginPath();g.ellipse(0,0,R*(3.9+.25*gp),R*(.20+.03*gp),0,0,6.283);g.fill();
+      g.fillStyle='rgba(255,222,184,'+(.10*gk*(.5+.5*gp))+')';
+      g.beginPath();g.ellipse(0,0,R*2.5,R*.09,0,0,6.283);g.fill();
+    }
     for(var m=0;m<(IS_POTATO?3:7);m++){
-      var ph2=(now*sp+m/7)%1,u=ph2*2-1;
-      var al2=Math.pow(1-Math.abs(u),1.9)*(.16+.12*BH.h+.10*e);
+      var ph2=(now*sp+OFX.dph+m/7)%1,u=ph2*2-1;
+      var al2=Math.pow(1-Math.abs(u),1.9)*(.16+.12*BH.h+.10*e+.10*gk);
       var tilt=(m%3-1)*.18;
       g.fillStyle='rgba(235,240,245,'+al2+')';
       g.beginPath();
@@ -3267,7 +3278,7 @@ function drawHole(now,age){
     }
     if(!IS_POTATO){
       for(var sa=0;sa<3;sa++){
-        var sph=(now*sp*.55+sa*.33)%1;
+        var sph=(now*sp*.55+OFX.dph*.55+sa*.33)%1;
         var saAl=(1-Math.abs(sph*2-1))* (.07+.05*BH.h);
         g.strokeStyle='rgba(200,220,240,'+saAl+')';
         g.lineWidth=.55;
@@ -3277,19 +3288,19 @@ function drawHole(now,age){
       }
       /* Secondary lens — locked to sprite disk plane (no drag wobble). */
       g.lineWidth=Math.max(.55,R*.016);
-      g.strokeStyle='rgba(200,220,245,.28)';
+      g.strokeStyle='rgba(200,220,245,'+(.28+.14*gk)+')';
       g.beginPath();
       g.ellipse(0,-R*.02,R*1.55,R*.38,0,Math.PI*1.15,Math.PI*1.85);
       g.stroke();
-      g.strokeStyle='rgba(240,245,255,.18)';
+      g.strokeStyle='rgba(240,245,255,'+(.18+.12*gk)+')';
       g.beginPath();
       g.ellipse(0,-R*.02,R*1.42,R*.28,0,Math.PI*1.2,Math.PI*1.8);
       g.stroke();
-      g.strokeStyle='rgba(200,220,245,.22)';
+      g.strokeStyle='rgba(200,220,245,'+(.22+.12*gk)+')';
       g.beginPath();
       g.ellipse(0,R*.02,R*1.55,R*.38,0,Math.PI*.15,Math.PI*.85);
       g.stroke();
-      g.strokeStyle='rgba(240,245,255,.14)';
+      g.strokeStyle='rgba(240,245,255,'+(.14+.10*gk)+')';
       g.beginPath();
       g.ellipse(0,R*.02,R*1.42,R*.28,0,Math.PI*.2,Math.PI*.8);
       g.stroke();
@@ -4638,9 +4649,16 @@ function drawShooting(now){
   if(idleMode)return; /* Energy saver: no new shooting stars while idle */
   /* Shooting stars stay alive during star SFX and constellation alignment too
      (they used to be gated by secondaryFxScale, which only heavier FX like asteroids should obey). */
-  if(now>nextSS&&!SW){nextSS=now+6000+Math.random()*7000;
-    var ang=(.14+Math.random()*.14)*Math.PI,sp=560+Math.random()*320,dir=Math.random()<.5?1:-1;
-    SS.push({x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850});}
+  if(now>nextSS&&!SW){
+    /* BGM on: jarak acak tapi lebih sering; jumlah meteor aktif dibatasi (lebih ketat di HP kecil). */
+    var ofxOn=OFX.p>.35,ofxCap=W<500?2:4;
+    nextSS=now+(ofxOn?(W<500?3300+Math.random()*3700:2000+Math.random()*3200):6000+Math.random()*7000);
+    if(!(ofxOn&&SS.length>=ofxCap)){
+      var ang=(.14+Math.random()*.14)*Math.PI,sp=560+Math.random()*320,dir=Math.random()<.5?1:-1;
+      var nm={x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850};
+      if(ofxOn){nm.c0=OFX.m0;nm.c1=OFX.m1;}
+      SS.push(nm);
+    }}
   for(var i=SS.length-1;i>=0;i--){
     var s=SS[i],u=(now-s.t)/s.life;if(u>1){SS.splice(i,1);continue;}
     var x=s.x+s.vx*(now-s.t)/1000,y=s.y+s.vy*(now-s.t)/1000,tl=s.tl||.07;
@@ -4809,7 +4827,9 @@ function drawCons(c,age,now){
   var wildField=(drag.on&&drag.moved)?1:0;
   var ox=Math.sin(tn*.00031+c.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(tn*.00027+c.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;
   if(now<glitchUntil){ox+=(Math.random()-.5)*7;oy+=(Math.random()-.5)*4;}
+  if(OFX.pK>.01){ofxPull(c,now);ox+=OFX.px;oy+=OFX.py;} /* tarikan halus ke Gargantua */
   c.ox=ox;c.oy=oy;
+  var obr=ofxBreath(c.phase,now); /* napas rasi: -1..1 x kehadiran BGM Constellation */
   if(c.nebula){
     var na=clamp((age-c.delay-1.2)/1.5);
     if(na>0&&nebulaIn(c.nebula.x+ox,c.nebula.y+oy,c.scale*1.5)){var nt=skyXF(c.nebula.x+ox,c.nebula.y+oy),q0=pull(nt[0],nt[1]),nx=q0[0],ny=q0[1],nr=c.scale*1.5*(1-.7*q0[2]);na*=(1-q0[2]);
@@ -4854,12 +4874,12 @@ function drawCons(c,age,now){
 
     for(pass=doGlow?0:1;pass<2;pass++){
       if(pass===0){
-        g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus)+')';
+        g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus*(1+.5*obr))+')';
         g.lineWidth=(lineHot?6:4) + audioPulse * 2.0;
       }
       else{
-        g.strokeStyle='rgba(150,212,255,'+(((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*Math.sin(tn*.0014+i)))*focus)+')';
-        g.lineWidth=(lineHot?1.8:1.1) + audioPulse * 1.2;
+        g.strokeStyle='rgba(150,212,255,'+Math.min(1,((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*Math.sin(tn*.0014+i)))*focus*(1+.32*obr))+')';
+        g.lineWidth=(lineHot?1.8:1.1) + audioPulse * 1.2 + .4*obr;
       }
       g.globalAlpha=kk;g.beginPath();drawing2=false;
       for(var sj=0;sj<=samples;sj++){
@@ -4961,7 +4981,8 @@ function drawStars(c,age,now){
       g.fillStyle='rgba(255,255,255,'+(.82*a)+')';
       g.beginPath();g.arc(x,y,Math.max(.72,r*.56),0,6.283);g.fill();
     }else{
-      drawStarGlow(x,y,r,s.rgb,a*tw);
+      var sb=ofxBreath(c.phase+(s.ph||0)*.35,now);
+      drawStarGlow(x,y,r*(1+.14*sb),s.rgb,a*tw*(1+.3*sb));
       g.fillStyle='rgba(255,255,255,'+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
     }
     if(typeof ALIGN!=='undefined'&&ALIGN.cid===c.id&&ALIGN.lit&&ALIGN.lit[k]){
@@ -5242,6 +5263,217 @@ function drawPortals(age,now){
 var lastFrameOK=performance.now();
 /* bootDone stays false until warm-up finishes. */
 var bootDone=false;
+/* ---------- Observatory FX: efek visual yang menumpang ke BGM ----------
+   Constellation BGM -> rasi "bernapas" + langit biru dingin.
+   Collapsars BGM    -> Gargantua menyala/berputar lebih cepat, bintang kena tarikan halus, langit ungu-merah.
+   Lintas BGM        -> meteor lebih sering, 8 bintang SFX menyala tipis, jejak debu bintang di kursor/sentuhan.
+   Semua efek visual mati kalau: tab hidden (render loop memang berhenti), prefers-reduced-motion, IS_POTATO,
+   Radio Silence, swallow, atau tesseract. Audio TIDAK ikut berhenti. Kalau satu efek error 5x, semua efek
+   visual mati sendiri (render loop tidak ikut jatuh). Pergantian BGM = crossfade ~4 detik (bukan lompat). */
+var OFX={pC:0,pK:0,p:0,last:0,dph:0,wasOn:false,m0:'234,246,255',m1:'110,229,255',px:0,py:0,
+  tc:null,tk:null,keys:null,dust:[],dAt:0,dx:-999,dy:-999,err:0,dead:false};
+var OFX_PAL_C=['150,212,255','205,232,255','118,168,255'],OFX_PAL_K=['255,178,130','214,150,255','255,120,150'];
+function ofxAllowed(){
+  if(OFX.dead||pageHidden||reduce||IS_POTATO||SW||RADIO_SILENCE)return false;
+  return !document.body.classList.contains('tesseract-running');
+}
+function ofxBgm(){ /* 0 = tidak ada, 1 = constellation, 2 = collapsars */
+  if(AMB&&!AMB.paused&&!AMB.ended)return 1;
+  if(MUSIC_COLLAP&&!MUSIC_COLLAP.paused&&!MUSIC_COLLAP.ended)return 2;
+  return 0;
+}
+function ofxSafe(fn,now){
+  if(OFX.dead)return;
+  try{fn(now);}catch(err){
+    try{window.__hub.renderError='ofx: '+(err&&err.message||err);}catch(e2){}
+    if(++OFX.err>=5){OFX.dead=true;OFX.pC=0;OFX.pK=0;OFX.p=0;OFX.dust.length=0;}
+    try{resetCanvasState();}catch(e3){}
+  }
+}
+function ofxUpdate(now){
+  var dt=OFX.last?Math.min(100,Math.max(0,now-OFX.last)):16;OFX.last=now;
+  var ok=ofxAllowed(),b=ok?ofxBgm():0,tc=b===1?1:0,tk=b===2?1:0,k=1-Math.exp(-dt/(ok?1400:350));
+  OFX.pC+=(tc-OFX.pC)*k;OFX.pK+=(tk-OFX.pK)*k;
+  if(!tc&&OFX.pC<.004)OFX.pC=0;
+  if(!tk&&OFX.pK<.004)OFX.pK=0;
+  OFX.p=OFX.pC>OFX.pK?OFX.pC:OFX.pK;
+  /* Fase tambahan cakram: nambah halus sesuai pK, jadi percepatan putaran tidak "loncat". */
+  OFX.dph=(OFX.dph+dt*.00024*.9*OFX.pK)%1;
+  if(OFX.pK>OFX.pC){OFX.m0='255,214,170';OFX.m1='255,104,140';}
+  else{OFX.m0='234,246,255';OFX.m1='110,229,255';}
+  var on=OFX.p>.35;
+  /* Begitu BGM mulai, jangan nunggu jadwal meteor lama (bisa 13 detik). */
+  if(on&&!OFX.wasOn&&nextSS>now+3000)nextSS=now+700+Math.random()*1600;
+  OFX.wasOn=on;
+  if(!ok&&OFX.dust.length)OFX.dust.length=0;
+}
+function ofxBreath(ph,now){return OFX.pC>.004?OFX.pC*Math.sin(now*.00105+ph):0;}
+function ofxPull(c,now){
+  var key=W*8191+H;
+  if(c._ofxK!==key){
+    var sx=0,sy=0,n=0,k,st;
+    for(k in c.stars){st=c.stars[k];sx+=st.x;sy+=st.y;n++;}
+    c._ofxX=n?sx/n:0;c._ofxY=n?sy/n:0;c._ofxK=key;
+  }
+  var dx=BH.x-c._ofxX,dy=BH.y-c._ofxY,d=Math.sqrt(dx*dx+dy*dy)||1;
+  var fall=Math.max(.35,Math.min(1,1.15-d/(Math.max(W,H)*.9)));  /* rasi yang lebih dekat ditarik lebih kuat */
+  var wave=.5+.5*Math.sin(now*.0014+c.phase*1.7);                 /* mendekat ... balik */
+  var shiver=Math.sin(now*.021+c.phase*3.1);                      /* getar kecil di puncak tarikan */
+  var sc=Math.max(.8,Math.min(1.4,Math.min(W,H)/420));
+  var m=OFX.pK*fall*sc*wave*(5.2+1.1*shiver);
+  if(!isFinite(m)||!isFinite(dx)||!isFinite(dy)){OFX.px=0;OFX.py=0;return;}
+  OFX.px=dx/d*m;OFX.py=dy/d*m;
+}
+function ofxMakeTint(kind){
+  var c=document.createElement('canvas');c.width=c.height=128;
+  var x=c.getContext('2d'),gr=x.createRadialGradient(64,64,0,64,64,64);
+  if(kind==='k'){
+    gr.addColorStop(0,'rgba(150,80,255,.60)');gr.addColorStop(.38,'rgba(112,34,150,.38)');
+    gr.addColorStop(.72,'rgba(125,22,48,.20)');gr.addColorStop(1,'rgba(90,10,20,0)');
+  }else{
+    gr.addColorStop(0,'rgba(60,130,255,.50)');gr.addColorStop(.45,'rgba(34,84,190,.26)');
+    gr.addColorStop(1,'rgba(20,50,140,0)');
+  }
+  x.fillStyle=gr;x.fillRect(0,0,128,128);return c;
+}
+function ofxDrawTint(now){
+  if(OFX.p<.01)return;
+  var S=Math.max(W,H)*2.2;
+  g.save();g.globalCompositeOperation='lighter';
+  if(OFX.pC>.01){
+    if(!OFX.tc)OFX.tc=ofxMakeTint('c');
+    g.globalAlpha=.17*OFX.pC*(.88+.12*Math.sin(now*.00105));
+    g.drawImage(OFX.tc,W*.5-S/2,H*.45-S/2,S,S);
+  }
+  if(OFX.pK>.01){
+    if(!OFX.tk)OFX.tk=ofxMakeTint('k');
+    g.globalAlpha=.26*OFX.pK*(.9+.1*Math.sin(now*.0013));
+    g.drawImage(OFX.tk,BH.x-S/2,BH.y-S/2,S,S);
+  }
+  g.restore();
+}
+/* 8 bintang yang bisa diklik: glow tipis sebagai tanda "tersedia" selama BGM on. */
+function ofxDrawAvail(now){
+  if(OFX.p<.02)return;
+  var keys=OFX.keys||(OFX.keys=Object.keys(TRIGGERS)),i,j,key,tr,q,c,s,ps,x,y,pu;
+  var dim=(activeSfx&&!activeSfx.paused&&!activeSfx.ended)?.35:1;
+  g.save();g.globalCompositeOperation='lighter';
+  for(i=0;i<keys.length;i++){
+    key=keys[i];tr=TRIGGERS[key];
+    if(activeSfx===SFX[key]&&!SFX[key].paused)continue; /* bintang yang lagi bunyi sudah punya efek sendiri */
+    if(tr.cons==='pleiades'){
+      if(!PLEIADES.ready)continue;
+      ps=null;
+      for(j=0;j<PLEIADES.bright.length;j++){if(PLEIADES.bright[j].name===tr.star){ps=PLEIADES.bright[j];break;}}
+      if(!ps)continue;
+      q=gSky(PLEIADES.x+ps.x*PLEIADES.scale+mouse.x*1.4+skyPan.x,PLEIADES.y+ps.y*PLEIADES.scale+mouse.y*1.0+skyPan.y);
+      if(!q||q[2]>=1)continue;
+      x=q[0];y=q[1];
+      if(x<-30||x>W+30||y<-30||y>H+30)continue;
+    }else{
+      c=cons(tr.cons);s=c&&c.stars[tr.star];
+      if(!s||!(s._a>0))continue;
+      q=gSkyC(s.x+c.ox,s.y+c.oy,72,true);if(!q)continue;
+      x=q[0];y=q[1];
+    }
+    pu=.5+.5*Math.sin(now*.0016+i*.83);
+    drawStarGlow(x,y,5.2+2.4*pu,tr.rgb,(.16+.16*pu)*OFX.p*dim*(1-.85*q[2]));
+  }
+  g.restore();
+}
+/* Jejak debu bintang di kursor / sentuhan. Warna ngikut BGM aktif. Jumlah partikel dibatasi. */
+function ofxSpawnDust(x,y,n){
+  var cap=W<500?14:26,pal=OFX.pK>OFX.pC?OFX_PAL_K:OFX_PAL_C,d=OFX.dust;
+  while(n-->0){
+    if(d.length>=cap)d.shift();
+    d.push({x:x+(Math.random()-.5)*8,y:y+(Math.random()-.5)*8,vx:(Math.random()-.5)*.03,vy:(Math.random()-.35)*.025,
+      t:performance.now(),l:650+Math.random()*500,r:1.1+Math.random()*1.6,c:pal[(Math.random()*3)|0]});
+  }
+}
+function ofxDrawDust(now){
+  var a=OFX.dust,i,p,dt,u;
+  if(!a.length)return;
+  g.save();g.globalCompositeOperation='lighter';
+  for(i=a.length-1;i>=0;i--){
+    p=a[i];dt=Math.max(0,now-p.t);u=dt/p.l;
+    if(u>=1){a.splice(i,1);continue;}
+    drawStarGlow(p.x+p.vx*dt,p.y+p.vy*dt,p.r*(1.25-.45*u),p.c,.7*(1-u)*(1-u));
+  }
+  g.restore();
+}
+if(!reduce&&!IS_POTATO){
+  window.addEventListener('pointermove',function(e){
+    if(OFX.p<.3||!ofxAllowed())return;
+    var now=performance.now();
+    if(now-OFX.dAt<(W<500?60:36))return;
+    var dx=e.clientX-OFX.dx,dy=e.clientY-OFX.dy;
+    if(dx*dx+dy*dy<80)return;
+    OFX.dAt=now;OFX.dx=e.clientX;OFX.dy=e.clientY;
+    ofxSpawnDust(e.clientX,e.clientY,1);
+  },{passive:true});
+  window.addEventListener('pointerdown',function(e){
+    if(OFX.p<.3||!ofxAllowed())return;
+    OFX.dx=e.clientX;OFX.dy=e.clientY;OFX.dAt=performance.now();
+    ofxSpawnDust(e.clientX,e.clientY,3);
+  },{passive:true});
+}
+/* ---------- Ducking BGM saat SFX bintang ----------
+   BGM turun ke ~28% volume (220 ms), SFX main, lalu BGM naik pelan (1 dtk) setelah SFX selesai/dijeda.
+   Pakai timer sendiri (bukan RAF) supaya tetap jalan walau tab hidden. Kalau browser tidak mengizinkan
+   ubah volume (iOS Safari), atau IS_POTATO, atau Radio Silence/swallow -> perilaku lama (BGM di-pause). */
+var OFX_VOL_OK=(function(){try{var t=new Audio();t.volume=.37;return Math.abs(t.volume-.37)<.01;}catch(e){return false;}})();
+var DUCK_LVL=.28,DUCK={a:null,f:1,from:1,to:1,t0:0,dur:1,timer:0,rel:0};
+function ofxDuckTo(to){
+  if(DUCK.to===to&&(DUCK.timer||DUCK.f===to))return;
+  DUCK.from=DUCK.f;DUCK.to=to;DUCK.t0=performance.now();DUCK.dur=to<DUCK.f?220:1000;
+  if(!DUCK.timer)DUCK.timer=setInterval(ofxDuckTick,40);
+}
+function ofxDuckAbort(){
+  if(DUCK.timer){clearInterval(DUCK.timer);DUCK.timer=0;}
+  if(DUCK.rel){clearTimeout(DUCK.rel);DUCK.rel=0;}
+  if(DUCK.a&&!SW){try{DUCK.a.volume=.5;}catch(e){}} /* saat swallow, transisi yang pegang volume */
+  DUCK.a=null;DUCK.f=1;DUCK.from=1;DUCK.to=1;
+}
+function ofxDuckTick(){
+  var a=DUCK.a;
+  if(!a||SW||RADIO_SILENCE){ofxDuckAbort();return;}
+  var u=Math.min(1,(performance.now()-DUCK.t0)/DUCK.dur),e=u*u*(3-2*u);
+  DUCK.f=DUCK.from+(DUCK.to-DUCK.from)*e;
+  try{a.volume=Math.max(0,Math.min(1,.5*DUCK.f));}catch(err){}
+  if(u>=1){
+    clearInterval(DUCK.timer);DUCK.timer=0;
+    if(DUCK.to===1){DUCK.a=null;DUCK.f=1;}
+  }
+}
+function ofxDuckBgm(){ /* true = BGM di-duck (jangan di-pause) */
+  if(!OFX_VOL_OK||IS_POTATO||RADIO_SILENCE||SW)return false;
+  var a=(AMB&&!AMB.paused&&!AMB.ended)?AMB:((MUSIC_COLLAP&&!MUSIC_COLLAP.paused&&!MUSIC_COLLAP.ended)?MUSIC_COLLAP:null);
+  if(!a)return false;
+  if(DUCK.a&&DUCK.a!==a){try{DUCK.a.volume=.5;}catch(e){}}
+  DUCK.a=a;
+  if(DUCK.rel){clearTimeout(DUCK.rel);DUCK.rel=0;}
+  ofxDuckTo(DUCK_LVL);
+  return true;
+}
+function ofxAnySfxPlaying(){
+  for(var k in SFX){var a=SFX[k];if(a&&!a.paused&&!a.ended)return true;}
+  return false;
+}
+function ofxDuckRelease(){
+  if(!DUCK.a)return;
+  if(DUCK.rel)clearTimeout(DUCK.rel);
+  /* Jeda singkat: pindah bintang A -> B kirim 'pause' A sebelum B benar-benar bunyi. */
+  DUCK.rel=setTimeout(function(){DUCK.rel=0;if(!DUCK.a||ofxAnySfxPlaying())return;ofxDuckTo(1);},140);
+}
+(function(){
+  Object.keys(SFX).forEach(function(k){
+    var a=SFX[k];if(!a)return;
+    a.addEventListener('play',function(){ofxDuckBgm();});
+    a.addEventListener('pause',ofxDuckRelease);
+    a.addEventListener('ended',ofxDuckRelease);
+  });
+})();
+
 function frame(now){
   /* Capture generation at entry. If a watchdog/visibility restart bumped
      renderGeneration while this callback was already queued, bail out so
@@ -5258,6 +5490,7 @@ function frame(now){
     if(SW)swP=clamp((now-SW.t0)/SW.dur);
     mouse.x+=(mouse.tx-mouse.x)*.05;mouse.y+=(mouse.ty-mouse.y)*.05;
     updateAudioViz(now);
+    ofxSafe(ofxUpdate,now);
     updateConstellationFocus(now);
     updateTimeDilation(now);
     if(hoverDirty&&mouse.px!=null&&!drag.on&&(now-lastHoverAt)>=HOVER_MIN_MS){
@@ -5303,6 +5536,7 @@ function frame(now){
       }
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
     }
+    ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
     drawFloatingTelescope(now);
     var msgEl=$('#secret-msg');
     if(msgEl&&msgEl.classList.contains('on')&&msgEl.dataset.type==='telescope')placeSecretMsg();
@@ -5315,8 +5549,10 @@ function frame(now){
     CONS.forEach(function(c){drawStars(c,age,now);});
     drawPleiades(age,now);
     drawTriggerVisuals(now);
+    ofxSafe(ofxDrawAvail,now);
     drawFocusFx(now);
     drawSupernovaBursts(now);
+    ofxSafe(ofxDrawDust,now);
 
     // RENDER EFEK KOSMIK BARU:
     drawBHShockwaves(now);
