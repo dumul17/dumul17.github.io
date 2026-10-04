@@ -571,6 +571,7 @@ function haptic(ms){
 }
 function showSecret(text,ms){
   var el=$('#secret-msg');if(!el)return;
+  teleGreetHide();
   clearTimeout(el._t);clearTimeout(el._type);
   el.dataset.type='center'; /* Konami / centered overlay — do not follow telescope */
   el.style.left='';
@@ -977,6 +978,7 @@ function showUltraLoveSequence(el){
 
 function showSecretSequence(){
   var el=$('#secret-msg');if(!el)return;
+  teleGreetHide();
   clearTimeout(el._t);clearTimeout(el._type);
   el.dataset.type='telescope'; /* Telescope voice — track with placeSecretMsg each frame */
   el.classList.add('on');
@@ -2449,9 +2451,10 @@ function clockText(){
   var ap=h<12?'AM':'PM',hh=h%12;if(hh===0)hh=12;
   return (hh<10?'0':'')+hh+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec+' '+ap;
 }
-function tickClock(){
+function tickClock(force){
   var el=$('#bh-clock');
   if(!el)return;
+  if(!force&&typeof CLKD!=='undefined'&&CLKD&&CLKD.active)return;
   var now=new Date();
   var days=['SUN','MON','TUE','WED','THU','FRI','SAT'];
   var months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
@@ -5303,6 +5306,8 @@ function frame(now){
     drawFloatingTelescope(now);
     var msgEl=$('#secret-msg');
     if(msgEl&&msgEl.classList.contains('on')&&msgEl.dataset.type==='telescope')placeSecretMsg();
+    teleGreetFollow();
+    updateClockDilation(now);
     drawShooting(now);
     cullBegin();
     CONS.forEach(function(c){drawCons(c,age,now);});
@@ -6423,7 +6428,7 @@ if(window.PointerEvent){
    Session counter lokal (localStorage dumul_term_v1), pool log berkategori + anti-repeat,
    corruption meter (makin sering dibuka makin aneh), varian konteks (Observe Mode / rasi aktif).
    Semua lokal, tanpa tracking server. */
-var TERM_KEY='dumul_term_v1',TERM_ST=null,TERM_RUN=false,TERM_OBS_AT=0,TERM_T=[];
+var TERM_KEY='dumul_term_v1',TERM_ST=null,TERM_RUN=false,TERM_OBS_AT=0,TERM_FOCUS=null,TERM_T=[];
 var TERM_DIST={orion:1344,virgo:250,canis:9,pleiades:444,taurus:65,bootes:37,scorpius:550};
 var TERM_POOL=[
  ['SYSTEM','waking dormant process...'],['SYSTEM','render loop attached'],['SYSTEM','clock source: UTC'],
@@ -6446,7 +6451,19 @@ var TERM_POOL=[
  ['DUMUL','signal gap: one voice missing'],['DUMUL','glitch is not a bug. glitch is a track.'],['DUMUL','limerence index: stable']
 ];
 var TERM_W={SYSTEM:3,OBSERVER:3,MEMORY:2,CAUSALITY:2,ANOMALY:1,OWL:.6,DUMUL:1};
-function termNoteObserve(on){TERM_OBS_AT=performance.now();}
+function termNoteObserve(on){
+  TERM_OBS_AT=performance.now();
+  /* Camera focus cuma hidup di dalam Observe Mode (jam & terminal tersembunyi di sana),
+     jadi fokus terakhir direkam saat keluar dan berlaku sebagai jejak ~90 detik. */
+  if(on){TERM_FOCUS=null;return;}
+  TERM_FOCUS=null;
+  try{
+    if(typeof CAMERA_MODE!=='undefined'&&CAMERA_MODE&&typeof FOCUS!=='undefined'&&FOCUS.list){
+      var f=FOCUS.list[FOCUS.i];
+      if(f&&f.id!=='free')TERM_FOCUS={id:f.id,at:performance.now()};
+    }
+  }catch(e){}
+}
 function termLoad(){
   if(TERM_ST)return TERM_ST;
   var o=null;try{o=JSON.parse(localStorage.getItem(TERM_KEY)||'null');}catch(e){}
@@ -6494,16 +6511,31 @@ function termHeader(n,last){
   if(n>=12)h.push('> MEMORY FRAGMENT: "you were here"');
   return h;
 }
+function termFmtLY(d){return String(d).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 function termContext(){
-  if(OBSERVE_MODE||(TERM_OBS_AT&&performance.now()-TERM_OBS_AT<90000))
-    return ['> OBSERVATION MODE: RESIDUAL TRACE','> ...','> YOU SHOULD NOT HAVE ACCESS TO THIS.'];
-  if(typeof ALIGN!=='undefined'&&ALIGN.cid){
-    var id=ALIGN.cid,nm=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[id]||id).toUpperCase(),d=TERM_DIST[id];
-    var o=['> TARGET: '+nm];
-    if(d){var ds=String(d).replace(/\B(?=(\d{3})+(?!\d))/g,',');o.push('> DISTANCE: ~'+ds+' LY','> SIGNAL AGE: ~'+ds+' YEARS');}
-    o.push('> OBSERVER: PRESENT','> TARGET: ABSENT');return o;
+  var now=performance.now();
+  /* '!' di depan = baris peringatan (merah muda) */
+  if(typeof CLKD!=='undefined'&&CLKD&&(CLKD.k>.2||(CLKD.touchAt&&Date.now()-CLKD.touchAt<90000)))
+    return ['!> CAUTION','!> TEMPORAL REFERENCE UNSTABLE','> ...',
+      '!> LOCAL TIME .......... [ERROR]','!> EXTERNAL TIME ........ [ERROR]','!> OBSERVER TIME ......... [UNKNOWN]'];
+  if(TERM_FOCUS&&now-TERM_FOCUS.at<90000){
+    var fid=TERM_FOCUS.id;
+    if(fid==='bh')return [
+      '!> CAUTION','!> TEMPORAL REFERENCE UNSTABLE','> ...',
+      '!> LOCAL TIME .......... [ERROR]','!> EXTERNAL TIME ........ [ERROR]','!> OBSERVER TIME ......... [UNKNOWN]'
+    ];
+    return termTarget(fid);
   }
+  if(OBSERVE_MODE||(TERM_OBS_AT&&now-TERM_OBS_AT<90000))
+    return ['!> OBSERVATION MODE: RESIDUAL TRACE','> ...','!> YOU SHOULD NOT HAVE ACCESS TO THIS.'];
+  if(typeof ALIGN!=='undefined'&&ALIGN.cid)return termTarget(ALIGN.cid);
   return null;
+}
+function termTarget(id){
+  var nm=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[id]||id).toUpperCase(),d=TERM_DIST[id],o=['> TARGET: '+nm];
+  if(d){var ds=termFmtLY(d);o.push('> DISTANCE: ~'+ds+' LY','> SIGNAL AGE: ~'+ds+' YEARS');}
+  o.push('> OBSERVER: PRESENT','> TARGET: ABSENT');
+  return o;
 }
 var TERM_AT=0,TERM_TAIL=0,TERM_BODY=null,TERM_CUR=null,TERM_END=0,TERM_ASK=null,TERM_NOIN=0,TERM_TAPS=0,TERM_EXC=false,TERM_NOCLOSE=false;
 var TERM_PROMPTS=[
@@ -6566,7 +6598,7 @@ function termOpen(){
   var st=termLoad();st.n++;var prevLast=st.last;st.last=Date.now();
   var n=st.n,c=Math.min(1,(n-1)/30),ctx=termContext();
   var mile=(n===7)||(n>7&&n<30&&n!==20&&Math.random()<.06);
-  var k=mile?1:4+(Math.random()<.5?1:0)+(c>.5?1:0)+(Math.random()<c?1:0)-(ctx?2:0);
+  var k=mile?1:4+(Math.random()<.5?1:0)+(c>.5?1:0)+(Math.random()<c?1:0)-(ctx?(ctx.length>4?3:2):0);
   var picks=termPick(Math.max(mile?1:2,k),st,c);
   termSave();
   body.textContent='';
@@ -6586,7 +6618,10 @@ function termOpen(){
     TERM_NOCLOSE=true;
     return;
   }
-  if(ctx)for(i=0;i<ctx.length;i++)termEmit(ctx[i],ctx[i]==='> ...'?650:300);
+  if(ctx)for(i=0;i<ctx.length;i++){
+    var cl=ctx[i],wr=cl.charAt(0)==='!';if(wr)cl=cl.slice(1);
+    termEmit(cl,cl==='> ...'?650:300,wr?'term-warn':'');
+  }
   for(i=0;i<picks.length;i++){
     var p=TERM_POOL[picks[i]];base+=100+((Math.random()*800)|0);
     var ts=termPad(((base/1000)|0)%60,2)+'.'+termPad(base%1000,3);
@@ -6610,6 +6645,194 @@ function termOpen(){
   var t=$('#terminal');if(!t)return;
   t.addEventListener('pointerdown',function(e){e.stopPropagation();termTap();},{passive:true});
 })();
+
+/* ---------- TELESCOPE GREETING (pop-out otomatis saat buka / revisit) ----------
+   Bubble terpisah (#tele-greet) dengan pool sendiri: TIDAK ikut TELE_SCOPE_MESSAGES, jadi tidak
+   ketuker / numpuk sama pesan random saat teleskop diklik (klik teleskop langsung menutup greeting).
+   Isi: jeda sejak kunjungan terakhir + jam malam. State lokal: localStorage dumul_tg_v1. */
+var TG_KEY='dumul_tg_v1',TG={el:null,on:false,st:null,poll:0,hiddenAt:0,busy:false};
+var TG_POOL={
+ quick:["That was quick.","You left. You came back. I noticed.","Reloading won't change the sky.","Back so soon?"],
+ hours:["Back again today.","Same day. Different stars.","The sky moved a little while you were gone.","You didn't stay away long."],
+ day:["A night has passed.","One day. I kept watching.","You were gone a day. The stars weren't.","Welcome back. It's been a day."],
+ days:["{d} days. I counted.","{d} days of quiet. Then you.","{d} days. The lens stayed clean.","{d} days away. The sky didn't mind."],
+ weeks:["{w} weeks. The stars didn't wait.","{w} weeks. I almost stopped looking.","{w} weeks away. The light kept travelling."],
+ months:["{m} months. Hello again.","{m} months. I still remember where you stood.","It has been a long time. The light you saw then has moved on."],
+ night:["Why are you awake?","It's late. The sky doesn't mind.","The observatory is quieter at this hour.","Everyone else is asleep. The sky isn't.","Go to sleep. The stars will still be here.","The best stars come out when no one's looking."]
+};
+function tgLoad(){
+  if(TG.st)return TG.st;
+  var o=null;try{o=JSON.parse(localStorage.getItem(TG_KEY)||'null');}catch(e){}
+  if(!o||typeof o!=='object')o={};
+  TG.st={last:+o.last||0,nightAt:+o.nightAt||0,quickAt:+o.quickAt||0,recent:Array.isArray(o.recent)?o.recent.slice(-8):[]};
+  return TG.st;
+}
+function tgSave(){try{localStorage.setItem(TG_KEY,JSON.stringify(TG.st));}catch(e){}}
+function tgChoose(gap,fresh,hour,nowMs){
+  var st=tgLoad(),cat=null,d=Math.floor(gap/864e5),night=hour<5&&nowMs-st.nightAt>6*36e5;
+  if(gap>0){
+    if(fresh&&gap<90e3){if(nowMs-st.quickAt>3e5)cat='quick';}
+    else if(gap>=6*36e5&&gap<864e5)cat='hours';
+    else if(d>=1&&d<3)cat='day';
+    else if(d>=3&&d<14)cat='days';
+    else if(d>=14&&d<60)cat='weeks';
+    else if(d>=60)cat='months';
+  }
+  if(night&&(!cat||Math.random()<.5))cat='night';
+  if(!cat)return null;
+  if(cat==='night')st.nightAt=nowMs;
+  if(cat==='quick')st.quickAt=nowMs;
+  var pool=TG_POOL[cat],i,cand=[];
+  for(i=0;i<pool.length;i++)if(st.recent.indexOf(cat+i)<0)cand.push(i);
+  if(!cand.length)for(i=0;i<pool.length;i++)cand.push(i);
+  i=cand[(Math.random()*cand.length)|0];
+  st.recent.push(cat+i);while(st.recent.length>8)st.recent.shift();
+  return pool[i].replace('{d}',d).replace('{w}',Math.floor(d/7)).replace('{m}',Math.floor(d/30));
+}
+function placeTeleGreet(){
+  var el=TG&&TG.el,p=telescopeScreenPos();
+  if(!el||!p)return;
+  var gap=touchMode?10:12,pad=10,maxW=Math.min(220,(W||innerWidth||360)*.72);
+  var x=Math.max(pad+maxW*.5,Math.min((W||innerWidth)-pad-maxW*.5,p[0])),y=p[1]-gap;
+  y=Math.max(pad+36,Math.min((H||innerHeight)-pad,y));
+  el.style.left=Math.round(x)+'px';el.style.top=Math.round(y)+'px';
+}
+function teleGreetFollow(){if(TG&&TG.on)placeTeleGreet();}
+function teleGreetHide(){
+  var el=TG&&TG.el;if(!el||!TG.on)return;
+  clearTimeout(el._t);clearTimeout(el._type);TG.on=false;el.classList.remove('on');
+}
+function tgShow(msg){
+  var el=TG.el;if(!el)return;
+  clearTimeout(el._t);clearTimeout(el._type);
+  var short=msg.length<=24,txt=short?msg:teleWrapLines(msg,touchMode?24:28);
+  el.classList.toggle('tele-short',short);
+  el.textContent='';TG.on=true;placeTeleGreet();el.classList.add('on');
+  var hold=Math.min(7000,Math.max(3200,2200+msg.length*42));
+  teleTypeText(el,txt,function(){el._t=setTimeout(teleGreetHide,hold);},short?52:30);
+}
+function tgTrigger(gap,fresh){
+  if(TG.busy||!TG.el)return;
+  var now=Date.now(),msg=tgChoose(Math.max(0,gap),fresh,new Date().getHours(),now);
+  tgSave();
+  if(!msg)return;
+  TG.busy=true;
+  var t0=now,ready=0;
+  TG.poll=setInterval(function(){
+    if(Date.now()-t0>45000){clearInterval(TG.poll);TG.busy=false;return;}
+    var m=$('#secret-msg');
+    var ok=bootDone&&!document.hidden&&(TELESCOPE.sx||TELESCOPE.sy)&&!SW&&!document.body.classList.contains('tesseract-running')&&!(m&&m.classList.contains('on'));
+    if(!ok){ready=0;return;}
+    if(!ready){ready=Date.now();return;}
+    if(Date.now()-ready<1400)return;   /* teleskop sudah stabil di layar dulu, baru pop */
+    clearInterval(TG.poll);TG.busy=false;tgShow(msg);
+  },500);
+}
+(function(){
+  TG.el=$('#tele-greet');if(!TG.el)return;
+  var st=tgLoad(),now=Date.now(),gap=st.last?now-st.last:0;
+  st.last=now;
+  tgTrigger(gap,true);
+  document.addEventListener('visibilitychange',function(){
+    var s=tgLoad();
+    if(document.hidden){TG.hiddenAt=Date.now();s.last=TG.hiddenAt;tgSave();return;}
+    if(!TG.hiddenAt)return;
+    var g=Date.now()-TG.hiddenAt;TG.hiddenAt=0;s.last=Date.now();
+    if(g>=6*36e5)tgTrigger(g,false);else tgSave();
+  });
+  window.addEventListener('pagehide',function(){var s=tgLoad();s.last=Date.now();tgSave();});
+})();
+
+
+/* ---------- CLOCK TIME DILATION (Gargantua di-drag ke dekat jam) ----------
+   Makin dekat Gargantua ke #bh-clock, makin parah jam kena dilatasi: digit ter-scramble, kadang
+   ERR / RATE x0.xx, warna bergeser, dan jam berjalan lebih lambat (lag menumpuk).
+   Saat Gargantua balik ke home, level turun linear ~6.5 dtk dan jam "mengejar" waktu asli (decode pelan).
+   Nonaktif di reduced-motion, swallow, observe-mode, tesseract. Tanpa tracking, semua lokal. */
+var CLKD={k:0,lag:0,last:0,active:false,box:null,boxAt:0,rinf:0,txtAt:0,touchAt:0,kcss:-1};
+var CLK_GL='01#?%/|_-<>\u2588\u2592';
+function clkDist(b,px,py){
+  var cx=Math.max(b.left,Math.min(px,b.right)),cy=Math.max(b.top,Math.min(py,b.bottom));
+  return Math.hypot(px-cx,py-cy);
+}
+function clkScr(str,p){
+  if(p<=0)return str;
+  var o='',i,ch;
+  for(i=0;i<str.length;i++){
+    ch=str.charAt(i);
+    o+=(/[0-9A-Z]/.test(ch)&&Math.random()<p)?CLK_GL.charAt((Math.random()*CLK_GL.length)|0):ch;
+  }
+  return o;
+}
+function clkReset(el){
+  var C=CLKD;
+  C.active=false;C.k=0;C.lag=0;C.kcss=-1;
+  if(el){
+    el.classList.remove('clk-warp');el.style.removeProperty('--kw');el.style.opacity='';
+  }
+  tickClock(true);
+}
+function updateClockDilation(now){
+  var C=CLKD;if(!C)return;
+  var el=$('#bh-clock');if(!el)return;
+  var dt=Math.min(100,Math.max(0,now-(C.last||now)));C.last=now;
+  var b=document.body.classList;
+  if(reduce||SW||b.contains('observe-mode')||b.contains('tesseract-running')){
+    if(C.active||C.k>0||C.lag>0)clkReset(el);
+    return;
+  }
+  /* Kotak jam + radius pengaruh (di-cache; radius dibatasi 80% jarak home Gargantua -> di home efeknya pasti 0). */
+  if(!C.box||now-C.boxAt>400){
+    var r=el.getBoundingClientRect();
+    C.boxAt=now;
+    if(r.width>0&&r.height>0){
+      C.box=r;
+      var dh=clkDist(r,BH.hx,BH.hy);
+      C.rinf=Math.max(0,Math.min(Math.max(150,Math.min(W,H)*.5),dh*.8));
+    }else C.box=null;
+  }
+  var t=0;
+  if(C.box&&C.rinf>40&&!document.hidden){
+    var bp=camBH(),d=clkDist(C.box,bp[0],bp[1])-BH.R*skyZoom;
+    var u=Math.max(0,Math.min(1,1-d/C.rinf));
+    t=u*u*(3-2*u);
+  }
+  if(t>C.k)C.k+=(t-C.k)*Math.min(1,dt*.008);       /* naik cepat */
+  else C.k=Math.max(t,C.k-dt/6500);                  /* pulih linear ~6,5 dtk */
+  if(C.k<.004&&t===0)C.k=0;
+  if(C.k>.35)C.touchAt=Date.now();
+  /* Jam berjalan lebih lambat saat dilatasi (lag menumpuk), lalu mengejar saat k turun. */
+  C.lag+=dt*C.k*.85;
+  if(C.lag>45000)C.lag=45000;
+  C.lag-=C.lag*(1-C.k)*dt*.0006;
+  if(C.k===0&&C.lag<250)C.lag=0;
+  var on=C.k>.01||C.lag>=250;
+  if(!on){if(C.active)clkReset(el);return;}
+  if(!C.active){C.active=true;el.classList.add('clk-warp');}
+  var kq=Math.round(C.k*20)/20;
+  if(kq!==C.kcss){C.kcss=kq;el.style.setProperty('--kw',kq.toFixed(2));}
+  if(now-C.txtAt<(IS_POTATO?140:70))return;
+  C.txtAt=now;
+  var ch=el.children;
+  if(ch.length<3){tickClock(true);ch=el.children;if(ch.length<3)return;}
+  var k=C.k,tt=new Date(Date.now()-C.lag);
+  var days=['SUN','MON','TUE','WED','THU','FRI','SAT'],mons=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var h=tt.getUTCHours(),m=tt.getUTCMinutes(),s=tt.getUTCSeconds(),hh=h%12;if(hh===0)hh=12;
+  var time=(hh<10?'0':'')+hh+':'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s+' '+(h<12?'AM':'PM');
+  var date=days[tt.getUTCDay()]+' '+tt.getUTCDate()+' '+mons[tt.getUTCMonth()]+' '+(k>.5&&Math.random()<.7?'DILATED':'UTC');
+  var p=Math.pow(k,1.15)*.8;
+  if(k>.5&&Math.random()<(k-.5)*.45){
+    var q=Math.random();
+    time=q<.35?'--:--:-- --':(q<.65?'??:??:?? ??':(q<.85?'ERR:ERR:ERR':'RATE x'+Math.max(.05,1-.9*k).toFixed(2)));
+  }else time=clkScr(time,p);
+  ch[0].textContent=clkScr(date,p*.35);
+  ch[2].textContent=time;
+  var dx=(Math.random()*2-1)*k*2.2;
+  ch[2].style.textShadow=dx.toFixed(1)+'px 0 rgba(255,70,100,.75),'+(-dx).toFixed(1)+'px 0 rgba(90,230,255,.7),0 0 6px rgba(110,229,255,.24)';
+  ch[2].style.letterSpacing=(.045+(Math.random()-.5)*k*.12).toFixed(3)+'em';
+  el.style.opacity=Math.random()<k*.12?'.45':'';
+}
+
 $('#bh-clock').addEventListener('pointerdown',function(e){
   e.stopPropagation();var now=performance.now();
   if(now-utcReset>2200)utcClicks=0;
