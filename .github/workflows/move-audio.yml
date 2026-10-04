@@ -1,0 +1,37 @@
+name: Audio move helper
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "copy = salin .opus ke audio/ | cleanup = hapus .opus lama di root"
+        type: choice
+        options:
+          - copy
+          - cleanup
+        default: copy
+permissions:
+  contents: write
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy ke audio/
+        if: ${{ inputs.step == 'copy' }}
+        run: |
+          mkdir -p audio
+          cp ./*.opus audio/
+          git add audio
+      - name: Hapus .opus lama di root
+        if: ${{ inputs.step == 'cleanup' }}
+        run: |
+          for f in *.opus; do
+            [ -f "audio/$f" ] || { echo "audio/$f belum ada, dibatalkan"; exit 1; }
+          done
+          git rm -- ./*.opus
+      - name: Commit dan push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: audio ${{ inputs.step }}" || echo "tidak ada perubahan"
+          git push
