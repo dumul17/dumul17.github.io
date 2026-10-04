@@ -108,6 +108,9 @@ body.sw{pointer-events:none}
 #terminal{position:fixed;left:50%;bottom:74px;z-index:10;width:min(88vw,430px);padding:14px 16px;border:1px solid rgba(110,229,255,.38);background:rgba(3,8,12,.92);box-shadow:0 0 30px rgba(110,229,255,.12),inset 0 0 22px rgba(110,229,255,.035);font:11px/1.65 'Courier New',monospace;color:#8eeeff;opacity:0;transform:translate(-50%,18px);pointer-events:none;transition:opacity .35s,transform .35s}
 #terminal.on{opacity:1;transform:translate(-50%,0)}
 #terminal .term-title{color:#eaf6ff;letter-spacing:.14em}
+#terminal .term-body{max-height:46vh;overflow:hidden}
+#terminal .term-body div{white-space:pre-wrap;word-break:break-word}
+#terminal .term-warn{color:#ffb4c0}
 #terminal .cursor{display:inline-block;width:7px;height:12px;background:#6ee5ff;vertical-align:-2px;animation:blink .8s steps(1,end) infinite}
 @keyframes blink{50%{opacity:0}}
 .supernova-flash{position:fixed;inset:0;z-index:7;pointer-events:none;background:radial-gradient(circle at var(--sx) var(--sy),rgba(255,255,255,.98) 0,rgba(var(--sn-rgb),.82) 4%,rgba(var(--sn-rgb),.24) 13%,transparent 42%);opacity:0}

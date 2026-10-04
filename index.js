@@ -2086,6 +2086,7 @@ function showModeToast(text,kind,ms){
 
 function setObserveMode(on){
   OBSERVE_MODE=!!on;
+  if(typeof termNoteObserve==='function')termNoteObserve(OBSERVE_MODE);
   document.body.classList.toggle('observe-mode',OBSERVE_MODE);
   var btn=document.getElementById('mode-observe');
   if(btn){
@@ -6417,15 +6418,134 @@ if(window.PointerEvent){
   },{passive:true});
 }
 
+
+/* ---------- TERMINAL SESSION (klik jam 5x) ----------
+   Session counter lokal (localStorage dumul_term_v1), pool log berkategori + anti-repeat,
+   corruption meter (makin sering dibuka makin aneh), varian konteks (Observe Mode / rasi aktif).
+   Semua lokal, tanpa tracking server. */
+var TERM_KEY='dumul_term_v1',TERM_ST=null,TERM_RUN=false,TERM_OBS_AT=0,TERM_T=[];
+var TERM_DIST={orion:1344,virgo:250,canis:9,pleiades:444,taurus:65,bootes:37,scorpius:550};
+var TERM_POOL=[
+ ['SYSTEM','waking dormant process...'],['SYSTEM','render loop attached'],['SYSTEM','clock source: UTC'],
+ ['SYSTEM','checksum ....... unverified'],['SYSTEM','heartbeat irregular'],['SYSTEM','sky_cache rebuilt'],
+ ['SYSTEM','buffer drained, nothing lost'],['SYSTEM','no operator on record'],
+ ['OBSERVER','presence detected'],['OBSERVER','gaze vector: undefined'],['OBSERVER','observer count: 1 (assumed)'],
+ ['OBSERVER','input device: finger'],['OBSERVER','you are reading this'],['OBSERVER','attention: unmeasured'],
+ ['OBSERVER','observer is also being logged'],['OBSERVER','blink rate: unknown'],
+ ['MEMORY','fragment found'],['MEMORY','fragment unreadable'],['MEMORY','index rebuilt, 1 entry missing'],
+ ['MEMORY','recalled: someone, not here'],['MEMORY','read error at sector 0x4C'],['MEMORY','cache is older than system'],
+ ['MEMORY','overwritten by itself'],['MEMORY','restoring... restoring...'],
+ ['CAUSALITY','waiting...'],['CAUSALITY','effect precedes cause (minor)'],['CAUSALITY','event order: disputed'],
+ ['CAUSALITY','causal map ...... PARTIAL'],['CAUSALITY','which came first: the click?'],
+ ['CAUSALITY','no cause found for this log'],['CAUSALITY','timeline branch merged silently'],['CAUSALITY','reason pending'],
+ ['ANOMALY','telemetry stable, source unknown'],['ANOMALY','star count off by one'],['ANOMALY','light arrived before it left'],
+ ['ANOMALY','signal older than the sender'],['ANOMALY','ghost frame detected'],['ANOMALY','something moved. it was you.'],
+ ['ANOMALY','noise floor is listening'],['ANOMALY','subject/object ... NOT FOUND'],
+ ['OWL','owl.sys ........ ACTIVE'],['OWL','unregistered process: owl'],['OWL','perched, not parsed'],['OWL','owl.sys has never crashed'],
+ ['DUMUL','dumul.core ..... RESIDENT'],['DUMUL','playback head: elsewhere'],['DUMUL','with you / without you: both true'],
+ ['DUMUL','signal gap: one voice missing'],['DUMUL','glitch is not a bug. glitch is a track.'],['DUMUL','limerence index: stable']
+];
+var TERM_W={SYSTEM:3,OBSERVER:3,MEMORY:2,CAUSALITY:2,ANOMALY:1,OWL:.6,DUMUL:1};
+function termNoteObserve(on){TERM_OBS_AT=performance.now();}
+function termLoad(){
+  if(TERM_ST)return TERM_ST;
+  var o=null;try{o=JSON.parse(localStorage.getItem(TERM_KEY)||'null');}catch(e){}
+  if(!o||typeof o!=='object')o={};
+  TERM_ST={n:(o.n|0)||0,last:+o.last||0,recent:Array.isArray(o.recent)?o.recent.slice(-60):[]};
+  return TERM_ST;
+}
+function termSave(){try{localStorage.setItem(TERM_KEY,JSON.stringify(TERM_ST));}catch(e){}}
+function termPad(n,l){n=String(n);while(n.length<l)n='0'+n;return n;}
+function termCorrupt(s,c){
+  if(Math.random()>c*.45)return s;
+  var a=s.split(''),k=2+((Math.random()*4)|0),i,p;
+  for(i=0;i<k;i++){p=(Math.random()*a.length)|0;if(a[p]!==' ')a[p]='\u2588';}
+  return a.join('');
+}
+function termPick(k,st,c){
+  var cap=Math.max(12,(TERM_POOL.length*.35)|0),rec=st.recent,i,cand=[],out=[],cnt={},tot,r,j,e;
+  for(i=0;i<TERM_POOL.length;i++){
+    if(rec.indexOf(i)>=0)continue;
+    var w=TERM_W[TERM_POOL[i][0]]||1;
+    if(TERM_POOL[i][0]==='MEMORY'||TERM_POOL[i][0]==='ANOMALY')w+=c*3;
+    cand.push({i:i,w:w});
+  }
+  while(out.length<k&&cand.length){
+    tot=0;for(j=0;j<cand.length;j++)tot+=cand[j].w;
+    r=Math.random()*tot;
+    for(j=0;j<cand.length;j++){r-=cand[j].w;if(r<=0)break;}
+    if(j>=cand.length)j=cand.length-1;
+    e=cand.splice(j,1)[0];
+    var cat=TERM_POOL[e.i][0];
+    if((cnt[cat]|0)>=2)continue;
+    cnt[cat]=(cnt[cat]|0)+1;out.push(e.i);
+  }
+  for(i=0;i<out.length;i++)rec.push(out[i]);
+  while(rec.length>cap)rec.shift();
+  return out;
+}
+function termHeader(n,last){
+  var h=[],s='SESSION #'+termPad(n,3),lt=last?new Date(last).toISOString().substr(11,8)+' UTC':'UNKNOWN';
+  if(n>=30&&(n===30||Math.random()<.25))return ['> SESSION #???','> DATE: UNKNOWN','> TIME: UNKNOWN','> ...','> THIS IS NOT YOUR FIRST SESSION.'];
+  if(n===20)return ['> OBSERVER RETURNING','> ...','> ...','> WE WERE NOT EXPECTING YOU THIS EARLY.'];
+  if(n===1)return ['> ACCESSING SYSTEM...','> SESSION INITIALIZED','> FIRST CONTACT','> OBSERVER NOT RECOGNIZED','> LOGGING...'];
+  if(n<5)return ['> ACCESSING SYSTEM...','> ACCESS GRANTED','> PREVIOUS SESSION FOUND',s,'LAST OBSERVATION: '+lt,'OBSERVER: RETURNING'];
+  h=['> OBSERVER RETURNING','> MEMORY FRAGMENT FOUND',s];
+  if(n>=12)h.push('> MEMORY FRAGMENT: "you were here"');
+  return h;
+}
+function termContext(){
+  if(OBSERVE_MODE||(TERM_OBS_AT&&performance.now()-TERM_OBS_AT<90000))
+    return ['> OBSERVATION MODE: RESIDUAL TRACE','> ...','> YOU SHOULD NOT HAVE ACCESS TO THIS.'];
+  if(typeof ALIGN!=='undefined'&&ALIGN.cid){
+    var id=ALIGN.cid,nm=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[id]||id).toUpperCase(),d=TERM_DIST[id];
+    var o=['> TARGET: '+nm];
+    if(d){var ds=String(d).replace(/\B(?=(\d{3})+(?!\d))/g,',');o.push('> DISTANCE: ~'+ds+' LY','> SIGNAL AGE: ~'+ds+' YEARS');}
+    o.push('> OBSERVER: PRESENT','> TARGET: ABSENT');return o;
+  }
+  return null;
+}
+function termOpen(){
+  if(TERM_RUN)return;
+  var term=$('#terminal'),body=term&&term.querySelector('.term-body');if(!term||!body)return;
+  TERM_RUN=true;
+  var st=termLoad();st.n++;var prevLast=st.last;st.last=Date.now();
+  var c=Math.min(1,(st.n-1)/30),ctx=termContext();
+  var k=4+(Math.random()<.5?1:0)+(c>.5?1:0)+(Math.random()<c?1:0)-(ctx?2:0);
+  var picks=termPick(Math.max(2,k),st,c);
+  termSave();
+  var seq=[],i,hd=termHeader(st.n,prevLast),base=Date.now()%60000;
+  for(i=0;i<hd.length;i++)seq.push({t:hd[i],d:hd[i]==='> ...'?650:260});
+  if(ctx)for(i=0;i<ctx.length;i++)seq.push({t:ctx[i],d:ctx[i]==='> ...'?650:300,w:1});
+  for(i=0;i<picks.length;i++){
+    var p=TERM_POOL[picks[i]];base+=100+((Math.random()*800)|0);
+    var ts=termPad(((base/1000)|0)%60,2)+'.'+termPad(base%1000,3);
+    seq.push({t:'['+ts+'] '+p[0]+' :: '+termCorrupt(p[1],c),d:340+((Math.random()*300)|0),w:p[0]==='ANOMALY'});
+  }
+  seq.push({t:'> PROCESS COMPLETE',d:420},{t:'> RETURNING TO IDLE...',d:380});
+  body.textContent='';
+  var cur=document.createElement('div');cur.innerHTML='&gt; <span class="cursor"></span>';body.appendChild(cur);
+  term.classList.add('on');term.setAttribute('aria-hidden','false');
+  var at=0;TERM_T.forEach(clearTimeout);TERM_T=[];
+  seq.forEach(function(s){
+    at+=s.d;
+    TERM_T.push(setTimeout(function(){
+      var el=document.createElement('div');el.textContent=s.t;if(s.w)el.className='term-warn';
+      body.insertBefore(el,cur);
+      while(body.children.length>12)body.removeChild(body.firstChild);
+    },at));
+  });
+  TERM_T.push(setTimeout(function(){
+    term.classList.remove('on');term.setAttribute('aria-hidden','true');TERM_RUN=false;
+  },at+2800));
+}
+
 $('#bh-clock').addEventListener('pointerdown',function(e){
   e.stopPropagation();var now=performance.now();
   if(now-utcReset>2200)utcClicks=0;
   utcReset=now;utcClicks++;
   haptic(8);
-  if(utcClicks>=5){
-    utcClicks=0;var term=$('#terminal');term.classList.add('on');term.setAttribute('aria-hidden','false');
-    clearTimeout(term._t);term._t=setTimeout(function(){term.classList.remove('on');term.setAttribute('aria-hidden','true');},4200);
-  }
+  if(utcClicks>=5){utcClicks=0;termOpen();}
 },{passive:true});
 document.addEventListener('pointerdown',function(e){
   if(SW)return;
