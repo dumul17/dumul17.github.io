@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cache status — Dumul</title>
+<style>
+body{margin:0;padding:20px;background:#060b11;color:#dff6ff;font:15px/1.5 system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}p{margin:4px 0;color:#8fb3c4}
+ul{list-style:none;padding:0;margin:14px 0}
+li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #12202c}
+.ok{color:#6ee5ff}.no{color:#5a6b78}
+button{background:#6ee5ff;color:#060b11;border:0;border-radius:8px;padding:10px 14px;font-weight:600;margin-right:8px}
+#sum{font-weight:600;color:#6ee5ff}
+</style></head><body>
+<h1>Status cache lagu</h1>
+<p id="sw">Mengecek service worker…</p>
+<p id="sum"></p>
+<ul id="list"></ul>
+<p id="store"></p>
+<button onclick="precacheNow()">Unduh semua lagu</button>
+<button onclick="render()">Refresh</button>
+<button onclick="clearAudio()">Hapus cache lagu</button>
+<script>
+var EXPECTED=['constellation','glitch-instrumental','collapsars','rigel','spica','betelgeuse','sirius','pleione','aldebaran','arcturus','antares','limerence','glitch','nastenka','larung'];
+async function precacheNow(){
+  if(!confirm('Unduh semua lagu untuk offline? Total sekitar 30-60 MB.'))return;
+  var reg=await navigator.serviceWorker.ready;
+  reg.active.postMessage({type:'PRECACHE_AUDIO'});
+  document.getElementById('sw').textContent='Mengunduh semua lagu… (daftar update otomatis)';
+}
+if(navigator.serviceWorker)navigator.serviceWorker.addEventListener('message',function(e){
+  if(e.data&&(e.data.type==='AUDIO_CACHED'||e.data.type==='PRECACHE_DONE'))render();
+});
+function mb(b){return (b/1048576).toFixed(2)+' MB';}
+async function render(){
+  var sw=document.getElementById('sw');
+  if(!('caches' in window)){sw.textContent='Browser ini tidak mendukung Cache API.';return;}
+  var reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();
+  sw.textContent=reg&&navigator.serviceWorker.controller?'Service worker: aktif ✓':'Service worker: belum mengontrol halaman ini (reload sekali)';
+  var names=(await caches.keys()).filter(function(k){return k.indexOf('dumul-audio')===0;});
+  var found={},total=0;
+  for(var n=0;n<names.length;n++){
+    var c=await caches.open(names[n]);
+    var keys=await c.keys();
+    for(var i=0;i<keys.length;i++){
+      var r=await c.match(keys[i]);
+      var size=+r.headers.get('content-length')||(await r.clone().blob()).size;
+      var slug=new URL(keys[i].url).pathname.split('/').pop().replace(/\.[^.]+$/,'');
+      found[decodeURIComponent(slug)]=size;total+=size;
+    }
+  }
+  var ul=document.getElementById('list');ul.innerHTML='';
+  var all=EXPECTED.slice();Object.keys(found).forEach(function(s){if(all.indexOf(s)<0)all.push(s);});
+  all.forEach(function(s){
+    var li=document.createElement('li');
+    li.innerHTML='<span>'+s+'</span><span class="'+(found[s]?'ok':'no')+'">'+(found[s]?'✓ '+mb(found[s]):'belum')+'</span>';
+    ul.appendChild(li);
+  });
+  var cnt=Object.keys(found).length;
+  document.getElementById('sum').textContent=cnt+' lagu tersimpan • '+mb(total)+' (batas SW: 24 file)';
+  if(navigator.storage&&navigator.storage.estimate){
+    var e=await navigator.storage.estimate();
+    document.getElementById('store').textContent='Storage situs ini: '+mb(e.usage||0)+' dari kuota '+mb(e.quota||0);
+  }
+}
+async function clearAudio(){
+  var names=(await caches.keys()).filter(function(k){return k.indexOf('dumul-audio')===0;});
+  await Promise.all(names.map(function(k){return caches.delete(k);}));
+  render();
+}
+render();
+</script></body></html>

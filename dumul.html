@@ -421,10 +421,21 @@ function dmNeuralDraw(g,W,H,net,t){
 <script defer src="dumul.js?v=1"></script>
 <script type="module" src="dumul-app.js?v=1"></script>
 <script>
-/* PWA: daftar service worker + lapor lagu yang sudah didengar >50% biar disimpan buat revisit */
+/* PWA: daftar service worker, lapor lagu yang didengar >50%, dan simpan semua lagu di background */
 if ('serviceWorker' in navigator) {
+  var AUTO_PRECACHE = true;   /* false = matikan unduh otomatis semua lagu (sisa: simpan per lagu yang didengar) */
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    if (!AUTO_PRECACHE) return;
+    /* Tunggu 30 detik (pengunjung yang betah saja), dan hanya di koneksi non-seluler, bukan Data Saver */
+    setTimeout(function () {
+      var c = navigator.connection;
+      if (document.visibilityState !== 'visible') return;
+      if (!c || c.saveData || c.type === 'cellular' || !/4g/.test(c.effectiveType || '')) return;
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (reg.active) reg.active.postMessage({ type: 'PRECACHE_AUDIO' });
+      });
+    }, 30000);
   });
   (function () {
     var seen = new WeakSet(), sent = {};

@@ -3,7 +3,8 @@
    - CSS/JS/gambar/font      -> stale-while-revalidate
    - Audio (.opus dll)       -> kalau sudah tersimpan: dilayani dari cache lengkap dengan Range/206 (seek aman)
                                 kalau belum: diteruskan apa adanya ke network
-   - Lagu disimpan HANYA kalau halaman melapor "sudah didengar >50%" (message CACHE_AUDIO)
+   - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
+                          (b) halaman minta unduh semua lagu (PRECACHE_AUDIO)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
 const VERSION = 'v1';
 const AUDIO_VERSION = 'v1';
@@ -11,8 +12,15 @@ const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
 const AUDIO_CACHE = `dumul-audio-${AUDIO_VERSION}`;
 
-const MAX_AUDIO_FILES = 8;                 /* ~8 x 2-4 MB = sekitar 16-32 MB */
+const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (15 file, sekitar 30-60 MB) */
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
+
+/* Semua lagu situs ini. Urutan: yang dipakai boot index.html dulu, lalu lagu di dumul.html. */
+const ALL_AUDIO = [
+  'constellation', 'glitch-instrumental', 'collapsars',
+  'rigel', 'spica', 'betelgeuse', 'sirius', 'pleione', 'aldebaran', 'arcturus', 'antares',
+  'limerence', 'glitch', 'nastenka', 'larung'
+].map((n) => n + '.opus');
 
 /* Harus sama persis dengan yang dipanggil HTML (termasuk ?v=) */
 const SHELL = [
@@ -54,8 +62,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   const d = event.data;
-  if (d && d.type === 'CACHE_AUDIO' && typeof d.url === 'string') {
+  if (!d) return;
+  if (d.type === 'CACHE_AUDIO' && typeof d.url === 'string') {
     event.waitUntil(cacheAudio(d.url));
+  } else if (d.type === 'PRECACHE_AUDIO') {
+    event.waitUntil(precacheAll());
   }
 });
 
@@ -91,11 +102,17 @@ function audioKey(u) {
   return x.origin + x.pathname;
 }
 
+const inflight = new Set();
+let precaching = false;
+
 async function cacheAudio(rawUrl) {
+  let key = '';
   try {
     const url = new URL(rawUrl, self.location.href);
     if (url.origin !== self.location.origin || !MEDIA_RE.test(url.pathname)) return;
-    const key = audioKey(url.href);
+    key = audioKey(url.href);
+    if (inflight.has(key)) return;               /* sudah diunduh oleh jalur lain */
+    inflight.add(key);
     const cache = await caches.open(AUDIO_CACHE);
     if (await cache.match(key)) return;
 
@@ -104,11 +121,34 @@ async function cacheAudio(rawUrl) {
     const len = +res.headers.get('content-length') || 0;
     if (len > MAX_AUDIO_BYTES) return;
 
-    await cache.put(key, res);                   /* kalau koneksi putus di tengah, put gagal -> tidak ada file setengah jadi */
+    await cache.put(key, res);                   /* koneksi putus di tengah -> put gagal, tidak ada file setengah jadi */
 
     const keys = await cache.keys();             /* urutan = paling lama disimpan dulu */
     for (let i = 0; i < keys.length - MAX_AUDIO_FILES; i++) await cache.delete(keys[i]);
   } catch (err) { /* diam: ini cuma optimasi */ }
+  finally { if (key) inflight.delete(key); }
+}
+
+/* Unduh semua lagu satu per satu (tidak paralel, biar tidak menyaingi streaming yang sedang jalan) */
+async function precacheAll() {
+  if (precaching) return;
+  precaching = true;
+  try {
+    for (const f of ALL_AUDIO) {
+      await cacheAudio(new URL(f, self.registration.scope).href);
+      await notify({ type: 'AUDIO_CACHED', file: f });
+    }
+  } finally {
+    precaching = false;
+  }
+  await notify({ type: 'PRECACHE_DONE' });
+}
+
+async function notify(msg) {
+  try {
+    const cs = await self.clients.matchAll({ type: 'window' });
+    cs.forEach((c) => c.postMessage(msg));
+  } catch (e) {}
 }
 
 async function serveAudio(req, url) {
