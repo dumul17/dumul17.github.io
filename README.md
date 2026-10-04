@@ -46,6 +46,21 @@ DUMUL transition.
     on the 8 clickable SFX stars, a star-dust trail behind the cursor /
     touch colored by the active BGM, and **BGM ducking** (BGM drops to
     ~28% while a star SFX plays, then rises back after it ends)
+-   **Constellation Lock (minigame):** the 8 stellar SFX start locked.
+    Open Observation Mode → Constellation Camera, focus a constellation and
+    tap its stars in order (a yellow ring marks the next one; the SFX star is
+    always the last step). Only the final tap makes sound: it unlocks the
+    constellation, plays its SFX and shows an *ALIGNMENT COMPLETE* popup.
+    Orion unlocks **Betelgeuse + Rigel**; every other constellation unlocks
+    its single star. While locked, constellation lines are hidden and the
+    sky shows a pulse on each star plus an occasional light dot travelling in
+    alignment order (off on `IS_POTATO` / reduced motion, which keep one static
+    ring on the first star). Lines draw in as the unlock reward. **Pleiades**
+    has no lines, so it unlocks with a cross-sector chain in Camera mode:
+    Orion's belt (Alnitak → Alnilam → Mintaka), then switch focus to Taurus and
+    tap Aldebaran. Locked SFX rows in the Music HUD show a padlock and are
+    disabled; the two BGM loops are never locked. The Konami code unlocks
+    everything (without touching the Constellation Log).
 -   **Constellation Camera** with `1×–3×` zoom, pinch/wheel control, and
     two-finger sky rotation
 -   Mobile sky pan and rotation interactions
@@ -332,7 +347,11 @@ The site is configured for the user site **`dumul17.github.io`**.
     `sessionStorage` for short-lived audio and visual handoff state, and
     the Observatory also uses session state to shorten repeat-visit boot
     behavior. The DUMUL page keeps a small returning-visitor record in
-    `localStorage`. The Offline Archive banner stores the visitor's
+    `localStorage`. The Observatory keeps heard-state in `obs_stellar_v1` (StellarMem,
+    drives the Constellation Log) and unlocked constellations in `obs_unlock_v1`
+    (separate on purpose: *heard* is not *unlocked*). Unlocking asks the
+    service worker to save that constellation's `.opus` (`CACHE_AUDIO`); existing
+    cached audio is never cleared. The Offline Archive banner stores the visitor's
     choice in `localStorage` (`ofl_choice`), and saved tracks and the
     offline shell live in the browser's Cache Storage.
 

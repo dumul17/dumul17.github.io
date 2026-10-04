@@ -445,7 +445,7 @@ function drawFocusFx(now){
     }
     g.restore();return;
   }else{
-    var c=cons(id);if(!c){g.restore();return;}
+    var c=cons(id);if(!c||!isUnlocked(c.id)){g.restore();return;} /* rasi terkunci: garis belum boleh muncul */
     for(i=0;i<c.lines.length;i++){
       A=c.stars[c.lines[i][0]];B=c.stars[c.lines[i][1]];if(!A||!B)continue;
       var qa=gSky(A.x+c.ox,A.y+c.oy),qb=gSky(B.x+c.ox,B.y+c.oy);
@@ -1509,6 +1509,8 @@ function pauseMusicForSfx(){
 function playSfx(a){
   /* Star SFX no longer warms, loads, or auto-resumes constellation music. */
   if(!a)return;
+  /* Gembok: semua jalur (canvas, tombol #xxx-fx, panel musik) berakhir di sini. */
+  var lk=keyFromAudio(a);if(lk&&!isUnlocked(lk))return;
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   if(a.preload!=='auto'){a.preload='auto';}
   if(activeSfx===a){
@@ -1839,6 +1841,75 @@ var StellarMem={
 };
 StellarMem.load();
 
+/* ---------- UNLOCK (minigame lock) ----------
+   Terpisah dari StellarMem: "pernah didengar" (observed) != "sudah di-unlock".
+   Per rasi: Orion buka Betelgeuse + Rigel, rasi lain satu bintang SFX-nya.
+   Pengunjung lama mulai dari kosong (terkunci lagi); cache audio yang sudah tersimpan TIDAK disentuh. */
+var UNLOCK={
+  set:{},
+  storageKey:'obs_unlock_v1',
+  load:function(){
+    try{
+      var raw=localStorage.getItem(this.storageKey);
+      if(!raw)return;
+      var d=JSON.parse(raw);
+      if(d&&typeof d==='object'&&d.set&&typeof d.set==='object')this.set=d.set;
+    }catch(e){this.set={};}
+  },
+  save:function(){try{localStorage.setItem(this.storageKey,JSON.stringify({set:this.set}));}catch(e){}}
+};
+UNLOCK.load();
+var UNLOCK_CONS=['orion','virgo','canis','pleiades','taurus','bootes','scorpius'];
+/* key = kunci bintang SFX ('betel', 'rigel', ...) atau id rasi ('orion', ...) */
+function isUnlocked(key){
+  var cid=STELLAR_CONS[key]||key;
+  return !!(UNLOCK&&UNLOCK.set&&UNLOCK.set[cid]);
+}
+/* Kirim pesan ke service worker (sama pola dengan hook ">50% didengar" di index.html, hormati Data Saver / 2G). */
+function swPost(msg){
+  try{
+    if(!('serviceWorker' in navigator))return;
+    var c=navigator.connection;
+    if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return;
+    var ctl=navigator.serviceWorker.controller;
+    if(ctl){ctl.postMessage(msg);return;}
+    navigator.serviceWorker.ready.then(function(reg){if(reg&&reg.active)reg.active.postMessage(msg);}).catch(function(){});
+  }catch(e){}
+}
+/* Pas unlock: file .opus rasi itu ikut disimpan (SW nggak akan unduh ulang kalau sudah ada, dan nggak pernah menghapus). */
+function cacheUnlockedAudio(cid){
+  var keys=CONS_STARS[cid]||[];
+  for(var i=0;i<keys.length;i++){
+    var a=SFX[keys[i]];if(!a)continue;
+    var src=a.currentSrc||a.src;
+    if(src)swPost({type:'CACHE_AUDIO',url:src});
+  }
+}
+function unlock(cid){
+  if(UNLOCK_CONS.indexOf(cid)<0||UNLOCK.set[cid])return false;
+  UNLOCK.set[cid]={at:Date.now()};
+  UNLOCK.save();
+  var c=cons(cid);if(c)c._reveal=performance.now(); /* garis rasi digambar pelan-pelan sebagai reward */
+  cacheUnlockedAudio(cid);
+  renderStellarRecord();
+  return true;
+}
+function unlockAll(){
+  if(typeof ALIGN!=='undefined'&&ALIGN.cid)endAlignment(true);
+  var n=0;
+  for(var i=0;i<UNLOCK_CONS.length;i++)if(unlock(UNLOCK_CONS[i]))n++;
+  return n;
+}
+/* Tap bintang SFX yang masih terkunci: bisu, tapi kasih petunjuk (rate-limit biar nggak spam). */
+var _lockHintAt=0;
+function lockedHint(){
+  var n=performance.now();
+  if(n-_lockHintAt<2600)return;
+  _lockHintAt=n;
+  haptic(6);
+  if(typeof showModeToast==='function')showModeToast('SIGNAL LOCKED\nALIGN THE CONSTELLATION IN CAMERA MODE',null,2000);
+}
+
 function formatSrCount(){
   var n=StellarMem.count();
   return (n<10?'0':'')+n+' <span>/ 08</span>';
@@ -1861,9 +1932,18 @@ function renderStellarRecord(){
   for(var i=0;i<rows.length;i++){
     var row=rows[i],key=row.getAttribute('data-key');
     var on=!!(key&&StellarMem.isObserved(key));
+    var lk=!!(key&&!isUnlocked(key));
     row.classList.toggle('observed',on);
+    row.classList.toggle('locked',lk);
+    row.disabled=lk;
+    row.setAttribute('aria-disabled',lk?'true':'false');
     var obs=row.querySelector('.mp-obs');
-    if(obs){obs.textContent=on?'●':'○';obs.title=on?'Captured':'Unobserved';}
+    if(obs){
+      if(lk){
+        obs.innerHTML='<svg viewBox="0 0 10 12" aria-hidden="true"><rect x="1.2" y="5" width="7.6" height="6" rx="1.2"/><path d="M3 5V3.6a2 2 0 0 1 4 0V5"/></svg>';
+        obs.title='Locked';
+      }else{obs.textContent=on?'●':'○';obs.title=on?'Captured':'Unobserved';}
+    }
   }
   if(consEl){
     var cids=['orion','virgo','canis','pleiades','taurus','bootes','scorpius'];
@@ -1915,13 +1995,30 @@ function hideSignalFragment(){
   el.setAttribute('aria-hidden','true');
   clearTimeout(el._t);
 }
-function showConsArchive(cid){
+/* mode 'unlock' = popup congrats pas alignment selesai; default = popup ARCHIVED (Constellation Log).
+   Dua popup berbagi satu elemen, jadi yang datang pas lagi tampil ditunda sampai yang pertama selesai. */
+function showConsArchive(cid,mode){
   var el=document.getElementById('cons-archive');
   if(!el)return;
+  var t0=performance.now();
+  if(showConsArchive._until>t0){
+    setTimeout(function(){showConsArchive(cid,mode);},showConsArchive._until-t0+120);
+    return;
+  }
+  showConsArchive._until=t0+2900;
   var name=document.getElementById('ca-name');
   var sub=document.getElementById('ca-sub');
-  if(name)name.textContent=(CONS_LABELS[cid]||cid).toUpperCase();
-  if(sub)sub.textContent=(CONS_LABELS[cid]||cid).toUpperCase()+' // ARCHIVED';
+  var line=el.querySelector('.ca-line');
+  var lab=(CONS_LABELS[cid]||cid).toUpperCase();
+  if(name)name.textContent=lab;
+  if(mode==='unlock'){
+    var ks=CONS_STARS[cid]||[],nm=ks.map(function(k){return (STELLAR_LABELS[k]||k).toUpperCase();});
+    if(line)line.textContent='ALIGNMENT COMPLETE';
+    if(sub)sub.textContent=nm.join(' · ')+' // UNLOCKED';
+  }else{
+    if(line)line.textContent='PATTERN RECOGNIZED';
+    if(sub)sub.textContent=lab+' // ARCHIVED';
+  }
   el.classList.remove('on');
   void el.offsetWidth;
   el.classList.add('on');
@@ -2201,27 +2298,58 @@ var CF={active:null,current:[],target:[],lastNow:0};
 function cfInit(){for(var i=0;i<CONS.length;i++){CF.current[i]=.24;CF.target[i]=.24;}}
 cfInit();
 
-/* ---------- Constellation Alignment ---------- */
-var ALIGN={cid:null,seq:[],next:0,lit:null,dim:0,toastAt:0,last:0};
+/* ---------- Constellation Alignment (minigame lock) ----------
+   - Cuma jalan di Constellation Camera, kamera harus fokus ke rasi itu, dan cuma buat rasi yang MASIH terkunci.
+   - Bintang SFX jadi titik terakhir urutan. Langkah sebelumnya cuma dihitung (SFX diam);
+     langkah terakhir: unlock(cid) -> triggerSupernova -> popup.
+   - Pleiades nggak punya garis: alignment-nya lintas sektor (sabuk Orion -> Aldebaran), lihat PLE_CHAIN. */
+var ALIGN={cid:null,seq:[],next:0,lit:null,dim:0,toastAt:0,last:0,idle:15000};
+var PLE_CHAIN=[['orion','alnitak'],['orion','alnilam'],['orion','mintaka'],['taurus','aldebaran']];
+var ALIGN_IDLE_MS=15000,ALIGN_IDLE_CHAIN=30000;
 function secondaryFxScale(){
   if(ALIGN.cid)return 1;
   if(typeof CF!=='undefined'&&CF.active)return .78;
   return ALIGN.dim;
 }
+function camFocusId(){var f=FOCUS.list&&FOCUS.list[FOCUS.i];return f?f.id:null;}
+/* Bintang SFX milik sebuah rasi, urutan sesuai TRIGGERS (Orion: betel, rigel). */
+function sfxStarsOf(c){
+  var out=[];
+  for(var k in TRIGGERS){var t=TRIGGERS[k];if(t.cons===c.id&&t.cons!=='pleiades'&&c.stars[t.star])out.push(t.star);}
+  return out;
+}
+/* Urutan dari garis, tapi bintang SFX dikeluarkan lalu di-push ke paling akhir. */
 function alignmentSequence(c){
   if(!c||!c.lines)return [];
-  var order=[],seen={};
-  for(var i=0;i<c.lines.length;i++){
+  if(c._seq)return c._seq;
+  var order=[],seen={},i;
+  for(i=0;i<c.lines.length;i++){
     var a=c.lines[i][0],b=c.lines[i][1];
     if(!seen[a]){seen[a]=1;order.push(a);}
     if(!seen[b]){seen[b]=1;order.push(b);}
   }
-  return order;
+  var sfx=sfxStarsOf(c),rest=[];
+  for(i=0;i<order.length;i++)if(sfx.indexOf(order[i])<0)rest.push(order[i]);
+  for(i=0;i<sfx.length;i++)if(seen[sfx[i]])rest.push(sfx[i]);
+  c._seq=rest;
+  return rest;
 }
-var ALIGN_IDLE_MS=15000;
+/* 'lit' | 'next' | null untuk bintang k di rasi c, termasuk chain Pleiades (lintas rasi). */
+function alignMark(c,k){
+  if(!ALIGN.cid)return null;
+  if(ALIGN.cid==='pleiades'){
+    for(var i=0;i<PLE_CHAIN.length;i++){
+      if(PLE_CHAIN[i][0]===c.id&&PLE_CHAIN[i][1]===k)return i<ALIGN.next?'lit':(i===ALIGN.next?'next':null);
+    }
+    return null;
+  }
+  if(ALIGN.cid!==c.id)return null;
+  if(ALIGN.lit&&ALIGN.lit[k])return 'lit';
+  return ALIGN.seq[ALIGN.next]===k?'next':null;
+}
 function beginAlignment(c){
   if(!c)return;
-  ALIGN.cid=c.id;ALIGN.seq=alignmentSequence(c);ALIGN.next=0;ALIGN.lit=Object.create(null);ALIGN.dim=1;ALIGN.last=performance.now();
+  ALIGN.cid=c.id;ALIGN.seq=alignmentSequence(c);ALIGN.next=0;ALIGN.lit=Object.create(null);ALIGN.dim=1;ALIGN.last=performance.now();ALIGN.idle=ALIGN_IDLE_MS;
   document.body.classList.add('aligning'); /* UI lain ngalah: portal/teleskop/pleione pasif */
   if(typeof showModeToast==='function'&&performance.now()-ALIGN.toastAt>900){
     ALIGN.toastAt=performance.now();
@@ -2229,14 +2357,37 @@ function beginAlignment(c){
     showModeToast('ALIGNMENT · '+lab.toUpperCase()+'\nCONNECT THE STARS IN ORDER',null,2200);
   }
 }
+function beginPleChain(){
+  ALIGN.cid='pleiades';ALIGN.seq=[];ALIGN.next=0;ALIGN.lit=Object.create(null);ALIGN.dim=1;ALIGN.last=performance.now();ALIGN.idle=ALIGN_IDLE_CHAIN;
+  document.body.classList.add('aligning'); /* portal DUMUL di sabuk Orion ngalah selama chain, sama kayak alignment Orion */
+  if(typeof showModeToast==='function'&&performance.now()-ALIGN.toastAt>900){
+    ALIGN.toastAt=performance.now();
+    showModeToast('ALIGNMENT · PLEIADES\nORION BELT → ALDEBARAN',null,2200);
+  }
+}
 function endAlignment(ok){
   var cid=ALIGN.cid;ALIGN.cid=null;ALIGN.seq=[];ALIGN.next=0;ALIGN.lit=null;ALIGN.dim=ok?0:.35;
   document.body.classList.remove('aligning');return cid;
 }
-/* Alignment only starts when the first star of the sequence is tapped (so random taps never
-   dim the sky), restarts on that star, ignores wrong taps, and times out when idle. */
+/* Langkah terakhir: unlock -> SFX (kalau ada) -> popup. viaKey = kunci TRIGGERS yang dibunyikan. */
+function alignDone(cid,viaKey){
+  endAlignment(true);
+  unlock(cid);
+  tapFlash={until:performance.now()+1500,cons:cid}; /* garis yang baru muncul ikut menyala */
+  if(viaKey&&typeof triggerSupernova==='function')triggerSupernova(viaKey);
+  showConsArchive(cid,'unlock');
+  if(typeof haptic==='function')haptic(22);
+}
+/* Return: false = bukan langkah alignment (caller lanjut seperti biasa),
+           'step'  = langkah yang benar tapi belum terakhir (dihitung, SFX DIAM),
+           'done'  = langkah terakhir (unlock + SFX + popup sudah ditangani di sini). */
 function alignTapStar(c,starKey){
   if(!c||!starKey||!c.stars||!c.stars[starKey])return false;
+  if(!CAMERA_MODE)return false;                       /* alignment cuma di mode kamera */
+  var ch=pleChainTap(c,starKey);                      /* chain lintas sektor Pleiades */
+  if(ch)return ch;
+  if(isUnlocked(c.id))return false;                   /* sudah unlocked: nggak ada hint kuning / toast / dimming lagi */
+  if(camFocusId()!==c.id)return false;                /* kamera harus lagi fokus di rasi ini */
   var seq=alignmentSequence(c);if(!seq.length)return false;
   if(ALIGN.cid!==c.id){
     if(starKey!==seq[0])return false;
@@ -2251,16 +2402,11 @@ function alignTapStar(c,starKey){
     if(typeof haptic==='function')haptic(10);
     if(typeof tapFlash!=='undefined')tapFlash={until:performance.now()+520,cons:c.id};
     if(ALIGN.next>=ALIGN.seq.length){
-      var cid=endAlignment(true);
-      var lab=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[cid])?CONS_LABELS[cid]:cid;
-      if(typeof showModeToast==='function')showModeToast('CONSTELLATION ALIGNED\n'+String(lab).toUpperCase(),null,2400);
-      /* No free progress: only archive if the player already observed every star the normal way. */
-      if(typeof StellarMem!=='undefined'&&cid&&StellarMem.consComplete(cid)&&!StellarMem.isArchived(cid)&&StellarMem.markArchived(cid)){
-        setTimeout(function(){if(typeof showConsArchive==='function')showConsArchive(cid);if(typeof renderStellarRecord==='function')renderStellarRecord();},700);
-      }
-      if(typeof haptic==='function')haptic(22);
+      var tk=(TRIGGERS[starKey]&&TRIGGERS[starKey].cons===c.id)?starKey:null;
+      alignDone(c.id,tk);
+      return 'done';
     }
-    return true;
+    return 'step';
   }
   if(ALIGN.lit&&ALIGN.lit[starKey])return false; /* re-tap of an already lit star: ignore */
   /* Forgiving: a wrong / audio-trigger star tap is ignored (no reset). Progress is only lost
@@ -2268,20 +2414,63 @@ function alignTapStar(c,starKey){
   if(typeof haptic==='function')haptic(4);
   return false;
 }
+/* Pleiades cuma 1 bintang interaktif & nggak punya garis, jadi syaratnya alignment antar sektor di mode kamera:
+   sabuk Orion (Alnitak -> Alnilam -> Mintaka) dulu, lanjut Aldebaran (kamera pindah ke Taurus), baru Pleiades kebuka.
+   Chain cuma mulai dari Alnitak dengan kamera fokus Orion, jadi tap sabuk biasa (toggle portal DUMUL) di luar mode kamera
+   nggak keganggu. Selama chain jalan portal pasif (body.aligning) supaya tap Alnilam jatuh ke canvas, bukan ke tombol portal. */
+function pleChainTap(c,k){
+  if(UNLOCK.set.pleiades)return false;
+  if(ALIGN.cid&&ALIGN.cid!=='pleiades')return false;   /* alignment rasi lain lagi jalan */
+  var S=PLE_CHAIN,on=(ALIGN.cid==='pleiades'),first=S[0];
+  var isFirst=(c.id===first[0]&&k===first[1]);
+  if(!on){
+    if(!isFirst||camFocusId()!==first[0])return false;
+    beginPleChain();
+  }else if(isFirst&&ALIGN.next>0){
+    beginPleChain();                                   /* tap bintang pertama lagi = ulang */
+  }else if(!isFirst&&!(c.id===S[ALIGN.next][0]&&k===S[ALIGN.next][1])){
+    return false;                                      /* bukan bagian chain: biarkan jalur normal */
+  }
+  var w=S[ALIGN.next];
+  ALIGN.last=performance.now();
+  if(c.id===w[0]&&k===w[1]&&camFocusId()===w[0]){
+    ALIGN.next++;
+    if(typeof haptic==='function')haptic(10);
+    if(typeof tapFlash!=='undefined')tapFlash={until:performance.now()+520,cons:c.id};
+    if(ALIGN.next>=S.length){alignDone('pleiades','pleione');return 'done';}
+    if(ALIGN.next===S.length-1&&typeof showModeToast==='function')showModeToast('BELT LOCKED\nSHIFT CAMERA FOCUS TO TAURUS',null,2200);
+    return 'step';
+  }
+  if(typeof haptic==='function')haptic(4);             /* langkah benar tapi kamera belum di sektor yang tepat */
+  return false;
+}
 /* Bintang audio-trigger (Rigel, Betelgeuse, Sirius, Aldebaran, Arcturus, Antares) punya tombol
    DOM sendiri (#xxx-fx) yang nangkep tap sebelum handler canvas. Tanpa jembatan ini, tap di situ
-   cuma bunyiin SFX dan nggak pernah dihitung sebagai langkah alignment. */
+   cuma bunyiin SFX dan nggak pernah dihitung sebagai langkah alignment. Return = hasil alignTapStar. */
 function alignFx(key){
   try{
     var tr=(typeof TRIGGERS!=='undefined')?TRIGGERS[key]:null;
-    if(!tr||tr.cons==='pleiades')return;
-    var c=cons(tr.cons);if(!c)return;
-    alignTapStar(c,tr.star);
+    if(!tr||tr.cons==='pleiades')return false;
+    var c=cons(tr.cons);if(!c)return false;
+    return alignTapStar(c,tr.star);
   }catch(err){}
+  return false;
+}
+/* Handler tombol #xxx-fx: langkah alignment cuma dihitung; SFX cuma bunyi kalau bukan langkah alignment
+   (atau di langkah terakhir, yang sudah dibunyikan oleh alignTapStar). */
+function fxTap(key){
+  if(SW)return;
+  if(alignFx(key))return;
+  triggerSupernova(key);
 }
 function updateAlignmentDim(now){
   if(ALIGN.cid){
-    if(performance.now()-ALIGN.last>ALIGN_IDLE_MS){
+    var fid=camFocusId();
+    if(ALIGN.cid==='pleiades'&&fid!==updateAlignmentDim._f)ALIGN.last=performance.now(); /* pindah sektor = bagian dari chain */
+    updateAlignmentDim._f=fid;
+    if(!CAMERA_MODE||(ALIGN.cid!=='pleiades'&&fid!==ALIGN.cid)){
+      endAlignment(false);                             /* keluar kamera / pindah fokus: batal diam-diam */
+    }else if(performance.now()-ALIGN.last>(ALIGN.idle||ALIGN_IDLE_MS)){
       endAlignment(false);
       if(typeof showModeToast==='function')showModeToast('ALIGNMENT TIMED OUT',null,1400);
     }else{ALIGN.dim=1;return;}
@@ -2289,7 +2478,6 @@ function updateAlignmentDim(now){
   var floor=(typeof CF!=='undefined'&&CF.active)?.78:0;
   if(ALIGN.dim>floor)ALIGN.dim=Math.max(floor,ALIGN.dim-0.022);else ALIGN.dim=floor;
 }
-
 
 /* ---------- V5: constellation sweep -> individual star twinkle ----------
    Logic-only scanner. It uses the CURRENT screen positions of the active
@@ -4818,6 +5006,42 @@ function drawTriggerVisuals(now){
   });
 }
 
+/* Tampilan rasi terkunci. Efek cahaya (pulse + titik jalan) mati di IS_POTATO dan prefers-reduced-motion;
+   di mode itu cuma ada satu ring statis di bintang pertama biar pemain tahu mulai dari mana. */
+var LOCK_RGB='140,220,255';
+function drawLockedSignal(c,age,now,ox,oy,focus){
+  var seq=alignmentSequence(c),n=seq.length,i,s,q;
+  if(!n)return;
+  if(reduce||IS_POTATO){
+    s=c.stars[seq[0]];q=gSkyC(s.x+ox,s.y+oy,72);
+    if(q&&q[2]<1){g.strokeStyle='rgba('+LOCK_RGB+','+(.38*(1-.85*q[2]))+')';g.lineWidth=1;g.beginPath();g.arc(q[0],q[1],7,0,6.283);g.stroke();}
+    return;
+  }
+  var fa=.5+.5*focus;
+  /* pulse di tiap bintang (ring sabuk Orion dilewati: sudah dipakai portal DUMUL) */
+  for(i=0;i<n;i++){
+    var k=seq[i];
+    if(c.id==='orion'&&(k==='mintaka'||k==='alnilam'||k==='alnitak'))continue;
+    s=c.stars[k];
+    var a=clamp((age-s.t0)/.5);if(a<=0)continue;
+    q=gSkyC(s.x+ox,s.y+oy,72);if(!q||q[2]>=1)continue;
+    var ph=(now*.00055+s.ph*.159)%1;
+    drawRipple(q[0],q[1],s.r*1.2+3+9*ph,LOCK_RGB,.42*(1-ph)*a*fa*(1-.85*q[2]),false);
+  }
+  /* titik cahaya: sesekali jalan dari bintang ke bintang sesuai urutan sequence (SFX terakhir), lalu diam */
+  var hop=360,run=hop*(n-1),cyc=run+5200,t=(now+c.phase*1900)%cyc;
+  if(t>=run)return;
+  var idx=(t/hop)|0,u=(t-idx*hop)/hop;u=u*u*(3-2*u);
+  var A=c.stars[seq[idx]],B=c.stars[seq[idx+1]];
+  if(!A||!B||!cullSegAt(A.x+ox,A.y+oy,B.x+ox,B.y+oy))return;
+  var qd=gSky(A.x+(B.x-A.x)*u+ox,A.y+(B.y-A.y)*u+oy);
+  if(!qd||qd[2]>=1)return;
+  var kd=1-.85*qd[2];
+  g.save();g.globalCompositeOperation='lighter';
+  drawStarGlow(qd[0],qd[1],4.2,'190,235,255',.95*kd*fa);
+  g.fillStyle='rgba(255,255,255,'+(.9*kd)+')';g.beginPath();g.arc(qd[0],qd[1],1.5,0,6.283);g.fill();
+  g.restore();
+}
 function nebulaIn(x,y,r){var t=skyXF(x,y);CULL.tot++;if(cullIn(t[0],t[1],r)){CULL.drawn++;return true;}CULL.saved+=2;return false;}
 function drawCons(c,age,now){
   var tn=now-(TD.lag[c.id]||0); /* time-dilated clock */
@@ -4829,6 +5053,7 @@ function drawCons(c,age,now){
   if(now<glitchUntil){ox+=(Math.random()-.5)*7;oy+=(Math.random()-.5)*4;}
   if(OFX.pK>.01){ofxPull(c,now);ox+=OFX.px;oy+=OFX.py;} /* tarikan halus ke Gargantua */
   c.ox=ox;c.oy=oy;
+  var locked=!isUnlocked(c.id);
   var obr=ofxBreath(c.phase,now); /* napas rasi: -1..1 x kehadiran BGM Constellation */
   if(c.nebula){
     var na=clamp((age-c.delay-1.2)/1.5);
@@ -4838,12 +5063,16 @@ function drawCons(c,age,now){
       g.fillStyle=gr;g.beginPath();g.arc(nx,ny,nr,0,6.283);g.fill();}
   }
   g.lineCap='round';
+  /* Terkunci: garis disembunyikan, diganti pulse di tiap bintang + titik cahaya yang jalan sesuai urutan alignment. */
+  if(locked)drawLockedSignal(c,age,now,ox,oy,focus);
   /* Adaptive lens samples: few when far from BH; denser only near horizon.
      One sample pass per line — glow (if any) reuses the same points. */
-  var lines=c.lines,nLines=lines.length;
+  var lines=c.lines,nLines=locked?0:lines.length;
+  /* Reward pas unlock: garis digambar satu-satu dari waktu unlock (bukan dari boot). */
+  if(c._reveal!=null&&(reduce||now-c._reveal>lines.length*90+1400))c._reveal=null;
   for(var i=0;i<nLines;i++){
     var l=lines[i];
-    var p=clamp((age-c.delay-i*.28)/.8);if(p<=0)continue;p=1-Math.pow(1-p,3);
+    var p=(c._reveal!=null)?clamp(((now-c._reveal)/1000-i*.09)/.8):clamp((age-c.delay-i*.28)/.8);if(p<=0)continue;p=1-Math.pow(1-p,3);
     var a=c.stars[l[0]],b=c.stars[l[1]];
     var lineHot=(c._hot===i||(tapFlash.cons===c.id&&tapFlash.until>now));
     var mx=(a.x+b.x)*.5+ox,my=(a.y+b.y)*.5+oy;
@@ -4985,10 +5214,11 @@ function drawStars(c,age,now){
       drawStarGlow(x,y,r*(1+.14*sb),s.rgb,a*tw*(1+.3*sb));
       g.fillStyle='rgba(255,255,255,'+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
     }
-    if(typeof ALIGN!=='undefined'&&ALIGN.cid===c.id&&ALIGN.lit&&ALIGN.lit[k]){
+    var am=ALIGN.cid?alignMark(c,k):null;
+    if(am==='lit'){
       g.strokeStyle='rgba(110,229,255,'+(.55*a)+')';g.lineWidth=1;
       g.beginPath();g.arc(x,y,Math.max(3.2,r*2.1),0,6.283);g.stroke();
-    }else if(typeof ALIGN!=='undefined'&&ALIGN.cid===c.id&&ALIGN.seq[ALIGN.next]===k){
+    }else if(am==='next'){
       var hp=.5+.5*Math.sin(tn*.008);
       g.strokeStyle='rgba(255,226,140,'+((.45+.4*hp)*a)+')';g.lineWidth=1.1;
       g.beginPath();g.arc(x,y,Math.max(5,r*2.6)+2*hp,0,6.283);g.stroke();
@@ -5176,7 +5406,7 @@ function drawPulses(now,age){
   if(now>nextPU){nextPU=now+500+Math.random()*900;
     /* Pick any constellation (Orion / Virgo / Canis Major) so every figure gets line pulses */
     var c=CONS[(Math.random()*CONS.length)|0],l=c.lines[(Math.random()*c.lines.length)|0],f=Math.random()<.5;
-    PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});}
+    if(isUnlocked(c.id))PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});} /* terkunci = nggak ada garis buat dilewati pulse */
   for(var i=PU.length-1;i>=0;i--){
     var p=PU[i],u=(now-p.t)/p.d;if(u>1){PU.splice(i,1);continue;}
     if(p.shock){
@@ -5873,6 +6103,7 @@ var SN_COOLDOWN={};
   function selectAndPlay(i){
     var target=tracks[i];
     if(!target)return;
+    if(target.type==='sfx'&&!isUnlocked(target.key)){lockedHint(target.key);return;}
     if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){showModeToast('RADIO SILENCE\nAUDIO CHANNEL CLOSED','silence',1800);return;}
     var playingIdx=getPlayingTrackIndex();
 
@@ -5940,6 +6171,7 @@ var SN_COOLDOWN={};
 
 function triggerSupernova(key){
   if(SW)return;
+  if(!isUnlocked(key)){lockedHint(key);return;}
   var tr=TRIGGERS[key],
       c=tr&&tr.cons==='pleiades'?PLEIADES:(tr&&cons(tr.cons)),
       s=tr&&c&&(tr.cons==='pleiades'?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:c.stars[tr.star]);
@@ -6076,7 +6308,7 @@ function updateHover(px,py){
       var s=c.stars[k],q=gSky(s.x+c.ox,s.y+c.oy),d=Math.hypot(px-q[0],py-q[1]);
       if(d<Math.max(10,s.r*3.5)&&d<best){best=d;hit={c:c,star:k};}
     });
-    c.lines.forEach(function(l,i){
+    if(isUnlocked(c.id))c.lines.forEach(function(l,i){
       var a=c.stars[l[0]],b=c.stars[l[1]];
       var qa=gSky(a.x+c.ox,a.y+c.oy),qb=gSky(b.x+c.ox,b.y+c.oy);
       var ax=qa[0],ay=qa[1],bx=qb[0],by=qb[1];
@@ -6106,7 +6338,7 @@ document.addEventListener('pointerdown',function(e){
       var s=c.stars[k],q=gSky(s.x+c.ox,s.y+c.oy),d=Math.hypot(e.clientX-q[0],e.clientY-q[1]);
       var hr=Math.min(18,Math.max(13,s.r*4)); /* perilaku lama: cap 18px */
       /* Alignment: bintang target berikutnya dapet hit radius gede (mobile-friendly). */
-      var isNext=aligning&&ALIGN.cid===c.id&&ALIGN.seq[ALIGN.next]===k;
+      var isNext=aligning&&alignMark(c,k)==='next';
       if(isNext)hr=Math.max(26,s.r*8);
       /* Target berikutnya selalu menang kalau tap-nya masuk radiusnya, walau ada bintang lain yang lebih dekat. */
       if(d<hr&&(isNext||d<best)){hit={c:c,star:k};best=isNext?-1:d;}
@@ -6114,14 +6346,13 @@ document.addEventListener('pointerdown',function(e){
   });
   if(hit){
     tapFlash={until:now+420,cons:hit.c.id};
-    if(typeof alignTapStar==='function')alignTapStar(hit.c,hit.star);
-    if(hit.star==='betel'){triggerSupernova('betel');}
-    else if(hit.star==='rigel'){triggerSupernova('rigel');}
-    else if(hit.star==='spica'){triggerSupernova('spica');}
-    else if(hit.star==='sirius'){triggerSupernova('sirius');}
-    else if(hit.star==='aldebaran'){triggerSupernova('aldebaran');}
-    else if(hit.star==='arcturus'){triggerSupernova('arcturus');}
-    else if(hit.star==='antares'){triggerSupernova('antares');}
+    /* as: false = bukan langkah alignment; 'step' = langkah biasa (dihitung doang, SFX diam);
+       'done' = langkah terakhir (unlock + SFX + popup sudah ditangani di alignTapStar). */
+    var as=(typeof alignTapStar==='function')?alignTapStar(hit.c,hit.star):false;
+    var tk=(TRIGGERS[hit.star]&&TRIGGERS[hit.star].cons===hit.c.id)?hit.star:null; /* betel, rigel, spica, sirius, aldebaran, arcturus, antares */
+    if(tk){
+      if(!as)triggerSupernova(tk); /* terkunci -> bisu + hint (digate di triggerSupernova) */
+    }
     else {
       // Mainkan chime synthesizer kosmik untuk bintang biasa
       playStarChime(hit.c.stars[hit.star]);
@@ -6403,41 +6634,41 @@ document.addEventListener('wheel',function(e){
 var rgFx=$('#rigel-fx');
 rgFx.addEventListener('mouseenter',function(){hot='rigel';});
 rgFx.addEventListener('mouseleave',function(){if(hot==='rigel')hot=null;});
-rgFx.addEventListener('click',function(){if(!SW){alignFx('rigel');triggerSupernova('rigel');}});
+rgFx.addEventListener('click',function(){fxTap('rigel');});
 
 var btFx=$('#betel-fx');
 btFx.addEventListener('mouseenter',function(){hot='betel';});
 btFx.addEventListener('mouseleave',function(){if(hot==='betel')hot=null;});
-btFx.addEventListener('click',function(){if(!SW){alignFx('betel');triggerSupernova('betel');}});
+btFx.addEventListener('click',function(){fxTap('betel');});
 
 var srFx=$('#sirius-fx');
 srFx.addEventListener('mouseenter',function(){hot='sirius';});
 srFx.addEventListener('mouseleave',function(){if(hot==='sirius')hot=null;});
-srFx.addEventListener('click',function(){if(!SW){alignFx('sirius');triggerSupernova('sirius');}});
+srFx.addEventListener('click',function(){fxTap('sirius');});
 
 var plFx=$('#pleione-fx');
 if(plFx){
   plFx.addEventListener('mouseenter',function(){hot='pleione';});
   plFx.addEventListener('mouseleave',function(){if(hot==='pleione')hot=null;});
-  plFx.addEventListener('click',function(){if(!SW){alignFx('pleione');triggerSupernova('pleione');}});
+  plFx.addEventListener('click',function(){fxTap('pleione');});
 }
 var adFx=$('#aldebaran-fx');
 if(adFx){
   adFx.addEventListener('mouseenter',function(){hot='aldebaran';});
   adFx.addEventListener('mouseleave',function(){if(hot==='aldebaran')hot=null;});
-  adFx.addEventListener('click',function(){if(!SW){alignFx('aldebaran');triggerSupernova('aldebaran');}});
+  adFx.addEventListener('click',function(){fxTap('aldebaran');});
 }
 var arcFx=$('#arcturus-fx');
 if(arcFx){
   arcFx.addEventListener('mouseenter',function(){hot='arcturus';});
   arcFx.addEventListener('mouseleave',function(){if(hot==='arcturus')hot=null;});
-  arcFx.addEventListener('click',function(){if(!SW){alignFx('arcturus');triggerSupernova('arcturus');}});
+  arcFx.addEventListener('click',function(){fxTap('arcturus');});
 }
 var antFx=$('#antares-fx');
 if(antFx){
   antFx.addEventListener('mouseenter',function(){hot='antares';});
   antFx.addEventListener('mouseleave',function(){if(hot==='antares')hot=null;});
-  antFx.addEventListener('click',function(){if(!SW){alignFx('antares');triggerSupernova('antares');}});
+  antFx.addEventListener('click',function(){fxTap('antares');});
 }
 
 /* ---------- easter eggs ---------- */
@@ -6616,6 +6847,9 @@ function triggerKonami(){
   showSecret('SYSTEM OVERRIDE · DUMUL//OBSERVATORY',1800);
   konamiMeteors();
   konamiComet();
+  /* Cheat: buka semua gembok. markObserved sengaja TIDAK disentuh, biar Constellation Log tetap jujur. */
+  unlockAll();
+  showModeToast('ALL SIGNALS UNLOCKED',null,2400);
   clearTimeout(triggerKonami._t);
   triggerKonami._t=setTimeout(function(){document.body.classList.remove('konami');},(reduce||IS_POTATO||SW)?2100:5200);
 }
