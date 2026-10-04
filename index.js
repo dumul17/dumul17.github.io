@@ -6028,7 +6028,7 @@ function skyTwoDist(){
 function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
-  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#terminal,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -6505,41 +6505,111 @@ function termContext(){
   }
   return null;
 }
+var TERM_AT=0,TERM_TAIL=0,TERM_BODY=null,TERM_CUR=null,TERM_END=0,TERM_ASK=null,TERM_NOIN=0,TERM_TAPS=0,TERM_EXC=false,TERM_NOCLOSE=false;
+var TERM_PROMPTS=[
+ {q:'> WHY ARE YOU HERE?',a:['> INPUT RECEIVED','> "?"','> ACCEPTABLE.','> MOST OBSERVERS BEGIN WITH A QUESTION.']},
+ {q:'> ARE YOU STILL THERE?',a:['> INPUT RECEIVED','> "."','> YES. THAT IS ENOUGH.']},
+ {q:'> WHAT DO YOU SEE?',a:['> INPUT RECEIVED','> "..."','> INTERESTING.','> I SEE THE SAME.']}
+];
+function termEmit(text,d,cls,hold){
+  if(!TERM_RUN||!TERM_BODY)return;
+  var now=performance.now()-TERM_AT;
+  TERM_TAIL=Math.max(TERM_TAIL,now)+d;
+  var wait=TERM_TAIL-now,body=TERM_BODY,cur=TERM_CUR;
+  TERM_T.push(setTimeout(function(){
+    if(!TERM_RUN)return;
+    var el=document.createElement('div');el.textContent=text;if(cls)el.className=cls;
+    body.insertBefore(el,cur);
+    while(body.children.length>14)body.removeChild(body.firstChild);
+  },wait));
+  clearTimeout(TERM_END);
+  TERM_END=setTimeout(termClose,wait+(hold||2800));
+}
+function termClose(){
+  var term=$('#terminal');
+  term.classList.remove('on');term.setAttribute('aria-hidden','true');
+  TERM_RUN=false;TERM_ASK=null;clearTimeout(TERM_NOIN);
+  TERM_T.forEach(clearTimeout);TERM_T=[];
+}
+function termTail(){termEmit('> PROCESS COMPLETE',420);termEmit('> RETURNING TO IDLE...',380);}
+function termOwl(n){
+  if(Math.random()<.5){
+    termEmit('> SYSTEM PROCESS ........ ACTIVE',1900);termEmit('> OBSERVER .............. ACTIVE',500);termEmit('> OWL ................... ACTIVE',700,'term-owl',3400);
+    return;
+  }
+  termEmit('> ...',1700);termEmit('> ...',650);termEmit('> owl.sys has entered the session.',700,'term-owl');
+  termEmit('OWL :: why are you reading system logs',900,'term-owl');
+  termEmit('SYSTEM :: unauthorized process',800);
+  termEmit('OWL :: i live here',800,'term-owl');
+  termEmit('SYSTEM :: ...',900);
+  termEmit('OWL :: skill issue',700,'term-owl',3600);
+}
+function termTap(){
+  if(!TERM_RUN)return;
+  haptic(8);TERM_TAPS++;
+  if(TERM_ASK){
+    var p=TERM_ASK;TERM_ASK=null;clearTimeout(TERM_NOIN);
+    p.a.forEach(function(t,i){termEmit(t,i?520:260);});
+    termTail();return;
+  }
+  if(TERM_NOCLOSE)return;
+  if(TERM_TAPS===1){termEmit('> INPUT RECEIVED',220);return;}
+  if(TERM_TAPS>=6&&!TERM_EXC){
+    TERM_EXC=true;
+    termEmit('> INPUT RATE: EXCESSIVE',240,'term-warn');termEmit('> ...',650);termEmit('> YOU REALLY LIKE CLICKING THINGS.',420);
+  }
+}
 function termOpen(){
   if(TERM_RUN)return;
   var term=$('#terminal'),body=term&&term.querySelector('.term-body');if(!term||!body)return;
-  TERM_RUN=true;
+  TERM_RUN=true;TERM_BODY=body;TERM_TAPS=0;TERM_EXC=false;TERM_ASK=null;TERM_NOCLOSE=false;
   var st=termLoad();st.n++;var prevLast=st.last;st.last=Date.now();
-  var c=Math.min(1,(st.n-1)/30),ctx=termContext();
-  var k=4+(Math.random()<.5?1:0)+(c>.5?1:0)+(Math.random()<c?1:0)-(ctx?2:0);
-  var picks=termPick(Math.max(2,k),st,c);
+  var n=st.n,c=Math.min(1,(n-1)/30),ctx=termContext();
+  var mile=(n===7)||(n>7&&n<30&&n!==20&&Math.random()<.06);
+  var k=mile?1:4+(Math.random()<.5?1:0)+(c>.5?1:0)+(Math.random()<c?1:0)-(ctx?2:0);
+  var picks=termPick(Math.max(mile?1:2,k),st,c);
   termSave();
-  var seq=[],i,hd=termHeader(st.n,prevLast),base=Date.now()%60000;
-  for(i=0;i<hd.length;i++)seq.push({t:hd[i],d:hd[i]==='> ...'?650:260});
-  if(ctx)for(i=0;i<ctx.length;i++)seq.push({t:ctx[i],d:ctx[i]==='> ...'?650:300,w:1});
+  body.textContent='';
+  var cur=document.createElement('div');cur.innerHTML='&gt; <span class="cursor"></span>';body.appendChild(cur);TERM_CUR=cur;
+  term.classList.add('on');term.setAttribute('aria-hidden','false');
+  TERM_T.forEach(clearTimeout);TERM_T=[];clearTimeout(TERM_END);
+  TERM_AT=performance.now();TERM_TAIL=0;
+  var i,hd=mile?['> OBSERVER RETURNING','SESSION #'+termPad(n,3)]:termHeader(n,prevLast),base=Date.now()%60000;
+  for(i=0;i<hd.length;i++)termEmit(hd[i],hd[i]==='> ...'?650:260);
+  if(mile){
+    var W='term-warn';
+    termEmit('> SYSTEM STATUS: NOMINAL',420);termEmit('> ...',700);termEmit('> ...',700);
+    termEmit('> SYSTEM STATUS: OBSERVED',520,W);termEmit('> correcting...',620);
+    termEmit('> SYSTEM STATUS: OBSERVED',520,W);termEmit('> correcting...',620);
+    termEmit('> SYSTEM STATUS: OBSERVED',520,W);
+    termEmit('> ERROR: OBSERVER CANNOT BE EXCLUDED',950,W,3800);
+    TERM_NOCLOSE=true;
+    return;
+  }
+  if(ctx)for(i=0;i<ctx.length;i++)termEmit(ctx[i],ctx[i]==='> ...'?650:300);
   for(i=0;i<picks.length;i++){
     var p=TERM_POOL[picks[i]];base+=100+((Math.random()*800)|0);
     var ts=termPad(((base/1000)|0)%60,2)+'.'+termPad(base%1000,3);
-    seq.push({t:'['+ts+'] '+p[0]+' :: '+termCorrupt(p[1],c),d:340+((Math.random()*300)|0),w:p[0]==='ANOMALY'});
+    termEmit('['+ts+'] '+p[0]+' :: '+termCorrupt(p[1],c),340+((Math.random()*300)|0),p[0]==='ANOMALY'?'term-warn':(p[0]==='OWL'?'term-owl':''));
   }
-  seq.push({t:'> PROCESS COMPLETE',d:420},{t:'> RETURNING TO IDLE...',d:380});
-  body.textContent='';
-  var cur=document.createElement('div');cur.innerHTML='&gt; <span class="cursor"></span>';body.appendChild(cur);
-  term.classList.add('on');term.setAttribute('aria-hidden','false');
-  var at=0;TERM_T.forEach(clearTimeout);TERM_T=[];
-  seq.forEach(function(s){
-    at+=s.d;
-    TERM_T.push(setTimeout(function(){
-      var el=document.createElement('div');el.textContent=s.t;if(s.w)el.className='term-warn';
-      body.insertBefore(el,cur);
-      while(body.children.length>12)body.removeChild(body.firstChild);
-    },at));
-  });
-  TERM_T.push(setTimeout(function(){
-    term.classList.remove('on');term.setAttribute('aria-hidden','true');TERM_RUN=false;
-  },at+2800));
+  if(n>=2&&Math.random()<.3){
+    var q=TERM_PROMPTS[(Math.random()*TERM_PROMPTS.length)|0];
+    termEmit(q.q,520,'',7000);
+    var wait=TERM_TAIL-(performance.now()-TERM_AT);
+    TERM_ASK=q;
+    TERM_NOIN=setTimeout(function(){
+      if(!TERM_ASK||!TERM_RUN)return;
+      TERM_ASK=null;termEmit('> NO INPUT. ALSO A RESPONSE.',300);termTail();
+    },wait+4500);
+    return;
+  }
+  termTail();
+  if(n>=3&&Math.random()<.1)termOwl(n);
 }
-
+(function(){
+  var t=$('#terminal');if(!t)return;
+  t.addEventListener('pointerdown',function(e){e.stopPropagation();termTap();},{passive:true});
+})();
 $('#bh-clock').addEventListener('pointerdown',function(e){
   e.stopPropagation();var now=performance.now();
   if(now-utcReset>2200)utcClicks=0;

@@ -106,7 +106,8 @@ body.sw{pointer-events:none}
 #secret-msg.tele-short{white-space:nowrap;max-width:none;padding:5px 8px}
 #secret-msg.tele-wrap{white-space:pre-line;max-width:min(72vw,220px)}
 #terminal{position:fixed;left:50%;bottom:74px;z-index:10;width:min(88vw,430px);padding:14px 16px;border:1px solid rgba(110,229,255,.38);background:rgba(3,8,12,.92);box-shadow:0 0 30px rgba(110,229,255,.12),inset 0 0 22px rgba(110,229,255,.035);font:11px/1.65 'Courier New',monospace;color:#8eeeff;opacity:0;transform:translate(-50%,18px);pointer-events:none;transition:opacity .35s,transform .35s}
-#terminal.on{opacity:1;transform:translate(-50%,0)}
+#terminal.on{opacity:1;transform:translate(-50%,0);pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#terminal .term-owl{color:#ffd9a0}
 #terminal .term-title{color:#eaf6ff;letter-spacing:.14em}
 #terminal .term-body{max-height:46vh;overflow:hidden}
 #terminal .term-body div{white-space:pre-wrap;word-break:break-word}
