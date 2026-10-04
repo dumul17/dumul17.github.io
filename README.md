@@ -171,36 +171,36 @@ once its files (and, optionally, its music) have been cached.
 │
 ├── README.md
 │
-├── # Observatory stellar SFX
-├── betelgeuse.opus
-├── rigel.opus
-├── spica.opus
-├── sirius.opus
-├── pleione.opus
-├── aldebaran.opus
-├── arcturus.opus
-├── antares.opus
-│
-├── # Observatory / transition audio
-├── constellation.opus      # Observatory BGM
-├── collapsars.opus         # Observatory BGM
-├── glitch-instrumental.opus# Gargantua → DUMUL transition / album opening
-│
-├── # DUMUL album audio
-├── limerence.opus
-├── glitch.opus
-├── nastenka.opus
-├── larung.opus
+├── audio/                  # All .opus files live here (kept out of the root)
+│   ├── # Observatory stellar SFX
+│   ├── betelgeuse.opus
+│   ├── rigel.opus
+│   ├── spica.opus
+│   ├── sirius.opus
+│   ├── pleione.opus
+│   ├── aldebaran.opus
+│   ├── arcturus.opus
+│   ├── antares.opus
+│   ├── # Observatory / transition audio
+│   ├── constellation.opus      # Observatory BGM
+│   ├── collapsars.opus         # Observatory BGM
+│   ├── glitch-instrumental.opus# Gargantua → DUMUL transition / album opening
+│   ├── # DUMUL album audio
+│   ├── limerence.opus
+│   ├── glitch.opus
+│   ├── nastenka.opus
+│   └── larung.opus
 │
 ├── og.webp                 # Hero image used on both pages
 ├── og.jpg                  # DUMUL Open Graph image
 └── og-constellation.jpg    # Observatory Open Graph image
 ```
 
-Audio and image paths are relative to the HTML pages and are loaded
-directly by the JavaScript and CSS. Keep the assets in the same folder
-as the HTML files (the Open Graph images are referenced by absolute
-URL, so leave them at the site root). `service-worker.js` and
+Audio paths are relative to the HTML pages (`audio/<name>.opus`) and are
+built in `index.js` (`mkAudio`) and `dumul.js` (`srcOf`); the service
+worker lists them in `ALL_AUDIO`. Images stay beside the HTML files (the
+Open Graph images are referenced by absolute URL, so leave them at the
+site root). `service-worker.js` and
 `manifest.json` must also stay at the root so the service worker's scope
 covers both pages.
 
@@ -230,7 +230,7 @@ Notes:
     10 minutes. **Also update the same entry in the `SHELL` list of
     `service-worker.js`** and bump its `VERSION` so the old precached copy
     is dropped.
--   **Adding, renaming or removing a track:** update `ALL_AUDIO` in
+-   **Adding, renaming or removing a track:** put the file in `audio/`, then update `ALL_AUDIO` in
     `service-worker.js` and `SIZE_MB` in the banner script (both HTML
     files). If you replace an audio file's contents but keep its name,
     bump `AUDIO_VERSION` in `service-worker.js`; otherwise visitors who

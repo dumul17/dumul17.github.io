@@ -518,7 +518,7 @@ var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');
 var SFX={rigel:mkAudio('rigel.opus',.85,false,'metadata'),spica:mkAudio('spica.opus',.85,false,'metadata'),betel:mkAudio('betelgeuse.opus',.85,false,'metadata'),sirius:mkAudio('sirius.opus',.85,false,'metadata'),pleione:mkAudio('pleione.opus',.85,false,'metadata'),aldebaran:mkAudio('aldebaran.opus',.85,false,'metadata')};
 SFX.arcturus=mkAudio('arcturus.opus',.85,false,'metadata');
 SFX.antares=mkAudio('antares.opus',.85,false,'metadata');
-function mkAudio(name,vol,loop,preloadMode){var a=new Audio(encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;return a;}
+function mkAudio(name,vol,loop,preloadMode){var a=new Audio('audio/'+encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;return a;}
 function safePlay(a){
   if(!a)return false;
   try{
