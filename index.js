@@ -2418,13 +2418,22 @@ function alignTapStar(c,starKey){
    sabuk Orion (Alnitak -> Alnilam -> Mintaka) dulu, lanjut Aldebaran (kamera pindah ke Taurus), baru Pleiades kebuka.
    Chain cuma mulai dari Alnitak dengan kamera fokus Orion, jadi tap sabuk biasa (toggle portal DUMUL) di luar mode kamera
    nggak keganggu. Selama chain jalan portal pasif (body.aligning) supaya tap Alnilam jatuh ke canvas, bukan ke tombol portal. */
+var _beltHintAt=0;
+function beltHint(){
+  var n=performance.now();if(n-_beltHintAt<3000)return;_beltHintAt=n;
+  if(typeof showModeToast==='function')showModeToast('PLEIADES LOCKED\nSTART THE BELT AT ALNITAK',null,2200);
+}
 function pleChainTap(c,k){
   if(UNLOCK.set.pleiades)return false;
   if(ALIGN.cid&&ALIGN.cid!=='pleiades')return false;   /* alignment rasi lain lagi jalan */
   var S=PLE_CHAIN,on=(ALIGN.cid==='pleiades'),first=S[0];
   var isFirst=(c.id===first[0]&&k===first[1]);
   if(!on){
-    if(!isFirst||camFocusId()!==first[0])return false;
+    if(!isFirst){
+      if(c.id===first[0]&&(k==='alnilam'||k==='mintaka')&&camFocusId()===first[0]&&!ALIGN.cid)beltHint();
+      return false;
+    }
+    if(camFocusId()!==first[0])return false;
     beginPleChain();
   }else if(isFirst&&ALIGN.next>0){
     beginPleChain();                                   /* tap bintang pertama lagi = ulang */
@@ -5464,10 +5473,16 @@ function drawPortals(age,now){
     }
     if(na<=0)return;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid){p.el.classList.remove('mobile-show');return;}
+    /* Mode kamera: portal DUMUL dinonaktifin total (panel + tombol hit lewat CSS) supaya tap sabuk Orion
+       jatuh ke canvas buat chain Pleiades. Cincin sabuk cuma tersisa sebagai petunjuk selama Pleiades masih terkunci. */
+    if(CAMERA_MODE){
+      p.el.classList.remove('mobile-show');
+      if(UNLOCK.set.pleiades||camFocusId()!==p.cons)return;
+    }
     if(!p.el.classList.contains('on'))p.el.classList.add('on');
 
     /* Desktop always visible; mobile only when .mobile-show is toggled on. */
-    var isVisible=!(W<=600||document.body.classList.contains('touch-short'))||p.el.classList.contains('mobile-show');
+    var isVisible=!CAMERA_MODE&&(!(W<=600||document.body.classList.contains('touch-short'))||p.el.classList.contains('mobile-show'));
 
     /* Connector: only drawn while the portal panel is actually visible. */
     if(isVisible){
