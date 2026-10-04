@@ -3549,6 +3549,15 @@ function dmTransitionGraph(){
       if(!AV.sources.garg){
         AV.sources.garg=DM_TR_CTX.createMediaElementSource(GARG);
         AV.sources.garg.connect(DM_TR_AN);
+        /* FIX: analyser AV.an adalah tap murni (tidak tersambung ke destination kalau AV.lpf ada),
+           jadi GARG harus ikut disambung ke jalur keluar yang terdengar, sama seperti audioVizInit().
+           Tanpa ini, kalau user sempat tap bintang sebelum klik Gargantua, swallow-nya bisu. */
+        if(AV.lpf){
+          try{AV.sources.garg.connect(AV.lpf);}
+          catch(eG1){try{DM_TR_AN.connect(DM_TR_CTX.destination);AV._anOut=true;}catch(eG2){}}
+        }else if(!AV._anOut){
+          try{DM_TR_AN.connect(DM_TR_CTX.destination);AV._anOut=true;}catch(eG3){}
+        }
       }
     }else{
       DM_TR_CTX=new AC();
