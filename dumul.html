@@ -421,21 +421,10 @@ function dmNeuralDraw(g,W,H,net,t){
 <script defer src="dumul.js?v=1"></script>
 <script type="module" src="dumul-app.js?v=1"></script>
 <script>
-/* PWA: daftar service worker, lapor lagu yang didengar >50%, dan simpan semua lagu di background */
+/* PWA: daftar service worker + lapor lagu yang didengar >50% biar disimpan buat revisit */
 if ('serviceWorker' in navigator) {
-  var AUTO_PRECACHE = true;   /* false = matikan unduh otomatis semua lagu (sisa: simpan per lagu yang didengar) */
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('service-worker.js').catch(function () {});
-    if (!AUTO_PRECACHE) return;
-    /* Tunggu 30 detik (pengunjung yang betah saja), dan hanya di koneksi non-seluler, bukan Data Saver */
-    setTimeout(function () {
-      var c = navigator.connection;
-      if (document.visibilityState !== 'visible') return;
-      if (!c || c.saveData || c.type === 'cellular' || !/4g/.test(c.effectiveType || '')) return;
-      navigator.serviceWorker.ready.then(function (reg) {
-        if (reg.active) reg.active.postMessage({ type: 'PRECACHE_AUDIO' });
-      });
-    }, 30000);
   });
   (function () {
     var seen = new WeakSet(), sent = {};
@@ -460,6 +449,171 @@ if ('serviceWorker' in navigator) {
     };
   })();
 }
+</script>
+<script>
+/* Offline archive — banner opt-in (gaya HUD observatory). Teks & angka bisa diubah di TXT / SIZE_MB. */
+(function () {
+  if (!('serviceWorker' in navigator) || !('caches' in window)) return;
+  var SIZE_MB = 43;          /* perkiraan total ukuran semua lagu */
+  var ASK_AGAIN_DAYS = 14;   /* "NOT NOW" -> tanya lagi setelah sekian hari */
+  var KEY = 'ofl_choice';
+  var TXT = {
+    title: '> OFFLINE ARCHIVE',
+    ask: 'Save all {n} tracks (~{mb} MB) so the observatory keeps playing without signal?',
+    yes: 'SAVE ALL', no: 'NOT NOW',
+    sync: '> SYNCING {d}/{t}', syncNote: 'Runs in the background. Keep exploring.',
+    done: '> ARCHIVE SECURED', doneNote: 'Offline mode ready.',
+    part: '> SYNC INTERRUPTED', partNote: '{d}/{t} saved. Resumes on your next visit.'
+  };
+  var total = 0, cachedNow = 0, card = null, mode = '', watchdog = 0, hideT = 0, styled = false;
+
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function save(v) { try { localStorage.setItem(KEY, JSON.stringify({ v: v, t: Date.now() })); } catch (e) {} }
+  function net() {
+    var c = navigator.connection || {};
+    return { slow: !!(c.saveData || /(^|-)2g$/.test(c.effectiveType || '')), cell: c.type === 'cellular' };
+  }
+  function fmt(s, d) {
+    return s.replace('{n}', total).replace('{mb}', SIZE_MB).replace('{d}', d || 0).replace('{t}', total);
+  }
+  function q(sel) { return card.querySelector(sel); }
+  function visible() { return !!card && card.classList.contains('on'); }
+
+  function style() {
+    if (styled) return; styled = true;
+    var css = [
+      '#ofl-card{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:45;width:min(92vw,340px);box-sizing:border-box;padding:12px 14px;border:1px solid rgba(110,229,255,.30);border-radius:5px;background:rgba(2,8,13,.9);box-shadow:0 0 22px rgba(110,229,255,.12),inset 0 0 18px rgba(110,229,255,.04);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#cfeffa;font:12px/1.55 "Courier New",monospace;opacity:0;pointer-events:none;transform:translate(-50%,12px);transition:opacity .35s ease,transform .35s ease}',
+      '#ofl-card.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}',
+      'body.sw #ofl-card{opacity:0!important;pointer-events:none!important}',
+      '#ofl-card .ofl-t{color:#6ee5ff;font-weight:700;letter-spacing:.12em;font-size:12px;text-shadow:0 0 8px rgba(110,229,255,.55);padding-right:22px}',
+      '#ofl-card .ofl-p{margin-top:5px;font-size:11px;color:rgba(214,228,240,.74);letter-spacing:.02em}',
+      '#ofl-card .ofl-x{position:absolute;top:4px;right:6px;width:28px;height:28px;border:0;background:none;color:rgba(214,228,240,.55);font:18px/1 "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent}',
+      '#ofl-card .ofl-x:hover,#ofl-card .ofl-x:focus-visible{color:#6ee5ff}',
+      '#ofl-card .ofl-row{display:flex;gap:8px;margin-top:11px}',
+      '#ofl-card .ofl-b{flex:1;min-height:38px;border-radius:4px;font:700 11px "Courier New",monospace;letter-spacing:.14em;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}',
+      '#ofl-card .ofl-y{border:1px solid rgba(110,229,255,.55);background:rgba(110,229,255,.10);color:#6ee5ff}',
+      '#ofl-card .ofl-y:hover,#ofl-card .ofl-y:focus-visible{background:rgba(110,229,255,.18);box-shadow:0 0 12px rgba(110,229,255,.25)}',
+      '#ofl-card .ofl-n{border:1px solid rgba(214,228,240,.2);background:transparent;color:rgba(214,228,240,.7)}',
+      '#ofl-card .ofl-n:hover,#ofl-card .ofl-n:focus-visible{border-color:rgba(255,122,217,.55);color:#ff7ad9}',
+      '#ofl-card .ofl-bar{height:3px;margin-top:10px;background:rgba(110,229,255,.12);border-radius:2px;overflow:hidden}',
+      '#ofl-card .ofl-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6ee5ff,#ff7ad9);transition:width .4s ease}',
+      '#ofl-card[data-m="ask"] .ofl-bar{display:none}',
+      '#ofl-card:not([data-m="ask"]) .ofl-row{display:none}',
+      '@media (prefers-reduced-motion:reduce){#ofl-card,#ofl-card .ofl-bar i{transition:none}}'
+    ].join('');
+    var st = document.createElement('style');
+    st.textContent = css;
+    document.head.appendChild(st);
+  }
+
+  function build() {
+    if (card) return;
+    style();
+    card = document.createElement('div');
+    card.id = 'ofl-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-live', 'polite');
+    card.setAttribute('aria-label', 'Offline archive');
+    card.innerHTML =
+      '<button type="button" class="ofl-x" aria-label="Close">&times;</button>' +
+      '<div class="ofl-t"></div><div class="ofl-p"></div>' +
+      '<div class="ofl-bar"><i></i></div>' +
+      '<div class="ofl-row"><button type="button" class="ofl-b ofl-y"></button><button type="button" class="ofl-b ofl-n"></button></div>';
+    document.body.appendChild(card);
+    q('.ofl-x').addEventListener('click', function () { if (mode === 'ask') choose('later'); else hide(); });
+    q('.ofl-y').addEventListener('click', start);
+    q('.ofl-n').addEventListener('click', function () { choose('later'); });
+  }
+
+  function render(m, d) {
+    mode = m; build();
+    card.setAttribute('data-m', m);
+    var pct = total ? Math.round((d || 0) / total * 100) : 0;
+    if (m === 'ask') {
+      q('.ofl-t').textContent = TXT.title; q('.ofl-p').textContent = fmt(TXT.ask);
+      q('.ofl-y').textContent = TXT.yes; q('.ofl-n').textContent = TXT.no;
+    } else if (m === 'sync') {
+      q('.ofl-t').textContent = fmt(TXT.sync, d); q('.ofl-p').textContent = TXT.syncNote;
+      q('.ofl-bar i').style.width = pct + '%';
+    } else if (m === 'done') {
+      q('.ofl-t').textContent = TXT.done; q('.ofl-p').textContent = TXT.doneNote;
+      q('.ofl-bar i').style.width = '100%';
+    } else {
+      q('.ofl-t').textContent = TXT.part; q('.ofl-p').textContent = fmt(TXT.partNote, d);
+      q('.ofl-bar i').style.width = pct + '%';
+    }
+    clearTimeout(hideT);
+    requestAnimationFrame(function () { card.classList.add('on'); });
+  }
+  function hide() { if (card) card.classList.remove('on'); }
+  function hideSoon(ms) { clearTimeout(hideT); hideT = setTimeout(hide, ms); }
+  function choose(v) { save(v); hide(); }
+
+  function sendPrecache() {
+    navigator.serviceWorker.ready.then(function (reg) {
+      if (reg.active) reg.active.postMessage({ type: 'PRECACHE_AUDIO' });
+    });
+  }
+  function arm() {
+    clearTimeout(watchdog);
+    watchdog = setTimeout(function () {
+      if (mode === 'sync' && visible()) { render('part', cachedNow); hideSoon(4500); }
+    }, 90000);
+  }
+  function start() {
+    save('yes');
+    render('sync', cachedNow);
+    arm();
+    sendPrecache();
+  }
+
+  function onStatus(d) {
+    total = d.total; cachedNow = d.cached;
+    if (d.cached >= d.total) return;                 /* sudah lengkap: tidak perlu tanya */
+    var ch = load(), n = net();
+    if (ch && (ch.v === 'yes')) {                    /* pernah setuju: lanjutkan diam-diam */
+      if (!n.slow && !n.cell) sendPrecache();
+      return;
+    }
+    if (ch && ch.v === 'later' && Date.now() - ch.t < ASK_AGAIN_DAYS * 864e5) return;
+    if (n.slow) return;
+    if (document.visibilityState !== 'visible' || document.body.classList.contains('sw')) return;
+    render('ask');
+  }
+
+  navigator.serviceWorker.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || !d.type) return;
+    if (d.type === 'AUDIO_STATUS') { onStatus(d); return; }
+    if (d.type === 'AUDIO_CACHED') {
+      total = d.total || total; cachedNow = d.done;
+      if (mode === 'sync' && visible()) { render('sync', d.done); arm(); }
+      return;
+    }
+    if (d.type === 'PRECACHE_DONE') {
+      clearTimeout(watchdog);
+      total = d.total || total; cachedNow = d.ok;
+      if (mode === 'sync' && visible()) {
+        if (d.ok >= d.total) { render('done', d.ok); hideSoon(3500); }
+        else { render('part', d.ok); hideSoon(5000); }
+      }
+    }
+  });
+
+  function askStatus() {
+    navigator.serviceWorker.ready.then(function (reg) {
+      if (reg.active) reg.active.postMessage({ type: 'AUDIO_STATUS' });
+    });
+  }
+  function begin() {
+    var hasBoot = !!document.getElementById('boot-screen'), tries = 0;
+    (function wait() {
+      if (document.getElementById('boot-screen') && ++tries < 120) { setTimeout(wait, 500); return; }
+      setTimeout(askStatus, hasBoot ? 3000 : 8000);
+    })();
+  }
+  if (document.readyState === 'complete') begin(); else window.addEventListener('load', begin);
+})();
 </script>
 </body>
 </html>

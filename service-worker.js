@@ -4,7 +4,7 @@
    - Audio (.opus dll)       -> kalau sudah tersimpan: dilayani dari cache lengkap dengan Range/206 (seek aman)
                                 kalau belum: diteruskan apa adanya ke network
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
-                          (b) halaman minta unduh semua lagu (PRECACHE_AUDIO)
+                          (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
 const VERSION = 'v2';
 const AUDIO_VERSION = 'v1';
@@ -67,6 +67,8 @@ self.addEventListener('message', (event) => {
     event.waitUntil(cacheAudio(d.url));
   } else if (d.type === 'PRECACHE_AUDIO') {
     event.waitUntil(precacheAll());
+  } else if (d.type === 'AUDIO_STATUS') {
+    event.waitUntil(replyStatus(event.source));
   }
 });
 
@@ -102,46 +104,71 @@ function audioKey(u) {
   return x.origin + x.pathname;
 }
 
-const inflight = new Set();
+const inflight = new Map();
 let precaching = false;
 
-async function cacheAudio(rawUrl) {
-  let key = '';
+/* true = lagu ini sekarang ada di cache (sudah ada atau baru berhasil disimpan), false = gagal */
+function cacheAudio(rawUrl) {
+  let key;
   try {
     const url = new URL(rawUrl, self.location.href);
-    if (url.origin !== self.location.origin || !MEDIA_RE.test(url.pathname)) return;
+    if (url.origin !== self.location.origin || !MEDIA_RE.test(url.pathname)) return Promise.resolve(false);
     key = audioKey(url.href);
-    if (inflight.has(key)) return;               /* sudah diunduh oleh jalur lain */
-    inflight.add(key);
+  } catch (err) { return Promise.resolve(false); }
+  if (inflight.has(key)) return inflight.get(key);   /* jalur lain sedang mengunduh file yang sama */
+  const p = storeAudio(key).finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
+
+async function storeAudio(key) {
+  try {
     const cache = await caches.open(AUDIO_CACHE);
-    if (await cache.match(key)) return;
+    if (await cache.match(key)) return true;
 
     const res = await fetch(key);                /* tanpa Range -> 200 utuh */
-    if (!res.ok || res.status !== 200) return;
+    if (!res.ok || res.status !== 200) return false;
     const len = +res.headers.get('content-length') || 0;
-    if (len > MAX_AUDIO_BYTES) return;
+    if (len > MAX_AUDIO_BYTES) return false;
 
     await cache.put(key, res);                   /* koneksi putus di tengah -> put gagal, tidak ada file setengah jadi */
 
     const keys = await cache.keys();             /* urutan = paling lama disimpan dulu */
     for (let i = 0; i < keys.length - MAX_AUDIO_FILES; i++) await cache.delete(keys[i]);
-  } catch (err) { /* diam: ini cuma optimasi */ }
-  finally { if (key) inflight.delete(key); }
+    return true;
+  } catch (err) { return false; }                /* diam: ini cuma optimasi */
+}
+
+async function countCached() {
+  const cache = await caches.open(AUDIO_CACHE);
+  let n = 0;
+  for (const f of ALL_AUDIO) {
+    if (await cache.match(audioKey(new URL(f, self.registration.scope).href))) n++;
+  }
+  return n;
+}
+
+async function replyStatus(client) {
+  try {
+    if (client) client.postMessage({ type: 'AUDIO_STATUS', cached: await countCached(), total: ALL_AUDIO.length });
+  } catch (e) {}
 }
 
 /* Unduh semua lagu satu per satu (tidak paralel, biar tidak menyaingi streaming yang sedang jalan) */
 async function precacheAll() {
   if (precaching) return;
   precaching = true;
+  let ok = 0;
   try {
-    for (const f of ALL_AUDIO) {
-      await cacheAudio(new URL(f, self.registration.scope).href);
-      await notify({ type: 'AUDIO_CACHED', file: f });
+    for (let i = 0; i < ALL_AUDIO.length; i++) {
+      const good = await cacheAudio(new URL(ALL_AUDIO[i], self.registration.scope).href);
+      if (good) ok++;
+      await notify({ type: 'AUDIO_CACHED', file: ALL_AUDIO[i], done: ok, total: ALL_AUDIO.length });
     }
   } finally {
     precaching = false;
   }
-  await notify({ type: 'PRECACHE_DONE' });
+  await notify({ type: 'PRECACHE_DONE', ok: ok, total: ALL_AUDIO.length });
 }
 
 async function notify(msg) {
