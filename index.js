@@ -1099,13 +1099,18 @@ function showSecretSequence(){
     el._t=setTimeout(function(){el.classList.remove('on');el.classList.remove('tele-wrap');},hold);
   }, short?52:30);
 }
-function fadeTo(a,vol,ms){
+function fadeTo(a,vol,ms,opts){
+  opts=opts||{};
   clearInterval(a._f);var v0=a.volume,t0=performance.now();
-  if(vol>0&&a.paused)safePlay(a);
+  /* Only resume if the caller explicitly asks. Mute/unmute must not wake every paused track. */
+  if(opts.resume&&vol>0&&a.paused)safePlay(a);
   a._f=setInterval(function(){
     var u=Math.min(1,(performance.now()-t0)/ms),v=v0+(vol-v0)*u;
     a.volume=Math.max(0,Math.min(1,v));
-    if(u>=1){clearInterval(a._f);if(vol<=0)a.pause();}
+    if(u>=1){
+      clearInterval(a._f);
+      if(vol<=0&&opts.pause!==false)a.pause();
+    }
   },40);
 }
 var activeSfx=null;
@@ -2443,17 +2448,18 @@ function setRadioSilence(on){
       try{if(typeof setAVColor==='function')setAVColor(null,false);}catch(e3){}
       showModeToast('RADIO SILENCE\n─────────────\nAUDIO FADING OUT','silence',2200);
     }else{
-      /* Restore: fade volume back to each element's base (_bv) */
+      /* Restore ONLY channels that were actually playing when muted.
+         Never wake paused SFX / other BGM — that stacked every track. */
       for(i=0;i<list.length;i++){
         a=list[i];
         try{
           var bv=a._bv!=null?a._bv:.85;
-          if(a._silWas||a.paused||a.volume<.02){
-            if(typeof fadeTo==='function')fadeTo(a,bv,480);
-            else{a.volume=bv;}
-          }else if(a.volume<bv*.9){
-            if(typeof fadeTo==='function')fadeTo(a,bv,360);
-            else a.volume=bv;
+          if(a._silWas){
+            if(typeof fadeTo==='function')fadeTo(a,bv,480,{resume:true,pause:false});
+            else{a.volume=bv;if(a.paused)safePlay(a);}
+          }else{
+            /* leave paused tracks paused; just make sure leftover 0-volume isn't sticky if they play later */
+            if(a.volume<.02)a.volume=bv;
           }
           a._silWas=0;
         }catch(e4){}
@@ -6917,6 +6923,7 @@ document.addEventListener('pointerdown',function(e){
   function openOwl(){
     panel.classList.add('on');
     if(back)back.classList.add('on');
+    document.body.classList.add('owl-open');
     panel.setAttribute('aria-hidden','false');
     if(back)back.setAttribute('aria-hidden','false');
     btn.setAttribute('aria-expanded','true');
@@ -6925,6 +6932,7 @@ document.addEventListener('pointerdown',function(e){
   function closeOwl(){
     panel.classList.remove('on');
     if(back)back.classList.remove('on');
+    document.body.classList.remove('owl-open');
     panel.setAttribute('aria-hidden','true');
     if(back)back.setAttribute('aria-hidden','true');
     btn.setAttribute('aria-expanded','false');
@@ -6941,6 +6949,7 @@ document.addEventListener('pointerdown',function(e){
     },700);
     try{haptic(8);}catch(e){}
   }
+  function swallow(e){e.stopPropagation();}
   if(brand){
     brand.addEventListener('pointerdown',function(e){e.stopPropagation();brandGlitch();});
   }
@@ -6949,8 +6958,19 @@ document.addEventListener('pointerdown',function(e){
     if(panel.classList.contains('on'))closeOwl();else openOwl();
   });
   if(closeB)closeB.addEventListener('click',function(e){e.stopPropagation();closeOwl();});
-  if(back)back.addEventListener('click',function(){closeOwl();});
-  panel.addEventListener('click',function(e){e.stopPropagation();});
+  if(back){
+    back.addEventListener('pointerdown',swallow);
+    back.addEventListener('click',function(e){e.stopPropagation();closeOwl();});
+  }
+  /* Isolate panel: swallow pointer so sky / portals / hits underneath never receive the tap. */
+  ['pointerdown','pointerup','pointermove','click','touchstart','touchend'].forEach(function(ev){
+    panel.addEventListener(ev,swallow);
+  });
+  document.addEventListener('pointerdown',function(e){
+    if(!panel.classList.contains('on'))return;
+    if(panel.contains(e.target)||(btn&&btn.contains(e.target)))return;
+    if(back&&(e.target===back||back.contains(e.target)))return;
+  }, true);
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'&&panel.classList.contains('on'))closeOwl();
   });
