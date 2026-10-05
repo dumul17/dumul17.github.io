@@ -2751,16 +2751,16 @@ function playingSignalName(){
 var TD={rate:1,a:null,last:0,lag:{},f:1};
 function tdRelease(){
   if(TD.a){try{TD.a.playbackRate=1;}catch(e){}}
-  TD.a=null;TD.rate=1;TD.f=1;
+  TD.a=null;TD.rate=1;TD.ar=1;TD.f=1;
 }
 function updateTimeDilation(now){
   var dt=Math.min(50,Math.max(0,now-(TD.last||now)));TD.last=now;
   var cid=playingConstellationId(),a=cid?activeSfx:null;
   if(TD.a&&TD.a!==a)tdRelease();
   if(!a){return;}
-  if(TD.a!==a){TD.a=a;TD.rate=1;
+  if(TD.a!==a){TD.a=a;TD.rate=1;TD.ar=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
-  var gm=focusGeom(cid),target=1;
+  var gm=focusGeom(cid),target=1,miniBH=!!(SECT.cur&&SUM.on);   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
   if(gm&&BH.R>0&&BHSC>.05){
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
        moved off its home spot (idle = everything stays at normal speed). */
@@ -2776,7 +2776,10 @@ function updateTimeDilation(now){
   TD.f=target;
   /* frame-rate independent smoothing */
   TD.rate+=(target-TD.rate)*(1-Math.pow(.001,dt/1000));
-  if(Math.abs(a.playbackRate-TD.rate)>.004){try{a.playbackRate=TD.rate;}catch(e){}}
+  /* audio: di overview selalu normal; efek visual (lag) tetap ikut TD.rate */
+  TD.ar=(TD.ar==null?1:TD.ar);
+  TD.ar+=((miniBH?TD.rate:1)-TD.ar)*(1-Math.pow(.001,dt/1000));
+  if(Math.abs(a.playbackRate-TD.ar)>.004){try{a.playbackRate=TD.ar;}catch(e){}}
   if(!IS_POTATO)TD.lag[cid]=(TD.lag[cid]||0)+(1-TD.rate)*dt;
 }
 function updateConstellationFocus(now){
@@ -6134,7 +6137,12 @@ function sectToggle(){
 /* Soft proximity of summoned mini-BH to rasi/cluster mass. Continuous field, no hard edge. */
 function bhNearFactor(){
   if(!SECT.cur||!SUM.on||!W||!H)return 0;
-  var bx=BH.x,by=BH.y,i,cs,cx,cy,hw,hh,dx,dy,d,R,w,acc=0,wSum=0;
+  return bhNearAt(BH.x,BH.y);
+}
+/* Faktor kedekatan di titik (bx,by) ruang BH. Dipakai juga sumSpot() biar spot parkir dipilih pakai rumus yang SAMA dengan yang menentukan ukuran. */
+function bhNearAt(bx,by){
+  if(!SECT.cur||!W||!H)return 0;
+  var i,cs,cx,cy,hw,hh,dx,dy,d,R,w,acc=0,wSum=0;
   var field=Math.max(100,Math.min(W,H)*.42); /* outer soft influence */
   for(i=0;i<CONS.length;i++){
     cs=CONS[i];
@@ -6221,11 +6229,14 @@ function sumSpot(){
   if(sectShow('pleiades')&&PLEIADES.ready){
     PLEIADES.bright.forEach(function(z){q=skyXF(PLEIADES.x+z.x*PLEIADES.scale,PLEIADES.y+z.y*PLEIADES.scale);pts.push(q[0],q[1]);});
   }
-  var best=null,bs=-1,nx=14,ny=10;
+  var best=null,bs=1e9,nx=18,ny=13,zz=skyZoom||1,ccx=W*.5,ccy=H*.5;
   for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
     var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/Math.max(1,ny),md=1e9;
     for(k=0;k<pts.length;k+=2){var d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
-    if(md>bs){bs=md;best=[cx,cy];}
+    /* screen -> ruang BH (rumus sama dengan sumSet), lalu nilai pakai bhNearAt: makin kecil = makin kecil pula BH mini pas parkir */
+    var bxx=ccx+(cx-ccx)/zz-skyPan.x*BHK,byy=ccy+(cy-ccy)/zz-skyPan.y*BHK;
+    var sc=bhNearAt(bxx,byy)-Math.min(md,200)/2000;   /* tie-break: yang lebih jauh dari bintang menang */
+    if(sc<bs){bs=sc;best=[cx,cy];}
   }
   return best||[W*.5,H*.5];
 }
