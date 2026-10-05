@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=18">
+<link rel="stylesheet" href="index.css?v=21">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -84,7 +84,7 @@
   <div class="owl-brand">
     <h2 id="owl-panel-title" tabindex="0"><span class="kicker">Dumul's</span><span class="big">Observatory</span></h2>
     <p class="owl-sub">modder &amp; music composer</p>
-    <p class="owl-quote"><em>Keep creating, even without the applause.</em> 🦉</p>
+    <p class="owl-quote"><em>Keep creating, even without the applause.</em><span class="owl-q-emoji" aria-hidden="true"> 🦉</span></p>
   </div>
   <div class="owl-links">
     <a class="owl-link" href="https://www.youtube.com/@dumul17" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube">
@@ -130,7 +130,7 @@
 <button id="antares-fx" type="button" class="hit" aria-label="Putar suara Antares"></button>
 <div id="veil" aria-hidden="true"></div>
 <section id="music-player" aria-label="Music player" aria-hidden="true">
-  <div class="mp-head"><div><span class="mp-kicker">Dumul's Observatory</span><strong>Music Transmission</strong></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
+  <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker">Dumul's Observatory</span><div class="mp-title-row"><strong>Music Transmission</strong><button type="button" id="mode-silence" class="mp-silence" aria-pressed="false" aria-label="Radio Silence" title="Mute audio">🔊</button></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
   <div class="mp-scroll">
   <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/08</span></div>
   <div class="mp-tracks">
@@ -163,7 +163,6 @@
   <div class="ls-meta"><span id="ls-spec">—</span><span id="ls-dist">—</span></div>
 </div>
 <div id="mode-cluster">
-  <button type="button" id="mode-silence" aria-pressed="false" aria-label="Radio Silence" title="Radio Silence">🔊</button>
   <button type="button" id="mode-observe" aria-pressed="false" aria-label="Observation Mode" title="Observation Mode">👁️</button>
   <button type="button" id="mode-camera" aria-pressed="false" aria-label="Constellation Camera" title="Constellation Camera (Observation only)" hidden>📷</button>
   <button type="button" id="mode-sectors" aria-label="Back to sector overview" title="Back to overview">◎</button>
@@ -176,7 +175,7 @@
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
 <div id="sector-scan" aria-hidden="true">
-  <div class="ss-head"><span>SCAN</span><span class="ss-sec" id="ss-sec">SEC-01</span></div>
+  <div class="ss-head"><span>MAP</span><span class="ss-sec" id="ss-sec">—</span></div>
   <canvas id="sector-radar" width="168" height="168"></canvas>
   <div class="ss-stat" id="ss-draw">DRAW 0/0</div>
   <div class="ss-stat" id="ss-cull">CULL 0%</div>
@@ -198,7 +197,7 @@
   </nav>
   <p class="quote">I create what I love, even without applause.</p>
 </footer>
-<script defer src="index.js?v=37"></script>
+<script defer src="index.js?v=39"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
