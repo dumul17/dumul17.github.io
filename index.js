@@ -2932,7 +2932,26 @@ function fitTitle(){
 var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
 /* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
 var AST_SPRITES=null,AST_SPRITE_R=24;
-var bgCanvas=null,bgCtx=null,bgDirty=true;
+var bgCanvas=null,bgCtx=null,bgDirty=true,HUD=null;
+/* Tactical HUD (LAT/LON/AZ/EL): fixed ke layar, nggak ikut geser/zoom canvas. Vektor kecil, murah. */
+function drawHud(){
+  if(!HUD)return;
+  var m=HUD.m,len=HUD.len,t=HUD.top,b=H-HUD.bot;
+  g.save();
+  g.strokeStyle='rgba(110,229,255,0.22)';g.fillStyle='rgba(110,229,255,0.18)';g.lineWidth=1;
+  g.font='600 8px "Courier New",monospace';
+  g.beginPath();
+  g.moveTo(m,t+len);g.lineTo(m,t);g.lineTo(m+len,t);
+  g.moveTo(W-m-len,t);g.lineTo(W-m,t);g.lineTo(W-m,t+len);
+  g.moveTo(m,b-len);g.lineTo(m,b);g.lineTo(m+len,b);
+  g.moveTo(W-m-len,b);g.lineTo(W-m,b);g.lineTo(W-m,b-len);
+  g.stroke();
+  g.textBaseline='top';g.textAlign='left';g.fillText('[ LAT 00\u00b000\u2032N ]',m+4,t+4);
+  g.textAlign='right';g.fillText('[ LON 000\u00b000\u2032E ]',W-m-4,t+4);
+  g.textBaseline='bottom';g.textAlign='left';g.fillText('[ AZ 000\u00b0 ]',m+4,b-4);
+  g.textAlign='right';g.fillText('[ EL 00\u00b0 ]',W-m-4,b-4);
+  g.restore();
+}
 /* Astrophotography plate: deep layer (dust/band/galaxies) + mid layer (stars/HUD/grid), both baked offscreen. */
 var plateDeep=null,plateM=28,plateDPR=0;
 /* Dust depth layers: 2 transparent plates baked ONCE at low res, drifting on sine paths with
@@ -3090,35 +3109,11 @@ function bakeAstroPlates(){
       bgCtx.restore();
     }
   }
-    /* Observatory HUD corner reticles (static, zero runtime cost) */
+    /* Observatory HUD corner reticles: sengaja TIDAK di-bake ke bgCanvas (itu ikut parallax/pan/zoom).
+       Cuma hitung geometri di sini; digambar fixed di layar lewat drawHud() tiap frame. */
     (function(){
-      /* Responsive safe frame: keep corner HUD away from header/footer/logo
-         zones, especially on narrow portrait phones. */
-      var m=Math.max(10,Math.min(18,W*.035)),len=Math.min(22,Math.max(16,Math.min(W,H)*.055)),lw=1;
-      var topSafe=Math.max(44,Math.min(88,H*.105));
-      var bottomSafe=Math.max(42,Math.min(82,H*.105));
-      bgCtx.save();
-      bgCtx.strokeStyle='rgba(110,229,255,0.22)';
-      bgCtx.fillStyle='rgba(110,229,255,0.18)';
-      bgCtx.lineWidth=lw;
-      bgCtx.font='600 8px "Courier New",monospace';
-      bgCtx.textBaseline='top';
-      /* top-left */
-      bgCtx.beginPath();bgCtx.moveTo(m,topSafe+len);bgCtx.lineTo(m,topSafe);bgCtx.lineTo(m+len,topSafe);bgCtx.stroke();
-      bgCtx.fillText('[ LAT 00°00′N ]',m+4,topSafe+4);
-      /* top-right */
-      bgCtx.beginPath();bgCtx.moveTo(W-m-len,topSafe);bgCtx.lineTo(W-m,topSafe);bgCtx.lineTo(W-m,topSafe+len);bgCtx.stroke();
-      bgCtx.textAlign='right';
-      bgCtx.fillText('[ LON 000°00′E ]',W-m-4,topSafe+4);
-      /* bottom-left */
-      bgCtx.textAlign='left';bgCtx.textBaseline='bottom';
-      bgCtx.beginPath();bgCtx.moveTo(m,H-bottomSafe-len);bgCtx.lineTo(m,H-bottomSafe);bgCtx.lineTo(m+len,H-bottomSafe);bgCtx.stroke();
-      bgCtx.fillText('[ AZ 000° ]',m+4,H-bottomSafe-4);
-      /* bottom-right */
-      bgCtx.textAlign='right';
-      bgCtx.beginPath();bgCtx.moveTo(W-m-len,H-bottomSafe);bgCtx.lineTo(W-m,H-bottomSafe);bgCtx.lineTo(W-m,H-bottomSafe-len);bgCtx.stroke();
-      bgCtx.fillText('[ EL 00° ]',W-m-4,H-bottomSafe-4);
-      bgCtx.restore();
+      var m=Math.max(10,Math.min(18,W*.035)),len=Math.min(22,Math.max(16,Math.min(W,H)*.055));
+      HUD={m:m,len:len,top:Math.max(44,Math.min(88,H*.105)),bot:Math.max(42,Math.min(82,H*.105))};
     })();
 
     /* Equatorial RA/Dec grid — baked into bgCanvas, so it is redrawn only
@@ -3204,10 +3199,11 @@ function layout(){
      Koordinat scene = peta bintang referensi (kira-kira 1000x830, y ke bawah), lalu di-fit ke layar. */
   var SCN=(function(){
     var D=Math.PI/180,
-        def={orion:{k:.7738,th:6.01,tx:-26.01,ty:106.39},
+        def={/* Orion diputar -29.85° mengelilingi Alnilam (pv/at): sabuk sejajar garis Sirius→Aldebaran, Alnilam tetap di garis */
+             orion:{k:.7738,th:-23.84,pv:[492,651],at:[299.86,647.23]},
              taurus:{k:.7241,th:5.3,tx:312.95,ty:-58.3},
              canis:{k:.5417,th:4,pv:[445,316],at:[3.05,938.8]}},
-        PC=[745.1,209.9],PS=170,ids=['orion','taurus','canis'],pts=[],i,j,k2,c,f,p,st;
+        PC=[745.1,209.9],PS=140,ids=['orion','taurus','canis'],pts=[],i,j,k2,c,f,p,st;
     function mk(d){
       var cs=Math.cos(d.th*D)*d.k,sn=Math.sin(d.th*D)*d.k,tx=d.tx,ty=d.ty;
       if(d.pv){tx=d.at[0]-(cs*d.pv[0]-sn*d.pv[1]);ty=d.at[1]-(sn*d.pv[0]+cs*d.pv[1]);}
@@ -6276,15 +6272,17 @@ function drawSectorOverview(now,age){
   if(bb)bb.addEventListener('click',function(){sumSet(!SUM.on);});
   sectSet(true);
   try{if(window.__hub)window.__hub.sect=SECT;}catch(e){}
-  var SKIP='#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#boot-screen,#terminal,#signal-fragment';
+  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#boot-screen,#terminal,#signal-fragment';
+  function owlShut(){var bc=document.body.classList;return bc.contains('owl-open')||bc.contains('owl-block');}
   document.addEventListener('pointerdown',function(e){
+    if(owlShut()){SECT.down=null;return;} /* panel owl terbuka / baru ditutup: tap tidak boleh tembus ke ikon sektor (Virgo dll) */
     if(SECT.busy&&!(e.target.closest&&e.target.closest('#mode-cluster'))){e.stopPropagation();SECT.down=null;return;} /* animasi zoom: sentuhan diabaikan */
     if(!SECT.on||OBSERVE_MODE||SW||drag.on||(e.target.closest&&e.target.closest(SKIP))){SECT.down=null;return;}
     SECT.down={x:e.clientX,y:e.clientY,t:performance.now()};
   },true);
   document.addEventListener('pointerup',function(e){
     var d=SECT.down;SECT.down=null;
-    if(!d||!SECT.on||SECT.busy||SW||drag.on)return;
+    if(!d||owlShut()||!SECT.on||SECT.busy||SW||drag.on)return;
     var now=performance.now();
     if(now-d.t>420||Math.hypot(e.clientX-d.x,e.clientY-d.y)>10)return;
     var best=null,bd=Math.max(34,Math.min(30,W*.07)+14);
@@ -6358,6 +6356,7 @@ function frame(now){
         plateBlit(dl.c,pM,pW,pH,1+(skyZoom-1)*dl.zf,skyPan.x*dl.par+ddx,skyPan.y*dl.par+ddy);
       }
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      drawHud();
     }
     ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
     drawFloatingTelescope(now);
@@ -6989,6 +6988,22 @@ document.addEventListener('pointerdown',function(e){
   var closeB=document.getElementById('owl-close');
   var brand=document.getElementById('owl-panel-title');
   if(!btn||!panel)return;
+  /* Kilau jarang & acak: tunggu 20–60 dtk, itu pun 35% dilewati. Skip kalau tab hidden / panel kebuka / reduce-motion / device low-end. */
+  (function owlShine(){
+    if(reduce||IS_POTATO)return;
+    var t=0;
+    btn.addEventListener('animationend',function(){btn.classList.remove('shine');});
+    function arm(first){
+      clearTimeout(t);
+      t=setTimeout(function(){
+        var ok=!document.hidden&&!panel.classList.contains('on')&&Math.random()>.35;
+        if(ok){try{var cs=getComputedStyle(btn);if(cs.display==='none'||cs.visibility==='hidden'||+cs.opacity===0)ok=false;}catch(e){}}
+        if(ok){btn.classList.remove('shine');void btn.offsetWidth;btn.classList.add('shine');}
+        arm(false);
+      },first?(7000+Math.random()*8000):(20000+Math.random()*40000));
+    }
+    arm(true);
+  })();
   function openOwl(){
     panel.classList.add('on');
     if(back)back.classList.add('on');
@@ -7217,7 +7232,8 @@ function skyTwoDist(){
 function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
-  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#terminal,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
+  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#terminal,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -7562,7 +7578,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){

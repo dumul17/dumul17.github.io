@@ -108,6 +108,13 @@ body.sw{pointer-events:none}
 #owl-source{position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;width:34px;height:34px;display:grid;place-items:center;color:rgba(184,198,214,.46);text-decoration:none;border:1px solid rgba(110,229,255,.12);border-radius:50%;background:rgba(6,11,17,.32);backdrop-filter:blur(4px);cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:color .2s,border-color .2s,transform .2s,box-shadow .2s}
 #owl-source:hover,#owl-source:focus-visible,#owl-source[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.55);box-shadow:0 0 16px rgba(110,229,255,.16);transform:translateY(-1px)}
 #owl-source svg{width:19px;height:19px}
+/* Kilau sesekali di latar logo owl: cuma transform+opacity (compositor), di-trigger JS acak jarang-jarang, bukan loop terus-menerus */
+#owl-source{overflow:hidden}
+#owl-source::after{content:'';position:absolute;top:-25%;bottom:-25%;left:0;width:55%;pointer-events:none;opacity:0;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(190,245,255,.5) 50%,rgba(255,255,255,0) 100%);transform:translate3d(-130%,0,0) skewX(-18deg)}
+#owl-source.shine::after{animation:owlShine 1.05s ease-out 1 both}
+@keyframes owlShine{0%{opacity:0;transform:translate3d(-130%,0,0) skewX(-18deg)}18%{opacity:1}82%{opacity:1}100%{opacity:0;transform:translate3d(260%,0,0) skewX(-18deg)}}
+@media (prefers-reduced-motion:reduce){#owl-source::after{display:none}}
+.perf-tier-0 #owl-source::after{display:none}
 #owl-backdrop{position:fixed;inset:0;z-index:40;background:rgba(2,6,12,.55);opacity:0;pointer-events:none;transition:opacity .28s ease}
 #owl-backdrop.on{opacity:1;pointer-events:auto}
 #owl-panel{position:fixed;left:50%;top:50%;z-index:41;width:min(90vw,280px);max-width:calc(100vw - 24px);box-sizing:border-box;padding:14px 12px 12px;border:1px solid rgba(110,229,255,.32);border-radius:8px;background:rgba(2,8,13,.94);box-shadow:0 0 28px rgba(110,229,255,.14),inset 0 0 20px rgba(110,229,255,.04);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transform:translate(-50%,-46%) scale(.96);opacity:0;pointer-events:none;visibility:hidden;transition:opacity .3s ease,transform .32s cubic-bezier(.22,.7,.3,1),visibility 0s linear .32s}
