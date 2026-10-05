@@ -356,8 +356,8 @@ function setCameraMode(on){
     btn.setAttribute('aria-label',CAMERA_MODE?'Exit Constellation Camera':'Constellation Camera');
     btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   }
-  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;setSkyZoom(1,false);}
-  else{if(!FOCUS.list)FOCUS.list=focusList();FOCUS.i=0;}
+  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;setSkyZoom(1,false);FOCUS.list=null;}
+  else{FOCUS.list=focusList();FOCUS.i=0;}
   if(!CAMERA_MODE){FFX.id=null;hideWhisper();}
   focusUI();
   updateCamZoomUI();
@@ -369,11 +369,21 @@ function setCameraMode(on){
 }
 /* ---------- Constellation Camera: focus targets (tap to lock + auto-fit zoom) ---------- */
 var FOCUS={i:0,anim:false,list:null};
+/* Per-sector focus order (display names use brightest star for canis/scorpius).
+   Orion: Free → Sirius → Orion → Taurus → Pleiades
+   Virgo: Free → Antares → Boötes → Virgo */
 function focusList(){
-  var nm={orion:'Orion',taurus:'Taurus',virgo:'Virgo',canis:'Canis Major',bootes:'Boötes',scorpius:'Scorpius'};
-  var L=[{id:'free',n:'Free'},{id:'bh',n:'Gargantua'}];
-  CONS.forEach(function(c){if(sectShow(c.id))L.push({id:c.id,n:nm[c.id]||c.id});});
-  if(sectShow('pleiades'))L.push({id:'pleiades',n:'Pleiades'});
+  var nm={orion:'Orion',taurus:'Taurus',virgo:'Virgo',canis:'Sirius',bootes:'Boötes',scorpius:'Antares',pleiades:'Pleiades'};
+  var order;
+  if(SECT.cur&&SECT.cur.k==='orion') order=['canis','orion','taurus','pleiades'];
+  else if(SECT.cur&&SECT.cur.k==='virgo') order=['scorpius','bootes','virgo'];
+  else order=['canis','orion','taurus','pleiades','scorpius','bootes','virgo'];
+  var L=[{id:'free',n:'Free'}];
+  for(var i=0;i<order.length;i++){
+    var id=order[i];
+    if(id==='pleiades'){if(sectShow('pleiades'))L.push({id:'pleiades',n:nm.pleiades});}
+    else if(sectShow(id))L.push({id:id,n:nm[id]||id});
+  }
   return L;
 }
 /* Free band of screen between the caption panel (top) and the CAM controls (bottom). */
@@ -2343,7 +2353,7 @@ function setObserveMode(on){
     if(!OBSERVE_MODE){
       CAMERA_MODE=false;
       document.body.classList.remove('camera-mode');
-      FFX.id=null;hideWhisper();FOCUS.i=0;FOCUS.anim=false;
+      FFX.id=null;hideWhisper();FOCUS.i=0;FOCUS.anim=false;FOCUS.list=null;
       camBtn.classList.remove('on');
       camBtn.setAttribute('aria-pressed','false');
       camBtn.title='Constellation Camera';
@@ -6110,11 +6120,16 @@ function sectStep(now){
       SECT.flash=now;SECT.cur=s;SECT.phase='sec';SECT.busy=false;
       skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
       sectSet(false);
+      try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
       try{syncSkyPanHits();}catch(e){}
     }
   }else if(SECT.phase==='out'){
     sectApply(s,1-sectEase(u));
-    if(u>=1){SECT.busy=false;SECT.phase='ov';skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;try{syncSkyPanHits();}catch(e){}}
+    if(u>=1){
+      SECT.busy=false;SECT.phase='ov';skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
+      try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;}catch(eF){}
+      try{syncSkyPanHits();}catch(e){}
+    }
   }
 }
 function drawSectFlash(now){
@@ -6887,11 +6902,51 @@ document.addEventListener('pointerdown',function(e){
     scatterAsteroid(ai,e.clientX,e.clientY);
   }
 },{passive:false});
-$('#title').addEventListener('pointerdown',function(){
-  if(SW)return;
-  var h=this;h.classList.remove('gl');void h.offsetWidth;h.classList.add('gl');
-  glitchUntil=performance.now()+650;clearTimeout(h._t);h._t=setTimeout(function(){h.classList.remove('gl');},700);
-});
+/* Header title glitch removed — branding lives in #owl-panel only. */
+/* ---------- Owl about panel ---------- */
+(function(){
+  var btn=document.getElementById('owl-source');
+  var panel=document.getElementById('owl-panel');
+  var back=document.getElementById('owl-backdrop');
+  var closeB=document.getElementById('owl-close');
+  var brand=document.getElementById('owl-panel-title');
+  if(!btn||!panel)return;
+  function openOwl(){
+    panel.classList.add('on');
+    if(back)back.classList.add('on');
+    panel.setAttribute('aria-hidden','false');
+    if(back)back.setAttribute('aria-hidden','false');
+    btn.setAttribute('aria-expanded','true');
+    try{haptic(8);}catch(e){}
+  }
+  function closeOwl(){
+    panel.classList.remove('on');
+    if(back)back.classList.remove('on');
+    panel.setAttribute('aria-hidden','true');
+    if(back)back.setAttribute('aria-hidden','true');
+    btn.setAttribute('aria-expanded','false');
+  }
+  /* Panel-only brand glitch (CSS owlGl/owlGk) — does NOT set global glitchUntil / sky shake */
+  function brandGlitch(){
+    if(!brand||typeof SW!=='undefined'&&SW)return;
+    brand.classList.remove('gl');void brand.offsetWidth;brand.classList.add('gl');
+    clearTimeout(brand._t);brand._t=setTimeout(function(){brand.classList.remove('gl');},700);
+    try{haptic(8);}catch(e){}
+  }
+  if(brand){
+    brand.addEventListener('pointerdown',function(e){e.stopPropagation();brandGlitch();});
+  }
+  btn.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    if(panel.classList.contains('on'))closeOwl();else openOwl();
+  });
+  if(closeB)closeB.addEventListener('click',function(e){e.stopPropagation();closeOwl();});
+  if(back)back.addEventListener('click',function(){closeOwl();});
+  panel.addEventListener('click',function(e){e.stopPropagation();});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&panel.classList.contains('on'))closeOwl();
+  });
+})();
 var bhA=$('#bh');
 bhA.addEventListener('mouseenter',function(){hot='bh';});
 bhA.addEventListener('mouseleave',function(){if(hot==='bh')hot=null;});
