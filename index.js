@@ -1650,8 +1650,7 @@ function drawAudioVisualizerBars(now,R){
    the instant a star SFX takes over, so the two systems never fight. */
 var musicForceStop=null;
 function pauseMusicForSfx(){
-  /* BGM lagi bunyi -> turunin volumenya (duck) alih-alih pause; naik lagi pas SFX selesai. */
-  if(ofxDuckBgm())return;
+  /* Pause BGM while star SFX plays (ducking removed — volume control is only via 🔊/🔈). */
   safePause(AMB);
   safePause(MUSIC_COLLAP);
   if(typeof musicForceStop==='function'){
@@ -2472,7 +2471,7 @@ function setRadioSilence(on){
   var obs=document.getElementById('mode-observe');
   var sil=document.getElementById('mode-silence');
   if(obs)obs.addEventListener('click',function(){setObserveMode(!OBSERVE_MODE);haptic(10);});
-  if(sil)sil.addEventListener('click',function(){setRadioSilence(!RADIO_SILENCE);haptic(10);});
+  if(sil)sil.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();setRadioSilence(!RADIO_SILENCE);haptic(10);});
   var cam=document.getElementById('mode-camera');
   if(cam){
     cam.hidden=true;
@@ -5994,62 +5993,10 @@ if(!reduce&&!IS_POTATO){
     ofxSpawnDust(e.clientX,e.clientY,3);
   },{passive:true});
 }
-/* ---------- Ducking BGM saat SFX bintang ----------
-   BGM turun ke ~28% volume (220 ms), SFX main, lalu BGM naik pelan (1 dtk) setelah SFX selesai/dijeda.
-   Pakai timer sendiri (bukan RAF) supaya tetap jalan walau tab hidden. Kalau browser tidak mengizinkan
-   ubah volume (iOS Safari), atau IS_POTATO, atau Radio Silence/swallow -> perilaku lama (BGM di-pause). */
-var OFX_VOL_OK=(function(){try{var t=new Audio();t.volume=.37;return Math.abs(t.volume-.37)<.01;}catch(e){return false;}})();
-var DUCK_LVL=.28,DUCK={a:null,f:1,from:1,to:1,t0:0,dur:1,timer:0,rel:0};
-function ofxDuckTo(to){
-  if(DUCK.to===to&&(DUCK.timer||DUCK.f===to))return;
-  DUCK.from=DUCK.f;DUCK.to=to;DUCK.t0=performance.now();DUCK.dur=to<DUCK.f?220:1000;
-  if(!DUCK.timer)DUCK.timer=setInterval(ofxDuckTick,40);
-}
-function ofxDuckAbort(){
-  if(DUCK.timer){clearInterval(DUCK.timer);DUCK.timer=0;}
-  if(DUCK.rel){clearTimeout(DUCK.rel);DUCK.rel=0;}
-  if(DUCK.a&&!SW){try{DUCK.a.volume=.5;}catch(e){}} /* saat swallow, transisi yang pegang volume */
-  DUCK.a=null;DUCK.f=1;DUCK.from=1;DUCK.to=1;
-}
-function ofxDuckTick(){
-  var a=DUCK.a;
-  if(!a||SW||RADIO_SILENCE){ofxDuckAbort();return;}
-  var u=Math.min(1,(performance.now()-DUCK.t0)/DUCK.dur),e=u*u*(3-2*u);
-  DUCK.f=DUCK.from+(DUCK.to-DUCK.from)*e;
-  try{a.volume=Math.max(0,Math.min(1,.5*DUCK.f));}catch(err){}
-  if(u>=1){
-    clearInterval(DUCK.timer);DUCK.timer=0;
-    if(DUCK.to===1){DUCK.a=null;DUCK.f=1;}
-  }
-}
-function ofxDuckBgm(){ /* true = BGM di-duck (jangan di-pause) */
-  if(!OFX_VOL_OK||IS_POTATO||RADIO_SILENCE||SW)return false;
-  var a=(AMB&&!AMB.paused&&!AMB.ended)?AMB:((MUSIC_COLLAP&&!MUSIC_COLLAP.paused&&!MUSIC_COLLAP.ended)?MUSIC_COLLAP:null);
-  if(!a)return false;
-  if(DUCK.a&&DUCK.a!==a){try{DUCK.a.volume=.5;}catch(e){}}
-  DUCK.a=a;
-  if(DUCK.rel){clearTimeout(DUCK.rel);DUCK.rel=0;}
-  ofxDuckTo(DUCK_LVL);
-  return true;
-}
-function ofxAnySfxPlaying(){
-  for(var k in SFX){var a=SFX[k];if(a&&!a.paused&&!a.ended)return true;}
-  return false;
-}
-function ofxDuckRelease(){
-  if(!DUCK.a)return;
-  if(DUCK.rel)clearTimeout(DUCK.rel);
-  /* Jeda singkat: pindah bintang A -> B kirim 'pause' A sebelum B benar-benar bunyi. */
-  DUCK.rel=setTimeout(function(){DUCK.rel=0;if(!DUCK.a||ofxAnySfxPlaying())return;ofxDuckTo(1);},140);
-}
-(function(){
-  Object.keys(SFX).forEach(function(k){
-    var a=SFX[k];if(!a)return;
-    a.addEventListener('play',function(){ofxDuckBgm();});
-    a.addEventListener('pause',ofxDuckRelease);
-    a.addEventListener('ended',ofxDuckRelease);
-  });
-})();
+/* Ducking BGM removed — mute is only via #mode-silence fade. */
+function ofxDuckBgm(){return false;}
+function ofxDuckAbort(){}
+function ofxDuckRelease(){}
 
 /* ================= Sector Overview (idle) — fase 1 =================
    Idle = satu ikon gugus per sektor mengelilingi Gargantua (sektor 0, tengah). Ikon digambar lewat gSky(),

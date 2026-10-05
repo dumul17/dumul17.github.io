@@ -25,16 +25,16 @@ h1.gl .kicker{animation:gk .65s steps(1,end)}
 @keyframes gk{0%{transform:translateX(4px);color:#ff7ad9}30%{transform:translateX(-4px);color:#6ee5ff}60%{transform:translateX(3px);color:#ff7ad9}100%{transform:none}}
 #music-player{position:fixed;right:12px;bottom:58px;z-index:12;width:min(258px,calc(100vw - 34px));max-height:min(300px,calc(100vh - 120px));display:flex;flex-direction:column;overflow:hidden;padding:10px 10px 8px;border:1px solid rgba(110,229,255,.24);border-radius:8px;background:rgba(3,8,13,.88);box-shadow:0 10px 28px rgba(0,0,0,.34),0 0 18px rgba(110,229,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .28s ease,transform .28s cubic-bezier(.22,.7,.3,1)}
 #music-player.open{opacity:1;transform:none;pointer-events:auto;will-change:transform,opacity}
-.mp-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px}
+.mp-scroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;position:relative;z-index:1;touch-action:pan-y}
 .mp-scroll::-webkit-scrollbar{width:3px}
 .mp-scroll::-webkit-scrollbar-thumb{background:rgba(110,229,255,.3);border-radius:2px}
 .mp-foot{flex:0 0 auto;padding-top:8px;margin-top:2px;border-top:1px solid rgba(110,229,255,.1);background:rgba(3,8,13,.96)}
-.mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex:0 0 auto}
+.mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex:0 0 auto;position:relative;z-index:3;background:rgba(3,8,13,.96);padding-bottom:2px}
 .mp-head-left{min-width:0;flex:1 1 auto}
 .mp-kicker{display:block;font-size:6.5px;line-height:1;text-transform:uppercase;letter-spacing:.2em;color:rgba(184,198,214,.4);margin-bottom:3px}
 .mp-title-row{display:flex;align-items:center;gap:8px;min-width:0}
 .mp-head strong{font:600 12px/1 'Syne',sans-serif;letter-spacing:.04em;color:#dff7ff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#mode-silence.mp-silence{flex:0 0 auto;width:26px;height:26px;padding:0;display:grid;place-items:center;border:1px solid rgba(110,229,255,.18);border-radius:4px;background:rgba(110,229,255,.04);color:rgba(214,228,240,.8);font:500 13px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
+#mode-silence.mp-silence{flex:0 0 auto;width:30px;height:30px;min-width:30px;min-height:30px;padding:0;display:grid;place-items:center;border:1px solid rgba(110,229,255,.18);border-radius:4px;background:rgba(110,229,255,.06);color:rgba(214,228,240,.85);font:500 14px/1 system-ui,sans-serif;cursor:pointer;position:relative;z-index:4;isolation:isolate;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
 #mode-silence.mp-silence:hover,#mode-silence.mp-silence:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.45);background:rgba(110,229,255,.1)}
 #mode-silence.mp-silence.on{color:#ff9ad9;border-color:rgba(255,122,217,.5);background:rgba(255,122,217,.1);box-shadow:0 0 10px rgba(255,122,217,.14)}
 #music-close{width:24px;height:24px;border:1px solid rgba(110,229,255,.12);border-radius:4px;background:rgba(110,229,255,.035);color:rgba(214,228,240,.65);font:300 17px/1 system-ui;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,transform .15s ease;flex:0 0 auto}
@@ -121,7 +121,7 @@ body.sw{pointer-events:none}
 #owl-panel-title.gl::before{width:140%;opacity:.85}
 #owl-panel .owl-brand .kicker{display:block;font:600 8.5px/1 'Syne',sans-serif;letter-spacing:.36em;padding-left:.36em;text-transform:uppercase;color:#6ee5ff}
 /* Fluid title: always show full "OBSERVATORY" — width 100%, letter-spacing scales down on narrow panels */
-#owl-panel .owl-brand .big{display:block;margin-top:5px;width:100%;box-sizing:border-box;font:800 clamp(13px,calc(5.4vw + 2px),19px)/1.08 'Syne',sans-serif;letter-spacing:clamp(.02em,.8vw,.05em);text-transform:uppercase;color:#eaf6ff;text-shadow:0 0 14px rgba(110,229,255,.35);white-space:nowrap;overflow:visible;text-align:center}
+#owl-panel .owl-brand .big{display:block;margin-top:5px;width:100%;box-sizing:border-box;font:800 15px/1.1 'Syne',sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#eaf6ff;text-shadow:0 0 12px rgba(110,229,255,.35);white-space:nowrap;overflow:visible;text-align:center}
 #owl-panel .owl-sub{margin:6px 0 0;font-size:7.5px;letter-spacing:.14em;padding-left:.14em;text-transform:uppercase;color:rgba(184,198,214,.62);white-space:nowrap}
 /* Quote: only the sentence is italic; owl emoji stays upright */
 #owl-panel .owl-quote{margin:7px 0 0;font:400 9px/1.4 'Space Grotesk',system-ui,sans-serif;letter-spacing:.02em;color:rgba(214,228,240,.72);text-wrap:balance}
@@ -161,7 +161,7 @@ body.sw{pointer-events:none}
 @media (max-width:340px){
   #owl-panel{width:min(94vw,260px);padding:12px 10px 10px}
   #owl-panel .owl-brand{padding:2px 14px 9px}
-  #owl-panel .owl-brand .big{font-size:clamp(12px,5vw,16px);letter-spacing:.02em}
+  #owl-panel .owl-brand .big{font-size:14px;letter-spacing:.015em}
   #owl-panel .owl-links{gap:5px}
   #owl-panel .owl-link{padding:8px 2px 6px;font-size:6.5px}
 }
