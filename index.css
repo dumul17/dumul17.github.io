@@ -817,3 +817,16 @@ body.camera-mode #cons-archive{opacity:0!important;visibility:hidden!important;p
    munculin panel Contextual Search ("Touch to Search") yang nutupin area tap. */
 #bh-clock,#bh-clock *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #bh-clock{touch-action:manipulation}
+
+/* ---------- Sector overview (idle) ---------- */
+#mode-sectors,#mode-bh{width:32px;height:32px;padding:0;display:none;place-items:center;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);font:500 15px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
+body.sect-in #mode-sectors,body.sect-in #mode-bh{display:grid}
+#mode-sectors:hover,#mode-bh:hover{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
+#mode-bh.on{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);box-shadow:0 0 12px rgba(110,229,255,.15)}
+#mode-bh{font-size:14px}
+@media (max-width:520px){#mode-sectors,#mode-bh{width:31px;height:31px}body.sect-in #mp-now-playing{right:197px!important}}
+@media (max-height:520px) and (orientation:landscape){#mode-sectors,#mode-bh{width:28px;height:28px}}
+body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 146px + 8px)!important}
+body.sect-ov .cap,body.sect-ov .hit,body.sect-ov #betel-fx,body.sect-ov #rigel-fx{display:none!important}
+body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!important}
+body.sect-in-orion #arcturus-fx,body.sect-in-orion #antares-fx,body.sect-in-virgo #rigel-fx,body.sect-in-virgo #betel-fx,body.sect-in-virgo #sirius-fx,body.sect-in-virgo #pleione-fx,body.sect-in-virgo #aldebaran-fx{display:none!important}

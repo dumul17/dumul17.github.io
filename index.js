@@ -22,6 +22,8 @@ function resetCanvasState(){
 }
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
+/* Override manual buat ngetes: ?perf=high (paksa normal) / ?perf=low (paksa potato). Berguna di WebView yang salah lapor spek. */
+try{var _pf=/[?&]perf=(high|low)/.exec(location.search);if(_pf)IS_POTATO=_pf[1]==='low';}catch(e){}
 try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');}catch(e){}
 var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
@@ -232,7 +234,8 @@ function sectorScanUpdate(now){
   if(drawT!==SS.dT){SS.dT=drawT;SS.draw.textContent=drawT;}
   if(cullT!==SS.cT){SS.cT=cullT;SS.cull.textContent=cullT;}
 }
-var BHZ=1,BHK=0;
+var BHZ=1,BHK=0,BHSC=1;
+var SUM={on:false},SUM_R=6;
 function camBH(){
   var px=BH.x+skyPan.x*BHK,py=BH.y+skyPan.y*BHK;
   if(skyZoom===1)return [px,py];
@@ -323,8 +326,8 @@ var FOCUS={i:0,anim:false,list:null};
 function focusList(){
   var nm={orion:'Orion',taurus:'Taurus',virgo:'Virgo',canis:'Canis Major',bootes:'Boötes',scorpius:'Scorpius'};
   var L=[{id:'free',n:'Free'},{id:'bh',n:'Gargantua'}];
-  CONS.forEach(function(c){L.push({id:c.id,n:nm[c.id]||c.id});});
-  L.push({id:'pleiades',n:'Pleiades'});
+  CONS.forEach(function(c){if(sectShow(c.id))L.push({id:c.id,n:nm[c.id]||c.id});});
+  if(sectShow('pleiades'))L.push({id:'pleiades',n:'Pleiades'});
   return L;
 }
 /* Free band of screen between the caption panel (top) and the CAM controls (bottom). */
@@ -351,7 +354,7 @@ function camBox(){
 }
 function focusGeom(id){
   var x,y,w,h;
-  if(id==='bh')return {x:BH.x,y:BH.y,z:1};
+  if(id==='bh'){if(BHSC<.05)return null;return {x:BH.x,y:BH.y,z:BHSC<.9?2.2:1};}
   if(id==='pleiades'){
     if(!PLEIADES.ready||!PLEIADES.scale)return null;
     x=PLEIADES.x+.53*PLEIADES.scale;y=PLEIADES.y+.42*PLEIADES.scale;w=.7*PLEIADES.scale;h=.5*PLEIADES.scale;
@@ -488,7 +491,7 @@ function syncBHDom(){
 function focusStep(){
   var want=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   var f=want&&FOCUS.list?FOCUS.list[FOCUS.i]:null,id=f?f.id:'free';
-  var tZ=(want&&id!=='free'&&id!=='bh')?Math.min(skyZoom,1.25):skyZoom,tK=want?1:0,ch=false;
+  var tZ=(want&&id!=='free'&&id!=='bh')?Math.min(skyZoom,1.25):skyZoom,tK=(want||SECT.busy)?1:0,ch=false;
   if(Math.abs(BHZ-tZ)>.002||Math.abs(BHK-tK)>.002){BHZ+=(tZ-BHZ)*.14;BHK+=(tK-BHK)*.14;ch=true;}
   else if(BHZ!==tZ||BHK!==tK){BHZ=tZ;BHK=tK;ch=true;}
   if(want&&id!=='free'){
@@ -1036,7 +1039,7 @@ var AV_FAST=(function(){
   if(navigator.deviceMemory&&navigator.deviceMemory<4)return false;
   return true;
 })();
-var AV={ctx:null,an:null,lpf:null,sources:{},data:null,prev:null,ready:false,fallback:false,level:0,bass:0,mid:0,high:0,beat:0,peak:0,glitchUntil:0,avgFlux:0,lastBeatT:0,skip:0,atten:0,_tick:0};
+var AV={_dbg:/[?&]muffdbg/.test(location.search),ctx:null,an:null,lpf:null,sources:{},data:null,prev:null,ready:false,fallback:false,level:0,bass:0,mid:0,high:0,beat:0,peak:0,glitchUntil:0,avgFlux:0,lastBeatT:0,skip:0,atten:0,_tick:0};
 /* The analyser path intentionally follows the proven dumul.html recipe:
    one AudioContext + one AnalyserNode, FFT 1024, smoothed spectrum and a
    low-frequency spectral-flux beat detector. Playback remains owned by the
@@ -1148,29 +1151,82 @@ function activeStarScreenPos(){
     return gSky(s.x+(c.ox||0),s.y+(c.oy||0));
   }catch(e){return null;}
 }
+/* ---- Spatial muffle (lowpass "tenggelam" saat sumber suara jauh) ----
+   Aktif di: (1) dalam sektor + Constellation Camera (jarak bintang ke tengah layar),
+             (2) transisi pindah sektor (jarak ikon sektor sumber ke tengah layar),
+             (3) home/overview (selalu teredam; ikon sektor jauh dari Gargantua).
+   Di overview, muffle dimatikan kalau sektor sumber punya "relay" = Gargantua mini
+   pernah di-summon di sektor itu (recall manual 🕳️ menghapus relay). */
+function sfxSector(){
+  if(!activeSfx||typeof TRIGGERS==='undefined'||typeof keyFromAudio!=='function')return null;
+  var key=keyFromAudio(activeSfx),tr=key&&TRIGGERS[key];if(!tr)return null;
+  for(var i=0;i<SECT.list.length;i++)if(SECT.list[i].ids.indexOf(tr.cons)>=0)return SECT.list[i];
+  return null;
+}
+function spatialTarget(){
+  var cx=W*.5,cy=H*.5,maxD=Math.max(120,Math.hypot(W,H)*.48),t,p,s;
+  if(SECT.on||SECT.busy){                       /* home/overview + transisi antar sektor */
+    s=sfxSector();
+    if(s&&s.relay&&SECT.on&&SECT.phase!=='in')return 0;   /* relay Gargantua mini = sinyal jernih */
+    if(s&&s.sx!=null){t=Math.min(1,Math.hypot(s.sx-cx,s.sy-cy)/maxD);t=Math.max(0,(t-.12)/.88);}
+    else t=.7;
+    if(!SECT.busy)t=Math.max(.7,t);             /* diam di overview: selalu jelas teredam */
+    return t;
+  }
+  if(!CAMERA_MODE)return 0;                     /* dalam sektor tanpa kamera: normal */
+  p=activeStarScreenPos();
+  if(!p||p[2]>=1)return .55;
+  t=Math.min(1,Math.max(0,Math.hypot(p[0]-cx,p[1]-cy)/maxD));
+  return Math.max(0,(t-.12)/.88);
+}
+function spatialHint(t){
+  var st='',s;
+  if(SECT.on&&!SECT.busy){
+    s=sfxSector();
+    if(t>.5)st='muffled';else if(s&&s.relay)st='relay';
+  }
+  if(st===AV._hint)return;
+  AV._hint=st;
+  if(!st||typeof showModeToast!=='function')return;
+  if(st==='muffled')showModeToast('SIGNAL MUFFLED · SOURCE TOO FAR\nSUMMON 🕳️ INSIDE ITS SECTOR TO CLEAR IT',null,4200);
+  else showModeToast('RELAY LINKED · SIGNAL CLEAR\nRECALL 🕳️ IN THE SECTOR TO MUFFLE AGAIN',null,3600);
+}
+function spatialRelease(){
+  AV.atten=0;AV._hint='';
+  if(AV._lpfLow&&AV.lpf&&AV.ctx){AV._lpfLow=false;try{AV.lpf.frequency.setTargetAtTime(16000,AV.ctx.currentTime,.06);}catch(e){}}
+  if(AV._volLow&&AV._volEl){try{AV._volEl.volume=.85;}catch(e2){}AV._volLow=false;AV._volEl=null;}
+}
+/* Ada 2 jalur: (A) lowpass Web Audio (kalau graph jalan), (B) fallback volume <audio> (potato / WebView yang
+   gagal createMediaElementSource) supaya efek "tenggelam" tetap kedengeran. */
+function spatialDbg(msg){
+  if(!AV._dbg)return;
+  var el=document.getElementById('muff-dbg');
+  if(!el){el=document.createElement('div');el.id='muff-dbg';el.style.cssText='position:fixed;left:6px;top:6px;z-index:99999;font:10px/1.35 monospace;color:#8eeeff;background:rgba(0,0,0,.7);padding:4px 6px;pointer-events:none;white-space:pre';document.body.appendChild(el);}
+  el.textContent=msg;
+}
 function updateSpatialAttenuation(){
-  if(!AV.lpf||!AV.ctx||AV.fallback||!activeSfx||activeSfx.paused||activeSfx.ended){AV.atten=0;return;}
-  if(!CAMERA_MODE){
-    if(AV.atten<.004){AV.atten=0;return;}
-    AV.atten*=.9;
-    try{AV.lpf.frequency.setTargetAtTime(400+15600*Math.pow(1-AV.atten,1.65),AV.ctx.currentTime,.06);}catch(e0){}
-    return;
+  if(!activeSfx||activeSfx.paused||activeSfx.ended){spatialRelease();return;}
+  var t=spatialTarget(),useLpf=!!(AV.lpf&&AV.ctx&&!AV.fallback&&AV.ready);
+  AV.atten+=(t-AV.atten)*.14;
+  if(t===0&&AV.atten<.004)AV.atten=0;
+  if(useLpf){
+    var hz=400+15600*Math.pow(1-AV.atten,1.65);
+    AV._lpfLow=AV.atten>0;
+    try{if(AV.lpf.frequency.setTargetAtTime)AV.lpf.frequency.setTargetAtTime(hz,AV.ctx.currentTime,.06);else AV.lpf.frequency.value=hz;}catch(eHz){}
+    /* kalau context suspended (autoplay policy) filter tidak ngapa-ngapain; bangunin */
+    if(AV.ctx.state!=='running')unlockAudioGraph();
+    if(AV._volLow&&AV._volEl){try{AV._volEl.volume=.85;}catch(eR){}AV._volLow=false;AV._volEl=null;}
+  }else{
+    /* Fallback: redam lewat volume (tidak bisa lowpass tanpa Web Audio) */
+    AV._volEl=activeSfx;AV._volLow=AV.atten>0;
+    try{activeSfx.volume=Math.max(.06,.85*(1-.88*Math.pow(AV.atten,.8)));}catch(eV){}
   }
-  var p=activeStarScreenPos();
-  if(!p||p[2]>=1){AV.atten=Math.min(1,AV.atten*.92+.55*.08);}
-  else{
-    var cx=W*.5,cy=H*.5,d=Math.hypot(p[0]-cx,p[1]-cy);
-    var maxD=Math.max(120,Math.hypot(W,H)*.48);
-    var t=Math.min(1,Math.max(0,d/maxD));
-    t=Math.max(0,(t-.12)/.88);
-    AV.atten+=(t-AV.atten)*.14;
-  }
-  var hz=400+15600*Math.pow(1-AV.atten,1.65);
-  try{if(AV.lpf.frequency.setTargetAtTime)AV.lpf.frequency.setTargetAtTime(hz,AV.ctx.currentTime,.06);else AV.lpf.frequency.value=hz;}catch(eHz){}
+  spatialHint(t);
+  spatialDbg('MUFFLE '+(useLpf?'LPF':'VOLUME-FALLBACK')+'\npotato='+IS_POTATO+' fb='+AV.fallback+' ready='+AV.ready+' lpf='+!!AV.lpf+'\nctx='+(AV.ctx?AV.ctx.state:'none')+'\nsect.on='+SECT.on+' busy='+SECT.busy+' cam='+CAMERA_MODE+'\ntarget='+t.toFixed(2)+' atten='+AV.atten.toFixed(2));
 }
 function updateAudioViz(now){
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){audioVizOff();return;}
-  if(!activeSfx||activeSfx.paused||activeSfx.ended){audioVizOff();AV.atten=0;return;}
+  if(!activeSfx||activeSfx.paused||activeSfx.ended){audioVizOff();spatialRelease();return;}
   updateSpatialAttenuation();
   if(AV.fallback){
     var t=activeSfx.currentTime||0;
@@ -2560,13 +2616,13 @@ function updateTimeDilation(now){
   if(TD.a!==a){TD.a=a;TD.rate=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
   var gm=focusGeom(cid),target=1;
-  if(gm&&BH.R>0){
+  if(gm&&BH.R>0&&BHSC>.05){
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
        moved off its home spot (idle = everything stays at normal speed). */
     /* Relative geometry on screen: dragging the sky moves the constellation toward Gargantua too, unless
        Gargantua rides along with the sky (camera mode, BHK=1) - then the pan cancels out. */
     var px=skyPan.x*(1-BHK),py=skyPan.y*(1-BHK);
-    var d=Math.hypot(gm.x+px-BH.x,gm.y+py-BH.y),ratio=(BH.R*.35)/Math.max(d,1e-3);
+    var d=Math.hypot(gm.x+px-BH.x,gm.y+py-BH.y),ratio=(BH.R*BHSC*.35)/Math.max(d,1e-3);
     target=ratio>=1?0:Math.sqrt(1-ratio);
     var disp=Math.hypot(px-(BH.x-BH.hx),py-(BH.y-BH.hy)),k=Math.max(0,Math.min(1,(disp-10)/50));
     target=1-(1-target)*k;
@@ -3134,7 +3190,10 @@ function layout(){
   CAPS.virgo.style.transform='translate('+Math.round(v.maxX-42)+'px,'+Math.round(v.minY-24)+'px)';
   CAPS.canis.style.transform='translate('+Math.round((cm.minX+cm.maxX)/2-48)+'px,'+Math.round(cm.maxY+18)+'px)';
   if(tau&&CAPS.taurus)CAPS.taurus.style.transform='translate('+Math.round((tau.minX+tau.maxX)/2-28)+'px,'+Math.round(tau.maxY+18)+'px)';
-  if(!drag.on){BH.x=BH.hx;BH.y=BH.hy;}
+  if(!drag.on){
+    if(SECT.cur&&SUM.on){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
+    else{BH.x=BH.hx;BH.y=BH.hy;}
+  }
   /* Keep telescope inside the new viewport after rotation/URL-bar resize. */
   if(TELESCOPE&&TELESCOPE.init){
     var mX=Math.max(48,W*.08),mY=Math.max(56,H*.10);
@@ -3396,7 +3455,7 @@ function drawHoleFallback(now,age){
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
      primitives so one unsupported effect cannot make the whole scene vanish. */
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ);
+  var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ*BHSC);
   if(R<.5)return;
   var bp=camBH();
   g.save();g.translate(bp[0],bp[1]);
@@ -3426,7 +3485,7 @@ function drawHoleSafe(now,age){
 }
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  BH.Rr=BH.R*sc*(1+1.6*e);
+  BH.Rr=BH.R*sc*(1+1.6*e)*BHSC;
   if(BH.Rr<1||!BH.sprite)return;
 
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
@@ -4673,7 +4732,7 @@ function playStarChime(s){
 var BH_SHOCKWAVES = [];
 function createBHShockwave(x, y){
   if(reduce || IS_POTATO) return;
-  BH_SHOCKWAVES.push({x: x, y: y, r: BH.R * 1.1, maxR: Math.min(W, H) * 0.4, t0: performance.now(), dur: 580});
+  BH_SHOCKWAVES.push({x: x, y: y, r: Math.max(3, BH.R * 1.1 * BHSC), maxR: Math.min(W, H) * (0.14 + 0.26 * Math.min(1, BHSC)), t0: performance.now(), dur: 580});
 }
 function drawBHShockwaves(now){
   if(!BH_SHOCKWAVES.length) return;
@@ -4777,6 +4836,7 @@ function drawTargetLock(now){
   var d = STAR_DATA[activeKey];
   var tr = TRIGGERS[activeKey];
   if(!tr) return;
+  if(SECT.on||!sectShow(tr.cons)) return;
 
   var c = tr.cons === 'pleiades' ? PLEIADES : cons(tr.cons);
   var s = tr.cons === 'pleiades' 
@@ -4897,7 +4957,7 @@ function drawShooting(now){
   }
 }
 function asteroidScreenAt(x,y){
-  if(!AST.length)return -1;
+  if(!AST.length||BHSC<.6)return -1;
   var best=-1,bd=Infinity,now=performance.now();
   var bp=camBH();
   for(var i=0;i<AST.length;i++){
@@ -4975,9 +5035,10 @@ function ensureAsteroidSprites(){
 }
 function drawAsteroids(now){
   if(!AST.length)return;
+  var bv=clamp((BHSC-.6)/.4);if(bv<=.02)return;
   var fxDim=(typeof secondaryFxScale==='function')?secondaryFxScale():0;
   if(fxDim>0.9)return;
-  var alphaMul=fxDim>0.35?(1-fxDim*.85):1;
+  var alphaMul=(fxDim>0.35?(1-fxDim*.85):1)*bv;
   var sprites=ensureAsteroidSprites();
   var invR=1/AST_SPRITE_R;
   for(var i=0;i<AST.length;i++){
@@ -5011,9 +5072,11 @@ function drawAsteroids(now){
 }
 
 function drawTriggerVisuals(now){
+  if(SECT.on)return;
   Object.keys(TRIGGERS).forEach(function(key){
     var tr=TRIGGERS[key];
     if(tr.cons==='pleiades')return;
+    if(!sectShow(tr.cons))return;
     var c=cons(tr.cons),s=c.stars[tr.star];
     if(!s||s._a<=0)return;
     var q=gSkyC(s.x+c.ox,s.y+c.oy,72,true);if(!q)return;var x=q[0],y=q[1],fade=(1-.85*q[2]);
@@ -5443,9 +5506,10 @@ function drawPulses(now,age){
   if(now>nextPU){nextPU=now+500+Math.random()*900;
     /* Pick any constellation (Orion / Virgo / Canis Major) so every figure gets line pulses */
     var c=CONS[(Math.random()*CONS.length)|0],l=c.lines[(Math.random()*c.lines.length)|0],f=Math.random()<.5;
-    if(isUnlocked(c.id))PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});} /* terkunci = nggak ada garis buat dilewati pulse */
+    if(isUnlocked(c.id)&&!SECT.on&&sectShow(c.id))PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});} /* terkunci = nggak ada garis buat dilewati pulse */
   for(var i=PU.length-1;i>=0;i--){
     var p=PU[i],u=(now-p.t)/p.d;if(u>1){PU.splice(i,1);continue;}
+    if(SECT.on||!sectShow(p.shock?TRIGGERS[p.snKey].cons:p.c.id))continue;
     if(p.shock){
       var tr=TRIGGERS[p.snKey],sb=(tr&&tr.cons==='pleiades')?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:(p.c.stars&&p.c.stars[p.snKey]);
       if(!sb||!tr)continue;
@@ -5490,6 +5554,13 @@ function drawPortals(age,now){
   var na=clamp((age-3.6)/1)*(1-clamp(swP*4));
   PORTALS.forEach(function(p){
     var c=p.c,ox=c.ox,oy=c.oy;
+    var here=!SECT.on&&sectShow(p.cons);
+    if(!here){
+      if(hot===p.id)hot=null;
+      if(p._shown!==false){p._shown=false;p.el.classList.remove('on','mobile-show');p.el.style.visibility='hidden';p.hitEl.style.display='none';}
+      return;
+    }
+    if(p._shown!==true){p._shown=true;p.el.style.visibility='';p.hitEl.style.display='';}
     p.h+=((hot===p.id?1:0)-p.h)*.15;
     /* Panel is screen-fixed (layout anchors p.fx/p.fy). Only the connector
        line tracks the moving star. Hit target still follows the star. */
@@ -5593,7 +5664,7 @@ function ofxPull(c,now){
   var wave=.5+.5*Math.sin(now*.0014+c.phase*1.7);                 /* mendekat ... balik */
   var shiver=Math.sin(now*.021+c.phase*3.1);                      /* getar kecil di puncak tarikan */
   var sc=Math.max(.8,Math.min(1.4,Math.min(W,H)/420));
-  var m=OFX.pK*fall*sc*wave*(5.2+1.1*shiver);
+  var m=OFX.pK*fall*sc*wave*(5.2+1.1*shiver)*BHSC;
   if(!isFinite(m)||!isFinite(dx)||!isFinite(dy)){OFX.px=0;OFX.py=0;return;}
   OFX.px=dx/d*m;OFX.py=dy/d*m;
 }
@@ -5627,12 +5698,13 @@ function ofxDrawTint(now){
 }
 /* 8 bintang yang bisa diklik: glow tipis sebagai tanda "tersedia" selama BGM on. */
 function ofxDrawAvail(now){
-  if(OFX.p<.02)return;
+  if(OFX.p<.02||SECT.on)return;
   var keys=OFX.keys||(OFX.keys=Object.keys(TRIGGERS)),i,j,key,tr,q,c,s,ps,x,y,pu;
   var dim=(activeSfx&&!activeSfx.paused&&!activeSfx.ended)?.35:1;
   g.save();g.globalCompositeOperation='lighter';
   for(i=0;i<keys.length;i++){
     key=keys[i];tr=TRIGGERS[key];
+    if(!sectShow(tr.cons))continue;
     if(activeSfx===SFX[key]&&!SFX[key].paused)continue; /* bintang yang lagi bunyi sudah punya efek sendiri */
     if(tr.cons==='pleiades'){
       if(!PLEIADES.ready)continue;
@@ -5747,6 +5819,224 @@ function ofxDuckRelease(){
   });
 })();
 
+/* ================= Sector Overview (idle) — fase 1 =================
+   Idle = satu ikon gugus per sektor mengelilingi Gargantua (sektor 0, tengah). Ikon digambar lewat gSky(),
+   jadi tetap kena lensing / drag / swallow Gargantua. Sektor kosong = "???" (belum diisi).
+   Tap ikon terisi -> sementara masuk ke tampilan rasi lama (placeholder zoom, fase 2). Tombol ◎ = balik ke overview. */
+var SECT={on:true,vis:1,phase:'ov',cur:null,busy:false,z:0,t0:0,zt:2.4,dur:950,flash:0,list:[
+  {k:'orion',name:'Orion',ids:['orion','taurus','canis','pleiades'],a:-150},
+  {k:'virgo',name:'Virgo',ids:['virgo','bootes','scorpius'],a:-30},
+  {name:'???',ids:[],a:-90},{name:'???',ids:[],a:30},{name:'???',ids:[],a:90},{name:'???',ids:[],a:150}
+],down:null};
+function sectSet(on){
+  SECT.on=!!on;
+  try{var bc=document.body.classList;bc.toggle('sect-ov',SECT.on);
+    bc.toggle('sect-in',!SECT.on&&!!SECT.cur);
+    bc.toggle('sect-in-orion',!SECT.on&&!!SECT.cur&&SECT.cur.k==='orion');bc.toggle('sect-in-virgo',!SECT.on&&!!SECT.cur&&SECT.cur.k==='virgo');}catch(e){}
+  if(SECT.on){try{syncSkyPanHits();}catch(e){}}
+}
+function sectGlyph(c,cx,cy,box,al){
+  if(!c||!c.stars||!c.bw||!c.bh||!c.lines)return;
+  var sc=box/Math.max(c.bw,c.bh),ox=cx-c.bw*sc/2,oy=cy-c.bh*sc/2,i,k,a,b;
+  g.strokeStyle='rgba(110,229,255,'+(.42*al)+')';g.lineWidth=.8;g.beginPath();
+  for(i=0;i<c.lines.length;i++){
+    a=c.stars[c.lines[i][0]];b=c.stars[c.lines[i][1]];
+    if(!a||!b||a.rx==null||b.rx==null)continue;
+    g.moveTo(ox+(a.rx-c.minx)*sc,oy+(a.ry-c.miny)*sc);g.lineTo(ox+(b.rx-c.minx)*sc,oy+(b.ry-c.miny)*sc);
+  }
+  g.stroke();
+  g.fillStyle='rgba(234,246,255,'+(.9*al)+')';
+  for(k in c.stars){var s=c.stars[k];if(s.rx==null)continue;
+    g.beginPath();g.arc(ox+(s.rx-c.minx)*sc,oy+(s.ry-c.miny)*sc,Math.max(.8,(s.r||1.3)*.5),0,6.283);g.fill();}
+}
+function sectShow(id){return !SECT.cur||SECT.cur.ids.indexOf(id)>=0;}
+function sectEase(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
+/* Transform zoom ke ikon: titik P (dunia) -> tengah layar. pan = (pusat - P)*u, zoom = 1+u*(zt-1). */
+function sectApply(s,u){
+  skyZoom=1+u*(SECT.zt-1);
+  skyPan.x=(W*.5-s.bx)*u;skyPan.y=(H*.5-s.by)*u;
+  SECT.z=u;
+}
+function sectZoomIn(s){
+  if(SECT.busy||!s||s.bx==null)return;
+  SECT.busy=true;SECT.phase='in';SECT.cur=null;SECT.target=s;SECT.t0=performance.now();
+  try{if(typeof setCameraMode==='function'&&CAMERA_MODE)setCameraMode(false);}catch(e){}
+}
+function sectZoomOut(){
+  if(SECT.busy||!SECT.target)return;
+  var s=SECT.target;
+  try{if(CAMERA_MODE)setCameraMode(false);}catch(e){}
+  sumReset();
+  SECT.busy=true;SECT.phase='out';SECT.t0=performance.now();
+  SECT.cur=null;SECT.flash=SECT.t0;
+  sectSet(true);sectApply(s,1);
+  try{syncSkyPanHits();}catch(e){}
+}
+function sectToggle(){
+  if(SECT.busy)return;
+  if(SECT.phase==='sec')sectZoomOut();
+}
+/* ---- Gargantua = sektor 0. Di dalam sektor dia disembunyikan; tombol 🕳️ memanggilnya kecil (seukuran pulse) & bebas di-parkir ---- */
+function bhScaleTarget(){
+  if(SW)return 1;
+  if(SECT.cur)return SUM.on?Math.min(1,SUM_R/Math.max(1,BH.R)):0;
+  if(SECT.phase==='in')return 0;
+  return 1;
+}
+function bhScaleStep(){
+  var t=bhScaleTarget();
+  if(Math.abs(t-BHSC)>.002)BHSC+=(t-BHSC)*.14;else BHSC=t;
+  if(SECT.cur&&!SUM.on&&BHSC<.02&&!drag.on){BH.x=BH.hx;BH.y=BH.hy;}
+  var hid=BHSC<.05;
+  try{
+    var bhEl=document.getElementById('bh');
+    if(bhEl&&bhEl._hid!==hid){bhEl._hid=hid;bhEl.style.visibility=hid?'hidden':'';if(CAPS&&CAPS.bh)CAPS.bh.style.visibility=hid?'hidden':'';}
+  }catch(e){}
+}
+function sumSpot(){
+  var hb=0,ft=H;
+  try{hb=$('#header').getBoundingClientRect().bottom;ft=$('#footer').getBoundingClientRect().top;}catch(e){}
+  var x0=Math.max(40,W*.08),x1=W-x0,y0=Math.max(hb+30,H*.14),y1=Math.min(ft-30,H*.88),pts=[],k,c,s2,q,i,j;
+  CONS.forEach(function(cc){
+    if(!sectShow(cc.id))return;
+    for(k in cc.stars){s2=cc.stars[k];q=skyXF(s2.x+cc.ox,s2.y+cc.oy);pts.push(q[0],q[1]);}
+  });
+  if(sectShow('pleiades')&&PLEIADES.ready){
+    PLEIADES.bright.forEach(function(z){q=skyXF(PLEIADES.x+z.x*PLEIADES.scale,PLEIADES.y+z.y*PLEIADES.scale);pts.push(q[0],q[1]);});
+  }
+  var best=null,bs=-1,nx=14,ny=10;
+  for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
+    var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/Math.max(1,ny),md=1e9;
+    for(k=0;k<pts.length;k+=2){var d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
+    if(md>bs){bs=md;best=[cx,cy];}
+  }
+  return best||[W*.5,H*.5];
+}
+function sumSet(on){
+  if(on&&(!SECT.cur||SECT.busy||SW))return;
+  if(SECT.busy||SW)return;
+  if(on){
+    var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
+    BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
+    SUM.on=true;SECT.cur.relay=true;
+    try{if(typeof showModeToast==='function')showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET · OVERVIEW SIGNAL STAYS CLEAR',null,3200);}catch(e){}
+  }else{
+    SUM.on=false;if(SECT.cur)SECT.cur.relay=false;
+    try{if(CAMERA_MODE&&camFocusId()==='bh'){FOCUS.i=0;FOCUS.anim=false;focusUI();}}catch(e){}
+    try{if(typeof showModeToast==='function')showModeToast('GARGANTUA RECALLED',null,1800);}catch(e){}
+  }
+  haptic(10);sumUI();
+}
+function sumReset(){SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();}
+function sumUI(){
+  var b=document.getElementById('mode-bh');if(!b)return;
+  b.classList.toggle('on',SUM.on);b.setAttribute('aria-pressed',SUM.on?'true':'false');
+  b.title=b.ariaLabel=SUM.on?'Recall Gargantua':'Summon Gargantua';
+  b.setAttribute('aria-label',b.title);
+}
+function sectStep(now){
+  if(!SECT.busy)return;
+  var s=SECT.target;if(!s){SECT.busy=false;return;}
+  var u=clamp((now-SECT.t0)/(reduce?1:SECT.dur));
+  if(SECT.phase==='in'){
+    sectApply(s,sectEase(u));
+    if(u>=1){
+      SECT.flash=now;SECT.cur=s;SECT.phase='sec';SECT.busy=false;
+      skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
+      sectSet(false);
+      try{syncSkyPanHits();}catch(e){}
+    }
+  }else if(SECT.phase==='out'){
+    sectApply(s,1-sectEase(u));
+    if(u>=1){SECT.busy=false;SECT.phase='ov';skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;try{syncSkyPanHits();}catch(e){}}
+  }
+}
+function drawSectFlash(now){
+  var t=now-SECT.flash;
+  if(SECT.flash&&t<420){
+    g.save();g.globalAlpha=.5*(1-t/420);g.fillStyle='#bff4ff';g.fillRect(0,0,W,H);g.restore();
+  }
+}
+function drawSectorOverview(now,age){
+  if(window.__hub&&!window.__hub.sect)window.__hub.sect=SECT;
+  if(window.__hub&&!window.__hub.sky)window.__hub.sky=function(){return {z:skyZoom,px:skyPan.x,py:skyPan.y,bhk:BHK};};
+  var n=SECT.list.length,rad=Math.max(20,Math.min(30,W*.07)),
+      ry=Math.max(90,Math.min(H*.30,BH.hy-100)),rx=Math.min(W*.36,ry*1.7),
+      mx=reduce?0:mouse.x*7+skyPan.x,my=reduce?0:mouse.y*5+skyPan.y;
+  if(reduce){mx=skyPan.x;my=skyPan.y;}
+  if(SECT.busy){mx=skyPan.x;my=skyPan.y;}
+  SECT.vis+=((OBSERVE_MODE?0:1)-SECT.vis)*.12; /* mode 👁️: ikon sektor memudar, tinggal kanvas */
+  if(SECT.vis<.01){SECT.vis=0;for(var j=0;j<n;j++)SECT.list[j].sx=null;return;}
+  for(var i=0;i<n;i++){
+    var s=SECT.list[i],al=clamp((age-.5-i*.14)/1.1),empty=!s.ids.length;
+    if(al<=0)continue;
+    var an=s.a*Math.PI/180,bx=BH.hx+Math.cos(an)*rx,by=BH.hy+Math.sin(an)*ry;
+    s.bx=bx;s.by=by;
+    var p=gSky(bx+mx,by+my);
+    s.sx=p[0];s.sy=p[1];
+    var vis=al*SECT.vis*(1-Math.min(1,p[2]));
+    if(vis<=.01)continue;
+    var br=reduce?0:Math.sin(now*.0015+i*1.3)*.04,r=rad*(1+br);
+    g.save();
+    g.globalAlpha=vis;
+    /* halo */
+    var gr=g.createRadialGradient(p[0],p[1],r*.2,p[0],p[1],r*2.1);
+    gr.addColorStop(0,empty?'rgba(150,170,195,.06)':'rgba(110,229,255,.16)');gr.addColorStop(1,'rgba(110,229,255,0)');
+    g.fillStyle=gr;g.beginPath();g.arc(p[0],p[1],r*2.1,0,6.283);g.fill();
+    /* dashed ring */
+    g.lineWidth=1;g.strokeStyle=empty?'rgba(184,198,214,.28)':'rgba(110,229,255,.5)';
+    if(g.setLineDash){g.setLineDash([3,5]);g.lineDashOffset=reduce?0:-now*.012;}
+    g.beginPath();g.arc(p[0],p[1],r,0,6.283);g.stroke();
+    if(g.setLineDash)g.setLineDash([]);
+    g.textAlign='center';g.textBaseline='middle';
+    if(empty){
+      g.fillStyle='rgba(184,198,214,.5)';g.font='600 '+Math.round(r*.62)+'px "Space Grotesk",system-ui,sans-serif';
+      g.fillText('???',p[0],p[1]);
+    }else{
+      sectGlyph(cons(s.ids[0]),p[0],p[1],r*1.45,1);
+    }
+    /* label */
+    g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
+    g.fillStyle=empty?'rgba(184,198,214,.4)':'rgba(214,236,248,.82)';
+    var lab=empty?'unmapped':(s.name+(s.ids.length>1?'  +'+(s.ids.length-1):''));
+    g.fillText(lab,p[0],p[1]+r+7);
+    if(s.relay&&!(s.flash&&now-s.flash<1500)){
+      g.fillStyle='rgba(110,229,255,.7)';g.fillText('\u25c9 relay',p[0],p[1]+r+19);
+    }
+    if(s.flash&&now-s.flash<1500){
+      g.fillStyle='rgba(255,154,217,'+(.85*(1-(now-s.flash)/1500))+')';
+      g.fillText('no signal yet',p[0],p[1]+r+19);
+    }
+    g.restore();
+  }
+}
+(function sectInit(){
+  var b=document.getElementById('mode-sectors');
+  if(b)b.addEventListener('click',sectToggle);
+  var bb=document.getElementById('mode-bh');
+  if(bb)bb.addEventListener('click',function(){sumSet(!SUM.on);});
+  sectSet(true);
+  try{if(window.__hub)window.__hub.sect=SECT;}catch(e){}
+  var SKIP='#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#boot-screen,#terminal,#signal-fragment';
+  document.addEventListener('pointerdown',function(e){
+    if(SECT.busy&&!(e.target.closest&&e.target.closest('#mode-cluster'))){e.stopPropagation();SECT.down=null;return;} /* animasi zoom: sentuhan diabaikan */
+    if(!SECT.on||OBSERVE_MODE||SW||drag.on||(e.target.closest&&e.target.closest(SKIP))){SECT.down=null;return;}
+    SECT.down={x:e.clientX,y:e.clientY,t:performance.now()};
+  },true);
+  document.addEventListener('pointerup',function(e){
+    var d=SECT.down;SECT.down=null;
+    if(!d||!SECT.on||SECT.busy||SW||drag.on)return;
+    var now=performance.now();
+    if(now-d.t>420||Math.hypot(e.clientX-d.x,e.clientY-d.y)>10)return;
+    var best=null,bd=Math.max(34,Math.min(30,W*.07)+14);
+    for(var i=0;i<SECT.list.length;i++){var s=SECT.list[i];
+      if(s.sx==null)continue;
+      var dd=Math.hypot(e.clientX-s.sx,e.clientY-s.sy);if(dd<bd){bd=dd;best=s;}}
+    if(!best)return;
+    if(best.ids.length){sectZoomIn(best);}else{best.flash=now;try{navigator.vibrate&&navigator.vibrate(12);}catch(er){}}
+  },true);
+})();
+
 function frame(now){
   /* Capture generation at entry. If a watchdog/visibility restart bumped
      renderGeneration while this callback was already queued, bail out so
@@ -5766,17 +6056,18 @@ function frame(now){
     ofxSafe(ofxUpdate,now);
     updateConstellationFocus(now);
     updateTimeDilation(now);
-    if(hoverDirty&&mouse.px!=null&&!drag.on&&(now-lastHoverAt)>=HOVER_MIN_MS){
+    if(hoverDirty&&mouse.px!=null&&!drag.on&&!SECT.on&&(now-lastHoverAt)>=HOVER_MIN_MS){
       updateHover(mouse.px,mouse.py);
       hoverDirty=false;lastHoverAt=now;
     }
-    if(!drag.on&&(Math.abs(BH.x-BH.hx)>.05||Math.abs(BH.y-BH.hy)>.05)){
+    bhScaleStep();
+    if(!drag.on&&!SECT.cur&&(Math.abs(BH.x-BH.hx)>.05||Math.abs(BH.y-BH.hy)>.05)){
       BH.x+=(BH.hx-BH.x)*.065;BH.y+=(BH.hy-BH.y)*.065;
     }
     focusStep();
     /* Sky pan + rot springback when fingers are up.
        Disabled in Constellation Camera so the observer can explore freely. */
-    if(!CAMERA_MODE&&!skyDrag.on&&!skyRotDrag.on&&!skyPinch.on){
+    if(!CAMERA_MODE&&!SECT.busy&&!skyDrag.on&&!skyRotDrag.on&&!skyPinch.on){
       if(skyPan.x*skyPan.x+skyPan.y*skyPan.y>0.25){
         skyPan.x+=-skyPan.x*.065;skyPan.y+=-skyPan.y*.065;
         if(skyPan.x*skyPan.x+skyPan.y*skyPan.y<0.25){skyPan.x=0;skyPan.y=0;}
@@ -5817,10 +6108,14 @@ function frame(now){
     updateClockDilation(now);
     drawShooting(now);
     cullBegin();
-    CONS.forEach(function(c){drawCons(c,age,now);});
+    sectStep(now);
+    if(SECT.on){drawPulses(now,age);drawSectorOverview(now,age);}
+    else{
+    CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
     drawPulses(now,age);
-    CONS.forEach(function(c){drawStars(c,age,now);});
-    drawPleiades(age,now);
+    CONS.forEach(function(c){if(sectShow(c.id))drawStars(c,age,now);});
+    if(sectShow('pleiades'))drawPleiades(age,now);
+    }
     drawTriggerVisuals(now);
     ofxSafe(ofxDrawAvail,now);
     drawFocusFx(now);
@@ -5837,6 +6132,7 @@ function frame(now){
     try{drawAsteroids(now);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);}
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     drawHoleSafe(now,age);
+    drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}
     lastFrameOK=now;
   }catch(err){
@@ -6227,6 +6523,7 @@ function triggerSupernova(key){
      sehingga flash/partikel/warp/spektrum numpuk di HP RAM kecil. */
   if(SN_COOLDOWN.__g&&t0g-SN_COOLDOWN.__g<380)return;
   SN_COOLDOWN[key]=t0g;
+  if(SECT.on||!sectShow(tr.cons)){SN_COOLDOWN.__g=t0g;sfxArrive(key);return;}
 
   var flash=$('#sn-flash'),
       sx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),
@@ -6281,7 +6578,9 @@ function triggerSupernova(key){
     return skyXF(fx,fy); /* pre-gravity: the telescope draw applies lens() itself */
   };
   var ft=TELESCOPE.follow();TELESCOPE.targetX=ft[0];TELESCOPE.targetY=ft[1];
-  TELESCOPE.onWarpComplete=function(){
+  TELESCOPE.onWarpComplete=function(){sfxArrive(key);};
+}
+function sfxArrive(key){
     playSfx(SFX[key]);
     haptic(key==='betel'?20:18);
     /* Stellar Memory: click/observe on interaction (fragment waits for SFX end). */
@@ -6297,7 +6596,6 @@ function triggerSupernova(key){
       }
       if(firstObs){/* light tick already via haptic above */}
     }
-  };
 }
 (function(){
   var fl=document.getElementById('sn-flash');
@@ -6309,6 +6607,7 @@ function drawSupernovaBursts(now){
   for(var i=SN_BURSTS.length-1;i>=0;i--){
     var b=SN_BURSTS[i],u=(now-b.t)/b.d;
     if(u>1){SN_BURSTS.splice(i,1);continue;}
+    if(SECT.on||!sectShow(TRIGGERS[b.key].cons))continue;
     var tr=TRIGGERS[b.key],c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons),s=tr.cons==='pleiades'?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:c.stars[tr.star],sx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),sy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy),q=gSky(sx,sy);
     if(!q||q[2]>=1)continue;
     var fade=1-.85*q[2],easeOut=1-Math.pow(1-u,3),sr=(s&&s.r)||1.9,base=sr*(2.5+9*easeOut);
@@ -6339,11 +6638,12 @@ window.addEventListener('pointerdown',markActivity,{passive:true});
 function updateHover(px,py){
   if(drag.on)return;
   var hit=null,best=12;
-  var ph=pleiadesHitAt(px,py);
+  var ph=sectShow('pleiades')&&pleiadesHitAt(px,py);
   if(ph){hot='pleione';return;}
   if(hot==='pleione')hot=null;
   CONS.forEach(function(c){
     c._hot=-1;
+    if(!sectShow(c.id))return;
     Object.keys(c.stars).forEach(function(k){
       /* Project through gSky (skyRot + lens) so the hit test matches what's
          actually on screen after a mobile 2-finger rotate, not the pre-rotation
@@ -6364,17 +6664,18 @@ function updateHover(px,py){
   else if(hot!=='bh'&&hot!=='spica'&&hot!=='rigel'&&hot!=='betel'&&hot!=='sirius'&&hot!=='aldebaran'&&hot!=='arcturus'&&hot!=='antares')hot=null;
 }
 document.addEventListener('pointerdown',function(e){
-  if(SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
+  if(SECT.on||SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
   /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
-  var ph=aligning?null:pleiadesHitAt(e.clientX,e.clientY);
+  var ph=(aligning||!sectShow('pleiades'))?null:pleiadesHitAt(e.clientX,e.clientY);
   if(ph){
     tapFlash={until:now+420,cons:'pleiades'};
     triggerSupernova('pleione');
     return;
   }
   CONS.forEach(function(c){
+    if(!sectShow(c.id))return;
     Object.keys(c.stars).forEach(function(k){
       /* Same gSky projection as drawing/hover, so a tap still lands on the
          star after the sky has been rotated with a 2-finger twist. */
@@ -6436,7 +6737,8 @@ function bhGrabRadius(){
      Once the drag is active, moveBHDrag() still lets it travel across the whole canvas.
      This keeps the Konami swipe area open without shrinking Gargantua's movement range. */
   var base=Math.min(W,H);
-  return Math.max(BH.R*2.8,Math.min(base*.18,110));
+  var full=Math.max(BH.R*2.8,Math.min(base*.18,110));
+  return BHSC>=.9?full:Math.max(26,full*Math.max(0,BHSC));
 }
 function constellationTargetAt(x,y,skipTelescope){
   var found=false;
@@ -6456,7 +6758,7 @@ function constellationTargetAt(x,y,skipTelescope){
   return found;
 }
 function beginBHDrag(e){
-  if(reduce||SW||drag.on)return false;
+  if(reduce||SW||drag.on||BHSC<.05)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#mode-cluster,#mode-observe,#mode-silence'))return false;
@@ -6468,7 +6770,7 @@ function beginBHDrag(e){
   var bp=camBH();
   var d=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]);
   if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
-  drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;drag.tapEligible=(d<=Math.max(BH.R*1.9*skyZoom,42));
+  drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;drag.tapEligible=(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
   try{cv.setPointerCapture(e.pointerId);}catch(err){}
   haptic(15);e.preventDefault();e.stopPropagation();
   return true;
@@ -6478,11 +6780,13 @@ function moveBHDrag(e){
   var dx=e.clientX-drag.x0,dy=e.clientY-drag.y0;
   if(Math.hypot(dx,dy)>7)drag.moved=true;
   if(drag.moved){
+    var dz=(SECT.cur&&SUM.on)?Math.max(1,skyZoom):1;dx/=dz;dy/=dz;
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);
     BH.x=drag.bx+Math.max(-limX,Math.min(limX,dx));
     BH.y=drag.by+Math.max(-limY,Math.min(limY,dy));
-    BH.x=Math.max(BH.R*1.15,Math.min(W-BH.R*1.15,BH.x));
-    BH.y=Math.max(BH.R*1.15,Math.min(H-BH.R*1.15,BH.y));
+    var bm=BH.R*BHSC*1.15;
+    BH.x=Math.max(bm,Math.min(W-bm,BH.x));
+    BH.y=Math.max(bm,Math.min(H-bm,BH.y));
     mouse.tx=Math.max(-1,Math.min(1,dx/(Math.min(W,H)*.24)));
     mouse.ty=Math.max(-1,Math.min(1,dy/(Math.min(W,H)*.24)));
   }
@@ -6588,7 +6892,7 @@ function beginSkyPan(e){
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
   var dBH=Math.hypot(e.clientX-bpSky[0],e.clientY-bpSky[1]);
-  if(bhDragAllowed()&&dBH<=bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
+  if(BHSC>.05&&bhDragAllowed()&&dBH<=bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   skyPtrs[e.pointerId]={x:e.clientX,y:e.clientY};
   var n=Object.keys(skyPtrs).length;
   if(n>=2){
@@ -7345,8 +7649,8 @@ function updateClockDilation(now){
     }else C.box=null;
   }
   var t=0;
-  if(C.box&&C.rinf>40&&!document.hidden){
-    var bp=camBH(),d=clkDist(C.box,bp[0],bp[1])-BH.R*skyZoom;
+  if(C.box&&C.rinf>40&&!document.hidden&&BHSC>.05){
+    var bp=camBH(),d=clkDist(C.box,bp[0],bp[1])-BH.R*BHSC*skyZoom;
     var u=Math.max(0,Math.min(1,1-d/C.rinf));
     t=u*u*(3-2*u);
   }

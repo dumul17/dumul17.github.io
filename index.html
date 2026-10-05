@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=9">
+<link rel="stylesheet" href="index.css?v=13">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -143,6 +143,8 @@
   <button type="button" id="mode-silence" aria-pressed="false" aria-label="Radio Silence" title="Radio Silence">🔊</button>
   <button type="button" id="mode-observe" aria-pressed="false" aria-label="Observation Mode" title="Observation Mode">👁️</button>
   <button type="button" id="mode-camera" aria-pressed="false" aria-label="Constellation Camera" title="Constellation Camera (Observation only)" hidden>📷</button>
+  <button type="button" id="mode-sectors" aria-label="Back to sector overview" title="Back to overview">◎</button>
+  <button type="button" id="mode-bh" aria-pressed="false" aria-label="Summon Gargantua" title="Summon Gargantua">🕳️</button>
 </div>
 <div id="cam-zoom" aria-live="polite" aria-hidden="true">
   <span class="cz-label">CAM </span><span class="cz-val" id="cam-zoom-val">1×</span>
@@ -176,7 +178,7 @@
   </nav>
   <p class="quote">I create what I love, even without applause.</p>
 </footer>
-<script defer src="index.js?v=24"></script>
+<script defer src="index.js?v=30"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
