@@ -1173,6 +1173,9 @@ function spatialTarget(){
     if(!SECT.busy)t=Math.max(.7,t);             /* diam di overview: selalu jelas teredam */
     return t;
   }
+  s=sfxSector();
+  if(SECT.cur&&s&&s!==SECT.cur)                 /* sumber suara di sektor LAIN: tetap teredam (kecuali ada relay) */
+    return s.relay?0:.8;
   if(!CAMERA_MODE)return 0;                     /* dalam sektor tanpa kamera: normal */
   p=activeStarScreenPos();
   if(!p||p[2]>=1)return .55;
