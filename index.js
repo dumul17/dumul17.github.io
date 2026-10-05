@@ -37,6 +37,35 @@ var touchMode=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 var drag={on:false,moved:false,pid:null,x0:0,y0:0,bx:0,by:0};
 /* Mobile sky-pan + rotate: swipe to slide, 2-finger twist ±180°, both spring back. */
 var skyPan={x:0,y:0};
+/* ---- Landscape stage ----
+   Layar landscape: sky (canvas, rasi, cluster, Gargantua, sektor) tetap tampil seperti portrait dalam kolom tengah (lebar STG.w),
+   sedangkan panel-panel (music, mode, zoom, info kamera, radar) digeser CSS ke gutter kiri/kanan (body.ls). W = lebar kolom, bukan lebar layar.
+   Koordinat pointer dikurangi offset kolom supaya hit-test canvas tetap pakai ruang koordinat kolom. */
+var STG={on:false,x:0,w:0,g:0};
+function stageCalc(){
+  var iw=innerWidth,ih=innerHeight,on=iw>ih*1.15,w=iw;
+  if(on){w=Math.round(Math.max(300,Math.min(ih*.62,560)));w=Math.min(w,Math.round(iw*.7));}
+  STG.on=on;STG.w=w;STG.g=on?Math.max(0,Math.floor((iw-w)/2)):0;STG.x=STG.g;
+  try{
+    var de=document.documentElement;
+    de.style.setProperty('--stw',w+'px');de.style.setProperty('--gut',STG.g+'px');
+    if(document.body)document.body.classList.toggle('ls',on);
+  }catch(eS){}
+  return w;
+}
+(function(){
+  function hook(proto){
+    try{
+      var d=proto&&Object.getOwnPropertyDescriptor(proto,'clientX');
+      if(!d||!d.get||d.get._stg)return;
+      var g0=d.get,ng=function(){return g0.call(this)-STG.x;};ng._stg=1;
+      Object.defineProperty(proto,'clientX',{configurable:true,enumerable:d.enumerable,get:ng});
+    }catch(eH){}
+  }
+  hook(window.MouseEvent&&MouseEvent.prototype);
+  hook(window.PointerEvent&&PointerEvent.prototype);
+  hook(window.Touch&&Touch.prototype);
+})();
 var skyRot=0;
 var skyZoom=1;
 var CAMERA_MODE=false;
@@ -1975,12 +2004,15 @@ function unlockAll(){
 }
 /* Tap bintang SFX yang masih terkunci: bisu, tapi kasih petunjuk (rate-limit biar nggak spam). */
 var _lockHintAt=0;
-function lockedHint(){
+function lockedHint(key){
   var n=performance.now();
   if(n-_lockHintAt<4200)return; /* > durasi toast, biar tap berulang nggak mengulang animasinya */
   _lockHintAt=n;
   haptic(6);
-  if(typeof showModeToast==='function')showModeToast('SIGNAL LOCKED\nALIGN THE CONSTELLATION IN CAMERA MODE',null,4000);
+  if(typeof showModeToast==='function'){
+    if(key==='pleione')showModeToast('PLEIADES LOCKED\nIN CAMERA MODE: SIRIUS → ORION BELT → ALDEBARAN\nONE STRAIGHT LINE',null,4200);
+    else showModeToast('SIGNAL LOCKED\nALIGN THE CONSTELLATION IN CAMERA MODE',null,4000);
+  }
 }
 
 function formatSrCount(){
@@ -2393,9 +2425,9 @@ cfInit();
    - Cuma jalan di Constellation Camera, kamera harus fokus ke rasi itu, dan cuma buat rasi yang MASIH terkunci.
    - Bintang SFX jadi titik terakhir urutan. Langkah sebelumnya cuma dihitung (SFX diam);
      langkah terakhir: unlock(cid) -> triggerSupernova -> popup.
-   - Pleiades nggak punya garis: alignment-nya lintas sektor (sabuk Orion -> Aldebaran), lihat PLE_CHAIN. */
+   - Pleiades nggak punya garis: alignment-nya garis lurus lintas rasi (Sirius -> sabuk Orion -> Aldebaran -> Pleiades), lihat PLE_CHAIN. */
 var ALIGN={cid:null,seq:[],next:0,lit:null,dim:0,toastAt:0,last:0,idle:15000};
-var PLE_CHAIN=[['orion','alnitak'],['orion','alnilam'],['orion','mintaka'],['taurus','aldebaran']];
+var PLE_CHAIN=[['canis','sirius'],['orion','alnitak'],['orion','alnilam'],['orion','mintaka'],['taurus','aldebaran']];
 var ALIGN_IDLE_MS=15000,ALIGN_IDLE_CHAIN=30000;
 function secondaryFxScale(){
   if(ALIGN.cid)return 1;
@@ -2453,7 +2485,7 @@ function beginPleChain(){
   document.body.classList.add('aligning'); /* portal DUMUL di sabuk Orion ngalah selama chain, sama kayak alignment Orion */
   if(typeof showModeToast==='function'&&performance.now()-ALIGN.toastAt>900){
     ALIGN.toastAt=performance.now();
-    showModeToast('ALIGNMENT · PLEIADES\nORION BELT → ALDEBARAN',null,2200);
+    showModeToast('ALIGNMENT · PLEIADES\nSIRIUS → ORION BELT → ALDEBARAN',null,2600);
   }
 }
 function endAlignment(ok){
@@ -2514,7 +2546,7 @@ function alignTapStar(c,starKey){
 var _beltHintAt=0;
 function beltHint(){
   var n=performance.now();if(n-_beltHintAt<3000)return;_beltHintAt=n;
-  if(typeof showModeToast==='function')showModeToast('PLEIADES LOCKED\nSTART THE BELT AT ALNITAK',null,2200);
+  if(typeof showModeToast==='function')showModeToast('PLEIADES LOCKED\nSTART AT SIRIUS · DRAW THE LINE THROUGH THE BELT',null,2800);
 }
 function pleChainTap(c,k){
   if(UNLOCK.set.pleiades)return false;
@@ -2523,7 +2555,7 @@ function pleChainTap(c,k){
   var isFirst=(c.id===first[0]&&k===first[1]);
   if(!on){
     if(!isFirst){
-      if(c.id===first[0]&&(k==='alnilam'||k==='mintaka')&&camFocusId()===first[0]&&!ALIGN.cid)beltHint();
+      if(c.id==='orion'&&(k==='alnitak'||k==='alnilam'||k==='mintaka')&&camFocusId()==='orion'&&!ALIGN.cid)beltHint();
       return false;
     }
     if(camFocusId()!==first[0])return false;
@@ -2540,7 +2572,12 @@ function pleChainTap(c,k){
     if(typeof haptic==='function')haptic(10);
     if(typeof tapFlash!=='undefined')tapFlash={until:performance.now()+520,cons:c.id};
     if(ALIGN.next>=S.length){alignDone('pleiades','pleione');return 'done';}
-    if(ALIGN.next===S.length-1&&typeof showModeToast==='function')showModeToast('BELT LOCKED\nSHIFT CAMERA FOCUS TO TAURUS',null,2200);
+    if(typeof showModeToast==='function'){
+      if(ALIGN.next===1)showModeToast('SIRIUS LOCKED\nSHIFT FOCUS TO ORION · BELT: ALNITAK → MINTAKA',null,2600);
+      else if(ALIGN.next===S.length-1)showModeToast('BELT LOCKED\nSHIFT CAMERA FOCUS TO TAURUS',null,2200);
+    }
+    /* Sirius/Aldebaran punya SFX sendiri: kalau rasinya sudah unlock, langkah tetap dihitung tapi SFX-nya boleh bunyi normal. */
+    if(c.id!=='orion'&&UNLOCK.set[c.id])return false;
     return 'step';
   }
   if(typeof haptic==='function')haptic(4);             /* langkah benar tapi kamera belum di sektor yang tepat */
@@ -2782,8 +2819,8 @@ PORTALS.forEach(function(p){
 
 /* ---------- judul selalu muat di layar, font apa pun yang kepakai ---------- */
 function fitTitle(){
-  var big=$('.big'),avail=Math.max(0,innerWidth-32),minSize=14;
-  var size=Math.min(innerWidth*.07,innerHeight*.10,56);
+  var big=$('.big'),avail=Math.max(0,(STG.w||innerWidth)-32),minSize=14;
+  var size=Math.min((STG.w||innerWidth)*.07,innerHeight*.10,56);
   var rg=document.createRange();rg.selectNodeContents(big);
   big.style.fontSize=size+'px';
   var measured=rg.getBoundingClientRect().width;
@@ -3027,7 +3064,7 @@ function plateBlit(c,m,pw,ph,z,ox,oy){
 
 function layout(){
   if(SW)return;
-  W=innerWidth;H=innerHeight;
+  W=stageCalc();H=innerHeight;
   try{document.body.classList.toggle('cam-compact',H<=560&&W>=H*1.3);_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
   DPR=IS_POTATO?1:Math.min(window.devicePixelRatio||1,2);
   G_DEPTH=0;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
@@ -3068,6 +3105,47 @@ function layout(){
     });
     if(c.nebula){c.nebula.x=x0+(c.nebula.rx-c.minx)*sc;c.nebula.y=y0+(c.nebula.ry-c.miny)*sc;}
   });
+  /* ---- Sektor Orion: komposisi ngikut gambar referensi ----
+     Orion, Taurus, Canis Major dipasang lewat transformasi kesamaan (geser + putar + skala seragam) => BENTUK rasi tidak berubah,
+     cuma posisi & rotasinya. Garis lurus alignment: Sirius -> sabuk Orion -> Aldebaran -> Pleiades.
+     Koordinat scene = peta bintang referensi (kira-kira 1000x830, y ke bawah), lalu di-fit ke layar. */
+  var SCN=(function(){
+    var D=Math.PI/180,
+        def={orion:{k:.7738,th:6.01,tx:-26.01,ty:106.39},
+             taurus:{k:.7241,th:5.3,tx:312.95,ty:-58.3},
+             canis:{k:.5417,th:4,pv:[445,316],at:[3.05,938.8]}},
+        PC=[745.1,209.9],PS=170,ids=['orion','taurus','canis'],pts=[],i,j,k2,c,f,p,st;
+    function mk(d){
+      var cs=Math.cos(d.th*D)*d.k,sn=Math.sin(d.th*D)*d.k,tx=d.tx,ty=d.ty;
+      if(d.pv){tx=d.at[0]-(cs*d.pv[0]-sn*d.pv[1]);ty=d.at[1]-(sn*d.pv[0]+cs*d.pv[1]);}
+      return function(x,y){return [cs*x-sn*y+tx,sn*x+cs*y+ty];};
+    }
+    for(i=0;i<ids.length;i++){
+      c=cons(ids[i]);if(!c)return null;
+      f=mk(def[ids[i]]);
+      for(k2 in c.stars){st=c.stars[k2];p=f(st.rx,st.ry);st._sx=p[0];st._sy=p[1];pts.push(p);}
+      if(c.nebula){p=f(c.nebula.rx,c.nebula.ry);c.nebula._sx=p[0];c.nebula._sy=p[1];}
+    }
+    PLEIADES.bright.concat(PLEIADES.dim).forEach(function(z){pts.push([PC[0]+(z.x-.53)*PS,PC[1]+(z.y-.42)*PS]);});
+    var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+    for(j=0;j<pts.length;j++){mnx=Math.min(mnx,pts[j][0]);mxx=Math.max(mxx,pts[j][0]);mny=Math.min(mny,pts[j][1]);mxy=Math.max(mxy,pts[j][1]);}
+    var m=Math.max(14,W*.04),aL=m,aR=W-m,aT=top+8,aB=bot-34,bw=mxx-mnx,bh=mxy-mny,
+        fs=Math.min((aR-aL)/bw,(aB-aT)/bh),
+        offx=aL+((aR-aL)-bw*fs)/2-mnx*fs,offy=aT+((aB-aT)-bh*fs)/2-mny*fs;
+    for(i=0;i<ids.length;i++){
+      c=cons(ids[i]);c.maxX=-1e9;c.maxY=-1e9;c.minX=1e9;c.minY=1e9;c.scale=fs*def[ids[i]].k;
+      for(k2 in c.stars){
+        st=c.stars[k2];st.x=offx+st._sx*fs;st.y=offy+st._sy*fs;
+        c.maxX=Math.max(c.maxX,st.x);c.maxY=Math.max(c.maxY,st.y);c.minX=Math.min(c.minX,st.x);c.minY=Math.min(c.minY,st.y);
+      }
+      if(c.nebula){c.nebula.x=offx+c.nebula._sx*fs;c.nebula.y=offy+c.nebula._sy*fs;}
+    }
+    PLEIADES.scale=PS*fs;
+    PLEIADES.x=offx+(PC[0]-.53*PS)*fs;
+    PLEIADES.y=offy+(PC[1]-.42*PS)*fs;
+    PLEIADES.ready=true;
+    return {f:fs};
+  })();
   /* ---- shared anti-lensing / anti-clip helpers ----
      Rather than hand-tuning fragile pixel offsets per breakpoint, both
      Boötes and the Pleiades get a runtime safety pass: measure how close
@@ -3159,6 +3237,7 @@ function layout(){
   })();
   /* Pleiades: Presisi di atas Taurus/Aldebaran sesuai petunjuk */
   (function(){
+    if(SCN)return; /* posisi Pleiades sudah ditentukan scene referensi */
     var ad = cons('taurus').stars.aldebaran;
     
     // Skala cluster diperkecil sedikit agar pas di ceruk Taurus

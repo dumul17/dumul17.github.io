@@ -830,3 +830,19 @@ body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 146px + 8px)!importa
 body.sect-ov .cap,body.sect-ov .hit,body.sect-ov #betel-fx,body.sect-ov #rigel-fx{display:none!important}
 body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!important}
 body.sect-in-orion #arcturus-fx,body.sect-in-orion #antares-fx,body.sect-in-virgo #rigel-fx,body.sect-in-virgo #betel-fx,body.sect-in-virgo #sirius-fx,body.sect-in-virgo #pleione-fx,body.sect-in-virgo #aldebaran-fx{display:none!important}
+
+/* ===== Landscape stage (body.ls) =====
+   Sky = kolom portrait di tengah (lebar --stw). Semua elemen position:fixed otomatis relatif ke kolom (body ber-transform).
+   Panel digeser ke gutter kiri/kanan lewat properti `translate` (terpisah dari `transform` yang dipakai animasi/JS). */
+body.ls{width:var(--stw);margin:0 auto;height:100%;position:relative;transform:translateZ(0)}
+body.ls #boot-screen,body.ls #veil,body.ls .scan,body.ls #tesseract-warp{left:calc(-1 * var(--gut));right:calc(-1 * var(--gut));width:auto}
+/* kanan: cluster musik + mode + now-playing + owl */
+body.ls #music-player,body.ls #music-toggle,body.ls #mp-now-playing,body.ls #mode-cluster,body.ls #owl-source{translate:var(--gut) 0}
+/* kanan: info kamera (nama/data rasi + zoom) di atas, rapi di tengah gutter */
+body.ls #cam-whisper,body.ls #cam-zoom{translate:calc(var(--stw) / 2 + var(--gut) / 2) 0;width:min(270px,calc(var(--gut) - 28px))}
+body.ls #cam-whisper{top:calc(8px + env(safe-area-inset-top,0px))}
+body.ls #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+/* kiri: radar sector scan */
+body.ls #sector-scan{translate:calc(-1 * var(--gut)) 0;left:12px;right:auto;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+/* kiri: last signal, biar gak nutup sky */
+body.ls #last-signal{translate:calc(-1 * (var(--stw) / 2 + var(--gut) / 2)) 0;width:min(280px,calc(var(--gut) - 28px))}
