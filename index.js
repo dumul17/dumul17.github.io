@@ -1280,8 +1280,8 @@ function spatialHint(t){
   if(st===AV._hint)return;
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
-  if(st==='muffled')showModeToast('SIGNAL MUFFLED · SOURCE TOO FAR\nSUMMON 🕳️ INSIDE ITS SECTOR TO CLEAR IT',null,4200);
-  else showModeToast('RELAY LINKED · SIGNAL CLEAR\nRECALL 🕳️ IN THE SECTOR TO MUFFLE AGAIN',null,3600);
+  if(st==='muffled')showModeToast('SIGNAL MUFFLED · SOURCE TOO FAR\nSUMMON 🌀 INSIDE ITS SECTOR TO CLEAR IT',null,4200);
+  else showModeToast('RELAY LINKED · SIGNAL CLEAR\nRECALL 🌀 IN THE SECTOR TO MUFFLE AGAIN',null,3600);
 }
 function spatialRelease(){
   AV.atten=0;AV._hint='';
@@ -6067,15 +6067,78 @@ function sectToggle(){
   if(SECT.phase==='sec')sectZoomOut();
 }
 /* ---- Gargantua = sektor 0. Di dalam sektor dia disembunyikan; tombol 🕳️ memanggilnya kecil (seukuran pulse) & bebas di-parkir ---- */
+/* Soft proximity of summoned mini-BH to rasi/cluster mass. Continuous field, no hard edge. */
+function bhNearFactor(){
+  if(!SECT.cur||!SUM.on||!W||!H)return 0;
+  var bx=BH.x,by=BH.y,i,cs,cx,cy,hw,hh,dx,dy,d,R,w,acc=0,wSum=0;
+  var field=Math.max(100,Math.min(W,H)*.42); /* outer soft influence */
+  for(i=0;i<CONS.length;i++){
+    cs=CONS[i];
+    if(!cs||!sectShow(cs.id)||!(cs.maxX>-1e8))continue;
+    cx=(cs.minX+cs.maxX)*.5;cy=(cs.minY+cs.maxY)*.5;
+    hw=Math.max(28,(cs.maxX-cs.minX)*.55);hh=Math.max(28,(cs.maxY-cs.minY)*.55);
+    /* Distance to axis-aligned cluster bounds (0 inside the cloud) */
+    dx=Math.max(Math.abs(bx-cx)-hw,0);dy=Math.max(Math.abs(by-cy)-hh,0);
+    d=Math.hypot(dx,dy);
+    R=field+Math.max(hw,hh)*.35;
+    /* Gravity-like falloff: 1/(1+(d/R)^2) — continuous, never snaps */
+    w=1/(1+(d/R)*(d/R));
+    acc+=w*w; /* bias toward nearest strong peak without hard max */
+    wSum+=w;
+  }
+  if(sectShow('pleiades')&&typeof PLEIADES!=='undefined'&&PLEIADES.ready&&PLEIADES.scale){
+    cx=PLEIADES.x+.53*PLEIADES.scale;cy=PLEIADES.y+.42*PLEIADES.scale;
+    hw=Math.max(36,PLEIADES.scale*.55);hh=hw;
+    dx=Math.max(Math.abs(bx-cx)-hw,0);dy=Math.max(Math.abs(by-cy)-hh,0);
+    d=Math.hypot(dx,dy);
+    R=field+hw*.35;
+    w=1/(1+(d/R)*(d/R));
+    acc+=w*w;wSum+=w;
+  }
+  if(wSum<=1e-6)return 0;
+  /* Soft peak in [0,1], smoothstep for cinematic ramp */
+  var f=Math.max(0,Math.min(1,acc/(acc*.35+0.55)));
+  return f*f*(3-2*f);
+}
 function bhScaleTarget(){
   if(SW)return 1;
-  if(SECT.cur)return SUM.on?Math.min(1,SUM_R/Math.max(1,BH.R)):0;
+  if(SECT.cur){
+    if(!SUM.on)return 0;
+    var base=Math.min(1,SUM_R/Math.max(1,BH.R)); /* mini parked size */
+    var f=bhNearFactor();
+    /* Near mass → grow toward full overview size; curve keeps mid-range readable */
+    return base+(1-base)*(0.08*f+0.92*f*f);
+  }
   if(SECT.phase==='in')return 0;
   return 1;
 }
+/* Critically-damped-ish scale so drag growth feels heavy, not laggy or snappy. */
+var _bhScV=0,_bhScT=0;
 function bhScaleStep(){
   var t=bhScaleTarget();
-  if(Math.abs(t-BHSC)>.002)BHSC+=(t-BHSC)*.14;else BHSC=t;
+  var now=performance.now();
+  var dt=Math.min(50,_bhScT?now-_bhScT:16)/1000;_bhScT=now;
+  if(!(SECT.cur&&SUM.on)){
+    /* Default ease when leaving sector / recalling */
+    _bhScV=0;
+    var k=0.14;
+    if(Math.abs(t-BHSC)>.002)BHSC+=(t-BHSC)*k;else BHSC=t;
+  }else{
+    /* Spring toward target. Stiffer while dragging so it tracks the hand;
+       softer when released so size settles with weight. */
+    var stiff=drag.on?18:9;
+    var damp=drag.on?0.82:0.88;
+    var a=(t-BHSC)*stiff;
+    _bhScV=_bhScV*Math.pow(damp,dt*60)+a*dt;
+    /* Clamp velocity so a long fling cannot overshoot wildly */
+    var vmax=drag.on?2.8:1.6;
+    if(_bhScV>vmax)_bhScV=vmax;else if(_bhScV<-vmax)_bhScV=-vmax;
+    BHSC+=_bhScV*dt;
+    if(BHSC<0){BHSC=0;_bhScV=0;}
+    if(BHSC>1){BHSC=1;_bhScV*=.3;}
+    /* Snap residual when nearly settled */
+    if(!drag.on&&Math.abs(t-BHSC)<.003&&Math.abs(_bhScV)<.02){BHSC=t;_bhScV=0;}
+  }
   if(SECT.cur&&!SUM.on&&BHSC<.02&&!drag.on){BH.x=BH.hx;BH.y=BH.hy;}
   var hid=BHSC<.05;
   try{
