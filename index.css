@@ -372,23 +372,23 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
   pointer-events: auto;
 }
 /* Hard cut the old Gargantua renderer behind the transition. The transition owns the screen now. */
-body.tesseract-running > #sky,
-body.tesseract-running > .scan,
-body.tesseract-running > #header,
-body.tesseract-running > footer,
-body.tesseract-running > #bh,
-body.tesseract-running > #bh-clock,
-body.tesseract-running > .portal,
-body.tesseract-running > .hit,
-body.tesseract-running > #owl-source,
-body.tesseract-running > #music-toggle,
-body.tesseract-running > #mp-now-playing,
-body.tesseract-running > #music-player,
-body.tesseract-running > #veil,
-body.tesseract-running > #terminal,
-body.tesseract-running > #secret-msg,
-body.tesseract-running > #tele-greet,
-body.tesseract-running > .supernova-flash { visibility:hidden !important; }
+body.tesseract-running #sky,
+body.tesseract-running .scan,
+body.tesseract-running #header,
+body.tesseract-running footer,
+body.tesseract-running #bh,
+body.tesseract-running #bh-clock,
+body.tesseract-running .portal,
+body.tesseract-running .hit,
+body.tesseract-running #owl-source,
+body.tesseract-running #music-toggle,
+body.tesseract-running #mp-now-playing,
+body.tesseract-running #music-player,
+body.tesseract-running #veil,
+body.tesseract-running #terminal,
+body.tesseract-running #secret-msg,
+body.tesseract-running #tele-greet,
+body.tesseract-running .supernova-flash { visibility:hidden !important; }
 body.tesseract-running { background:#0a1218 !important; }
 #tesseract-canvas {
   position: absolute;
@@ -832,17 +832,18 @@ body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!im
 body.sect-in-orion #arcturus-fx,body.sect-in-orion #antares-fx,body.sect-in-virgo #rigel-fx,body.sect-in-virgo #betel-fx,body.sect-in-virgo #sirius-fx,body.sect-in-virgo #pleione-fx,body.sect-in-virgo #aldebaran-fx{display:none!important}
 
 /* ===== Landscape stage (body.ls) =====
-   Sky = kolom portrait di tengah (lebar --stw). Semua elemen position:fixed otomatis relatif ke kolom (body ber-transform).
-   Panel digeser ke gutter kiri/kanan lewat properti `translate` (terpisah dari `transform` yang dipakai animasi/JS). */
+   #stage = wadah sky (canvas, header, footer, rasi, BH, portal, bubble). Portrait: display:contents (tidak ada efek).
+   Landscape: stage berukuran portrait virtual (--vw x --vh) lalu di-scale seragam (--k) ke tinggi layar, jadi komposisinya SAMA PERSIS dengan portrait.
+   Panel tetap di luar stage dan digeser ke gutter lewat `translate`. */
+#stage{display:contents}
 body.ls{width:var(--stw);margin:0 auto;height:100%;position:relative;transform:translateZ(0)}
+body.ls #stage{display:block;position:fixed;left:0;top:0;width:var(--vw);height:var(--vh);transform-origin:0 0;scale:var(--k);z-index:5;pointer-events:none}
+body.ls #stage > *{pointer-events:auto}
+body.ls #stage > #sky,body.ls #stage > #secret-msg,body.ls #stage > #tele-greet,body.ls #stage > #sn-flash{pointer-events:none}
 body.ls #boot-screen,body.ls #veil,body.ls .scan,body.ls #tesseract-warp{left:calc(-1 * var(--gut));right:calc(-1 * var(--gut));width:auto}
-/* kanan: cluster musik + mode + now-playing + owl */
 body.ls #music-player,body.ls #music-toggle,body.ls #mp-now-playing,body.ls #mode-cluster,body.ls #owl-source{translate:var(--gut) 0}
-/* kanan: info kamera (nama/data rasi + zoom) di atas, rapi di tengah gutter */
 body.ls #cam-whisper,body.ls #cam-zoom{translate:calc(var(--stw) / 2 + var(--gut) / 2) 0;width:min(270px,calc(var(--gut) - 28px))}
 body.ls #cam-whisper{top:calc(8px + env(safe-area-inset-top,0px))}
 body.ls #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
-/* kiri: radar sector scan */
 body.ls #sector-scan{translate:calc(-1 * var(--gut)) 0;left:12px;right:auto;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-/* kiri: last signal, biar gak nutup sky */
 body.ls #last-signal{translate:calc(-1 * (var(--stw) / 2 + var(--gut) / 2)) 0;width:min(280px,calc(var(--gut) - 28px))}
