@@ -2366,6 +2366,10 @@ function showModeToast(text,kind,ms){
   },ms||2200);
 }
 
+function observeIcon(){
+  /* Overview: 🌠 · inside a sector: 🔍 */
+  return (typeof SECT!=='undefined'&&SECT.cur)?'🔍':'🌠';
+}
 function setObserveMode(on){
   OBSERVE_MODE=!!on;
   if(typeof termNoteObserve==='function')termNoteObserve(OBSERVE_MODE);
@@ -2374,7 +2378,7 @@ function setObserveMode(on){
   if(btn){
     btn.classList.toggle('on',OBSERVE_MODE);
     btn.setAttribute('aria-pressed',OBSERVE_MODE?'true':'false');
-    btn.textContent='👁️';
+    btn.textContent=observeIcon();
     btn.title=OBSERVE_MODE?'Exit Observation':'Observation Mode';
     btn.setAttribute('aria-label',OBSERVE_MODE?'Exit Observation':'Observation Mode');
   }
@@ -6018,6 +6022,7 @@ function sectSet(on){
   try{var bc=document.body.classList;bc.toggle('sect-ov',SECT.on);
     bc.toggle('sect-in',!SECT.on&&!!SECT.cur);
     bc.toggle('sect-in-orion',!SECT.on&&!!SECT.cur&&SECT.cur.k==='orion');bc.toggle('sect-in-virgo',!SECT.on&&!!SECT.cur&&SECT.cur.k==='virgo');}catch(e){}
+  try{var ob=document.getElementById('mode-observe');if(ob)ob.textContent=observeIcon();}catch(eO){}
   if(SECT.on){try{syncSkyPanHits();}catch(e){}}
 }
 function sectGlyph(c,cx,cy,box,al){
@@ -6856,6 +6861,7 @@ function updateHover(px,py){
   else if(hot!=='bh'&&hot!=='spica'&&hot!=='rigel'&&hot!=='betel'&&hot!=='sirius'&&hot!=='aldebaran'&&hot!=='arcturus'&&hot!=='antares')hot=null;
 }
 document.addEventListener('pointerdown',function(e){
+  if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return;
   if(SECT.on||SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
@@ -6929,13 +6935,19 @@ document.addEventListener('pointerdown',function(e){
     btn.setAttribute('aria-expanded','true');
     try{haptic(8);}catch(e){}
   }
+  var blockUntil=0;
   function closeOwl(){
     panel.classList.remove('on');
     if(back)back.classList.remove('on');
-    document.body.classList.remove('owl-open');
     panel.setAttribute('aria-hidden','true');
     if(back)back.setAttribute('aria-hidden','true');
     btn.setAttribute('aria-expanded','false');
+    /* Suppress hits under the panel for one short window so close-X cannot open a sector */
+    blockUntil=performance.now()+400;
+    document.body.classList.add('owl-block');
+    document.body.classList.remove('owl-open');
+    clearTimeout(closeOwl._t);
+    closeOwl._t=setTimeout(function(){document.body.classList.remove('owl-block');},420);
   }
   /* Panel brand + link icons glitch; glitchUntil shakes sky layer briefly (header-era feel, scoped to this tap) */
   function brandGlitch(){
@@ -6957,7 +6969,10 @@ document.addEventListener('pointerdown',function(e){
     e.preventDefault();e.stopPropagation();
     if(panel.classList.contains('on'))closeOwl();else openOwl();
   });
-  if(closeB)closeB.addEventListener('click',function(e){e.stopPropagation();closeOwl();});
+  if(closeB){
+    closeB.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();});
+    closeB.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();closeOwl();});
+  }
   if(back){
     back.addEventListener('pointerdown',swallow);
     back.addEventListener('click',function(e){e.stopPropagation();closeOwl();});
@@ -7012,6 +7027,7 @@ function beginBHDrag(e){
   if(reduce||SW||drag.on||BHSC<.05)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
+  if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
   if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;

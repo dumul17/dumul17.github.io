@@ -112,7 +112,8 @@ body.sw{pointer-events:none}
 #owl-backdrop.on{opacity:1;pointer-events:auto}
 #owl-panel{position:fixed;left:50%;top:50%;z-index:41;width:min(90vw,280px);max-width:calc(100vw - 24px);box-sizing:border-box;padding:14px 12px 12px;border:1px solid rgba(110,229,255,.32);border-radius:8px;background:rgba(2,8,13,.94);box-shadow:0 0 28px rgba(110,229,255,.14),inset 0 0 20px rgba(110,229,255,.04);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transform:translate(-50%,-46%) scale(.96);opacity:0;pointer-events:none;visibility:hidden;transition:opacity .3s ease,transform .32s cubic-bezier(.22,.7,.3,1),visibility 0s linear .32s}
 #owl-panel.on{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto;visibility:visible;transition:opacity .3s ease,transform .32s cubic-bezier(.22,.7,.3,1),visibility 0s}
-body.owl-open #sky,body.owl-open .hit,body.owl-open .portal,body.owl-open #bh,body.owl-open #stage{pointer-events:none!important}
+body.owl-open #sky,body.owl-open .hit,body.owl-open .portal,body.owl-open #bh,body.owl-open #stage,
+body.owl-block #sky,body.owl-block .hit,body.owl-block .portal,body.owl-block #bh,body.owl-block #stage{pointer-events:none!important}
 body.owl-open #owl-panel,body.owl-open #owl-backdrop,body.owl-open #owl-source{pointer-events:auto!important}
 #owl-panel .owl-close{position:absolute;top:4px;right:4px;width:28px;height:28px;border:0;background:none;color:rgba(214,228,240,.55);font:300 20px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .2s;z-index:1}
 #owl-panel .owl-close:hover,#owl-panel .owl-close:focus-visible{color:#6ee5ff}
