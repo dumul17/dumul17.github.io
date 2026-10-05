@@ -529,7 +529,7 @@ var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');
 var SFX={rigel:mkAudio('rigel.opus',.85,false,'metadata'),spica:mkAudio('spica.opus',.85,false,'metadata'),betel:mkAudio('betelgeuse.opus',.85,false,'metadata'),sirius:mkAudio('sirius.opus',.85,false,'metadata'),pleione:mkAudio('pleione.opus',.85,false,'metadata'),aldebaran:mkAudio('aldebaran.opus',.85,false,'metadata')};
 SFX.arcturus=mkAudio('arcturus.opus',.85,false,'metadata');
 SFX.antares=mkAudio('antares.opus',.85,false,'metadata');
-function mkAudio(name,vol,loop,preloadMode){var a=new Audio('audio/'+encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;return a;}
+function mkAudio(name,vol,loop,preloadMode){var a=new Audio('audio/'+encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;a._bv=vol;return a;}
 function safePlay(a){
   if(!a)return false;
   try{
@@ -1197,7 +1197,7 @@ function spatialHint(t){
 function spatialRelease(){
   AV.atten=0;AV._hint='';
   if(AV._lpfLow&&AV.lpf&&AV.ctx){AV._lpfLow=false;try{AV.lpf.frequency.setTargetAtTime(16000,AV.ctx.currentTime,.06);}catch(e){}}
-  if(AV._volLow&&AV._volEl){try{AV._volEl.volume=.85;}catch(e2){}AV._volLow=false;AV._volEl=null;}
+  if(AV._volEl){try{AV._volEl.volume=AV._volEl._bv||.85;}catch(e2){}AV._volLow=false;AV._volEl=null;}
 }
 /* Ada 2 jalur: (A) lowpass Web Audio (kalau graph jalan), (B) fallback volume <audio> (potato / WebView yang
    gagal createMediaElementSource) supaya efek "tenggelam" tetap kedengeran. */
@@ -1218,11 +1218,12 @@ function updateSpatialAttenuation(){
     try{if(AV.lpf.frequency.setTargetAtTime)AV.lpf.frequency.setTargetAtTime(hz,AV.ctx.currentTime,.06);else AV.lpf.frequency.value=hz;}catch(eHz){}
     /* kalau context suspended (autoplay policy) filter tidak ngapa-ngapain; bangunin */
     if(AV.ctx.state!=='running')unlockAudioGraph();
-    if(AV._volLow&&AV._volEl){try{AV._volEl.volume=.85;}catch(eR){}AV._volLow=false;AV._volEl=null;}
+    if(AV._volEl){try{AV._volEl.volume=AV._volEl._bv||.85;}catch(eR){}AV._volLow=false;AV._volEl=null;}
   }else{
     /* Fallback: redam lewat volume (tidak bisa lowpass tanpa Web Audio) */
+    if(AV._volEl&&AV._volEl!==activeSfx){try{AV._volEl.volume=AV._volEl._bv||.85;}catch(eP){}}
     AV._volEl=activeSfx;AV._volLow=AV.atten>0;
-    try{activeSfx.volume=Math.max(.06,.85*(1-.88*Math.pow(AV.atten,.8)));}catch(eV){}
+    try{activeSfx.volume=Math.max(.06,(activeSfx._bv||.85)*(1-.88*Math.pow(AV.atten,.8)));}catch(eV){}
   }
   spatialHint(t);
   spatialDbg('MUFFLE '+(useLpf?'LPF':'VOLUME-FALLBACK')+'\npotato='+IS_POTATO+' fb='+AV.fallback+' ready='+AV.ready+' lpf='+!!AV.lpf+'\nctx='+(AV.ctx?AV.ctx.state:'none')+'\nsect.on='+SECT.on+' busy='+SECT.busy+' cam='+CAMERA_MODE+'\ntarget='+t.toFixed(2)+' atten='+AV.atten.toFixed(2));
@@ -1580,6 +1581,10 @@ function playSfx(a){
   var lk=keyFromAudio(a);if(lk&&!isUnlocked(lk))return;
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   if(a.preload!=='auto'){a.preload='auto';}
+  /* Replay-safe: SFX yang sudah habis dianggap mulai baru (bukan toggle pause), volume balik ke dasar. */
+  if(a.ended){safeReset(a);if(activeSfx===a){a.onended=null;activeSfx=null;}}
+  try{a.volume=a._bv||.85;}catch(eBv){}
+  if(AV._volEl===a){AV._volEl=null;AV._volLow=false;}
   if(activeSfx===a){
     if(a.paused){
       pauseMusicForSfx();
@@ -1598,6 +1603,7 @@ function playSfx(a){
   if(activeSfx&&activeSfx!==a){
     activeSfx.onended=null;
     safeReset(activeSfx);
+    try{activeSfx.volume=activeSfx._bv||.85;}catch(eOv){}
   }
   activeSfx=a;
   setAVColor(a,false);
@@ -2827,7 +2833,7 @@ function bakeDustLayers(M,EW,EH){
     plateDust.push({c:cvs,par:d.par,amp:d.amp,per:d.per,zf:d.zf,ph:li*2.1});
   }
 }
-var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null,sx:0,sy:0,hitR:40};
+var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null,sx:0,sy:0,hitR:40,al:1,away:false,orbitR:38,followKind:null,followSect:null,busyShown:false};
 function telescopeHitRadius(){
   /* Generous mobile-friendly target; scales a bit with viewport. */
   var base=(typeof touchMode!=='undefined'&&touchMode)?48:36;
@@ -4402,6 +4408,64 @@ function drawDistantGalaxies(now){
     g.restore();
   }
 }
+/* ---- Teleskop x sektor ----
+   Home/overview : teleskop ngorbit IKON sektor yang SFX-nya lagi aktif.
+   Dalam sektor sumber : ngorbit bintangnya (alur lama via triggerSupernova).
+   Sektor lain (SFX aktif di sektor berbeda) : teleskop "sibuk", menghilang + bubble pamit. */
+var TELE_BUSY_MSG=["I'm busy tracking {s}. Can't come along.","Occupied. The signal in {s} still needs me.","Not now. I'm still listening to {s}.","Sorry. {s} has my lens for now."];
+function teleStarFollow(key){
+  var tr=TRIGGERS[key];if(!tr)return null;
+  var c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons);if(!c)return null;
+  var st=tr.cons==='pleiades'?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:c.stars[tr.star];
+  if(!st)return null;
+  return function(){
+    var fx=tr.cons==='pleiades'?(PLEIADES.x+st.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(st.x+c.ox),
+        fy=tr.cons==='pleiades'?(PLEIADES.y+st.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(st.y+c.oy);
+    return skyXF(fx,fy);
+  };
+}
+function teleIconFollow(sc){
+  return function(){
+    if(sc.bx==null)return null;
+    return skyXF(sc.bx+(SECT.mx||0),sc.by+(SECT.my||0));
+  };
+}
+function teleSectorLogic(dt){
+  var T=TELESCOPE;
+  if(SW)return;
+  var on=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);
+  var key=on?keyFromAudio(activeSfx):null,src=on?sfxSector():null,away=false;
+  if(src){
+    if(SECT.cur&&src!==SECT.cur)away=true;
+    else if(SECT.busy&&SECT.phase==='in'&&SECT.target&&SECT.target!==src)away=true;
+    if(SECT.on||SECT.busy||away){                                   /* berbasis ikon sektor */
+      if(T.followKind!=='icon'||T.followSect!==src){
+        T.follow=teleIconFollow(src);T.followKind='icon';T.followSect=src;
+        T.orbitR=Math.max(40,Math.max(20,Math.min(30,W*.07))+18);
+        if(T.mode==='drift')T.mode='warp';
+      }
+    }else if(SECT.cur===src&&T.followKind==='icon'){                /* masuk sektor sumber: pindah ke bintangnya */
+      var sf=key?teleStarFollow(key):null;
+      if(sf){T.follow=sf;T.followKind='star';T.followSect=null;T.orbitR=38;T.mode='warp';T.onWarpComplete=null;}
+    }
+  }
+  if(!T.follow)T.followKind=null;
+  /* sibuk: fade out + bubble sekali per masuk sektor */
+  T.away=away;
+  T.al+=((away?0:1)-T.al)*Math.min(1,dt*6);
+  if(T.al>.985)T.al=1;
+  if(away&&SECT.cur&&!T.busyShown){
+    T.busyShown=true;
+    try{
+      if(TG&&TG.el&&typeof tgShow==='function'){
+        var nm=src.name||'another sector',m=TELE_BUSY_MSG[(Math.random()*TELE_BUSY_MSG.length)|0].replace('{s}',nm);
+        TG.anchor=[(W||innerWidth)*.5,(H||innerHeight)*.34];
+        tgShow(m);
+      }
+    }catch(eB){}
+  }
+  if(!away)T.busyShown=false;
+}
 function drawFloatingTelescope(now){
   /* Free-floating telescope: drift / warp / orbit state machine.
      Warp + orbit triggered by star supernova; otherwise inertial drift. */
@@ -4429,6 +4493,7 @@ function drawFloatingTelescope(now){
   }
   var dt=Math.min(40,Math.max(0,now-(TELESCOPE.last||now)))/1000;
   TELESCOPE.last=now;
+  try{teleSectorLogic(dt);}catch(eTs){}
 
   /* --- Movement logic by mode --- */
   if((TELESCOPE.mode==='warp'||TELESCOPE.mode==='orbit')&&TELESCOPE.follow){
@@ -4468,7 +4533,7 @@ function drawFloatingTelescope(now){
     }else{
       /* Orbit the active star */
       TELESCOPE.orbitAngle+=dt*1.2;
-      var orbitRadius=38;
+      var orbitRadius=TELESCOPE.orbitR||38;
       var ok=Math.min(1,dt*9);
       TELESCOPE.ocx+=(TELESCOPE.targetX-TELESCOPE.ocx)*ok;TELESCOPE.ocy+=(TELESCOPE.targetY-TELESCOPE.ocy)*ok;
       TELESCOPE.x=TELESCOPE.ocx+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
@@ -4538,7 +4603,7 @@ function drawFloatingTelescope(now){
   }
   TELESCOPE.hitR=telescopeHitRadius();
 
-  for(var ci=0;ci<copies.length;ci++){
+  for(var ci=0;TELESCOPE.al>.02&&ci<copies.length;ci++){
     var tqx=TELESCOPE.x+copies[ci][0],tqy=TELESCOPE.y+copies[ci][1];
     var tq=SW?swallowedTelescope:lens(tqx,tqy);
     if(!tq)continue;
@@ -4547,7 +4612,7 @@ function drawFloatingTelescope(now){
     g.translate(tq[0],tq[1]);
     g.rotate(TELESCOPE.ang);
     g.scale(sc,sc);
-    g.globalAlpha=1;
+    g.globalAlpha=TELESCOPE.al;
 
     /*
       Solid Hubble-like silhouette.
@@ -5485,6 +5550,7 @@ function telescopeScreenPos(){
   return [q[0],q[1]];
 }
 function telescopeHitAt(px,py){
+  if(TELESCOPE.al<.5)return false;
   var r=TELESCOPE.hitR||telescopeHitRadius();
   var tp=telescopeScreenPos();
   if(tp&&Math.hypot(px-tp[0],py-tp[1])<r)return true;
@@ -5968,6 +6034,7 @@ function drawSectorOverview(now,age){
       mx=reduce?0:mouse.x*7+skyPan.x,my=reduce?0:mouse.y*5+skyPan.y;
   if(reduce){mx=skyPan.x;my=skyPan.y;}
   if(SECT.busy){mx=skyPan.x;my=skyPan.y;}
+  SECT.mx=mx;SECT.my=my;
   SECT.vis+=((OBSERVE_MODE?0:1)-SECT.vis)*.12; /* mode 👁️: ikon sektor memudar, tinggal kanvas */
   if(SECT.vis<.01){SECT.vis=0;for(var j=0;j<n;j++)SECT.list[j].sx=null;return;}
   for(var i=0;i<n;i++){
@@ -6581,6 +6648,7 @@ function triggerSupernova(key){
     return skyXF(fx,fy); /* pre-gravity: the telescope draw applies lens() itself */
   };
   var ft=TELESCOPE.follow();TELESCOPE.targetX=ft[0];TELESCOPE.targetY=ft[1];
+  TELESCOPE.followKind='star';TELESCOPE.followSect=null;TELESCOPE.orbitR=38;
   TELESCOPE.onWarpComplete=function(){sfxArrive(key);};
 }
 function sfxArrive(key){
@@ -7550,9 +7618,9 @@ function tgChoose(gap,fresh,hour,nowMs){
   return pool[i].replace('{d}',d).replace('{w}',Math.floor(d/7)).replace('{m}',Math.floor(d/30));
 }
 function placeTeleGreet(){
-  var el=TG&&TG.el,p=telescopeScreenPos();
+  var el=TG&&TG.el,p=TG&&TG.anchor?TG.anchor:telescopeScreenPos();
   if(!el||!p)return;
-  var gap=touchMode?10:12,pad=10,maxW=Math.min(220,(W||innerWidth||360)*.72);
+  var gap=TG&&TG.anchor?0:(touchMode?10:12),pad=10,maxW=Math.min(220,(W||innerWidth||360)*.72);
   var x=Math.max(pad+maxW*.5,Math.min((W||innerWidth)-pad-maxW*.5,p[0])),y=p[1]-gap;
   y=Math.max(pad+36,Math.min((H||innerHeight)-pad,y));
   el.style.left=Math.round(x)+'px';el.style.top=Math.round(y)+'px';
@@ -7560,7 +7628,7 @@ function placeTeleGreet(){
 function teleGreetFollow(){if(TG&&TG.on)placeTeleGreet();}
 function teleGreetHide(){
   var el=TG&&TG.el;if(!el||!TG.on)return;
-  clearTimeout(el._t);clearTimeout(el._type);TG.on=false;el.classList.remove('on');
+  clearTimeout(el._t);clearTimeout(el._type);TG.on=false;TG.anchor=null;el.classList.remove('on');
 }
 function tgShow(msg){
   var el=TG.el;if(!el)return;
