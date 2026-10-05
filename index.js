@@ -3242,9 +3242,12 @@ function layout(){
       }
       if(c.nebula){c.nebula.x=offx+c.nebula._sx*fs;c.nebula.y=offy+c.nebula._sy*fs;}
     }
-    PLEIADES.scale=PS*fs;
-    PLEIADES.x=offx+(PC[0]-.53*PS)*fs;
-    PLEIADES.y=offy+(PC[1]-.42*PS)*fs;
+    /* PS dikali fs (faktor fit-layar, bisa ~1.9 di HP) => PS=75 tampil ~140. PK = pengecil khusus ukuran tampilan,
+       titik tengah cluster tetap di tempat yang sama. Mau lebih kecil/besar? ubah PK aja. */
+    var PK=.55,psc=PS*fs*PK;
+    PLEIADES.scale=psc;
+    PLEIADES.x=offx+PC[0]*fs-.53*psc;
+    PLEIADES.y=offy+PC[1]*fs-.42*psc;
     PLEIADES.ready=true;
     return {f:fs};
   })();
@@ -6047,6 +6050,33 @@ function sectHaloSprite(empty){
   x.fillStyle=gr;x.beginPath();x.arc(48,48,48,0,6.283);x.fill();
   SECT_HALO[k]=c;return c;
 }
+/* Glyph rasi di-render SEKALI ke canvas kecil (sprite), lalu tinggal drawImage per frame. */
+var GLYPH_SPR={},GLYPH_URL={},GLYPH_PX=96;
+function glyphSprite(id){
+  var c=GLYPH_SPR[id];if(c)return c;
+  c=document.createElement('canvas');c.width=c.height=GLYPH_PX;
+  var og=g;g=c.getContext('2d');
+  try{sectGlyphAny(id,GLYPH_PX/2,GLYPH_PX/2,GLYPH_PX*.78,1);}catch(e){}
+  g=og;GLYPH_SPR[id]=c;return c;
+}
+function drawGlyphSprite(id,cx,cy,box,al){
+  if(al<=.01)return;
+  var c=glyphSprite(id);
+  g.save();g.globalAlpha*=al;g.drawImage(c,cx-box*.64,cy-box*.64,box*1.28,box*1.28);g.restore();
+}
+/* Rasi dari track yang lagi "dimuat" (main ATAU pause) sampai track habis / diganti / distop. */
+function trackConsId(){
+  if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.ended)return null;
+  var a=activeSfx;
+  if(a===SFX.betel||a===SFX.rigel)return 'orion';
+  if(a===SFX.spica)return 'virgo';
+  if(a===SFX.sirius)return 'canis';
+  if(a===SFX.pleione)return 'pleiades';
+  if(a===SFX.aldebaran)return 'taurus';
+  if(a===SFX.arcturus)return 'bootes';
+  if(a===SFX.antares)return 'scorpius';
+  return null;
+}
 /* Pleiades bukan CONS (nggak punya garis), jadi glyph-nya cuma titik-titik cluster. */
 function sectGlyphAny(id,cx,cy,box,al){
   if(al<=.01)return;
@@ -6285,21 +6315,21 @@ function drawSectorOverview(now,age){
       g.fillText('???',p[0],p[1]);
     }else{
       /* Ikon ngikut track yang lagi diputar: Aldebaran -> Taurus, Antares -> Scorpius, dst. Berhenti -> balik ke ikon utama. */
-      var want=s.ids[0],pid=playingConstellationId();
+      var want=s.ids[0],pid=trackConsId();
       if(pid&&s.ids.indexOf(pid)>=0)want=pid;
       if(s.gid==null)s.gid=want;
       if(want!==s.gid){s.gprev=reduce?null:s.gid;s.gid=want;s.gt=now;}
       var gp=s.gprev!=null?clamp((now-s.gt)/320):1;
       if(gp>=1)s.gprev=null;
-      if(s.gprev!=null)sectGlyphAny(s.gprev,p[0],p[1],r*1.45,1-gp);
-      sectGlyphAny(s.gid,p[0],p[1],r*1.45,gp);
+      if(s.gprev!=null)drawGlyphSprite(s.gprev,p[0],p[1],r*1.45,1-gp);
+      drawGlyphSprite(s.gid,p[0],p[1],r*1.45,gp);
     }
     /* label */
     g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
     g.fillStyle=empty?'rgba(184,198,214,.4)':'rgba(214,236,248,.82)';
     /* Label: "01 · ✦4" (nomor sektor · jumlah rasi). Pas SFX Stellar Signals aktif di sektor ini -> "01 · <nama track>"; balik normal pas SFX stop/pause. */
     var sigN=empty?null:playingSignalName(),pidL=empty?null:playingConstellationId(),hotL=!!(sigN&&pidL&&s.ids.indexOf(pidL)>=0);
-    var lab=(i<9?'0':'')+(i+1)+' \u00b7 '+(empty?'unmapped':(hotL?sigN:'\u2726'+s.ids.length));
+    var lab=(i<9?'0':'')+(i+1)+' - '+(empty?'unmapped':(hotL?sigN:'\uD83D\uDCAB'+s.ids.length));
     if(hotL)g.fillStyle='rgba(110,229,255,.95)';
     g.fillText(lab,p[0],p[1]+r+7);
     if(s.relay&&!(s.flash&&now-s.flash<1500)){
