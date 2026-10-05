@@ -2737,6 +2737,12 @@ function playingConstellationId(){
   if(activeSfx===SFX.antares)return 'scorpius';
   return null;
 }
+/* Nama track Stellar Signals yang lagi bunyi (sama dengan nama di panel musik), atau null kalau nggak ada. */
+var SIGNAL_NAMES={betel:'betelgeuse',rigel:'rigel',spica:'spica',sirius:'sirius',pleione:'pleione',aldebaran:'aldebaran',arcturus:'arcturus',antares:'antares'};
+function playingSignalName(){
+  if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.paused||activeSfx.ended)return null;
+  return SIGNAL_NAMES[keyFromAudio(activeSfx)]||null;
+}
 /* ---------- Gravitational time dilation (Schwarzschild) ----------
    Gargantua is the massive body, the constellation whose SFX is playing is the clock.
    Static-observer factor  dtau/dt = sqrt(1 - rs/r)   (r = distance BH <-> constellation centre, rs = 0.35*BH.R, only when dragged off home).
@@ -6291,7 +6297,10 @@ function drawSectorOverview(now,age){
     /* label */
     g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
     g.fillStyle=empty?'rgba(184,198,214,.4)':'rgba(214,236,248,.82)';
-    var lab=empty?'unmapped':(s.name+(s.ids.length>1?'  +'+(s.ids.length-1):''));
+    /* Label: "01 · ✦4" (nomor sektor · jumlah rasi). Pas SFX Stellar Signals aktif di sektor ini -> "01 · <nama track>"; balik normal pas SFX stop/pause. */
+    var sigN=empty?null:playingSignalName(),pidL=empty?null:playingConstellationId(),hotL=!!(sigN&&pidL&&s.ids.indexOf(pidL)>=0);
+    var lab=(i<9?'0':'')+(i+1)+' \u00b7 '+(empty?'unmapped':(hotL?sigN:'\u2726'+s.ids.length));
+    if(hotL)g.fillStyle='rgba(110,229,255,.95)';
     g.fillText(lab,p[0],p[1]+r+7);
     if(s.relay&&!(s.flash&&now-s.flash<1500)){
       g.fillStyle='rgba(110,229,255,.7)';g.fillText('\u25c9 relay',p[0],p[1]+r+19);
@@ -6302,6 +6311,8 @@ function drawSectorOverview(now,age){
     }
     g.restore();
   }
+  try{if(/[?&]dbg\b/.test(location.search)){g.save();g.fillStyle='rgba(255,255,255,.5)';g.font='9px monospace';g.textAlign='left';g.textBaseline='top';
+    g.fillText('build 2026-10-06a \u00b7 PLE '+(PLEIADES.scale||0).toFixed(1),8,top+4);g.restore();}}catch(eD){}
 }
 (function sectInit(){
   var b=document.getElementById('mode-sectors');
