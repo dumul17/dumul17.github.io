@@ -689,7 +689,6 @@ body.observe-mode #mode-silence,
 body.observe-mode .portal,
 body.observe-mode .cap,
 body.observe-mode #signal-fragment,
-body.observe-mode #cons-archive,
 body.observe-mode #terminal,
 body.observe-mode #sr-badge{
   opacity:0!important;pointer-events:none!important;visibility:hidden!important;
@@ -810,3 +809,11 @@ body.camera-mode #last-signal{opacity:0!important;visibility:hidden!important;tr
 /* Mode kamera: portal DUMUL pasif (panel + tombol hit sabuk Orion) supaya tap jatuh ke canvas buat alignment Pleiades. */
 body.camera-mode .portal,body.camera-mode .portal-hit{pointer-events:none!important}
 body.camera-mode .portal{opacity:0!important}
+
+/* Popup congrats/archived ditahan selama kamera aktif (antrean di JS), tampil lagi di Observe Mode biasa. */
+body.camera-mode #cons-archive{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+
+/* Jam bisa di-tap 5x buat buka terminal: teksnya nggak boleh bisa diseleksi, kalau nggak Chrome/Brave Android
+   munculin panel Contextual Search ("Touch to Search") yang nutupin area tap. */
+#bh-clock,#bh-clock *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#bh-clock{touch-action:manipulation}

@@ -312,6 +312,7 @@ function setCameraMode(on){
   if(!CAMERA_MODE){FFX.id=null;hideWhisper();}
   focusUI();
   updateCamZoomUI();
+  if(!CAMERA_MODE)flushConsPopups();
   if(typeof showModeToast==='function'){
     if(CAMERA_MODE)showModeToast('CONSTELLATION CAMERA\nTAP ‹ › TO FOCUS · PINCH / WHEEL',null,2200);
     else if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)showModeToast('CAMERA OFF',null,1400);
@@ -398,8 +399,15 @@ function showWhisper(id){
   var w=document.getElementById('cam-whisper'),a=FOCUS_WHISPER[id],d=FOCUS_INFO[id],f=FOCUS.list&&FOCUS.list[FOCUS.i];
   if(!w||!d||!f)return;
   clearTimeout(_whT);w.classList.remove('on');
-  var rows=d.rows.slice(0,3);
-  var wh=a?a[(Math.random()*a.length)|0]:'',n=rows.length;
+  var wh=a?a[(Math.random()*a.length)|0]:'';
+  /* Rasi / cluster yang masih terkunci: data & fact ikut terkunci, cuma nama + whisper. */
+  if(id!=='bh'&&!isUnlocked(id)){
+    var hl='<div class="ci-i ci-name" style="--d:.2s">'+f.n+'</div><div class="ci-i ci-wh" style="--d:.55s">“'+wh+'”</div>';
+    w.style.setProperty('--cc','rgb('+(d.rgb||'110,229,255')+')');
+    setTimeout(function(){if(FFX.id!==id)return;w.innerHTML=hl;w.classList.add('on');},260);
+    return;
+  }
+  var rows=d.rows.slice(0,3),n=rows.length;
   var h='<div class="ci-i ci-tag" style="--d:.15s">'+d.tag+'</div><div class="ci-i ci-name" style="--d:.3s">'+f.n+'</div><div class="ci-rows">';
   for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+rows[i][0]+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+rows[i][1]+'</span>';
   var t=.55+n*.14+.15;
@@ -1904,10 +1912,10 @@ function unlockAll(){
 var _lockHintAt=0;
 function lockedHint(){
   var n=performance.now();
-  if(n-_lockHintAt<2600)return;
+  if(n-_lockHintAt<4200)return; /* > durasi toast, biar tap berulang nggak mengulang animasinya */
   _lockHintAt=n;
   haptic(6);
-  if(typeof showModeToast==='function')showModeToast('SIGNAL LOCKED\nALIGN THE CONSTELLATION IN CAMERA MODE',null,2000);
+  if(typeof showModeToast==='function')showModeToast('SIGNAL LOCKED\nALIGN THE CONSTELLATION IN CAMERA MODE',null,4000);
 }
 
 function formatSrCount(){
@@ -1997,9 +2005,26 @@ function hideSignalFragment(){
 }
 /* mode 'unlock' = popup congrats pas alignment selesai; default = popup ARCHIVED (Constellation Log).
    Dua popup berbagi satu elemen, jadi yang datang pas lagi tampil ditunda sampai yang pertama selesai. */
+var CONS_POP_Q=[];
+/* Popup ditahan selama Constellation Camera aktif (di kamera gampang kelewat / ketimpa panel),
+   lalu dimunculkan berurutan begitu keluar dari mode kamera. */
+function flushConsPopups(){
+  if(CAMERA_MODE||!CONS_POP_Q.length)return;
+  clearTimeout(flushConsPopups._t);
+  flushConsPopups._t=setTimeout(function(){
+    if(CAMERA_MODE)return;
+    var q=CONS_POP_Q.splice(0,CONS_POP_Q.length);
+    for(var i=0;i<q.length;i++)showConsArchive(q[i][0],q[i][1]);
+  },450);
+}
 function showConsArchive(cid,mode){
   var el=document.getElementById('cons-archive');
   if(!el)return;
+  if(CAMERA_MODE){
+    for(var qi=0;qi<CONS_POP_Q.length;qi++)if(CONS_POP_Q[qi][0]===cid&&CONS_POP_Q[qi][1]===mode)return;
+    CONS_POP_Q.push([cid,mode]);
+    return;
+  }
   var t0=performance.now();
   if(showConsArchive._until>t0){
     setTimeout(function(){showConsArchive(cid,mode);},showConsArchive._until-t0+120);
@@ -2212,6 +2237,7 @@ function setObserveMode(on){
     }
   }
   updateCamZoomUI();
+  if(!CAMERA_MODE)flushConsPopups();
   /* Close music HUD if open */
   if(OBSERVE_MODE){
     var panel=document.getElementById('music-player');
@@ -2375,7 +2401,9 @@ function alignDone(cid,viaKey){
   unlock(cid);
   tapFlash={until:performance.now()+1500,cons:cid}; /* garis yang baru muncul ikut menyala */
   if(viaKey&&typeof triggerSupernova==='function')triggerSupernova(viaKey);
-  showConsArchive(cid,'unlock');
+  showConsArchive(cid,'unlock'); /* di mode kamera: masuk antrean, tampil setelah keluar kamera */
+  /* Fakta/data rasi yang tadinya terkunci ikut terbuka kalau kamera masih fokus di sana. */
+  if(CAMERA_MODE&&FFX.id===cid)setTimeout(function(){if(CAMERA_MODE&&FFX.id===cid)showWhisper(cid);},1200);
   if(typeof haptic==='function')haptic(22);
 }
 /* Return: false = bukan langkah alignment (caller lanjut seperti biasa),
@@ -7358,6 +7386,11 @@ function updateClockDilation(now){
   el.style.opacity=Math.random()<k*.12?'.45':'';
 }
 
+(function(){
+  var ck=$('#bh-clock');if(!ck)return;
+  /* Cadangan buat CSS user-select: cegah seleksi teks & menu long-press di jam. */
+  ['selectstart','contextmenu','dblclick'].forEach(function(t){ck.addEventListener(t,function(e){e.preventDefault();});});
+})();
 $('#bh-clock').addEventListener('pointerdown',function(e){
   e.stopPropagation();var now=performance.now();
   if(now-utcReset>2200)utcClicks=0;
