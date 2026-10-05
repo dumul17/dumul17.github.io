@@ -260,18 +260,18 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 
 /* ---------- mobile landscape: compact 4-zone observatory layout ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
-  header {
+  body:not(.ls) header {
     padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important;
     padding-left: 10px !important;
     padding-right: 10px !important;
   }
-  .kicker { font-size: 8px !important; letter-spacing: .3em !important; }
-  .big {
+  body:not(.ls) .kicker { font-size: 8px !important; letter-spacing: .3em !important; }
+  body:not(.ls) .big {
     margin-top: 2px !important;
     font-size: clamp(15px, 5vh, 22px) !important;
   }
   /* Sembunyikan subtitle agar kanvas bintang mendapat ruang vertikal maksimal */
-  .sub { display: none !important; }
+  body:not(.ls) .sub { display: none !important; }
 
   /* Boot Screen compact landscape fix (agar tidak terpotong vertikal) */
   #boot-core {
@@ -293,19 +293,19 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
   .boot-cap { width: 44px !important; height: 18px !important; }
 
   /* Portal & HUD */
-  .portal { margin-top: -12px !important; }
-  .portal .lab { padding: 3px 6px !important; }
-  .portal b { font-size: 9px !important; }
-  .portal small { font-size: 7.5px !important; }
-  .portal .lab-open { font-size: 6px !important; }
-  #bh-clock { font-size: 7.2px !important; }
-  #bh-clock .clock-time { font-size: 9px !important; }
-  footer {
+  body:not(.ls) .portal { margin-top: -12px !important; }
+  body:not(.ls) .portal .lab { padding: 3px 6px !important; }
+  body:not(.ls) .portal b { font-size: 9px !important; }
+  body:not(.ls) .portal small { font-size: 7.5px !important; }
+  body:not(.ls) .portal .lab-open { font-size: 6px !important; }
+  body:not(.ls) #bh-clock { font-size: 7.2px !important; }
+  body:not(.ls) #bh-clock .clock-time { font-size: 9px !important; }
+  body:not(.ls) footer {
     padding-left: 8px !important;
     padding-right: 8px !important;
     padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
   }
-  footer nav a, #music-toggle {
+  body:not(.ls) footer nav a, #music-toggle {
     width: 28px !important;
     height: 28px !important;
   }
