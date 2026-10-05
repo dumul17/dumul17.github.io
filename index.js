@@ -2785,7 +2785,7 @@ function updateConstellationFocus(now){
     CF.target[i]=on?1:.24;
     var k=1-Math.pow(.001,dt/420);CF.current[i]+=(CF.target[i]-CF.current[i])*k;
   }
-  if(aid){
+  if(aid&&!(SECT.on&&!SECT.busy)){ /* overview diam: rasi nggak digambar, sweep twinkle-nya nggak perlu dihitung */
     if(SWEEP.active!==aid)resetSweep(aid);
     if(aid==='pleiades'){
       /* Sweep across the Pleiades cluster using live screen positions. */
@@ -3016,6 +3016,13 @@ function bakeAstroPlates(){
     dc.fillStyle=dg;dc.beginPath();dc.arc(0,0,dr,0,6.283);dc.fill();
     dc.restore();
   }
+  /* Warna dasar langit (dulu hanya muncul saat Collapsars main): glow ungu-merah di sekitar posisi home Gargantua. */
+  (function(){
+    var R=Math.max(W,H)*1.1,hx=BH.hx||W*.5,hy=BH.hy||H*.45,tg=dc.createRadialGradient(hx,hy,0,hx,hy,R);
+    tg.addColorStop(0,'rgba(150,80,255,.156)');tg.addColorStop(.38,'rgba(112,34,150,.099)');
+    tg.addColorStop(.72,'rgba(125,22,48,.052)');tg.addColorStop(1,'rgba(90,10,20,0)');
+    dc.save();dc.globalCompositeOperation='lighter';dc.fillStyle=tg;dc.fillRect(-M,-M,EW,EH);dc.restore();
+  })();
   /* Milky-Way band: diagonal glow + mottled bright knots + dark dust lanes */
   dc.save();dc.translate(cx0,cy0);dc.rotate(BA);
   var bw=Math.max(W,H)*1.1,bgr=dc.createLinearGradient(0,-bt,0,bt);
@@ -3203,7 +3210,7 @@ function layout(){
              orion:{k:.7738,th:-23.84,pv:[492,651],at:[299.86,647.23]},
              taurus:{k:.7241,th:5.3,tx:312.95,ty:-58.3},
              canis:{k:.5417,th:4,pv:[445,316],at:[3.05,938.8]}},
-        PC=[745.1,209.9],PS=140,ids=['orion','taurus','canis'],pts=[],i,j,k2,c,f,p,st;
+        PC=[745.1,209.9],PS=75,ids=['orion','taurus','canis'],pts=[],i,j,k2,c,f,p,st;
     function mk(d){
       var cs=Math.cos(d.th*D)*d.k,sn=Math.sin(d.th*D)*d.k,tx=d.tx,ty=d.ty;
       if(d.pv){tx=d.at[0]-(cs*d.pv[0]-sn*d.pv[1]);ty=d.at[1]-(sn*d.pv[0]+cs*d.pv[1]);}
@@ -5177,7 +5184,7 @@ function drawShooting(now){
     if(!(ofxOn&&SS.length>=ofxCap)){
       var ang=(.14+Math.random()*.14)*Math.PI,sp=560+Math.random()*320,dir=Math.random()<.5?1:-1;
       var nm={x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850};
-      if(ofxOn){nm.c0=OFX.m0;nm.c1=OFX.m1;}
+      nm.c0=OFX.m0;nm.c1=OFX.m1;
       SS.push(nm);
     }}
   for(var i=SS.length-1;i>=0;i--){
@@ -5851,9 +5858,9 @@ var bootDone=false;
    Semua efek visual mati kalau: tab hidden (render loop memang berhenti), prefers-reduced-motion, IS_POTATO,
    Radio Silence, swallow, atau tesseract. Audio TIDAK ikut berhenti. Kalau satu efek error 5x, semua efek
    visual mati sendiri (render loop tidak ikut jatuh). Pergantian BGM = crossfade ~4 detik (bukan lompat). */
-var OFX={pC:0,pK:0,p:0,last:0,dph:0,wasOn:false,m0:'234,246,255',m1:'110,229,255',px:0,py:0,
+var OFX={pC:0,pK:0,p:0,last:0,dph:0,wasOn:false,m0:'255,214,170',m1:'255,104,140',px:0,py:0,
   tc:null,tk:null,keys:null,dust:[],dAt:0,dx:-999,dy:-999,err:0,dead:false};
-var OFX_PAL_C=['150,212,255','205,232,255','118,168,255'],OFX_PAL_K=['255,178,130','214,150,255','255,120,150'];
+var OFX_PAL_C=['150,212,255','205,232,255','118,168,255'],OFX_PAL_K=['235,96,76','176,38,62','255,70,64'];
 function ofxAllowed(){
   if(OFX.dead||pageHidden||reduce||IS_POTATO||SW||RADIO_SILENCE)return false;
   return !document.body.classList.contains('tesseract-running');
@@ -5880,8 +5887,10 @@ function ofxUpdate(now){
   OFX.p=OFX.pC>OFX.pK?OFX.pC:OFX.pK;
   /* Fase tambahan cakram: nambah halus sesuai pK, jadi percepatan putaran tidak "loncat". */
   OFX.dph=(OFX.dph+dt*.00024*.9*OFX.pK)%1;
-  if(OFX.pK>OFX.pC){OFX.m0='255,214,170';OFX.m1='255,104,140';}
-  else{OFX.m0='234,246,255';OFX.m1='110,229,255';}
+  /* Meteor: default = hangat (palet Collapsars lama), AMB = cyan, Collapsars = merah gelap. Dipilih saat meteor lahir. */
+  if(OFX.pC>OFX.pK&&OFX.pC>.35){OFX.m0='234,246,255';OFX.m1='110,229,255';}
+  else if(OFX.pK>OFX.pC&&OFX.pK>.35){OFX.m0='255,120,100';OFX.m1='150,14,24';}
+  else{OFX.m0='255,214,170';OFX.m1='255,104,140';}
   var on=OFX.p>.35;
   /* Begitu BGM mulai, jangan nunggu jadwal meteor lama (bisa 13 detik). */
   if(on&&!OFX.wasOn&&nextSS>now+3000)nextSS=now+700+Math.random()*1600;
@@ -5908,9 +5917,9 @@ function ofxPull(c,now){
 function ofxMakeTint(kind){
   var c=document.createElement('canvas');c.width=c.height=128;
   var x=c.getContext('2d'),gr=x.createRadialGradient(64,64,0,64,64,64);
-  if(kind==='k'){
-    gr.addColorStop(0,'rgba(150,80,255,.60)');gr.addColorStop(.38,'rgba(112,34,150,.38)');
-    gr.addColorStop(.72,'rgba(125,22,48,.20)');gr.addColorStop(1,'rgba(90,10,20,0)');
+  if(kind==='k'){ /* dipakai mode 'multiply': menggelapkan + menggeser langit ke merah tua */
+    gr.addColorStop(0,'rgba(140,22,30,.88)');gr.addColorStop(.4,'rgba(165,32,42,.62)');
+    gr.addColorStop(.75,'rgba(205,62,72,.30)');gr.addColorStop(1,'rgba(255,255,255,0)');
   }else{
     gr.addColorStop(0,'rgba(60,130,255,.50)');gr.addColorStop(.45,'rgba(34,84,190,.26)');
     gr.addColorStop(1,'rgba(20,50,140,0)');
@@ -5928,7 +5937,8 @@ function ofxDrawTint(now){
   }
   if(OFX.pK>.01){
     if(!OFX.tk)OFX.tk=ofxMakeTint('k');
-    g.globalAlpha=.26*OFX.pK*(.9+.1*Math.sin(now*.0013));
+    g.globalCompositeOperation='multiply';
+    g.globalAlpha=OFX.pK*(.92+.08*Math.sin(now*.0013));
     g.drawImage(OFX.tk,BH.x-S/2,BH.y-S/2,S,S);
   }
   g.restore();
@@ -6020,6 +6030,28 @@ function sectSet(on){
     bc.toggle('sect-in-orion',!SECT.on&&!!SECT.cur&&SECT.cur.k==='orion');bc.toggle('sect-in-virgo',!SECT.on&&!!SECT.cur&&SECT.cur.k==='virgo');}catch(e){}
   try{var ob=document.getElementById('mode-observe');if(ob)ob.textContent=observeIcon();}catch(eO){}
   if(SECT.on){try{syncSkyPanHits();}catch(e){}}
+}
+var SECT_HALO=[null,null];
+function sectHaloSprite(empty){
+  var k=empty?1:0,c=SECT_HALO[k];
+  if(c)return c;
+  c=document.createElement('canvas');c.width=c.height=96;
+  var x=c.getContext('2d'),gr=x.createRadialGradient(48,48,48*.2/2.1,48,48,48);
+  gr.addColorStop(0,empty?'rgba(150,170,195,.06)':'rgba(110,229,255,.16)');gr.addColorStop(1,'rgba(110,229,255,0)');
+  x.fillStyle=gr;x.beginPath();x.arc(48,48,48,0,6.283);x.fill();
+  SECT_HALO[k]=c;return c;
+}
+/* Pleiades bukan CONS (nggak punya garis), jadi glyph-nya cuma titik-titik cluster. */
+function sectGlyphAny(id,cx,cy,box,al){
+  if(al<=.01)return;
+  if(id==='pleiades'){
+    var pts=PLEIADES.bright.concat(PLEIADES.dim),sc=box/.62,i,z;
+    g.fillStyle='rgba(234,246,255,'+(.9*al)+')';
+    for(i=0;i<pts.length;i++){z=pts[i];
+      g.beginPath();g.arc(cx+(z.x-.53)*sc,cy+(z.y-.42)*sc,Math.max(.8,(z.r||1.3)*.55),0,6.283);g.fill();}
+    return;
+  }
+  sectGlyph(cons(id),cx,cy,box,al);
 }
 function sectGlyph(c,cx,cy,box,al){
   if(!c||!c.stars||!c.bw||!c.bh||!c.lines)return;
@@ -6235,9 +6267,7 @@ function drawSectorOverview(now,age){
     g.save();
     g.globalAlpha=vis;
     /* halo */
-    var gr=g.createRadialGradient(p[0],p[1],r*.2,p[0],p[1],r*2.1);
-    gr.addColorStop(0,empty?'rgba(150,170,195,.06)':'rgba(110,229,255,.16)');gr.addColorStop(1,'rgba(110,229,255,0)');
-    g.fillStyle=gr;g.beginPath();g.arc(p[0],p[1],r*2.1,0,6.283);g.fill();
+    g.drawImage(sectHaloSprite(empty),p[0]-r*2.1,p[1]-r*2.1,r*4.2,r*4.2);
     /* dashed ring */
     g.lineWidth=1;g.strokeStyle=empty?'rgba(184,198,214,.28)':'rgba(110,229,255,.5)';
     if(g.setLineDash){g.setLineDash([3,5]);g.lineDashOffset=reduce?0:-now*.012;}
@@ -6248,7 +6278,15 @@ function drawSectorOverview(now,age){
       g.fillStyle='rgba(184,198,214,.5)';g.font='600 '+Math.round(r*.62)+'px "Space Grotesk",system-ui,sans-serif';
       g.fillText('???',p[0],p[1]);
     }else{
-      sectGlyph(cons(s.ids[0]),p[0],p[1],r*1.45,1);
+      /* Ikon ngikut track yang lagi diputar: Aldebaran -> Taurus, Antares -> Scorpius, dst. Berhenti -> balik ke ikon utama. */
+      var want=s.ids[0],pid=playingConstellationId();
+      if(pid&&s.ids.indexOf(pid)>=0)want=pid;
+      if(s.gid==null)s.gid=want;
+      if(want!==s.gid){s.gprev=reduce?null:s.gid;s.gid=want;s.gt=now;}
+      var gp=s.gprev!=null?clamp((now-s.gt)/320):1;
+      if(gp>=1)s.gprev=null;
+      if(s.gprev!=null)sectGlyphAny(s.gprev,p[0],p[1],r*1.45,1-gp);
+      sectGlyphAny(s.gid,p[0],p[1],r*1.45,gp);
     }
     /* label */
     g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
@@ -6367,7 +6405,7 @@ function frame(now){
     drawShooting(now);
     cullBegin();
     sectStep(now);
-    if(SECT.on){drawPulses(now,age);drawSectorOverview(now,age);}
+    if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);}
     else{
     CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
     drawPulses(now,age);
