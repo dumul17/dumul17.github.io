@@ -339,18 +339,18 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 
 /* ---------- mobile landscape: compact 4-zone observatory layout ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
-  body:not(.ls) header {
+  body:not(.ls):not(.lr) header {
     padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important;
     padding-left: 10px !important;
     padding-right: 10px !important;
   }
-  body:not(.ls) .kicker { font-size: 8px !important; letter-spacing: .3em !important; }
-  body:not(.ls) .big {
+  body:not(.ls):not(.lr) .kicker { font-size: 8px !important; letter-spacing: .3em !important; }
+  body:not(.ls):not(.lr) .big {
     margin-top: 2px !important;
     font-size: clamp(15px, 5vh, 22px) !important;
   }
   /* Sembunyikan subtitle agar kanvas bintang mendapat ruang vertikal maksimal */
-  body:not(.ls) .sub { display: none !important; }
+  body:not(.ls):not(.lr) .sub { display: none !important; }
 
   /* Boot Screen compact landscape fix (agar tidak terpotong vertikal) */
   #boot-core {
@@ -372,19 +372,19 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
   .boot-cap { width: 44px !important; height: 18px !important; }
 
   /* Portal & HUD */
-  body:not(.ls) .portal { margin-top: -12px !important; }
-  body:not(.ls) .portal .lab { padding: 3px 6px !important; }
-  body:not(.ls) .portal b { font-size: 9px !important; }
-  body:not(.ls) .portal small { font-size: 7.5px !important; }
-  body:not(.ls) .portal .lab-open { font-size: 6px !important; }
-  body:not(.ls) #bh-clock { font-size: 7.2px !important; }
-  body:not(.ls) #bh-clock .clock-time { font-size: 9px !important; }
-  body:not(.ls) footer {
+  body:not(.ls):not(.lr) .portal { margin-top: -12px !important; }
+  body:not(.ls):not(.lr) .portal .lab { padding: 3px 6px !important; }
+  body:not(.ls):not(.lr) .portal b { font-size: 9px !important; }
+  body:not(.ls):not(.lr) .portal small { font-size: 7.5px !important; }
+  body:not(.ls):not(.lr) .portal .lab-open { font-size: 6px !important; }
+  body:not(.ls):not(.lr) #bh-clock { font-size: 7.2px !important; }
+  body:not(.ls):not(.lr) #bh-clock .clock-time { font-size: 9px !important; }
+  body:not(.ls):not(.lr) footer {
     padding-left: 8px !important;
     padding-right: 8px !important;
     padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
   }
-  body:not(.ls) footer nav a, #music-toggle {
+  body:not(.ls):not(.lr) footer nav a, #music-toggle {
     width: 28px !important;
     height: 28px !important;
   }
@@ -926,3 +926,42 @@ body.ls #cam-whisper{top:calc(8px + env(safe-area-inset-top,0px))}
 body.ls #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
 body.ls #sector-scan{translate:calc(-1 * var(--gut)) 0;left:12px;right:auto;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 body.ls #last-signal{translate:calc(-1 * (var(--stw) / 2 + var(--gut) / 2)) 0;width:min(280px,calc(var(--gut) - 28px))}
+
+/* ===== Mode ROT (body.lr) — HP landscape, gaya app kamera =====
+   Sky TIDAK mengecil / di-letterbox. #stage berukuran bingkai portrait HP (--vw x --vh = sisi pendek x sisi panjang layar)
+   lalu diputar 90° supaya pas memenuhi layar landscape. Arah putar mengikuti posisi fisik HP (body.lr-cw = diputar searah jarum jam).
+   Ikon + panel (HUD) ada di luar #stage dan pakai layout landscape biasa (media query orientation:landscape), jadi tetap tegak.
+   Karena media query lebar viewport (max-width:520/600px) tidak cocok di landscape, aturan "portrait" untuk isi stage ditiru di sini. */
+body.lr #stage{display:block;position:fixed;left:0;top:0;width:var(--vw);height:var(--vh);transform-origin:0 0;transform:translateY(var(--ih)) rotate(-90deg);z-index:5;pointer-events:none}
+body.lr.lr-cw #stage{transform:translateX(var(--iw)) rotate(90deg)}
+body.lr #stage > *{pointer-events:auto}
+body.lr #stage > #sky,body.lr #stage > #secret-msg,body.lr #stage > #tele-greet,body.lr #stage > #sn-flash{pointer-events:none}
+body.lr .scan{z-index:6}
+/* safe-area: sisi atas/bawah sky = sisi kiri/kanan layar */
+body.lr header{padding-top:calc(24px + env(safe-area-inset-left,0px))}
+body.lr.lr-cw header{padding-top:calc(24px + env(safe-area-inset-right,0px))}
+body.lr footer{padding-bottom:calc(10px + env(safe-area-inset-right,0px))}
+body.lr.lr-cw footer{padding-bottom:calc(10px + env(safe-area-inset-left,0px))}
+/* teks/label di dalam stage tetap tegak di layar */
+body.lr{--ur:90deg}
+body.lr.lr-cw{--ur:-90deg}
+body.lr #bh-clock{transform-origin:0 0;font-size:7.5px;letter-spacing:.06em}
+body.lr #bh-clock .clock-time{font-size:9.5px;letter-spacing:.025em}
+body.lr #bh-clock .clock-sep{padding:0 2px}
+body.lr #secret-msg{transform-origin:0 0;transform:rotate(var(--ur)) translate(-50%,-50%);font-size:8px;letter-spacing:.04em;padding:6px 8px}
+body.lr #secret-msg[data-type="telescope"]{transform:rotate(var(--ur)) translate(-50%,-100%)}
+body.lr #secret-msg:not(.tele-short){max-width:200px}
+body.lr #tele-greet{transform-origin:0 0;transform:rotate(var(--ur)) translate(-50%,-100%);font-size:8px;letter-spacing:.04em;padding:6px 8px}
+body.lr #tele-greet:not(.tele-short){max-width:200px}
+body.lr #tele-greet.on{animation-name:tgpopLR}
+@keyframes tgpopLR{from{opacity:0;transform:rotate(var(--ur)) translate(-50%,-82%) scale(.92)}to{opacity:1;transform:rotate(var(--ur)) translate(-50%,-100%) scale(1)}}
+@media (prefers-reduced-motion:reduce){body.lr #tele-greet.on{animation:none}}
+/* portal DUMUL: tegak, nempel di sisi "luar" sabuk Orion; di HP tersembunyi sampai sabuk di-tap (sama seperti portrait) */
+body.lr .portal{transform-origin:0 0;margin-top:0}
+body.lr .portal .lab{padding:4px 7px}
+body.lr .portal b{font-size:10px;letter-spacing:.12em}
+body.lr .portal small{font-size:8px;margin-top:2px}
+body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
+:where(body.lr) .portal{opacity:0!important;pointer-events:none!important;transition:opacity .35s ease,transform .35s ease}
+:where(body.lr) .portal.mobile-show{opacity:1!important;pointer-events:auto!important}
+

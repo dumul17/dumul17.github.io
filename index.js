@@ -41,47 +41,111 @@ var skyPan={x:0,y:0};
    Landscape: sky (canvas, rasi, cluster, Gargantua, sektor) dikunci ke komposisi PORTRAIT. Layout dihitung di ukuran portrait virtual
    (STG.vw x STG.vh) lalu #stage di-scale seragam (STG.k) ke tinggi layar dan ditaruh di tengah. Panel di luar #stage, digeser CSS ke gutter.
    Koordinat pointer dikonversi ke ruang virtual: (client - offset kolom) / k. */
-var STG={on:false,x:0,y:0,k:1,vw:0,vh:0,w:0,g:0};
+/* Mode ROT (HP landscape, gaya app kamera): sky TIDAK diskala/di-letterbox. Stage tetap berukuran bingkai portrait HP
+   (vw = sisi pendek layar, vh = sisi panjang) lalu diputar 90° supaya memenuhi seluruh layar landscape; arah putar mengikuti
+   orientasi fisik HP (sisi atas HP = sisi atas sky). Ikon + panel (HUD) ada di luar #stage dan memakai layout landscape biasa.
+   STG.rot: 0 = tidak diputar, -90 = diputar CCW (HP miring ke kiri), 90 = diputar CW (HP miring ke kanan). */
+var STG={on:false,x:0,y:0,k:1,vw:0,vh:0,w:0,g:0,rot:0,iw:0,ih:0,raw:false,up:'',pt:''};
 (function(){ /* bungkus elemen sky dalam #stage (urutan DOM dipertahankan) */
   var b=document.body,ids={sky:1,header:1,footer:1,'cap-orion':1,'cap-virgo':1,'cap-canis':1,'cap-taurus':1,'cap-bh':1,bh:1,'bh-clock':1,'secret-msg':1,'tele-greet':1,'sn-flash':1,'rigel-fx':1,'betel-fx':1,'sirius-fx':1,'pleione-fx':1,'aldebaran-fx':1,'arcturus-fx':1,'antares-fx':1};
   var first=document.getElementById('sky');if(!first||document.getElementById('stage'))return;
   var st=document.createElement('div');st.id='stage';b.insertBefore(st,first);
   [].slice.call(b.children).forEach(function(el){if(el!==st&&ids[el.id])st.appendChild(el);});
 })();
+/* Arah putar stage di HP landscape. screen.orientation.angle: 90 = HP dimiringkan ke kiri (sisi atas HP di kiri layar) -> sky diputar CCW;
+   270 = sisi atas HP di kanan layar -> sky diputar CW. Kalau di HP lu arahnya kebalik, buka situs dengan ?lrflip=1 (atau ganti LR_FLIP). */
+var LR_FLIP=false;
+try{LR_FLIP=/[?&]lrflip=1/.test(location.search);}catch(eF){}
+function lrDir(){
+  var a=null;
+  try{if(screen.orientation&&typeof screen.orientation.angle==='number')a=screen.orientation.angle;}catch(e1){}
+  if(a===null&&typeof window.orientation==='number')a=window.orientation;
+  if(a===null)a=90;
+  a=((a%360)+360)%360;
+  var cw=(a===270);
+  if(LR_FLIP)cw=!cw;
+  return cw?90:-90;
+}
 function stageCalc(){
-  var iw=innerWidth,ih=innerHeight,on=iw>ih*1.15,de=document.documentElement;
+  var iw=innerWidth,ih=innerHeight,on=iw>ih*1.15,de=document.documentElement,rot=0;
   if(on){
     var sw=Math.min(screen.width||0,screen.height||0),sh=Math.max(screen.width||0,screen.height||0),vw,vh;
-    if(sw&&sw<=600){vw=sw;vh=Math.max(560,Math.min(960,Math.round(sh*.9)));}   /* HP: ukuran portrait aslinya */
-    else{vh=800;vw=450;}                                                       /* desktop/tablet: portrait 9:16 */
-    STG.vw=vw;STG.vh=vh;STG.k=ih/vh;STG.w=Math.round(vw*STG.k);
+    if(sw&&sw<=600){                                 /* HP: sky memenuhi layar, diputar 90° (mode ROT) */
+      rot=lrDir();vw=ih;vh=iw;
+      STG.vw=vw;STG.vh=vh;STG.k=1;STG.w=iw;
+    }else{
+      vh=800;vw=450;                                 /* desktop/tablet: portrait 9:16, di-letterbox */
+      STG.vw=vw;STG.vh=vh;STG.k=ih/vh;STG.w=Math.round(vw*STG.k);
+    }
   }else{STG.vw=iw;STG.vh=ih;STG.k=1;STG.w=iw;}
-  STG.on=on;STG.g=on?Math.max(0,Math.floor((iw-STG.w)/2)):0;
+  STG.on=on;STG.rot=rot;STG.iw=iw;STG.ih=ih;
+  STG.g=(on&&!rot)?Math.max(0,Math.floor((iw-STG.w)/2)):0;
+  /* sufiks transform supaya teks/label kecil di dalam stage tetap TEGAK di layar (putar balik terhadap stage) */
+  STG.up=rot<0?' rotate(90deg)':(rot>0?' rotate(-90deg)':'');
+  STG.pt=rot<0?' rotate(90deg) translate(-6px,-100%)':(rot>0?' rotate(-90deg) translate(-6px,0)':'');
   try{
     de.style.setProperty('--stw',STG.w+'px');de.style.setProperty('--gut',STG.g+'px');
     de.style.setProperty('--vw',STG.vw+'px');de.style.setProperty('--vh',STG.vh+'px');de.style.setProperty('--k',STG.k);
-    if(document.body)document.body.classList.toggle('ls',on);
-    STG.x=on?document.body.getBoundingClientRect().left:0;STG.y=0;
+    de.style.setProperty('--iw',iw+'px');de.style.setProperty('--ih',ih+'px');
+    if(document.body){
+      var cl=document.body.classList;
+      cl.toggle('ls',on&&!rot);cl.toggle('lr',!!rot);cl.toggle('lr-cw',rot>0);
+      STG.x=(on&&!rot)?document.body.getBoundingClientRect().left:0;STG.y=0;
+    }
   }catch(eS){}
   return STG.vw;
 }
-/* rect elemen di dalam #stage dalam ruang koordinat virtual (kanvas) */
-function vrect(el){
-  var r=el.getBoundingClientRect();if(!STG.on)return r;
-  var k=STG.k||1,l=(r.left-STG.x)/k,t=(r.top-STG.y)/k,w=r.width/k,h=r.height/k;
-  return {left:l,top:t,right:l+w,bottom:t+h,width:w,height:h,x:l,y:t};
+/* konversi titik: ruang virtual (kanvas/stage) <-> koordinat layar asli (client) */
+function v2c(x,y){
+  if(!STG.on)return [x,y];
+  if(STG.rot<0)return [y,STG.ih-x];
+  if(STG.rot>0)return [STG.iw-y,x];
+  return [x*(STG.k||1)+STG.x,y*(STG.k||1)+STG.y];
 }
-(function(){
-  function hook(proto,prop){
+function c2v(cx,cy){
+  if(!STG.on)return [cx,cy];
+  if(STG.rot<0)return [STG.ih-cy,cx];
+  if(STG.rot>0)return [cy,STG.iw-cx];
+  var k=STG.k||1;return [(cx-STG.x)/k,(cy-STG.y)/k];
+}
+/* rect (koordinat layar asli) -> ruang koordinat virtual (kanvas) */
+function vconv(r){
+  if(!STG.on)return r;
+  if(STG.rot){
+    var a=c2v(r.left,r.top),b=c2v(r.right,r.bottom);
+    var l=Math.min(a[0],b[0]),rr=Math.max(a[0],b[0]),t=Math.min(a[1],b[1]),bb=Math.max(a[1],b[1]);
+    return {left:l,top:t,right:rr,bottom:bb,width:rr-l,height:bb-t,x:l,y:t};
+  }
+  var k=STG.k||1,l2=(r.left-STG.x)/k,t2=(r.top-STG.y)/k,w=r.width/k,h=r.height/k;
+  return {left:l2,top:t2,right:l2+w,bottom:t2+h,width:w,height:h,x:l2,y:t2};
+}
+/* rect elemen di dalam #stage dalam ruang koordinat virtual (kanvas) */
+function vrect(el){return vconv(el.getBoundingClientRect());}
+/* titik pointer di koordinat layar ASLI (tanpa konversi stage) - buat gesture arah layar, mis. swipe Konami */
+function scrPt(e){STG.raw=true;try{return [e.clientX,e.clientY];}finally{STG.raw=false;}}
+(function(){ /* clientX/clientY event & touch otomatis dikonversi ke ruang virtual stage (termasuk rotasi 90°) */
+  function hook(proto){
     try{
-      var d=proto&&Object.getOwnPropertyDescriptor(proto,prop);
-      if(!d||!d.get||d.get._stg)return;
-      var g0=d.get,isX=prop==='clientX',ng=function(){var v=g0.call(this);return STG.on?(v-(isX?STG.x:STG.y))/(STG.k||1):v;};ng._stg=1;
-      Object.defineProperty(proto,prop,{configurable:true,enumerable:d.enumerable,get:ng});
+      var dX=proto&&Object.getOwnPropertyDescriptor(proto,'clientX'),dY=proto&&Object.getOwnPropertyDescriptor(proto,'clientY');
+      if(!dX||!dY||!dX.get||!dY.get||dX.get._stg)return;
+      var gX=dX.get,gY=dY.get;
+      var nX=function(){
+        var v=gX.call(this);if(!STG.on||STG.raw)return v;
+        if(STG.rot)return STG.rot<0?STG.ih-gY.call(this):gY.call(this);
+        return (v-STG.x)/(STG.k||1);
+      };
+      var nY=function(){
+        var v=gY.call(this);if(!STG.on||STG.raw)return v;
+        if(STG.rot)return STG.rot<0?gX.call(this):STG.iw-gX.call(this);
+        return (v-STG.y)/(STG.k||1);
+      };
+      nX._stg=1;nY._stg=1;
+      Object.defineProperty(proto,'clientX',{configurable:true,enumerable:dX.enumerable,get:nX});
+      Object.defineProperty(proto,'clientY',{configurable:true,enumerable:dY.enumerable,get:nY});
     }catch(eH){}
   }
   var P=[window.MouseEvent&&MouseEvent.prototype,window.Touch&&Touch.prototype];
-  for(var i=0;i<P.length;i++){hook(P[i],'clientX');hook(P[i],'clientY');}
+  for(var i=0;i<P.length;i++)hook(P[i]);
 })();
 var skyRot=0;
 var skyZoom=1;
@@ -419,6 +483,16 @@ function camBox(){
   var n=performance.now();
   if(n-_cb.t>250||!_cb.h){
     _cb.t=n;var top=0,bot=H,a=document.getElementById('cam-whisper'),b=document.getElementById('cam-zoom'),r;
+    if(STG.rot){
+      /* Mode ROT: panel kamera didock di kanan LAYAR (landscape biasa). Area bebas = pita kiri layar; dipetakan ke ruang virtual sky. */
+      var rt2=STG.iw;
+      if(a){r=a.getBoundingClientRect();if(r.height>0&&r.width>0)rt2=Math.min(rt2,r.left-12);}
+      if(b){r=b.getBoundingClientRect();if(r.height>0&&r.width>0)rt2=Math.min(rt2,r.left-12);}
+      if(rt2<STG.iw*.4)rt2=STG.iw*.6;
+      var y0=STG.rot<0?0:STG.iw-rt2,y1=STG.rot<0?rt2:STG.iw;   /* sumbu panjang stage = sumbu x layar */
+      _cb.cx=W*.5;_cb.w=W;_cb.cy=(y0+y1)/2;_cb.h=Math.max(60,(y1-y0)-24);
+      return _cb;
+    }
     if(STG.on){_cb.cx=W*.5;_cb.w=W;_cb.cy=H*.5;_cb.h=H*.8;return _cb;}
     if(document.body.classList.contains('cam-compact')){
       /* Short/wide screens: panels are docked on the right, so the free area is the left band. */
@@ -569,7 +643,7 @@ function syncBHDom(){
     var bhEl=document.getElementById('bh');if(!bhEl||!W)return;
     var p=camBH();
     bhEl.style.transform='translate('+Math.round(p[0]-BH.R*8)+'px,'+Math.round(p[1]-BH.R*5)+'px)';
-    if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)';
+    if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
   }catch(e){}
 }
 function focusStep(){
@@ -2350,7 +2424,7 @@ function showModeToast(text,kind,ms){
   el.textContent=text;
   el.classList.toggle('silence',kind==='silence');
   var czEl=document.getElementById('cam-zoom');
-  if(CAMERA_MODE&&czEl&&!STG.on){
+  if(CAMERA_MODE&&czEl&&(!STG.on||STG.rot)){
     var czr=czEl.getBoundingClientRect();
     var vh=(window.visualViewport&&visualViewport.height)||innerHeight;
     el.style.bottom=Math.max(8,Math.round(vh-czr.top+18))+'px';
@@ -2925,14 +2999,15 @@ function fitTitle(){
   var size=Math.min((STG.vw||innerWidth)*.07,(STG.vh||innerHeight)*.10,56);
   var rg=document.createRange();rg.selectNodeContents(big);
   big.style.fontSize=size+'px';
-  var measured=rg.getBoundingClientRect().width;
+  var mw0=function(){var rr=rg.getBoundingClientRect();return STG.rot?vconv(rr).width:rr.width;};
+  var measured=mw0();
   if(measured<=avail)return;
   /* Proportional estimate first — usually lands within a few px of the fit. */
   var estimated=Math.max(minSize,Math.floor(size*(avail/measured)));
   big.style.fontSize=estimated+'px';
   /* Safety correction: browser remains the authority (font metrics ≠ pure scale). */
   var guard=0;
-  while(rg.getBoundingClientRect().width>avail&&estimated>minSize&&guard++<4){
+  while(mw0()>avail&&estimated>minSize&&guard++<4){
     estimated--;
     big.style.fontSize=estimated+'px';
   }
@@ -3169,7 +3244,7 @@ function plateBlit(c,m,pw,ph,z,ox,oy){
 function layout(){
   if(SW)return;
   W=stageCalc();H=STG.vh;
-  try{document.body.classList.toggle('cam-compact',H<=560&&W>=H*1.3);_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
+  try{document.body.classList.toggle('cam-compact',!!STG.rot||(H<=560&&W>=H*1.3));_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
   DPR=(IS_POTATO?1:Math.min(window.devicePixelRatio||1,2))*(STG.on?STG.k:1);
   G_DEPTH=0;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
   fitTitle();
@@ -3380,12 +3455,15 @@ function layout(){
     PLEIADES.y += cy0 || cy1;
   })();
   var clk=$('#bh-clock'),ft2=vrect($('#footer'));
-  clk.style.transform='translate(calc(14px + env(safe-area-inset-left,0px)),'+Math.round(ft2.top-26)+'px)';
+  if(STG.rot){ /* mode ROT: jam ditaruh di pojok kiri-bawah LAYAR, teks tegak (jangan numpuk sama ikon HUD di kanan-bawah) */
+    var cpv=c2v(12,STG.ih-30);
+    clk.style.transform='translate('+Math.round(cpv[0])+'px,'+Math.round(cpv[1])+'px) rotate('+(STG.rot<0?90:-90)+'deg)';
+  }else clk.style.transform='translate(calc(14px + env(safe-area-inset-left,0px)),'+Math.round(ft2.top-26)+'px)';
   var o=cons('orion'),v=cons('virgo'),cm=cons('canis'),tau=cons('taurus');
-  CAPS.orion.style.transform='translate('+Math.round((o.minX+o.maxX)/2-30)+'px,'+Math.round(o.maxY+22)+'px)';
-  CAPS.virgo.style.transform='translate('+Math.round(v.maxX-42)+'px,'+Math.round(v.minY-24)+'px)';
-  CAPS.canis.style.transform='translate('+Math.round((cm.minX+cm.maxX)/2-48)+'px,'+Math.round(cm.maxY+18)+'px)';
-  if(tau&&CAPS.taurus)CAPS.taurus.style.transform='translate('+Math.round((tau.minX+tau.maxX)/2-28)+'px,'+Math.round(tau.maxY+18)+'px)';
+  CAPS.orion.style.transform='translate('+Math.round((o.minX+o.maxX)/2-30)+'px,'+Math.round(o.maxY+22)+'px)'+STG.up;
+  CAPS.virgo.style.transform='translate('+Math.round(v.maxX-42)+'px,'+Math.round(v.minY-24)+'px)'+STG.up;
+  CAPS.canis.style.transform='translate('+Math.round((cm.minX+cm.maxX)/2-48)+'px,'+Math.round(cm.maxY+18)+'px)'+STG.up;
+  if(tau&&CAPS.taurus)CAPS.taurus.style.transform='translate('+Math.round((tau.minX+tau.maxX)/2-28)+'px,'+Math.round(tau.maxY+18)+'px)'+STG.up;
   if(!drag.on){
     if(SECT.cur&&SUM.on){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
     else{BH.x=BH.hx;BH.y=BH.hy;}
@@ -3399,7 +3477,7 @@ function layout(){
   var bhEl=$('#bh');bhEl.style.width=Math.round(BH.R*16)+'px';bhEl.style.height=Math.round(BH.R*10)+'px';
   var bhp=camBH();
   bhEl.style.transform='translate('+Math.round(bhp[0]-BH.R*8)+'px,'+Math.round(bhp[1]-BH.R*5)+'px)';
-  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*BHZ)+'px)';
+  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
   var rg=cons('orion').stars.rigel,rfx=$('#rigel-fx');
   rfx.style.width=rfx.style.height='52px';rfx.style.marginLeft=rfx.style.marginTop='-26px';
   rfx.style.transform='translate('+Math.round(rg.x+skyPan.x)+'px,'+Math.round(rg.y+skyPan.y)+'px)';
@@ -3454,7 +3532,7 @@ function layout(){
     /* Hard cap so DUMUL/YouTube panels stay compact and never cover Sirius / Rigel / other triggers */
     /* Membatasi lebar portal DUMUL agar berhenti bersih di W * 0.42 (sebelum halo Gargantua W * 0.44) */
     var maxAllowed = !portrait && p.id==='band' ? Math.max(50, Math.floor(W*.42 - p.fx)) : (W - p.fx - 16);
-    var mw = Math.min(W<600?88:115, maxAllowed);
+    var mw = STG.rot ? 104 : Math.min(W<600?88:115, maxAllowed);   /* ROT: lebar label di layar tidak dibatasi sisa lebar sky */
     p.el.style.maxWidth = mw + 'px';
   });
   var bgOrientation=W<H?'portrait':'landscape';
@@ -4499,13 +4577,21 @@ function startSwallow(href){
   });
   var maxD=Math.sqrt(W*W+H*H)*.6;
   els.forEach(function(el){
-    var r=(el.closest&&el.closest('#stage'))?vrect(el):el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-    var dx=cx-BH.x,dy=cy-BH.y,rad=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
-    var base=getComputedStyle(el).transform;base=(base&&base!=='none')?base+' ':'';
+    var inStg=!!(el.closest&&el.closest('#stage'));
+    var r=inStg?vrect(el):el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    /* ROT: elemen HUD (di luar stage) bergerak di koordinat layar asli, jadi lubang hitam dikonversi ke koordinat layar juga */
+    var bxy=(STG.rot&&!inStg)?v2c(BH.x,BH.y):[BH.x,BH.y];
+    var dx=cx-bxy[0],dy=cy-bxy[1],rad=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
+    var base=getComputedStyle(el).transform;
+    /* elemen di stage yang sudah punya rotasi tegak: translasi harus dimasukkan ke bingkai lokalnya */
+    var lcs=1,lsn=0;
+    if(STG.rot&&inStg&&base&&base!=='none'){try{var mm=new DOMMatrix(base),thx=Math.atan2(mm.b,mm.a);lcs=Math.cos(thx);lsn=Math.sin(thx);}catch(eM){}}
+    base=(base&&base!=='none')?base+' ':'';
     var swirl=2.6+Math.random()*1.2,N=18,frames=[];
     for(var j=0;j<=N;j++){
       var u=j/N,k=u*u,r2=rad*Math.pow(1-k,1.35),t2=th+k*swirl;
-      var tx=BH.x+Math.cos(t2)*r2-cx,ty=BH.y+Math.sin(t2)*r2-cy;
+      var tx=bxy[0]+Math.cos(t2)*r2-cx,ty=bxy[1]+Math.sin(t2)*r2-cy;
+      if(lsn!==0){var tx0=tx;tx=tx0*lcs+ty*lsn;ty=-tx0*lsn+ty*lcs;}
       frames.push({transform:base+'translate('+tx.toFixed(1)+'px,'+ty.toFixed(1)+'px) rotate('+(k*swirl*28.6).toFixed(1)+'deg) scale('+(1-.97*k).toFixed(3)+')',opacity:(1-Math.pow(k,2.4)).toFixed(3)});
     }
     var delay=140+Math.min(1,rad/maxD)*800;
@@ -5743,9 +5829,20 @@ function telescopeHitAt(px,py){
   if(tp&&Math.hypot(px-tp[0],py-tp[1])<r)return true;
   return false;
 }
+/* Mode ROT: bubble ditaruh dengan jangkar di koordinat LAYAR (teks tegak), lalu dikonversi balik ke ruang stage. */
+function bubbleXYRot(p,gap,pad,maxW){
+  var c=v2c(p[0],p[1]);
+  var cx=Math.max(pad+maxW*.5,Math.min(STG.iw-pad-maxW*.5,c[0])),cy=Math.max(pad+36,Math.min(STG.ih-pad,c[1]-gap));
+  return c2v(cx,cy);
+}
 function placeSecretMsg(){
   var el=$('#secret-msg'),p=telescopeScreenPos();
   if(!el||!p)return;
+  if(STG.rot){
+    var vv=bubbleXYRot(p,(typeof touchMode!=='undefined'&&touchMode)?10:12,10,Math.min(220,STG.iw*.72));
+    el.style.left=Math.round(vv[0])+'px';el.style.top=Math.round(vv[1])+'px';
+    return;
+  }
   /* Bottom of bubble sits just above the telescope (data-type=telescope uses translate(-50%,-100%)). */
   var gap=(typeof touchMode!=='undefined'&&touchMode)?10:12;
   var pad=10;
@@ -5822,7 +5919,7 @@ function drawPortals(age,now){
        line tracks the moving star. Hit target still follows the star. */
     if(!SW){
       var fx=p.fx!=null?p.fx:p.lx,fy=p.fy!=null?p.fy:p.ly;
-      p.el.style.transform='translate('+fx.toFixed(1)+'px,'+fy.toFixed(1)+'px)';
+      p.el.style.transform='translate('+fx.toFixed(1)+'px,'+fy.toFixed(1)+'px)'+STG.pt;
       var hs=c.stars[p.hit],hp=gSky(hs.x+ox,hs.y+oy);
       p.hitEl.style.transform='translate('+(hp[0]).toFixed(1)+'px,'+(hp[1]).toFixed(1)+'px)';
     }
@@ -7687,12 +7784,12 @@ if(window.PointerEvent){
   document.addEventListener('pointerdown',function(e){
     if(e.pointerType==='mouse')return;
     if(drag.on||konamiBlockedTarget(e.target))return;
-    konamiSwipeStart={x:e.clientX,y:e.clientY,id:e.pointerId};
+    var sp0=scrPt(e);konamiSwipeStart={x:sp0[0],y:sp0[1],id:e.pointerId};
   },{passive:true});
   document.addEventListener('pointerup',function(e){
     if(e.pointerType==='mouse')return;
     if(!konamiSwipeStart||e.pointerId!==konamiSwipeStart.id)return;
-    var dx=e.clientX-konamiSwipeStart.x,dy=e.clientY-konamiSwipeStart.y;
+    var sp1=scrPt(e),dx=sp1[0]-konamiSwipeStart.x,dy=sp1[1]-konamiSwipeStart.y;
     konamiSwipeStart=null;
     var dir=konamiSwipeDirection(dx,dy);
     if(dir)pushKonamiDir(dir);
@@ -7704,12 +7801,12 @@ if(window.PointerEvent){
   /* Legacy touch fallback only when Pointer Events do not exist. */
   document.addEventListener('touchstart',function(e){
     if(e.touches.length!==1||konamiBlockedTarget(e.target))return;
-    var t=e.touches[0];
-    konamiSwipeStart={x:t.clientX,y:t.clientY,id:'touch'};
+    var t=e.touches[0],sp2=scrPt(t);
+    konamiSwipeStart={x:sp2[0],y:sp2[1],id:'touch'};
   },{passive:true});
   document.addEventListener('touchend',function(e){
     if(!konamiSwipeStart||!e.changedTouches.length)return;
-    var t=e.changedTouches[0],dx=t.clientX-konamiSwipeStart.x,dy=t.clientY-konamiSwipeStart.y;
+    var t=e.changedTouches[0],sp3=scrPt(t),dx=sp3[0]-konamiSwipeStart.x,dy=sp3[1]-konamiSwipeStart.y;
     konamiSwipeStart=null;
     var dir=konamiSwipeDirection(dx,dy);
     if(dir)pushKonamiDir(dir);
@@ -7986,6 +8083,11 @@ function placeTeleGreet(){
   var el=TG&&TG.el,p=TG&&TG.anchor?TG.anchor:telescopeScreenPos();
   if(!el||!p)return;
   var gap=TG&&TG.anchor?0:(touchMode?10:12),pad=10,maxW=Math.min(220,(W||innerWidth||360)*.72);
+  if(STG.rot){
+    var vv=bubbleXYRot(p,gap,pad,Math.min(220,STG.iw*.72));
+    el.style.left=Math.round(vv[0])+'px';el.style.top=Math.round(vv[1])+'px';
+    return;
+  }
   var x=Math.max(pad+maxW*.5,Math.min((W||innerWidth)-pad-maxW*.5,p[0])),y=p[1]-gap;
   y=Math.max(pad+36,Math.min((H||innerHeight)-pad,y));
   el.style.left=Math.round(x)+'px';el.style.top=Math.round(y)+'px';
@@ -8437,11 +8539,16 @@ function scheduleLayout(){
   clearTimeout(rt);
   rt=setTimeout(layout,120);
 }
-window.addEventListener('resize',scheduleLayout);
+/* Stage (putar/skala) langsung diperbarui begitu ukuran/orientasi berubah; layout() penuh tetap di-debounce. */
+function onGeo(){try{if(W&&!SW)stageCalc();}catch(eG){}scheduleLayout();}
+window.addEventListener('resize',onGeo);
+window.addEventListener('orientationchange',onGeo);
+/* Landscape-kiri <-> landscape-kanan tidak mengubah ukuran viewport, jadi cuma event orientasi yang kena. */
+try{if(screen.orientation&&screen.orientation.addEventListener)screen.orientation.addEventListener('change',onGeo);}catch(eO){}
 /* Hybrid: visualViewport covers mobile URL-bar / soft-keyboard resizes that
    window.resize sometimes misses. Same debounced scheduler — not a replace. */
 if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',scheduleLayout);
+  window.visualViewport.addEventListener('resize',onGeo);
 }
 /* ready starts false: this object existing only means the script parsed,
    not that boot finished and the render loop is actually running. Flipped
