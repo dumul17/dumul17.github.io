@@ -1376,8 +1376,8 @@ function spatialTarget(){
     return t;
   }
   s=sfxSector();
-  if(SECT.cur&&s&&s!==SECT.cur)                 /* sumber suara di sektor LAIN: tetap teredam (kecuali ada relay) */
-    return s.relay?0:.8;
+  if(SECT.cur&&s&&s!==SECT.cur)                 /* sumber di sektor LAIN: teredam, kecuali Gargantua mini di-summon di sektor INI (relay baru) */
+    return SUM.on?0:.8;
   if(!CAMERA_MODE)return 0;                     /* dalam sektor tanpa kamera: normal */
   p=activeStarScreenPos();
   if(!p||p[2]>=1)return .55;
@@ -1385,16 +1385,19 @@ function spatialTarget(){
   return Math.max(0,(t-.12)/.88);
 }
 function spatialHint(t){
-  var st='',s;
+  var st='',s=sfxSector();
   if(SECT.on&&!SECT.busy){
-    s=sfxSector();
     if(t>.5)st='muffled';else if(s&&s.relay)st='relay';
+  }else if(SECT.cur&&!SECT.busy&&s&&s!==SECT.cur){
+    st=SUM.on?'relay-here':'far';              /* lagi di sektor lain dari sumber suara */
   }
   if(st===AV._hint)return;
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
-  if(st==='muffled')showModeToast('SIGNAL MUFFLED · SOURCE TOO FAR\nSUMMON 🌀 INSIDE ITS SECTOR TO CLEAR IT',null,4200);
-  else showModeToast('RELAY LINKED · SIGNAL CLEAR\nRECALL 🌀 IN THE SECTOR TO MUFFLE AGAIN',null,3600);
+  if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON \uD83C\uDF00 INSIDE THE SOURCE SECTOR TO RELAY',null,4200);
+  else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL \uD83C\uDF00 IN THAT SECTOR TO MUFFLE AGAIN',null,3600);
+  else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nSUMMON \uD83C\uDF00 HERE TO RELAY IT AGAIN',null,4200);
+  else showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL \uD83C\uDF00 TO MUFFLE AGAIN',null,3600);
 }
 function spatialRelease(){
   AV.atten=0;AV._hint='';
@@ -2480,8 +2483,8 @@ function showModeToast(text,kind,ms){
 }
 
 function observeIcon(){
-  /* Overview: 🌠 · inside a sector: 🔍 */
-  return (typeof SECT!=='undefined'&&SECT.cur)?'🔍':'🌠';
+  /* Overview: 🌠 · inside a sector: 📡 */
+  return (typeof SECT!=='undefined'&&SECT.cur)?'📡':'🌠';
 }
 function setObserveMode(on){
   OBSERVE_MODE=!!on;
@@ -2873,7 +2876,7 @@ function updateTimeDilation(now){
   if(!a){return;}
   if(TD.a!==a){TD.a=a;TD.rate=1;TD.ar=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
-  var gm=focusGeom(cid),target=1,miniBH=!!(SECT.cur&&SUM.on);   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
+  var gm=focusGeom(cid),target=1,miniBH=!!(SECT.cur&&SUM.on)&&!(CAMERA_MODE&&camFocusId()==='bh');   /* fokus kamera di BH mini: audio normal */   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
   if(gm&&BH.R>0&&BHSC>.05){
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
        moved off its home spot (idle = everything stays at normal speed). */
@@ -3059,7 +3062,7 @@ var bgCanvas=null,bgCtx=null,bgDirty=true,HUD=null;
 /* Tactical HUD (LAT/LON/AZ/EL): fixed ke layar, nggak ikut geser/zoom canvas. Vektor kecil, murah. */
 function drawHud(){
   if(!HUD)return;
-  /* LAT/LON/AZ/EL cuma di mode observasi (🌠/🔍) dan kamera (📷); tampilan biasa bersih. */
+  /* LAT/LON/AZ/EL cuma di mode observasi (🌠/📡) dan kamera (📷); tampilan biasa bersih. */
   if(!(OBSERVE_MODE||CAMERA_MODE))return;
   var m=HUD.m,len=HUD.len,t=HUD.top,b=H-HUD.bot;
   g.save();
@@ -6118,7 +6121,9 @@ function ofxDrawTint(now){
     if(!OFX.tk)OFX.tk=ofxMakeTint('k');
     g.globalCompositeOperation='multiply';
     g.globalAlpha=OFX.pK*(.92+.08*Math.sin(now*.0013));
-    g.drawImage(OFX.tk,BH.x-S/2,BH.y-S/2,S,S);
+    /* Di dalam sektor, tint tetap di posisi HOME (sama seperti overview) - jangan ikut Gargantua mini yang di-summon/di-drag. */
+    var tkx=SECT.cur?(BH.hx||BH.x):BH.x,tky=SECT.cur?(BH.hy||BH.y):BH.y;
+    g.drawImage(OFX.tk,tkx-S/2,tky-S/2,S,S);
   }
   g.restore();
 }
@@ -6289,8 +6294,9 @@ function sectZoomIn(s){
 function sectZoomOut(){
   if(SECT.busy||!SECT.target)return;
   var s=SECT.target;
-  try{if(CAMERA_MODE)setCameraMode(false);}catch(e){}
-  sumReset();
+  /* Dari mode observasi (📡) maupun kamera: matikan Observation Mode (kamera ikut mati) biar overview bersih, nggak nyangkut di 🌠 + HUD LAT/LON. */
+  try{if(typeof setObserveMode==='function'&&OBSERVE_MODE)setObserveMode(false);else if(CAMERA_MODE)setCameraMode(false);}catch(e){}
+  sumStash();
   SECT.busy=true;SECT.phase='out';SECT.t0=performance.now();
   SECT.cur=null;SECT.flash=SECT.t0;
   sectSet(true);sectApply(s,1);
@@ -6343,6 +6349,7 @@ function bhScaleTarget(){
   if(SW)return 1;
   if(SECT.cur){
     if(!SUM.on)return 0;
+    if(CAMERA_MODE&&SUM.on&&camFocusId()==='bh')return 1; /* fokus kamera ke BH mini (cam 1x): seukuran BH overview; keluar fokus/kamera -> balik ke ukuran parkir */
     var base=Math.min(1,SUM_R/Math.max(1,BH.R)); /* mini parked size */
     var f=bhNearFactor();
     /* Near mass → grow toward full overview size; curve keeps mid-range readable */
@@ -6415,15 +6422,29 @@ function sumSet(on){
     BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
     SUM.on=true;SECT.cur.relay=true;
     try{focusRefresh();}catch(eFR){}
-    try{if(typeof showModeToast==='function')showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET · OVERVIEW SIGNAL STAYS CLEAR',null,3200);}catch(e){}
+    try{var so=sfxSector();   /* kalau sumber suara di sektor lain, toast relay dari spatialHint yang tampil */
+      if(typeof showModeToast==='function'&&!(so&&so!==SECT.cur))showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET \u00b7 OVERVIEW SIGNAL STAYS CLEAR',null,3200);}catch(e){}
   }else{
-    SUM.on=false;if(SECT.cur)SECT.cur.relay=false;
+    SUM.on=false;if(SECT.cur){SECT.cur.relay=false;SECT.cur.sum=null;}
     try{focusRefresh();}catch(eFR){}
     try{if(typeof showModeToast==='function')showModeToast('GARGANTUA RECALLED',null,1800);}catch(e){}
   }
   haptic(10);sumUI();
 }
 function sumReset(){SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();}
+/* Keluar sektor: Gargantua mini DISIMPAN di sektornya (posisi + relay tetap), bukan di-reset. */
+function sumStash(){
+  var c=SECT.cur;
+  if(c)c.sum=SUM.on?{x:BH.x,y:BH.y}:null;
+  SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();
+}
+/* Masuk sektor: kalau tadi sudah di-summon di sini, munculkan lagi di posisi parkir terakhir. */
+function sumRestore(s){
+  if(!s||!s.sum)return;
+  var mg=Math.max(6,SUM_R*1.15);
+  BH.x=Math.max(mg,Math.min(W-mg,s.sum.x));BH.y=Math.max(mg,Math.min(H-mg,s.sum.y));
+  SUM.on=true;s.relay=true;sumUI();
+}
 function sumUI(){
   var b=document.getElementById('mode-bh');if(!b)return;
   b.classList.toggle('on',SUM.on);b.setAttribute('aria-pressed',SUM.on?'true':'false');
@@ -6438,6 +6459,7 @@ function sectStep(now){
     sectApply(s,sectEase(u));
     if(u>=1){
       SECT.flash=now;SECT.cur=s;SECT.phase='sec';SECT.busy=false;
+      try{sumRestore(s);}catch(eSR){}
       skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
       sectSet(false);
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
@@ -6472,7 +6494,15 @@ function drawSectorOverview(now,age){
   for(var i=0;i<n;i++){
     var s=SECT.list[i],al=clamp((age-.5-i*.14)/1.1),empty=!s.ids.length;
     if(al<=0)continue;
-    var an=s.a*Math.PI/180,bx=BH.hx+Math.cos(an)*rx,by=BH.hy+Math.sin(an)*ry;
+    var an=s.a*Math.PI/180,ox=Math.cos(an)*rx,oy=Math.sin(an)*ry,dx=ox,dy=oy;
+    if(STG.rot){
+      /* Landscape (stage diputar 90°): susunan portal di LAYAR disamakan dengan portrait (01 tetap di posisi atas, dst).
+         Offset portrait (ox,oy) diubah ke ruang stage, dan diskala supaya muat di tinggi layar landscape. */
+      var lf=Math.min(1,Math.max(.3,(STG.ih*.5-rad-36)/Math.max(1,ry)));
+      ox*=lf;oy*=lf;
+      if(STG.rot<0){dx=-oy;dy=ox;}else{dx=oy;dy=-ox;}
+    }
+    var bx=BH.hx+dx,by=BH.hy+dy;
     s.bx=bx;s.by=by;
     var p=gSky(bx+mx,by+my);
     s.sx=p[0];s.sy=p[1];
