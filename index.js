@@ -482,6 +482,8 @@ function focusList(){
     if(id==='pleiades'){if(sectShow('pleiades'))L.push({id:'pleiades',n:nm.pleiades});}
     else if(sectShow(id))L.push({id:id,n:nm[id]||id});
   }
+  /* Di dalam sektor, kalau BH mini lagi dipanggil: opsi fokus terakhir sebelum balik ke Free */
+  if(SECT.cur&&SUM.on)L.push({id:'bh',n:'Gargantua'});
   return L;
 }
 /* Free band of screen between the caption panel (top) and the CAM controls (bottom). */
@@ -519,7 +521,7 @@ function camBox(){
 }
 function focusGeom(id){
   var x,y,w,h;
-  if(id==='bh'){if(BHSC<.05)return null;return {x:BH.x,y:BH.y,z:BHSC<.9?2.2:1};}
+  if(id==='bh'){if(BHSC<.05)return null;return {x:BH.x,y:BH.y,z:1};} /* BH mini: auto-fit zoom 1x */
   if(id==='pleiades'){
     if(!PLEIADES.ready||!PLEIADES.scale)return null;
     x=PLEIADES.x+.53*PLEIADES.scale;y=PLEIADES.y+.42*PLEIADES.scale;w=.7*PLEIADES.scale;h=.5*PLEIADES.scale;
@@ -540,7 +542,7 @@ function focusCycle(d){
   if(!FOCUS.list)FOCUS.list=focusList();
   var n=FOCUS.list.length,i=FOCUS.i,t=0;
   do{i=(i+d+n)%n;t++;}while(t<n&&FOCUS.list[i].id!=='free'&&!focusGeom(FOCUS.list[i].id));
-  FOCUS.i=i;FOCUS.anim=FOCUS.list[i].id!=='free';
+  FOCUS.i=i;FOCUS.anim=FOCUS.list[i].id!=='free';_freeReset=FOCUS.list[i].id==='free';
   focusUI();focusFx(FOCUS.list[i].id);haptic(8);
 }
 var FOCUS_WHISPER={
@@ -655,7 +657,14 @@ function syncBHDom(){
     if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
   }catch(e){}
 }
-var _camUpOn=false;
+var _camUpOn=false,_freeReset=false;
+function focusRefresh(){ /* daftar fokus berubah (BH mini dipanggil/ditarik) saat mode kamera aktif */
+  if(!CAMERA_MODE)return;
+  var cid=camFocusId(),L=focusList(),k=0;
+  for(var i=0;i<L.length;i++)if(L[i].id===cid)k=i;
+  if(cid==='bh'&&k===0){FOCUS.anim=false;_freeReset=true;}
+  FOCUS.list=L;FOCUS.i=k;focusUI();
+}
 function focusStep(){
   var want=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   var f=want&&FOCUS.list?FOCUS.list[FOCUS.i]:null,id=f?f.id:'free';
@@ -669,6 +678,17 @@ function focusStep(){
       if(ra!==0)_camUpOn=true;
       if(Math.abs(skyRot-ra)>.002){skyRot+=(ra-skyRot)*.12;ch=true;}
       else{skyRot=ra;if(ra===0)_camUpOn=false;}
+    }
+  }
+  /* Kamera pindah ke Free: zoom otomatis keluar ke 1x dan pan balik ke tengah (berhenti kalau user mulai gerak sendiri) */
+  if(want&&id==='free'&&_freeReset){
+    if(skyDrag.on||skyPinch.on||skyRotDrag.on)_freeReset=false;
+    else{
+      var fdz=1-skyZoom,fpm=skyPan.x*skyPan.x+skyPan.y*skyPan.y;
+      if(Math.abs(fdz)>.004)setSkyZoom(skyZoom+fdz*.12,false);else if(skyZoom!==1)setSkyZoom(1,false);
+      if(fpm>.09){skyPan.x*=.88;skyPan.y*=.88;}else{skyPan.x=0;skyPan.y=0;}
+      ch=true;
+      if(Math.abs(skyZoom-1)<=.004&&fpm<=.09)_freeReset=false;
     }
   }
   if(want&&id!=='free'){
@@ -3917,7 +3937,7 @@ function drawHole(now,age){
     var wobS2=Math.min(1,Math.hypot(vx2,vy2)*8);
     g.save();
     g.translate(bp[0],bp[1]);
-    g.rotate(-.48);
+    g.rotate(-.48+upAng()); /* landscape: ikut tegak bareng BH */
     g.strokeStyle='rgba(180,210,240,'+(.10+.08*wobS2)+')';
     g.lineWidth=Math.max(.7,R*.02);
     g.beginPath();g.ellipse(0,0,R*4.3,R*.09,0,0,6.283);g.stroke();
@@ -6394,10 +6414,11 @@ function sumSet(on){
     var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
     BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
     SUM.on=true;SECT.cur.relay=true;
+    try{focusRefresh();}catch(eFR){}
     try{if(typeof showModeToast==='function')showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET · OVERVIEW SIGNAL STAYS CLEAR',null,3200);}catch(e){}
   }else{
     SUM.on=false;if(SECT.cur)SECT.cur.relay=false;
-    try{if(CAMERA_MODE&&camFocusId()==='bh'){FOCUS.i=0;FOCUS.anim=false;focusUI();}}catch(e){}
+    try{focusRefresh();}catch(eFR){}
     try{if(typeof showModeToast==='function')showModeToast('GARGANTUA RECALLED',null,1800);}catch(e){}
   }
   haptic(10);sumUI();
