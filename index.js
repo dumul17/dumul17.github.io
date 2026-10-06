@@ -1377,7 +1377,7 @@ function spatialTarget(){
   }
   s=sfxSector();
   if(SECT.cur&&s&&s!==SECT.cur)                 /* sumber di sektor LAIN: teredam, kecuali Gargantua mini di-summon di sektor INI (relay baru) */
-    return SUM.on?0:.8;
+    return (SUM.on&&s.relay)?0:.8;   /* relay harus berantai: sektor sumber WAJIB sudah di-relay (BH di-summon) dulu */
   if(!CAMERA_MODE)return 0;                     /* dalam sektor tanpa kamera: normal */
   p=activeStarScreenPos();
   if(!p||p[2]>=1)return .55;
@@ -1389,14 +1389,15 @@ function spatialHint(t){
   if(SECT.on&&!SECT.busy){
     if(t>.5)st='muffled';else if(s&&s.relay)st='relay';
   }else if(SECT.cur&&!SECT.busy&&s&&s!==SECT.cur){
-    st=SUM.on?'relay-here':'far';              /* lagi di sektor lain dari sumber suara */
+    st=SUM.on?(s.relay?'relay-here':'norelay'):'far';   /* lagi di sektor lain dari sumber suara */
   }
   if(st===AV._hint)return;
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
   if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON \uD83C\uDF00 INSIDE THE SOURCE SECTOR TO RELAY',null,4200);
   else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL \uD83C\uDF00 IN THAT SECTOR TO MUFFLE AGAIN',null,3600);
-  else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nSUMMON \uD83C\uDF00 HERE TO RELAY IT AGAIN',null,4200);
+  else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nRELAY THE SOURCE SECTOR FIRST, THEN SUMMON \uD83C\uDF00 HERE',null,4600);
+  else if(st==='norelay')showModeToast('RELAY NOT LINKED \u00b7 SOURCE SECTOR HAS NO RELAY\nSUMMON \uD83C\uDF00 IN THE SOURCE SECTOR FIRST',null,4600);
   else showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL \uD83C\uDF00 TO MUFFLE AGAIN',null,3600);
 }
 function spatialRelease(){
@@ -2876,7 +2877,11 @@ function updateTimeDilation(now){
   if(!a){return;}
   if(TD.a!==a){TD.a=a;TD.rate=1;TD.ar=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
-  var gm=focusGeom(cid),target=1,miniBH=!!(SECT.cur&&SUM.on)&&!(CAMERA_MODE&&camFocusId()==='bh');   /* fokus kamera di BH mini: audio normal */   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
+  var gm=focusGeom(cid),target=1,miniBH=false;
+  if(SECT.cur&&SUM.on){
+    if(!SUM.moved&&Math.hypot(BH.x-SUM.x0,BH.y-SUM.y0)>8)SUM.moved=true;   /* latch: sekali di-drag dari titik spawn, dilatasi aktif */
+    miniBH=SUM.moved&&!(CAMERA_MODE&&camFocusId()==='bh');
+  }   /* fokus kamera di BH mini: audio normal */   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
   if(gm&&BH.R>0&&BHSC>.05&&sectShow(cid)){   /* rasi sumber harus ada di sektor yang lagi dimasuki; kalau di sektor lain, BH mini nggak ngaruh */
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
        moved off its home spot (idle = everything stays at normal speed). */
@@ -6420,7 +6425,7 @@ function sumSet(on){
   if(on){
     var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
     BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
-    SUM.on=true;SECT.cur.relay=true;
+    SUM.on=true;SECT.cur.relay=true;SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;   /* belum di-drag = dilatasi audio pasif */
     try{focusRefresh();}catch(eFR){}
     try{var so=sfxSector();   /* kalau sumber suara di sektor lain, toast relay dari spatialHint yang tampil */
       if(typeof showModeToast==='function'&&!(so&&so!==SECT.cur))showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET \u00b7 OVERVIEW SIGNAL STAYS CLEAR',null,3200);}catch(e){}
@@ -6435,7 +6440,7 @@ function sumReset(){SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();}
 /* Keluar sektor: Gargantua mini DISIMPAN di sektornya (posisi + relay tetap), bukan di-reset. */
 function sumStash(){
   var c=SECT.cur;
-  if(c)c.sum=SUM.on?{x:BH.x,y:BH.y}:null;
+  if(c)c.sum=SUM.on?{x:BH.x,y:BH.y,x0:SUM.x0,y0:SUM.y0,moved:!!SUM.moved}:null;
   SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();
 }
 /* Masuk sektor: kalau tadi sudah di-summon di sini, munculkan lagi di posisi parkir terakhir. */
@@ -6443,7 +6448,7 @@ function sumRestore(s){
   if(!s||!s.sum)return;
   var mg=Math.max(6,SUM_R*1.15);
   BH.x=Math.max(mg,Math.min(W-mg,s.sum.x));BH.y=Math.max(mg,Math.min(H-mg,s.sum.y));
-  SUM.on=true;s.relay=true;sumUI();
+  SUM.on=true;s.relay=true;SUM.x0=s.sum.x0==null?s.sum.x:s.sum.x0;SUM.y0=s.sum.y0==null?s.sum.y:s.sum.y0;SUM.moved=!!s.sum.moved;sumUI();
 }
 function sumUI(){
   var b=document.getElementById('mode-bh');if(!b)return;
