@@ -935,7 +935,9 @@ body.ls #last-signal{translate:calc(-1 * (var(--stw) / 2 + var(--gut) / 2)) 0;wi
 body.lr #stage{display:block;position:fixed;left:0;top:0;width:var(--vw);height:var(--vh);transform-origin:0 0;transform:translateY(var(--ih)) rotate(-90deg);z-index:5;pointer-events:none}
 body.lr.lr-cw #stage{transform:translateX(var(--iw)) rotate(90deg)}
 body.lr #stage > *{pointer-events:auto}
-body.lr #stage > #sky,body.lr #stage > #secret-msg,body.lr #stage > #tele-greet,body.lr #stage > #sn-flash{pointer-events:none}
+body.lr #stage > #secret-msg,body.lr #stage > #tele-greet,body.lr #stage > #sn-flash,body.lr #stage > header,body.lr #stage > footer,body.lr #stage > .cap,body.lr #stage > #bh{pointer-events:none}
+/* #sky harus jadi target sentuhan (touch-action:none) seperti di portrait; kalau pointer-events:none, jari jatuh ke body -> browser ambil alih jadi pan -> pointercancel -> drag macet */
+body.lr #stage > #sky{pointer-events:auto;touch-action:none}
 body.lr .scan{z-index:6}
 /* safe-area: sisi atas/bawah sky = sisi kiri/kanan layar */
 body.lr header{padding-top:calc(24px + env(safe-area-inset-left,0px))}

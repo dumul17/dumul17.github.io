@@ -147,6 +147,13 @@ function scrPt(e){STG.raw=true;try{return [e.clientX,e.clientY];}finally{STG.raw
   var P=[window.MouseEvent&&MouseEvent.prototype,window.Touch&&Touch.prototype];
   for(var i=0;i<P.length;i++)hook(P[i]);
 })();
+/* Teks/sprite di canvas ikut berputar bareng #stage di HP landscape. uprBegin putar balik terhadap titik (x,y) supaya tegak di layar. */
+function upAng(){return STG.rot<0?Math.PI/2:(STG.rot>0?-Math.PI/2:0);}
+function uprBegin(x,y){
+  if(!STG.rot)return false;
+  g.save();g.translate(x,y);g.rotate(upAng());g.translate(-x,-y);return true;
+}
+function uprEnd(on){if(on)g.restore();}
 var skyRot=0;
 var skyZoom=1;
 var CAMERA_MODE=false;
@@ -521,6 +528,8 @@ function focusGeom(id){
     x=(c.minX+c.maxX)/2;y=(c.minY+c.maxY)/2;w=c.maxX-c.minX;h=c.maxY-c.minY;
   }
   var cb=camBox(),z=Math.min((cb.w||W)*.8/Math.max(w,1),cb.h*.94/Math.max(h,1));
+  /* landscape + kamera: rasi diputar tegak, jadi lebar rasi lari ke sumbu layar-horizontal (pita bebas cb.h) */
+  if(STG.rot&&CAMERA_MODE&&id!=='bh')z=Math.min(cb.h*.94/Math.max(w,1),(cb.w||W)*.8/Math.max(h,1));
   return {x:x,y:y,z:Math.max(1,Math.min(3,z))};
 }
 function focusUI(){
@@ -646,12 +655,22 @@ function syncBHDom(){
     if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
   }catch(e){}
 }
+var _camUpOn=false;
 function focusStep(){
   var want=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   var f=want&&FOCUS.list?FOCUS.list[FOCUS.i]:null,id=f?f.id:'free';
   var tZ=(want&&id!=='free'&&id!=='bh')?Math.min(skyZoom,1.25):skyZoom,tK=(want||SECT.busy)?1:0,ch=false;
   if(Math.abs(BHZ-tZ)>.002||Math.abs(BHK-tK)>.002){BHZ+=(tZ-BHZ)*.14;BHK+=(tK-BHK)*.14;ch=true;}
   else if(BHZ!==tZ||BHK!==tK){BHZ=tZ;BHK=tK;ch=true;}
+  /* HP landscape: pas auto-zoom ke rasi, sky ikut diputar balik 90° supaya rasi tegak di layar; balik ke 0 pas Free/BH. */
+  if(want&&STG.rot&&!skyRotDrag.on&&!skyPinch.on){
+    var ra=(id!=='free'&&id!=='bh')?upAng():(_camUpOn?0:null);
+    if(ra!==null){
+      if(ra!==0)_camUpOn=true;
+      if(Math.abs(skyRot-ra)>.002){skyRot+=(ra-skyRot)*.12;ch=true;}
+      else{skyRot=ra;if(ra===0)_camUpOn=false;}
+    }
+  }
   if(want&&id!=='free'){
     var g=focusGeom(id);
     if(g){
@@ -3020,6 +3039,8 @@ var bgCanvas=null,bgCtx=null,bgDirty=true,HUD=null;
 /* Tactical HUD (LAT/LON/AZ/EL): fixed ke layar, nggak ikut geser/zoom canvas. Vektor kecil, murah. */
 function drawHud(){
   if(!HUD)return;
+  /* LAT/LON/AZ/EL cuma di mode observasi (🌠/🔍) dan kamera (📷); tampilan biasa bersih. */
+  if(!(OBSERVE_MODE||CAMERA_MODE))return;
   var m=HUD.m,len=HUD.len,t=HUD.top,b=H-HUD.bot;
   g.save();
   g.strokeStyle='rgba(110,229,255,0.22)';g.fillStyle='rgba(110,229,255,0.18)';g.lineWidth=1;
@@ -3030,10 +3051,24 @@ function drawHud(){
   g.moveTo(m,b-len);g.lineTo(m,b);g.lineTo(m+len,b);
   g.moveTo(W-m-len,b);g.lineTo(W-m,b);g.lineTo(W-m,b-len);
   g.stroke();
-  g.textBaseline='top';g.textAlign='left';g.fillText('[ LAT 00\u00b000\u2032N ]',m+4,t+4);
-  g.textAlign='right';g.fillText('[ LON 000\u00b000\u2032E ]',W-m-4,t+4);
-  g.textBaseline='bottom';g.textAlign='left';g.fillText('[ AZ 000\u00b0 ]',m+4,b-4);
-  g.textAlign='right';g.fillText('[ EL 00\u00b0 ]',W-m-4,b-4);
+  var T={tl:'[ LAT 00\u00b000\u2032N ]',tr:'[ LON 000\u00b000\u2032E ]',bl:'[ AZ 000\u00b0 ]',br:'[ EL 00\u00b0 ]'};
+  if(!STG.rot){
+    g.textBaseline='top';g.textAlign='left';g.fillText(T.tl,m+4,t+4);
+    g.textAlign='right';g.fillText(T.tr,W-m-4,t+4);
+    g.textBaseline='bottom';g.textAlign='left';g.fillText(T.bl,m+4,b-4);
+    g.textAlign='right';g.fillText(T.br,W-m-4,b-4);
+  }else{
+    /* landscape: label tegak di pojok LAYAR (kiri-atas LAT, kanan-atas LON, kiri-bawah AZ, kanan-bawah EL) */
+    var cs=[[m,t],[W-m,t],[m,b],[W-m,b]];
+    for(var ci=0;ci<4;ci++){
+      var sp=v2c(cs[ci][0],cs[ci][1]),lf=sp[0]<STG.iw/2,tp=sp[1]<STG.ih/2;
+      var v=c2v(sp[0]+(lf?4:-4),sp[1]+(tp?4:-4));
+      g.save();g.translate(v[0],v[1]);g.rotate(upAng());
+      g.textAlign=lf?'left':'right';g.textBaseline=tp?'top':'bottom';
+      g.fillText(tp?(lf?T.tl:T.tr):(lf?T.bl:T.br),0,0);
+      g.restore();
+    }
+  }
   g.restore();
 }
 /* Astrophotography plate: deep layer (dust/band/galaxies) + mid layer (stars/HUD/grid), both baked offscreen. */
@@ -3733,6 +3768,7 @@ function drawHoleFallback(now,age){
   if(R<.5)return;
   var bp=camBH();
   g.save();g.translate(bp[0],bp[1]);
+  if(STG.rot)g.rotate(upAng());
   g.globalCompositeOperation='source-over';
   /* accretion disk */
   g.save();g.rotate(-.48);
@@ -3769,6 +3805,7 @@ function drawHole(now,age){
 
   g.save();
   g.translate(bp[0],bp[1]);
+  if(STG.rot)g.rotate(upAng()); /* BH tegak seperti di portrait */
 
   /* Core + static portal artwork */
   g.globalAlpha=Math.min(1,.86+.14*BH.h+.5*e+.08*gk);
@@ -5223,6 +5260,7 @@ function drawTargetLock(now){
   g.restore();
 
   // Telemetry HUD Text — Smart Adaptive Offset
+  var _upT=uprBegin(x,y);
   g.save();
   var isMobile = (W < 600 || H < 520);
   var labelOnRight = (s.nx && s.nx > 0);
@@ -5238,6 +5276,13 @@ function drawTargetLock(now){
     if(tx < 10) tx = 10;
     if(tx + 110 > W) tx = W - 115;
     if(ty + 26 > H - 35) ty = y - sz - 30; // Lempar ke atas jika terlalu dekat dengan footer/bawah
+    if(STG.rot){ /* landscape: batas dihitung di ruang LAYAR (teks sudah tegak) */
+      var spT=v2c(x,y),lx=-40,ly=sz+20,ex=spT[0]+lx,ey=spT[1]+ly;
+      if(ex<10)lx+=10-ex;
+      if(ex+115>STG.iw)lx-=ex+115-STG.iw;
+      if(ey+26>STG.ih-10)ly=-sz-30;
+      tx=x+lx;ty=y+ly;
+    }
   } else {
     // Pada Desktop: Posisikan di arah berlawanan dari nama bintang (s.nx)
     if(labelOnRight){
@@ -5267,6 +5312,7 @@ function drawTargetLock(now){
   g.beginPath();g.moveTo(tx - 4, ty - 8);g.lineTo(tx - 4, ty + 23);g.stroke();
 
   g.restore();
+  uprEnd(_upT);
 }
 
 function drawShooting(now){
@@ -5674,6 +5720,7 @@ function drawStars(c,age,now){
       /* Audio-trigger labels: each one inherits its own pulse color. */
       /* triggerKey / tr / isPlaying were resolved above so potato audio-focus
          can decide the cheap star path before any gradient work is allocated. */
+      var _upL=uprBegin(x,y);
       g.font='500 10px "Space Grotesk",system-ui,sans-serif';
       g.textAlign=s.nx<0?'right':'left';
       /* Closer gap for edge stars (Antares) so the label hugs the pulse. */
@@ -5714,6 +5761,7 @@ function drawStars(c,age,now){
         }
         g.restore();
       }
+      uprEnd(_upL);
     }
   });
 }
@@ -5776,6 +5824,7 @@ function drawPleiades(age,now){
       g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
       g.restore();
       if(age>3.5&&q[2]<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
+        var _upP=uprBegin(x,y);
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
         g.textAlign='left';g.fillStyle='rgba('+tr.rgb+','+(hotP?.95:(selected?.78:.42))+')';
         var labelX=x+r*3.4+7,labelY=y+3;
@@ -5795,6 +5844,7 @@ function drawPleiades(age,now){
           }
           g.restore();
         }
+        uprEnd(_upP);
       }
     }
   }
@@ -6410,6 +6460,7 @@ function drawSectorOverview(now,age){
     var br=reduce?0:Math.sin(now*.0015+i*1.3)*.04,r=rad*(1+br);
     g.save();
     g.globalAlpha=vis;
+    uprBegin(p[0],p[1]); /* ikon+teks sektor tegak di landscape (restore ikut g.restore di bawah) */
     /* halo */
     g.drawImage(sectHaloSprite(empty),p[0]-r*2.1,p[1]-r*2.1,r*4.2,r*4.2);
     /* dashed ring */
@@ -6447,7 +6498,7 @@ function drawSectorOverview(now,age){
       g.fillStyle='rgba(255,154,217,'+(.85*(1-(now-s.flash)/1500))+')';
       g.fillText('no signal yet',p[0],p[1]+r+19);
     }
-    g.restore();
+    g.restore();g.restore();
   }
   try{if(/[?&]dbg\b/.test(location.search)){g.save();g.fillStyle='rgba(255,255,255,.5)';g.font='9px monospace';g.textAlign='left';g.textBaseline='top';
     g.fillText('build 2026-10-06a \u00b7 PLE '+(PLEIADES.scale||0).toFixed(1),8,top+4);g.restore();}}catch(eD){}
