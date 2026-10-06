@@ -469,12 +469,13 @@ function setCameraMode(on){
 var FOCUS={i:0,anim:false,list:null};
 /* Per-sector focus order (display names use brightest star for canis/scorpius).
    Orion: Free → Sirius → Orion → Taurus → Pleiades
-   Virgo: Free → Antares → Boötes → Virgo */
+   Virgo: Free → Boötes → Virgo · Sektor 03 (summer): Free → Antares */
 function focusList(){
   var nm={orion:'Orion',taurus:'Taurus',virgo:'Virgo',canis:'Sirius',bootes:'Boötes',scorpius:'Antares',pleiades:'Pleiades'};
   var order;
   if(SECT.cur&&SECT.cur.k==='orion') order=['canis','orion','taurus','pleiades'];
-  else if(SECT.cur&&SECT.cur.k==='virgo') order=['scorpius','bootes','virgo'];
+  else if(SECT.cur&&SECT.cur.k==='virgo') order=['bootes','virgo'];
+  else if(SECT.cur&&SECT.cur.k==='summer') order=['scorpius'];
   else order=['canis','orion','taurus','pleiades','scorpius','bootes','virgo'];
   var L=[{id:'free',n:'Free'}];
   for(var i=0;i<order.length;i++){
@@ -6209,14 +6210,14 @@ function ofxDuckRelease(){}
    Tap ikon terisi -> sementara masuk ke tampilan rasi lama (placeholder zoom, fase 2). Tombol ◎ = balik ke overview. */
 var SECT={on:true,vis:1,phase:'ov',cur:null,busy:false,z:0,t0:0,zt:2.4,dur:950,flash:0,list:[
   {k:'orion',name:'Orion',ids:['orion','taurus','canis','pleiades'],a:-150},
-  {k:'virgo',name:'Virgo',ids:['virgo','bootes','scorpius'],a:-30},
-  {name:'???',ids:[],a:150},{name:'???',ids:[],a:30}   /* 03 = kiri-bawah, 04 = kanan-bawah (portal atas/bawah BH dihapus) */
+  {k:'virgo',name:'Virgo',ids:['virgo','bootes'],a:-30},
+  {k:'summer',name:'Summer',ids:['scorpius'],a:150},{name:'???',ids:[],a:30}   /* 03 = kiri-bawah, 04 = kanan-bawah (portal atas/bawah BH dihapus) */
 ],down:null};
 function sectSet(on){
   SECT.on=!!on;
   try{var bc=document.body.classList;bc.toggle('sect-ov',SECT.on);
     bc.toggle('sect-in',!SECT.on&&!!SECT.cur);
-    bc.toggle('sect-in-orion',!SECT.on&&!!SECT.cur&&SECT.cur.k==='orion');bc.toggle('sect-in-virgo',!SECT.on&&!!SECT.cur&&SECT.cur.k==='virgo');}catch(e){}
+    bc.toggle('sect-in-orion',!SECT.on&&!!SECT.cur&&SECT.cur.k==='orion');bc.toggle('sect-in-virgo',!SECT.on&&!!SECT.cur&&SECT.cur.k==='virgo');bc.toggle('sect-in-summer',!SECT.on&&!!SECT.cur&&SECT.cur.k==='summer');}catch(e){}
   try{var ob=document.getElementById('mode-observe');if(ob)ob.textContent=observeIcon();}catch(eO){}
   if(SECT.on){try{syncSkyPanHits();}catch(e){}}
 }

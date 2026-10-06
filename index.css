@@ -908,7 +908,8 @@ body.sect-in #mode-sectors,body.sect-in #mode-bh{display:grid}
 body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 114px + 8px)!important}
 body.sect-ov .cap,body.sect-ov .hit,body.sect-ov #betel-fx,body.sect-ov #rigel-fx{display:none!important}
 body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!important}
-body.sect-in-orion #arcturus-fx,body.sect-in-orion #antares-fx,body.sect-in-virgo #rigel-fx,body.sect-in-virgo #betel-fx,body.sect-in-virgo #sirius-fx,body.sect-in-virgo #pleione-fx,body.sect-in-virgo #aldebaran-fx{display:none!important}
+body.sect-in-orion #arcturus-fx,body.sect-in-orion #antares-fx,body.sect-in-virgo #rigel-fx,body.sect-in-virgo #betel-fx,body.sect-in-virgo #sirius-fx,body.sect-in-virgo #pleione-fx,body.sect-in-virgo #aldebaran-fx,body.sect-in-virgo #antares-fx,
+body.sect-in-summer #arcturus-fx,body.sect-in-summer #rigel-fx,body.sect-in-summer #betel-fx,body.sect-in-summer #sirius-fx,body.sect-in-summer #pleione-fx,body.sect-in-summer #aldebaran-fx{display:none!important}
 
 /* ===== Landscape stage (body.ls) =====
    #stage = wadah sky (canvas, header, footer, rasi, BH, portal, bubble). Portrait: display:contents (tidak ada efek).
