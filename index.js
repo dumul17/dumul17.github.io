@@ -2877,7 +2877,7 @@ function updateTimeDilation(now){
   if(TD.a!==a){TD.a=a;TD.rate=1;TD.ar=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
   var gm=focusGeom(cid),target=1,miniBH=!!(SECT.cur&&SUM.on)&&!(CAMERA_MODE&&camFocusId()==='bh');   /* fokus kamera di BH mini: audio normal */   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
-  if(gm&&BH.R>0&&BHSC>.05){
+  if(gm&&BH.R>0&&BHSC>.05&&sectShow(cid)){   /* rasi sumber harus ada di sektor yang lagi dimasuki; kalau di sektor lain, BH mini nggak ngaruh */
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
        moved off its home spot (idle = everything stays at normal speed). */
     /* Relative geometry on screen: dragging the sky moves the constellation toward Gargantua too, unless
@@ -6205,7 +6205,7 @@ function ofxDuckRelease(){}
 var SECT={on:true,vis:1,phase:'ov',cur:null,busy:false,z:0,t0:0,zt:2.4,dur:950,flash:0,list:[
   {k:'orion',name:'Orion',ids:['orion','taurus','canis','pleiades'],a:-150},
   {k:'virgo',name:'Virgo',ids:['virgo','bootes','scorpius'],a:-30},
-  {name:'???',ids:[],a:-90},{name:'???',ids:[],a:30},{name:'???',ids:[],a:90},{name:'???',ids:[],a:150}
+  {name:'???',ids:[],a:150},{name:'???',ids:[],a:30}   /* 03 = kiri-bawah, 04 = kanan-bawah (portal atas/bawah BH dihapus) */
 ],down:null};
 function sectSet(on){
   SECT.on=!!on;
@@ -6498,8 +6498,12 @@ function drawSectorOverview(now,age){
     if(STG.rot){
       /* Landscape (stage diputar 90°): susunan portal di LAYAR disamakan dengan portrait (01 tetap di posisi atas, dst).
          Offset portrait (ox,oy) diubah ke ruang stage, dan diskala supaya muat di tinggi layar landscape. */
-      var lf=Math.min(1,Math.max(.3,(STG.ih*.5-rad-36)/Math.max(1,ry)));
-      ox*=lf;oy*=lf;
+      /* Portal atas/bawah sudah tidak ada (sudut max 30° -> |sin|=.5), jadi tinggi layar cukup lega. Horizontal landscape lebih lebar:
+         portal dijauhkan dari BH sampai sisi layar (dengan sisa margin). */
+      var lf=Math.min(1,Math.max(.3,(STG.ih*.5-rad-36)/Math.max(1,ry*.5)));
+      var bxs=STG.rot<0?BH.hy:(STG.iw-BH.hy),avail=Math.min(bxs,STG.iw-bxs)-rad-24;
+      var rxL=Math.max(rx*lf,Math.min(avail*.85,STG.ih*1.1));
+      ox=Math.cos(an)*rxL;oy*=lf;
       if(STG.rot<0){dx=-oy;dy=ox;}else{dx=oy;dy=-ox;}
     }
     var bx=BH.hx+dx,by=BH.hy+dy;
