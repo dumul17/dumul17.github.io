@@ -6712,6 +6712,8 @@ var SN_COOLDOWN={};
       if(isFinite(dur)&&dur>0)prog=cur/dur;
       syncLoopFlag(a);
     }
+    /* Panel tertutup: jangan gambar waveform / update DOM seek (hemat GPU) */
+    if(!panelOpen())return;
     if(t0El)t0El.textContent=fmtTime(cur);
     if(t1El)t1El.textContent=dur>0?fmtTime(dur):'0:00';
     if(seekEl&&!seekDrag)seekEl.value=String(Math.round(prog*1000));
@@ -6720,11 +6722,20 @@ var SN_COOLDOWN={};
   var seekRAF=0;
   function tickSeek(){
     seekRAF=0;
+    /* Hanya jalan saat panel terbuka + ada audio playing */
+    if(!panelOpen()||getPlayingTrackIndex()===-1){stopSeekTick();return;}
     updateSeekUI();
-    if(getPlayingTrackIndex()!==-1)seekRAF=requestAnimationFrame(tickSeek);
+    seekRAF=requestAnimationFrame(tickSeek);
   }
-  function startSeekTick(){if(!seekRAF)seekRAF=requestAnimationFrame(tickSeek);}
-  function stopSeekTick(){if(seekRAF){cancelAnimationFrame(seekRAF);seekRAF=0;}updateSeekUI();}
+  function startSeekTick(){
+    if(seekRAF||!panelOpen()||getPlayingTrackIndex()===-1)return;
+    seekRAF=requestAnimationFrame(tickSeek);
+  }
+  function stopSeekTick(){
+    if(seekRAF){cancelAnimationFrame(seekRAF);seekRAF=0;}
+    /* satu frame terakhir cuma kalau panel masih terbuka */
+    if(panelOpen())updateSeekUI();
+  }
 
   var _sync0=sync;
   sync=function(){
@@ -6738,7 +6749,7 @@ var SN_COOLDOWN={};
       btnRepeat.setAttribute('aria-label',btnRepeat.title);
     }
     var pi=getPlayingTrackIndex();
-    if(pi>=0){waveSeed=(pi+1)*97;startSeekTick();}
+    if(pi>=0&&panelOpen()){waveSeed=(pi+1)*97;startSeekTick();}
     else stopSeekTick();
   };
 
@@ -6783,7 +6794,7 @@ var SN_COOLDOWN={};
     t.audio.addEventListener('play',sync);
     t.audio.addEventListener('pause',sync);
     t.audio.addEventListener('ended',function(){onTrackEnded(t);sync();});
-    t.audio.addEventListener('timeupdate',function(){if(!seekDrag)updateSeekUI();});
+    t.audio.addEventListener('timeupdate',function(){if(!seekDrag&&panelOpen())updateSeekUI();});
   });
   var _sel0=selectAndPlay;
   selectAndPlay=function(i){

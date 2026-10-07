@@ -1007,3 +1007,5 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 @media (prefers-reduced-motion:reduce){
   .mp-grp-marq{animation:none}
 }
+/* Panel tertutup: stop marquee CSS (hemat compositor) */
+#music-player:not(.open) .mp-grp-marq{animation:none;transform:none}
