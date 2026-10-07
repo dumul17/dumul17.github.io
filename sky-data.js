@@ -16,7 +16,7 @@
                    - scene     -> (opsional) kalau ikut komposisi/rotasi sektor Orion (SCN).
                    - cap       -> (opsional) caption di bawah/atas rasi.
                    - unlock:true -> rasi masuk arsip + minigame alignment (WAJIB punya minimal 1 bintang SFX).
-     3. SEKTOR   : sector:'winter' | 'summer' | 'spring' | 'autumn' (4 sektor musim). Urutan record = urutan ikon;
+     3. SEKTOR   : sector:'winter' | 'spring' | 'summer' | 'autumn' (4 sektor musim). Urutan record = urutan ikon;
                    record PERTAMA di tiap sektor = glyph ikon overview.
      4. Jalankan  node check-sky.js  -> harus keluar "OK" (laporkan data yang kelupaan / salah).
 
@@ -39,9 +39,9 @@ var SECTORS=[
      Saat SFX-nya jadi: tambah record di array SFX, nama di `stars` dipakai check-sky.js buat nandain yang belum dibuat. */
   {k:'winter', season:'Winter', name:'Winter', title:'The Pantheon of Radiant Heroes', a:-150,
    stars:['Aldebaran','Betelgeuse','Castor','Pollux','Pleione','Rigel','Sirius']},
-  {k:'summer', season:'Summer', name:'Summer', title:'The Guardians of the Cosmic Balance', a:-30,
+  {k:'spring', season:'Spring', name:'Spring', title:'The Guardians of the Cosmic Balance', a:-30,
    stars:['Alioth','Alphard','Arcturus','Denebola','Spica']},
-  {k:'spring', season:'Spring', name:'Spring', title:'The Assembly of Celestial Beasts', a:150,
+  {k:'summer', season:'Summer', name:'Summer', title:'The Assembly of Celestial Beasts', a:150,
    stars:['Altair','Antares','Deneb','Nunki','Rasalhague','Vega']},
   {k:'autumn', season:'Autumn', name:'Autumn', title:'The Royal Court of the Fallen Dynasty', a:30,
    stars:['Algol','Alpheratz','Alpherg','Hamal','Schedar']}
@@ -75,16 +75,16 @@ var RASI=[
    scene:{k:.9, th:0, tx:-160, ty:-10},
    whisper:[] /* BELUM ADA — isi sebelum off dilepas */,
    info:null /* BELUM ADA — isi sebelum off dilepas */},
-  {id:'virgo', sector:'summer', label:'Virgo', focusName:'Virgo', focus:2, dist:250, unlock:true,
+  {id:'virgo', sector:'spring', label:'Virgo', focusName:'Virgo', focus:2, dist:250, unlock:true,
    cap:{text:'Virgo', x:'right', dx:-42, y:'top', dy:-24},
    box:{portrait:function(W,top,ah,bot){return [W*.52,top+ah*.72,W*.82,bot-34];}, land:function(W,top,ah,bot){return [W*.72,top+ah*.08,W*.96,bot-12];}},
    whisper:["Spica burns quietly, like it knows something.","Spring sleeps here, folded in blue light."],
    info:{"tag":"Constellation · The Maiden","rows":[["Brightest","Spica · ~250 ly"],["Rank","2nd largest of 88"],["Cluster","Virgo · ~1,300 galaxies"],["Area","1,294 sq°"]],"fact":"Galaxy M87 hides here, home of the first black hole ever photographed."}},
-  {id:'bootes', sector:'summer', label:'Boötes', focusName:'Boötes', focus:1, dist:37, unlock:true,
+  {id:'bootes', sector:'spring', label:'Boötes', focusName:'Boötes', focus:1, dist:37, unlock:true,
    box:{portrait:function(W,top,ah,bot){return [W*.78,top+ah*.52,W*.90,top+ah*.66];}, land:function(W,top,ah,bot){return [W*.62,top+ah*.18,W*.70,top+ah*.38];}}, /* kite kecil, digeser turun */
    whisper:["The herdsman holds a lantern called Arcturus.","Amber light, older than the question."],
    info:{"tag":"Constellation · The Herdsman","rows":[["Brightest","Arcturus · ~37 ly"],["Type","Orange giant"],["Rank","4th brightest star"],["Area","907 sq°"]],"fact":"Nearby lies the Boötes Void, an emptiness about 330 million light-years wide."}},
-  {id:'scorpius', sector:'spring', label:'Scorpius', focusName:'Antares', focus:1, dist:550, unlock:true,
+  {id:'scorpius', sector:'summer', label:'Scorpius', focusName:'Antares', focus:1, dist:550, unlock:true,
    box:{portrait:function(W,top,ah,bot){return [W*.76,top+ah*.05,W*.88,top+ah*.28];}, land:function(W,top,ah,bot){return [W*.34,top+ah*.12,W*.42,top+ah*.44];}}, /* kanan-atas Orion / kiri tengah (luar zona lensing BH) */
    whisper:["Antares glows red, a heart that never settled.","The scorpion waits where the summer sky is thickest."],
    info:{"tag":"Constellation · The Scorpion","rows":[["Brightest","Antares · ~550 ly"],["Type","Red supergiant"],["Size","~700× the Sun"],["Area","497 sq°"]],"fact":"Antares means “rival of Mars”, named for its matching red glow."}}
