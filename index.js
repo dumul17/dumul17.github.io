@@ -2113,7 +2113,12 @@ function setRadioSilence(on){
   var obs=document.getElementById('mode-observe');
   var sil=document.getElementById('mode-silence');
   if(obs)obs.addEventListener('click',function(){setObserveMode(!OBSERVE_MODE);haptic(10);});
-  if(sil)sil.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();setRadioSilence(!RADIO_SILENCE);haptic(10);});
+  if(sil)sil.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    /* Volume control lives in music-player IIFE; fallback = classic mute toggle */
+    if(typeof window.__mpVolToggle==='function'){window.__mpVolToggle(e);haptic(8);return;}
+    setRadioSilence(!RADIO_SILENCE);haptic(10);
+  });
   var cam=document.getElementById('mode-camera');
   if(cam){
     cam.hidden=true;
@@ -6258,21 +6263,15 @@ var SN_COOLDOWN={};
     return '<button class="mp-track" type="button" '+attrs+'><span class="mp-num">'+pad2(n)+'</span><span class="mp-name">'+name+'</span>'+(obs?'<span class="mp-obs" aria-hidden="true" title="Unobserved">\u25CB</span>':'')+SPEC+'</button>';
   }
   if(grpEl){
-    var html='';
+    var html='',n=0;
     SKY.panelGroups().forEach(function(g){
       if(!g.sfx.length)return; /* sektor belum punya SFX: belum tampil */
-      /* urut A-Z per accordion (label); nomor baris lokal 01..N di dalam grup */
-      var list=g.sfx.slice().sort(function(a,b){
-        return a.label.toLowerCase().localeCompare(b.label.toLowerCase());
+      var rowsH='';
+      g.sfx.forEach(function(s){
+        n++;tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
+        rowsH+=trackRow(n,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
       });
-      var rowsH='',ln=0;
-      list.forEach(function(s){
-        ln++;
-        tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
-        rowsH+=trackRow(ln,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
-      });
-      /* header: cuma judul (marquee) + jumlah + chevron — tanpa 01 Winter / 02 Spring */
-      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-name"><span class="mp-grp-marq">'+g.title+'</span></span><span class="mp-grp-n">'+list.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
+      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-no">'+pad2(g.no)+'</span><span class="mp-grp-name">'+g.season+' \u00B7 '+g.title+'</span><span class="mp-grp-n">'+g.sfx.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
     });
     grpEl.innerHTML=html;
   }
@@ -6402,7 +6401,7 @@ var SN_COOLDOWN={};
        when closed it relocates into the music logo. */
     toggle.classList.toggle('playing-closed',playing&&!open);
     playBtn.setAttribute('aria-label',playing?'Pause music':'Play music');
-    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">'+(playing?'Ⅱ':'▶')+'</span><span class="mp-play-label">'+(playing?'Pause':'Play')+'</span>';
+    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">'+(playing?'Ⅱ':'▶')+'</span>';
     if(playing)startSpec();else stopSpec();
     /* Title migrates to logo side when HUD closes while music plays;
        after 2s it slides into the logo. */
@@ -6447,7 +6446,7 @@ var SN_COOLDOWN={};
     toggle.classList.remove('playing-closed');
     rows.forEach(function(row){row.classList.remove('playing');});
     playBtn.setAttribute('aria-label','Play music');
-    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">▶</span><span class="mp-play-label">Play</span>';
+    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">▶</span>';
     clearNowPlaying();
     if(MS&&msKey){try{MS.playbackState='paused';}catch(e){}}
   };
@@ -6490,7 +6489,8 @@ var SN_COOLDOWN={};
         audioVizOff();
         setAVColor(null,false);
       }
-      target.audio.volume=.5;
+      target.audio._bv=.5;
+      target.audio.volume=Math.max(0,Math.min(1,.5*(typeof masterVol==='number'?masterVol:.85)));
       safePlay(target.audio);
     }
     sync();
@@ -6518,14 +6518,290 @@ var SN_COOLDOWN={};
   },true);
   playBtn.addEventListener('click',toggleCurrentPlay);
   rows.forEach(function(row,i){row.addEventListener('click',function(){selectAndPlay(i);});});
+
+  /* ---- Transport: prev / next / shuffle / repeat + seek waveform + master volume ---- */
+  var btnPrev=document.getElementById('mp-prev');
+  var btnNext=document.getElementById('mp-next');
+  var btnShuffle=document.getElementById('mp-shuffle');
+  var btnRepeat=document.getElementById('mp-repeat');
+  var seekEl=document.getElementById('mp-seek');
+  var waveCv=document.getElementById('mp-wave');
+  var waveCx=waveCv?waveCv.getContext('2d'):null;
+  var t0El=document.getElementById('mp-t0');
+  var t1El=document.getElementById('mp-t1');
+  var volEl=document.getElementById('mp-vol');
+  var volBtn=document.getElementById('mode-silence');
+  var volWrap=volBtn&&volBtn.parentElement;
+  var shuffleOn=false;
+  var repeatMode=0; /* 0 off · 1 one · 2 all */
+  var masterVol=.85;
+  var lastVol=.85;
+  var seekDrag=false;
+  var waveSeed=1;
+  try{var _sv=localStorage.getItem('mp_vol');if(_sv!=null){masterVol=Math.max(0,Math.min(1,Number(_sv)/100));lastVol=masterVol||.85;}}catch(eV0){}
+  try{shuffleOn=localStorage.getItem('mp_shuffle')==='1';}catch(eSh){}
+  try{repeatMode=Math.max(0,Math.min(2,Number(localStorage.getItem('mp_repeat')||0)|0));}catch(eRp){}
+
+  function volIcon(v){
+    if(v<.01)return '🔇';
+    if(v<.34)return '🔈';
+    if(v<.67)return '🔉';
+    return '🔊';
+  }
+  function applyMasterVol(){
+    function setA(a){
+      if(!a)return;
+      var bv=a._bv!=null?a._bv:(a===AMB||a===MUSIC_COLLAP?.5:.85);
+      a._bv=bv;
+      try{
+        /* jangan ganggu fade yang sedang jalan */
+        if(a._f)return;
+        a.volume=Math.max(0,Math.min(1,bv*masterVol));
+      }catch(e){}
+    }
+    tracks.forEach(function(t){setA(t.audio);});
+    try{if(typeof SFX==='object')Object.keys(SFX).forEach(function(k){setA(SFX[k]);});}catch(eS){}
+    try{setA(AMB);setA(MUSIC_COLLAP);}catch(eB){}
+    var muted=masterVol<.01;
+    RADIO_SILENCE=muted;
+    if(volBtn){
+      volBtn.textContent=volIcon(masterVol);
+      volBtn.classList.toggle('on',muted);
+      volBtn.classList.toggle('muted',muted);
+      volBtn.setAttribute('aria-pressed',muted?'true':'false');
+      volBtn.title=muted?'Unmute':'Volume';
+      volBtn.setAttribute('aria-label',muted?'Unmute':'Volume');
+    }
+    if(volEl)volEl.value=String(Math.round(masterVol*100));
+  }
+  function setMasterVol(v,persist){
+    masterVol=Math.max(0,Math.min(1,v));
+    if(masterVol>.01)lastVol=masterVol;
+    applyMasterVol();
+    if(persist!==false){try{localStorage.setItem('mp_vol',String(Math.round(masterVol*100)));}catch(e){}}
+  }
+  window.__mpVolToggle=function(e){
+    if(volWrap){
+      /* tap ikon: buka/tutup slider; kalau sudah terbuka & vol>0 → mute, vol=0 → restore */
+      var open=volWrap.classList.contains('open');
+      if(!open){volWrap.classList.add('open');return;}
+    }
+    if(masterVol<.01)setMasterVol(lastVol||.85);
+    else setMasterVol(0);
+  };
+  if(volEl){
+    volEl.value=String(Math.round(masterVol*100));
+    volEl.addEventListener('input',function(){setMasterVol(Number(volEl.value)/100);});
+    volEl.addEventListener('change',function(){setMasterVol(Number(volEl.value)/100);});
+  }
+  if(volWrap){
+    document.addEventListener('pointerdown',function(e){
+      if(!volWrap.classList.contains('open'))return;
+      if(volWrap.contains(e.target))return;
+      volWrap.classList.remove('open');
+    },true);
+  }
+  applyMasterVol();
+
+  function isPlayable(i){
+    var t=tracks[i];
+    if(!t)return false;
+    if(t.type==='sfx'&&typeof isUnlocked==='function'&&!isUnlocked(t.key))return false;
+    return true;
+  }
+  function playableList(){
+    var L=[];
+    for(var i=0;i<tracks.length;i++)if(isPlayable(i))L.push(i);
+    return L;
+  }
+  function pickNext(from,dir){
+    var L=playableList();
+    if(!L.length)return -1;
+    if(shuffleOn){
+      if(L.length===1)return L[0];
+      var opts=L.filter(function(i){return i!==from;});
+      return opts[(Math.random()*opts.length)|0];
+    }
+    var start=from;
+    if(start<0)start=activeIdx;
+    var idx=L.indexOf(start);
+    if(idx<0){
+      /* cari tetangga terdekat di L */
+      for(var k=0;k<tracks.length;k++){
+        var j=(start+dir*k+tracks.length*20)%tracks.length;
+        if(L.indexOf(j)>=0)return j;
+      }
+      return L[0];
+    }
+    return L[(idx+dir+L.length*20)%L.length];
+  }
+  function stepTrack(dir){
+    if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE&&masterVol<.01){
+      showModeToast('RADIO SILENCE\nAUDIO CHANNEL CLOSED','silence',1600);return;
+    }
+    var cur=getPlayingTrackIndex();
+    if(cur===-1)cur=activeIdx;
+    var n=pickNext(cur,dir);
+    if(n<0)return;
+    /* force play even if same index (shuffle single) */
+    var playingIdx=getPlayingTrackIndex();
+    if(playingIdx===n){
+      var t=tracks[n];
+      if(t&&t.audio){try{t.audio.currentTime=0;}catch(e){}safePlay(t.audio);}
+      sync();return;
+    }
+    selectAndPlay(n);
+  }
+  function syncLoopFlag(a){
+    if(!a)return;
+    /* BGM default loop; SFX no. Repeat-one forces loop on whatever is active. */
+    var isBgm=(a===AMB||a===MUSIC_COLLAP);
+    a.loop=(repeatMode===1)||(isBgm&&repeatMode!==2&&repeatMode!==0?true:false);
+    if(repeatMode===1)a.loop=true;
+    else if(repeatMode===2)a.loop=false;
+    else a.loop=!!isBgm; /* off: BGM still ambient-loops, SFX stop */
+  }
+  function onTrackEnded(t){
+    if(!t||!t.audio)return;
+    if(repeatMode===1){
+      try{t.audio.currentTime=0;}catch(e){}
+      safePlay(t.audio);return;
+    }
+    if(repeatMode===2||shuffleOn){
+      var cur=tracks.indexOf(t);
+      var n=pickNext(cur,1);
+      if(n>=0&&n!==cur)selectAndPlay(n);
+      else if(n===cur){try{t.audio.currentTime=0;}catch(e2){}safePlay(t.audio);}
+      return;
+    }
+    /* off: stop (BGM already looped via syncLoopFlag) */
+    sync();
+  }
+  function fmtTime(s){
+    if(!isFinite(s)||s<0)return '0:00';
+    s=Math.floor(s);
+    return ((s/60)|0)+':'+((s%60)<10?'0':'')+(s%60);
+  }
+  function paintWave(prog,playing){
+    if(!waveCx||!waveCv)return;
+    var w=waveCv.width,h=waveCv.height;
+    waveCx.clearRect(0,0,w,h);
+    var bars=36,gap=2,bw=(w-gap*(bars-1))/bars,mid=h*.55;
+    var seed=waveSeed;
+    for(var i=0;i<bars;i++){
+      seed=(seed*16807+i*13)%2147483647;
+      var n=((seed%1000)/1000);
+      var env=.35+.65*Math.sin((i/bars)*Math.PI);
+      var bh=Math.max(2,mid*env*(.45+.55*n));
+      if(playing){
+        var pulse=.5+.5*Math.sin(performance.now()*.006+i*.55);
+        bh*=.75+.25*pulse;
+      }
+      var x=i*(bw+gap);
+      var filled=(i/bars)<prog;
+      waveCx.fillStyle=filled?'rgba(110,229,255,.75)':'rgba(110,229,255,.18)';
+      waveCx.fillRect(x,mid-bh*.55,bw,bh);
+    }
+    /* playhead */
+    var px=Math.max(0,Math.min(w,prog*w));
+    waveCx.fillStyle='rgba(234,252,255,.9)';
+    waveCx.fillRect(px-0.5,2,1.5,h-4);
+  }
+  function updateSeekUI(){
+    var i=getPlayingTrackIndex();
+    var a=i>=0?tracks[i].audio:null;
+    var cur=0,dur=0,prog=0;
+    if(a){
+      try{cur=a.currentTime||0;dur=a.duration||0;}catch(e){}
+      if(isFinite(dur)&&dur>0)prog=cur/dur;
+      syncLoopFlag(a);
+    }
+    if(t0El)t0El.textContent=fmtTime(cur);
+    if(t1El)t1El.textContent=dur>0?fmtTime(dur):'0:00';
+    if(seekEl&&!seekDrag)seekEl.value=String(Math.round(prog*1000));
+    paintWave(prog,!!a&&!a.paused);
+  }
+  var seekRAF=0;
+  function tickSeek(){
+    seekRAF=0;
+    updateSeekUI();
+    if(getPlayingTrackIndex()!==-1)seekRAF=requestAnimationFrame(tickSeek);
+  }
+  function startSeekTick(){if(!seekRAF)seekRAF=requestAnimationFrame(tickSeek);}
+  function stopSeekTick(){if(seekRAF){cancelAnimationFrame(seekRAF);seekRAF=0;}updateSeekUI();}
+
+  /* hook sync to drive seek tick + control chrome */
+  var _sync0=sync;
+  sync=function(){
+    _sync0();
+    if(btnShuffle){btnShuffle.classList.toggle('on',shuffleOn);btnShuffle.setAttribute('aria-pressed',shuffleOn?'true':'false');}
+    if(btnRepeat){
+      btnRepeat.dataset.mode=String(repeatMode);
+      btnRepeat.classList.toggle('on',repeatMode>0);
+      btnRepeat.setAttribute('aria-pressed',repeatMode>0?'true':'false');
+      btnRepeat.title=repeatMode===1?'Repeat one':(repeatMode===2?'Repeat all':'Repeat off');
+    }
+    var pi=getPlayingTrackIndex();
+    if(pi>=0){waveSeed=(pi+1)*97;startSeekTick();}
+    else stopSeekTick();
+  };
+
+  if(btnPrev)btnPrev.addEventListener('click',function(){stepTrack(-1);haptic(6);});
+  if(btnNext)btnNext.addEventListener('click',function(){stepTrack(1);haptic(6);});
+  if(btnShuffle)btnShuffle.addEventListener('click',function(){
+    shuffleOn=!shuffleOn;
+    try{localStorage.setItem('mp_shuffle',shuffleOn?'1':'0');}catch(e){}
+    sync();haptic(6);
+  });
+  if(btnRepeat)btnRepeat.addEventListener('click',function(){
+    repeatMode=(repeatMode+1)%3;
+    try{localStorage.setItem('mp_repeat',String(repeatMode));}catch(e){}
+    var pi=getPlayingTrackIndex();
+    if(pi>=0)syncLoopFlag(tracks[pi].audio);
+    sync();haptic(6);
+  });
+  if(seekEl){
+    seekEl.addEventListener('pointerdown',function(){seekDrag=true;});
+    seekEl.addEventListener('pointerup',function(){seekDrag=false;});
+    seekEl.addEventListener('change',function(){seekDrag=false;});
+    seekEl.addEventListener('input',function(){
+      var i=getPlayingTrackIndex();
+      if(i<0)i=activeIdx;
+      var a=tracks[i]&&tracks[i].audio;
+      if(!a)return;
+      var d=a.duration;
+      if(!isFinite(d)||d<=0)return;
+      try{a.currentTime=(Number(seekEl.value)/1000)*d;}catch(e){}
+      updateSeekUI();
+    });
+  }
+
+  /* Media Session next/prev → real step */
+  if(MS){
+    try{
+      MS.setActionHandler('previoustrack',function(){stepTrack(-1);});
+      MS.setActionHandler('nexttrack',function(){stepTrack(1);});
+    }catch(eMS){}
+  }
+
   /* Stars can also start/stop via canvas hits, so listen on every track's
      own audio element (not just the two BGM loops) to stay in sync. */
   tracks.forEach(function(t){
     if(!t.audio)return;
     t.audio.addEventListener('play',sync);
     t.audio.addEventListener('pause',sync);
-    t.audio.addEventListener('ended',sync);
+    t.audio.addEventListener('ended',function(){onTrackEnded(t);sync();});
+    t.audio.addEventListener('timeupdate',function(){if(!seekDrag)updateSeekUI();});
   });
+  /* patch selectAndPlay volume to respect master */
+  var _sel0=selectAndPlay;
+  selectAndPlay=function(i){
+    _sel0(i);
+    applyMasterVol();
+    var t=tracks[i];
+    if(t&&t.audio)syncLoopFlag(t.audio);
+  };
+  updateSeekUI();
   sync();
 })();
 

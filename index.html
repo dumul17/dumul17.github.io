@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=31">
+<link rel="stylesheet" href="index.css?v=32">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -115,7 +115,7 @@
 <!-- Tombol #<key>-fx per bintang SFX dibuat index.js dari sky-data.js (SKY.sfx). -->
 <div id="veil" aria-hidden="true"></div>
 <section id="music-player" aria-label="Music player" aria-hidden="true">
-  <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker">Dumul's Observatory</span><div class="mp-title-row"><strong>Music Transmission</strong><button type="button" id="mode-silence" class="mp-silence" aria-pressed="false" aria-label="Radio Silence" title="Mute audio">🔊</button></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
+  <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker">Dumul's Observatory</span><div class="mp-title-row"><strong>Music Transmission</strong><div class="mp-vol-wrap" title="Volume"><button type="button" id="mode-silence" class="mp-silence mp-vol-btn" aria-pressed="false" aria-label="Volume" title="Volume">🔊</button><input type="range" id="mp-vol" class="mp-vol" min="0" max="100" value="85" step="1" aria-label="Volume level"></div></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
   <div class="mp-scroll">
   <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/00</span></div>
   <!-- Baris track SFX (accordion per sektor) dibangun index.js dari sky-data.js. Jangan tulis manual. -->
@@ -126,7 +126,26 @@
   <div class="sr-list" id="sr-cons"></div>
   </div>
   <div class="mp-foot">
-    <button id="music-play" class="mp-play" type="button" aria-label="Play music"><span class="mp-play-icon" aria-hidden="true">▶</span><span class="mp-play-label">Play</span></button>
+    <div class="mp-seek" id="mp-seek-wrap">
+      <canvas id="mp-wave" width="280" height="32" aria-hidden="true"></canvas>
+      <input type="range" id="mp-seek" class="mp-seek-range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+      <div class="mp-time"><span id="mp-t0">0:00</span><span id="mp-t1">0:00</span></div>
+    </div>
+    <div class="mp-controls">
+      <button type="button" id="mp-shuffle" class="mp-ctrl" aria-pressed="false" aria-label="Shuffle" title="Shuffle">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+      </button>
+      <button type="button" id="mp-prev" class="mp-ctrl" aria-label="Previous" title="Previous">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"/></svg>
+      </button>
+      <button id="music-play" class="mp-play" type="button" aria-label="Play music"><span class="mp-play-icon" aria-hidden="true">▶</span></button>
+      <button type="button" id="mp-next" class="mp-ctrl" aria-label="Next" title="Next">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>
+      </button>
+      <button type="button" id="mp-repeat" class="mp-ctrl" aria-pressed="false" data-mode="0" aria-label="Repeat" title="Repeat off">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      </button>
+    </div>
   </div>
 </section>
 
@@ -174,7 +193,7 @@
 <!-- DEPLOY: naikkan ?v= sky-data.js / texts.js / index.js / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
 <script defer src="sky-data.js?v=1"></script>
 <script defer src="texts.js?v=1"></script>
-<script defer src="index.js?v=68"></script>
+<script defer src="index.js?v=69"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
