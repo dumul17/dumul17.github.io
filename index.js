@@ -2115,7 +2115,6 @@ function setRadioSilence(on){
   if(obs)obs.addEventListener('click',function(){setObserveMode(!OBSERVE_MODE);haptic(10);});
   if(sil)sil.addEventListener('click',function(e){
     e.preventDefault();e.stopPropagation();
-    /* Volume control lives in music-player IIFE; fallback = classic mute toggle */
     if(typeof window.__mpVolToggle==='function'){window.__mpVolToggle(e);haptic(8);return;}
     setRadioSilence(!RADIO_SILENCE);haptic(10);
   });
@@ -6263,15 +6262,21 @@ var SN_COOLDOWN={};
     return '<button class="mp-track" type="button" '+attrs+'><span class="mp-num">'+pad2(n)+'</span><span class="mp-name">'+name+'</span>'+(obs?'<span class="mp-obs" aria-hidden="true" title="Unobserved">\u25CB</span>':'')+SPEC+'</button>';
   }
   if(grpEl){
-    var html='',n=0;
+    var html='';
     SKY.panelGroups().forEach(function(g){
       if(!g.sfx.length)return; /* sektor belum punya SFX: belum tampil */
-      var rowsH='';
-      g.sfx.forEach(function(s){
-        n++;tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
-        rowsH+=trackRow(n,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
+      /* urut A-Z per accordion; nomor lokal 01..N */
+      var list=g.sfx.slice().sort(function(a,b){
+        return a.label.toLowerCase().localeCompare(b.label.toLowerCase());
       });
-      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-no">'+pad2(g.no)+'</span><span class="mp-grp-name">'+g.season+' \u00B7 '+g.title+'</span><span class="mp-grp-n">'+g.sfx.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
+      var rowsH='',ln=0;
+      list.forEach(function(s){
+        ln++;
+        tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
+        rowsH+=trackRow(ln,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
+      });
+      /* header: judul saja (marquee) + count + chevron — tanpa 01 Winter */
+      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-name"><span class="mp-grp-marq">'+g.title+'</span></span><span class="mp-grp-n">'+list.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
     });
     grpEl.innerHTML=html;
   }
@@ -6490,7 +6495,7 @@ var SN_COOLDOWN={};
         setAVColor(null,false);
       }
       target.audio._bv=.5;
-      target.audio.volume=Math.max(0,Math.min(1,.5*(typeof masterVol==='number'?masterVol:.85)));
+      try{target.audio.volume=Math.max(0,Math.min(1,.5*(window.__mpMasterVol!=null?window.__mpMasterVol:.85)));}catch(eV){target.audio.volume=.5;}
       safePlay(target.audio);
     }
     sync();
@@ -6519,7 +6524,7 @@ var SN_COOLDOWN={};
   playBtn.addEventListener('click',toggleCurrentPlay);
   rows.forEach(function(row,i){row.addEventListener('click',function(){selectAndPlay(i);});});
 
-  /* ---- Transport: prev / next / shuffle / repeat + seek waveform + master volume ---- */
+  /* ---- Transport: prev/next/shuffle/repeat + seek waveform + master volume ---- */
   var btnPrev=document.getElementById('mp-prev');
   var btnNext=document.getElementById('mp-next');
   var btnShuffle=document.getElementById('mp-shuffle');
@@ -6541,6 +6546,7 @@ var SN_COOLDOWN={};
   try{var _sv=localStorage.getItem('mp_vol');if(_sv!=null){masterVol=Math.max(0,Math.min(1,Number(_sv)/100));lastVol=masterVol||.85;}}catch(eV0){}
   try{shuffleOn=localStorage.getItem('mp_shuffle')==='1';}catch(eSh){}
   try{repeatMode=Math.max(0,Math.min(2,Number(localStorage.getItem('mp_repeat')||0)|0));}catch(eRp){}
+  window.__mpMasterVol=masterVol;
 
   function volIcon(v){
     if(v<.01)return '🔇';
@@ -6553,15 +6559,12 @@ var SN_COOLDOWN={};
       if(!a)return;
       var bv=a._bv!=null?a._bv:(a===AMB||a===MUSIC_COLLAP?.5:.85);
       a._bv=bv;
-      try{
-        /* jangan ganggu fade yang sedang jalan */
-        if(a._f)return;
-        a.volume=Math.max(0,Math.min(1,bv*masterVol));
-      }catch(e){}
+      try{if(a._f)return;a.volume=Math.max(0,Math.min(1,bv*masterVol));}catch(e){}
     }
     tracks.forEach(function(t){setA(t.audio);});
     try{if(typeof SFX==='object')Object.keys(SFX).forEach(function(k){setA(SFX[k]);});}catch(eS){}
     try{setA(AMB);setA(MUSIC_COLLAP);}catch(eB){}
+    window.__mpMasterVol=masterVol;
     var muted=masterVol<.01;
     RADIO_SILENCE=muted;
     if(volBtn){
@@ -6580,9 +6583,8 @@ var SN_COOLDOWN={};
     applyMasterVol();
     if(persist!==false){try{localStorage.setItem('mp_vol',String(Math.round(masterVol*100)));}catch(e){}}
   }
-  window.__mpVolToggle=function(e){
+  window.__mpVolToggle=function(){
     if(volWrap){
-      /* tap ikon: buka/tutup slider; kalau sudah terbuka & vol>0 → mute, vol=0 → restore */
       var open=volWrap.classList.contains('open');
       if(!open){volWrap.classList.add('open');return;}
     }
@@ -6626,7 +6628,6 @@ var SN_COOLDOWN={};
     if(start<0)start=activeIdx;
     var idx=L.indexOf(start);
     if(idx<0){
-      /* cari tetangga terdekat di L */
       for(var k=0;k<tracks.length;k++){
         var j=(start+dir*k+tracks.length*20)%tracks.length;
         if(L.indexOf(j)>=0)return j;
@@ -6643,7 +6644,6 @@ var SN_COOLDOWN={};
     if(cur===-1)cur=activeIdx;
     var n=pickNext(cur,dir);
     if(n<0)return;
-    /* force play even if same index (shuffle single) */
     var playingIdx=getPlayingTrackIndex();
     if(playingIdx===n){
       var t=tracks[n];
@@ -6654,12 +6654,10 @@ var SN_COOLDOWN={};
   }
   function syncLoopFlag(a){
     if(!a)return;
-    /* BGM default loop; SFX no. Repeat-one forces loop on whatever is active. */
     var isBgm=(a===AMB||a===MUSIC_COLLAP);
-    a.loop=(repeatMode===1)||(isBgm&&repeatMode!==2&&repeatMode!==0?true:false);
     if(repeatMode===1)a.loop=true;
     else if(repeatMode===2)a.loop=false;
-    else a.loop=!!isBgm; /* off: BGM still ambient-loops, SFX stop */
+    else a.loop=!!isBgm;
   }
   function onTrackEnded(t){
     if(!t||!t.audio)return;
@@ -6674,7 +6672,6 @@ var SN_COOLDOWN={};
       else if(n===cur){try{t.audio.currentTime=0;}catch(e2){}safePlay(t.audio);}
       return;
     }
-    /* off: stop (BGM already looped via syncLoopFlag) */
     sync();
   }
   function fmtTime(s){
@@ -6702,7 +6699,6 @@ var SN_COOLDOWN={};
       waveCx.fillStyle=filled?'rgba(110,229,255,.75)':'rgba(110,229,255,.18)';
       waveCx.fillRect(x,mid-bh*.55,bw,bh);
     }
-    /* playhead */
     var px=Math.max(0,Math.min(w,prog*w));
     waveCx.fillStyle='rgba(234,252,255,.9)';
     waveCx.fillRect(px-0.5,2,1.5,h-4);
@@ -6730,7 +6726,6 @@ var SN_COOLDOWN={};
   function startSeekTick(){if(!seekRAF)seekRAF=requestAnimationFrame(tickSeek);}
   function stopSeekTick(){if(seekRAF){cancelAnimationFrame(seekRAF);seekRAF=0;}updateSeekUI();}
 
-  /* hook sync to drive seek tick + control chrome */
   var _sync0=sync;
   sync=function(){
     _sync0();
@@ -6740,6 +6735,7 @@ var SN_COOLDOWN={};
       btnRepeat.classList.toggle('on',repeatMode>0);
       btnRepeat.setAttribute('aria-pressed',repeatMode>0?'true':'false');
       btnRepeat.title=repeatMode===1?'Repeat one':(repeatMode===2?'Repeat all':'Repeat off');
+      btnRepeat.setAttribute('aria-label',btnRepeat.title);
     }
     var pi=getPlayingTrackIndex();
     if(pi>=0){waveSeed=(pi+1)*97;startSeekTick();}
@@ -6775,8 +6771,6 @@ var SN_COOLDOWN={};
       updateSeekUI();
     });
   }
-
-  /* Media Session next/prev → real step */
   if(MS){
     try{
       MS.setActionHandler('previoustrack',function(){stepTrack(-1);});
@@ -6784,8 +6778,6 @@ var SN_COOLDOWN={};
     }catch(eMS){}
   }
 
-  /* Stars can also start/stop via canvas hits, so listen on every track's
-     own audio element (not just the two BGM loops) to stay in sync. */
   tracks.forEach(function(t){
     if(!t.audio)return;
     t.audio.addEventListener('play',sync);
@@ -6793,7 +6785,6 @@ var SN_COOLDOWN={};
     t.audio.addEventListener('ended',function(){onTrackEnded(t);sync();});
     t.audio.addEventListener('timeupdate',function(){if(!seekDrag)updateSeekUI();});
   });
-  /* patch selectAndPlay volume to respect master */
   var _sel0=selectAndPlay;
   selectAndPlay=function(i){
     _sel0(i);
