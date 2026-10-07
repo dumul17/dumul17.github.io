@@ -64,10 +64,7 @@
   <h1 id="title" tabindex="-1"><span class="kicker">Dumul's</span><span class="big">Observatory</span></h1>
   <p class="sub">modder &amp; music composer</p>
 </header>
-<span class="cap" id="cap-orion" aria-hidden="true">Orion</span>
-<span class="cap" id="cap-virgo" aria-hidden="true">Virgo</span>
-<span class="cap" id="cap-canis" aria-hidden="true">Canis Major</span>
-<span class="cap" id="cap-taurus" aria-hidden="true">Taurus</span>
+<!-- Caption #cap-<id> per rasi dibuat index.js dari sky-data.js (field `cap`). Hanya #cap-bh (Gargantua) yang ditulis manual. -->
 <span class="cap" id="cap-bh" aria-hidden="true">Gargantua</span>
 <a id="bh" href="dumul.html" aria-label="Masuk ke DUMUL (lubang hitam Gargantua)" title="Gargantua"></a>
 <span id="bh-clock" aria-hidden="true"></span>
@@ -115,33 +112,16 @@
 
 <div id="terminal" aria-hidden="true"><div class="term-title">DUMUL//SYSTEM</div><div class="term-body"></div></div>
 <div id="sn-flash" class="supernova-flash" aria-hidden="true"></div>
-<button id="rigel-fx" type="button" class="hit" aria-label="Putar suara Rigel"></button>
-<button id="betel-fx" type="button" aria-label="Putar suara Betelgeuse"></button>
-<button id="sirius-fx" type="button" class="hit" aria-label="Putar suara Sirius"></button>
-<button id="pleione-fx" type="button" class="hit" aria-label="Putar suara Pleione"></button>
-<button id="aldebaran-fx" type="button" class="hit" aria-label="Putar suara Aldebaran"></button>
-<button id="arcturus-fx" type="button" class="hit" aria-label="Putar suara Arcturus"></button>
-<button id="antares-fx" type="button" class="hit" aria-label="Putar suara Antares"></button>
+<!-- Tombol #<key>-fx per bintang SFX dibuat index.js dari sky-data.js (SKY.sfx). -->
 <div id="veil" aria-hidden="true"></div>
 <section id="music-player" aria-label="Music player" aria-hidden="true">
   <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker">Dumul's Observatory</span><div class="mp-title-row"><strong>Music Transmission</strong><button type="button" id="mode-silence" class="mp-silence" aria-pressed="false" aria-label="Radio Silence" title="Mute audio">🔊</button></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
   <div class="mp-scroll">
-  <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/08</span></div>
-  <div class="mp-tracks">
-    <button class="mp-track" type="button" data-type="sfx" data-key="aldebaran"><span class="mp-num">01</span><span class="mp-name">aldebaran</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="antares"><span class="mp-num">02</span><span class="mp-name">antares</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="arcturus"><span class="mp-num">03</span><span class="mp-name">arcturus</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="betel"><span class="mp-num">04</span><span class="mp-name">betelgeuse</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="pleione"><span class="mp-num">05</span><span class="mp-name">pleione</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="rigel"><span class="mp-num">06</span><span class="mp-name">rigel</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="sirius"><span class="mp-num">07</span><span class="mp-name">sirius</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="sfx" data-key="spica"><span class="mp-num">08</span><span class="mp-name">spica</span><span class="mp-obs" aria-hidden="true" title="Unobserved">○</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-  </div>
+  <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/00</span></div>
+  <!-- Baris track SFX (accordion per sektor) dibangun index.js dari sky-data.js. Jangan tulis manual. -->
+  <div id="mp-sfx-groups"></div>
   <div class="mp-section-title">Observatory BGM</div>
-  <div class="mp-tracks">
-    <button class="mp-track active" type="button" data-type="bgm" data-index="0"><span class="mp-num">01</span><span class="mp-name">constellation</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-    <button class="mp-track" type="button" data-type="bgm" data-index="1"><span class="mp-num">02</span><span class="mp-name">collapsars</span><span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">●</span></button>
-  </div>
+  <div class="mp-tracks" id="mp-bgm-tracks"></div>
   <div class="mp-section-title">Constellation Log</div>
   <div class="sr-list" id="sr-cons"></div>
   </div>
@@ -191,7 +171,10 @@
   </nav>
   <p class="quote">I create what I love, even without applause.</p>
 </footer>
-<script defer src="index.js?v=63"></script>
+<!-- DEPLOY: naikkan ?v= sky-data.js / texts.js / index.js / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
+<script defer src="sky-data.js?v=1"></script>
+<script defer src="texts.js?v=1"></script>
+<script defer src="index.js?v=67"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">

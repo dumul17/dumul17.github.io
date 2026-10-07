@@ -70,10 +70,8 @@ footer nav svg{width:15px;height:15px;display:block}
 #bh-clock.clk-warp{filter:hue-rotate(calc(var(--kw,0)*150deg)) saturate(calc(1 + var(--kw,0)*.6));transition:none}
 #bh-clock.clk-warp .clock-time{text-transform:none}
 @media (max-width:520px){#bh-clock{font-size:7.5px;letter-spacing:.06em}#bh-clock .clock-time{font-size:9.5px;letter-spacing:.025em}#bh-clock .clock-sep{padding:0 2px}}
-#betel-fx{position:fixed;left:0;top:0;z-index:4;width:52px;height:52px;margin:-26px 0 0 -26px;border:0;border-radius:50%;padding:0;background:transparent;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
-#betel-fx:focus-visible{outline:2px solid #ff7ad9;outline-offset:2px}
 /* Observatory instrument reticle: native CSS cursor, no JS/render-loop work. */
-#betel-fx,#rigel-fx,#sirius-fx,#pleione-fx,#aldebaran-fx,#arcturus-fx,#antares-fx,.hit,#bh{cursor:crosshair}
+.hit,#bh{cursor:crosshair}
 /* Tactical HUD corner brackets for portal labels. */
 .portal .lab{position:relative}
 .portal .lab::before,.portal .lab::after{content:'';position:absolute;top:0;width:5px;height:5px;pointer-events:none}
@@ -906,10 +904,10 @@ body.sect-in #mode-sectors,body.sect-in #mode-bh{display:grid}
 @media (max-width:520px){#mode-sectors,#mode-bh{width:31px;height:31px}body.sect-in #mp-now-playing{right:165px!important}}
 @media (max-height:520px) and (orientation:landscape){#mode-sectors,#mode-bh{width:28px;height:28px}}
 body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 114px + 8px)!important}
-body.sect-ov .cap,body.sect-ov .hit,body.sect-ov #betel-fx,body.sect-ov #rigel-fx{display:none!important}
+body.sect-ov .cap,body.sect-ov .hit{display:none!important}
 body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!important}
-body.sect-in-orion #arcturus-fx,body.sect-in-orion #antares-fx,body.sect-in-virgo #rigel-fx,body.sect-in-virgo #betel-fx,body.sect-in-virgo #sirius-fx,body.sect-in-virgo #pleione-fx,body.sect-in-virgo #aldebaran-fx,body.sect-in-virgo #antares-fx,
-body.sect-in-summer #arcturus-fx,body.sect-in-summer #rigel-fx,body.sect-in-summer #betel-fx,body.sect-in-summer #sirius-fx,body.sect-in-summer #pleione-fx,body.sect-in-summer #aldebaran-fx{display:none!important}
+/* Tombol bintang di luar sektor yang lagi dibuka disembunyikan oleh JS (fxSectSync menambah .fx-other) — tidak perlu aturan per sektor. */
+.fx-other{display:none!important}
 
 /* ===== Landscape stage (body.ls) =====
    #stage = wadah sky (canvas, header, footer, rasi, BH, portal, bubble). Portrait: display:contents (tidak ada efek).
@@ -968,3 +966,11 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 :where(body.lr) .portal{opacity:0!important;pointer-events:none!important;transition:opacity .35s ease,transform .35s ease}
 :where(body.lr) .portal.mobile-show{opacity:1!important;pointer-events:auto!important}
 
+
+/* Panel musik: accordion per sektor (dibangun index.js dari SKY.panelGroups) */
+.mp-grp{margin:0 0 4px}.mp-grp-head{display:grid;grid-template-columns:18px minmax(0,1fr) auto 10px;align-items:center;gap:0 4px;width:100%;padding:5px 7px;border:1px solid rgba(110,229,255,.12);border-radius:5px;background:rgba(110,229,255,.03);color:rgba(214,228,240,.78);text-align:left;cursor:pointer;font:600 8px/1 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;-webkit-tap-highlight-color:transparent;transition:border-color .25s ease,background .25s ease,color .25s ease}
+.mp-grp-head:hover,.mp-grp-head:focus-visible{border-color:rgba(110,229,255,.35);color:#eafcff}.mp-grp.open>.mp-grp-head{border-color:rgba(110,229,255,.3);background:rgba(110,229,255,.06);color:#eafcff}
+.mp-grp-no{color:rgba(110,229,255,.5);font-size:7.5px}.mp-grp-n{color:rgba(110,229,255,.6);font-size:7.5px}
+.mp-grp-chev{width:5px;height:5px;border-right:1.5px solid rgba(110,229,255,.6);border-bottom:1.5px solid rgba(110,229,255,.6);transform:rotate(-45deg);transition:transform .25s ease;justify-self:center}.mp-grp.open .mp-grp-chev{transform:rotate(45deg)}
+.mp-grp>.mp-tracks{display:none;margin-top:3px}.mp-grp.open>.mp-tracks{display:grid}
+.mp-grp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

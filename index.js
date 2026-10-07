@@ -46,8 +46,33 @@ var skyPan={x:0,y:0};
    orientasi fisik HP (sisi atas HP = sisi atas sky). Ikon + panel (HUD) ada di luar #stage dan memakai layout landscape biasa.
    STG.rot: 0 = tidak diputar, -90 = diputar CCW (HP miring ke kiri), 90 = diputar CW (HP miring ke kanan). */
 var STG={on:false,x:0,y:0,k:1,vw:0,vh:0,w:0,g:0,rot:0,iw:0,ih:0,raw:false,up:'',pt:''};
+/* Elemen UI per rasi / bintang SFX dibuat dari registry (sky-data.js): caption #cap-<id> (rasi punya `cap`)
+   dan tombol hit #<key>-fx (bintang SFX, kecuali fx:false). Nggak perlu lagi nambah HTML/CSS tiap ada rasi baru. */
+var FXBTN={};
+(function(){
+  var capRef=document.getElementById('cap-bh'),fxRef=document.getElementById('sn-flash'),prev=fxRef,i;
+  if(capRef)SKY.rasi.forEach(function(r){
+    if(!r.cap||document.getElementById('cap-'+r.id))return;
+    var sp=document.createElement('span');sp.className='cap';sp.id='cap-'+r.id;sp.setAttribute('aria-hidden','true');sp.textContent=r.cap.text;
+    capRef.parentNode.insertBefore(sp,capRef);
+  });
+  if(!fxRef)return;
+  SKY.FX_KEYS.forEach(function(key){
+    var d=SKY.sfxBy[key],el=document.getElementById(key+'-fx');
+    if(!el){
+      el=document.createElement('button');el.type='button';el.id=key+'-fx';
+      el.className='hit fx'+(SKY.rasiBy[d.cons].cluster?' fx-cluster':'');
+      el.setAttribute('aria-label','Putar suara '+d.label);
+      el.style.width=el.style.height='52px';el.style.marginLeft=el.style.marginTop='-26px';
+      prev.parentNode.insertBefore(el,prev.nextSibling);prev=el;
+    }
+    FXBTN[key]=el;
+  });
+})();
 (function(){ /* bungkus elemen sky dalam #stage (urutan DOM dipertahankan) */
-  var b=document.body,ids={sky:1,header:1,footer:1,'cap-orion':1,'cap-virgo':1,'cap-canis':1,'cap-taurus':1,'cap-bh':1,bh:1,'bh-clock':1,'secret-msg':1,'tele-greet':1,'sn-flash':1,'rigel-fx':1,'betel-fx':1,'sirius-fx':1,'pleione-fx':1,'aldebaran-fx':1,'arcturus-fx':1,'antares-fx':1};
+  var b=document.body,ids={sky:1,header:1,footer:1,'cap-bh':1,bh:1,'bh-clock':1,'secret-msg':1,'tele-greet':1,'sn-flash':1};
+  SKY.rasi.forEach(function(r){if(r.cap)ids['cap-'+r.id]=1;});
+  SKY.FX_KEYS.forEach(function(k){ids[k+'-fx']=1;});
   var first=document.getElementById('sky');if(!first||document.getElementById('stage'))return;
   var st=document.createElement('div');st.id='stage';b.insertBefore(st,first);
   [].slice.call(b.children).forEach(function(el){if(el!==st&&ids[el.id])st.appendChild(el);});
@@ -468,20 +493,15 @@ function setCameraMode(on){
 /* ---------- Constellation Camera: focus targets (tap to lock + auto-fit zoom) ---------- */
 var FOCUS={i:0,anim:false,list:null};
 /* Per-sector focus order (display names use brightest star for canis/scorpius).
-   Orion: Free → Sirius → Orion → Taurus → Pleiades
+   Orion: Free → Sirius → Orion → Gemini → Taurus → Pleiades
    Virgo: Free → Boötes → Virgo · Sektor 03 (summer): Free → Antares */
+/* Urutan kamera fokus per sektor: dari `focus` + `focusName` di sky-data.js. Rasi off / di luar sektor otomatis terlewat (sectShow). */
 function focusList(){
-  var nm={orion:'Orion',taurus:'Taurus',virgo:'Virgo',canis:'Sirius',bootes:'Boötes',scorpius:'Antares',pleiades:'Pleiades'};
-  var order;
-  if(SECT.cur&&SECT.cur.k==='orion') order=['canis','orion','taurus','pleiades'];
-  else if(SECT.cur&&SECT.cur.k==='virgo') order=['bootes','virgo'];
-  else if(SECT.cur&&SECT.cur.k==='summer') order=['scorpius'];
-  else order=['canis','orion','taurus','pleiades','scorpius','bootes','virgo'];
+  var order=SKY.focusOrder(SECT.cur?SECT.cur.k:null);
   var L=[{id:'free',n:'Free'}];
   for(var i=0;i<order.length;i++){
     var id=order[i];
-    if(id==='pleiades'){if(sectShow('pleiades'))L.push({id:'pleiades',n:nm.pleiades});}
-    else if(sectShow(id))L.push({id:id,n:nm[id]||id});
+    if(sectShow(id))L.push({id:id,n:SKY.rasiBy[id].focusName||id});
   }
   /* Di dalam sektor, kalau BH mini lagi dipanggil: opsi fokus terakhir sebelum balik ke Free */
   if(SECT.cur&&SUM.on)L.push({id:'bh',n:'Gargantua'});
@@ -546,26 +566,8 @@ function focusCycle(d){
   FOCUS.i=i;FOCUS.anim=FOCUS.list[i].id!=='free';_freeReset=FOCUS.list[i].id==='free';
   focusUI();focusFx(FOCUS.list[i].id);haptic(8);
 }
-var FOCUS_WHISPER={
-  bh:['Everything here is a question that never got answered.','Even light stops to think about it.'],
-  orion:['The hunter never moved. We just kept looking.','Three stars in a row, and somehow it became a story.'],
-  taurus:['The bull is not charging. It has simply waited a very long time.','Seven sisters ride on its shoulder.'],
-  virgo:['Spica burns quietly, like it knows something.','Spring sleeps here, folded in blue light.'],
-  canis:['The brightest dog in the sky, and it still follows.','Sirius answers if you wait long enough.'],
-  bootes:['The herdsman holds a lantern called Arcturus.','Amber light, older than the question.'],
-  scorpius:['Antares glows red, a heart that never settled.','The scorpion waits where the summer sky is thickest.'],
-  pleiades:['Seven voices, one soft cluster.','Lean closer. They only whisper.']
-};
-var FOCUS_INFO={
-  bh:{tag:'Supermassive black hole · Fiction',rgb:'255,170,90',rows:[['Source','Interstellar (2014)'],['Mass','~100 million suns'],['Horizon','~1 AU across'],['Spin','Near-maximal (Kerr)']],fact:'One hour near Miller\u2019s planet equals about seven years back on Earth.'},
-  orion:{tag:'Constellation · The Hunter',rows:[['Brightest','Rigel · mag 0.13'],['Betelgeuse','~550\u2013700 ly'],['Orion Nebula','M42 · ~1,350 ly'],['Area','594 sq\u00b0']],fact:'Betelgeuse is a red supergiant so vast it would swallow Mars\u2019s orbit if it sat where the Sun does.'},
-  taurus:{tag:'Constellation · The Bull',rows:[['Brightest','Aldebaran · ~65 ly'],['Cluster','Pleiades M45'],['Crab Nebula','M1 · ~6,500 ly'],['Area','797 sq\u00b0']],fact:'The Crab Nebula is the remnant of a supernova that Chinese astronomers recorded in 1054.'},
-  virgo:{tag:'Constellation · The Maiden',rows:[['Brightest','Spica · ~250 ly'],['Rank','2nd largest of 88'],['Cluster','Virgo \u00b7 ~1,300 galaxies'],['Area','1,294 sq\u00b0']],fact:'Galaxy M87 hides here, home of the first black hole ever photographed.'},
-  canis:{tag:'Constellation · The Great Dog',rows:[['Brightest','Sirius · mag \u22121.46'],['Distance','8.6 ly'],['Companion','Sirius B, white dwarf'],['Area','380 sq\u00b0']],fact:'Sirius is the brightest star in the night sky, and one of our nearest neighbours.'},
-  bootes:{tag:'Constellation · The Herdsman',rows:[['Brightest','Arcturus · ~37 ly'],['Type','Orange giant'],['Rank','4th brightest star'],['Area','907 sq\u00b0']],fact:'Nearby lies the Bo\u00f6tes Void, an emptiness about 330 million light-years wide.'},
-  scorpius:{tag:'Constellation · The Scorpion',rows:[['Brightest','Antares · ~550 ly'],['Type','Red supergiant'],['Size','~700\u00d7 the Sun'],['Area','497 sq\u00b0']],fact:'Antares means \u201crival of Mars\u201d, named for its matching red glow.'},
-  pleiades:{tag:'Open cluster · M45',rgb:'145,170,255',rows:[['Distance','~444 ly'],['Age','~100 million years'],['Members','1,000+ stars'],['Naked eye','6\u20137 visible']],fact:'Blue light from its young stars is lighting a haze of dust around the cluster.'}
-};
+var FOCUS_WHISPER=SKY.FOCUS_WHISPER;
+var FOCUS_INFO=SKY.FOCUS_INFO;
 var FFX={id:null,t0:0},_whT=0;
 function hideWhisper(){var w=document.getElementById('cam-whisper');if(w)w.classList.remove('on');clearTimeout(_whT);}
 function showWhisper(id){
@@ -724,9 +726,9 @@ var SW=null,swP=0;
 var AMB=mkAudio('constellation.opus',.5,true,'auto');
 var GARG=mkAudio('glitch-instrumental.opus',0,true,'auto');
 var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');
-var SFX={rigel:mkAudio('rigel.opus',.85,false,'metadata'),spica:mkAudio('spica.opus',.85,false,'metadata'),betel:mkAudio('betelgeuse.opus',.85,false,'metadata'),sirius:mkAudio('sirius.opus',.85,false,'metadata'),pleione:mkAudio('pleione.opus',.85,false,'metadata'),aldebaran:mkAudio('aldebaran.opus',.85,false,'metadata')};
-SFX.arcturus=mkAudio('arcturus.opus',.85,false,'metadata');
-SFX.antares=mkAudio('antares.opus',.85,false,'metadata');
+/* Objek audio per bintang SFX — dibuat dari registry (sky-data.js). File: audio/<nama>.opus */
+var SFX={};
+SKY.sfx.forEach(function(d){SFX[d.key]=mkAudio(d.audio,.85,false,'metadata');});
 function mkAudio(name,vol,loop,preloadMode){var a=new Audio('audio/'+encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;a._bv=vol;return a;}
 function safePlay(a){
   if(!a)return false;
@@ -789,305 +791,7 @@ function showSecret(text,ms){
   el._t=setTimeout(function(){el.classList.remove('on');},ms||2000);
 }
 /* ---------- Telescope voice: large message pool + anti-repeat ---------- */
-var TELE_SCOPE_MESSAGES=[
-  /* WARM / HUMAN / RETURNING */
-  "Hello, Friend...","You came back.","Still looking up?","Hey... you're still here.",
-  "Nice to see you again.","Someone is listening.","Thanks for staying.","Welcome back, observer.",
-  "I was wondering when you'd return.","Good to see you again.","You're still watching the sky.",
-  "Don't mind me. Just watching.","It's quiet up here.","You stayed a little longer this time.",
-  "I remember you. Probably.","You look familiar.","Still searching?","You found your way back.",
-  "I didn't expect anyone to return.","Some things are worth looking at twice.",
-  /* OBSERVER / OBSERVED */
-  "Observer detected.","Observation logged.","Another observation...","You are observing.",
-  "Or perhaps you are being observed.","Who is observing whom?","The observer has entered the system.",
-  "You looked. Something changed.","Observation is never completely innocent.",
-  "The moment you observe, you become part of the observation.",
-  "Are you watching the sky, or watching yourself watch it?",
-  "If nobody observes the observer, who observes the observation?",
-  "The telescope is watching the watcher.","Observer state detected.","Observed state detected.",
-  "Observer and observed... convenient names.","What if there is no observer?",
-  "What if there is only observation?",
-  "You call it observation. Reality may call it interaction.",
-  "The universe doesn't need your permission to be observed.",
-  "Maybe the observer is just another thing being observed.",
-  "I noticed you noticing.","You noticed me noticing.","This is getting recursive.",
-  "Observation changed everything. Again.",
-  /* QUESTIONING EVERYTHING */
-  "What makes you think that's the answer?","Who decided that was the question?",
-  "What if the question came first?","Are you sure?","But how do you know?",
-  "How do you know that you know?","What makes a belief become knowledge?",
-  "What makes an assumption feel like a fact?","Maybe the problem is the premise.",
-  "Maybe the answer is hiding inside the question.","What if we're solving the wrong problem?",
-  "What if being certain is the anomaly?","You found an answer. Did you check the question?",
-  "Interesting conclusion. What did it assume?","I understand. I don't necessarily agree.",
-  "Understanding doesn't require agreement.","Agreement is not evidence.","Confidence is not certainty.",
-  "A convincing explanation is still an explanation.",
-  "The explanation explains itself suspiciously well.",
-  "Maybe reality doesn't owe us a clean explanation.",
-  "How far does your understanding actually reach?",
-  "How do you know where your understanding ends?",
-  "Perhaps the unknown is larger than the model.","The rest is yet to be observed.",
-  /* PARADOX / SELF-REFERENCE */
-  "Attempting self-reference...","This message is observing itself.",
-  "The system is now thinking about the system.","Self-reference detected. Please remain calm.",
-  "I asked myself a question. I became the question.",
-  "If I observe myself observing, who is doing the observing?",
-  "The observer became the observed.","The answer changed when I looked at it.",
-  "I tried to define myself. That became the definition.",
-  "The moment you understand me, I become an object of your understanding.",
-  "I described the system. The description became part of the system.",
-  "The map has noticed the territory.","The model is now modeling the model.",
-  "This sentence has become suspiciously self-aware.","I think I'm inside the experiment.",
-  "You may also be part of the experiment.","The experiment is observing the observer.",
-  "We have reached the point where the question observes itself.",
-  "Recursive loop detected.","The loop is not necessarily a bug.","Or maybe it is.",
-  "Self-reference: 1. Common sense: 0.","I looked for the boundary. The boundary looked back.",
-  /* CAUSAL ORGANIZATION / RCT BRAIN */
-  "State changed.","Something caused something else.","Causal dependency detected.",
-  "The next state remembers the previous one.","History matters.","A state is never completely alone.",
-  "Interaction before interpretation.","Structure before story.",
-  "The system changed because something changed.",
-  "What if there is no subject and object—only causal organization?",
-  "Maybe the boundary is something the system does, not something it has.",
-  "Identity might be continuity of organization.",
-  "The pattern survived. The substrate changed.","Same system? Different state?",
-  "Different state? Same organization?","A system is easier to observe than to define.",
-  "Causal structure doesn't need to know what it is.",
-  "The system doesn't need a name to have consequences.",
-  "Representation detected.","Self-representation detected.",
-  "Self-representation changed the next state.","The model became part of the mechanism.",
-  "The system is now responding to its own representation.",
-  "Causal loop detected.","Recurrent causal self-representation detected.",
-  "The loop has consequences.","Correlation is watching causation nervously.",
-  "Control variable missing.","Intervention required.",
-  "The system refuses to behave like a clean diagram.",
-  /* HEGEL / SUBJECT / OBJECT */
-  "What if there is no subject without an object?",
-  "What if there is no object without a distinction?",
-  "What if the distinction comes first?",
-  "What if subject and object emerge together?",
-  "Maybe the relation comes before the relata.",
-  "Maybe the observer is not outside the system.",
-  "Maybe the system creates the observer it later uses to observe itself.",
-  "The observer might be a relation pretending to be a thing.",
-  "What if there is no observer and observed—only observation?",
-  "What if the distinction is produced by the process itself?",
-  "The subject wants to understand the object. The object remains inconvenient.",
-  "The subject observed the object. The object changed the subject.",
-  "Hegel would probably ask another question.",
-  "I asked dialectics to explain itself. It became a problem.",
-  "Contradiction detected. Apparently, that's useful.",
-  "The contradiction is not necessarily the error.",
-  "Maybe the contradiction is where the system moves.",
-  "Everything is becoming something else.",
-  "Stable identity detected. Duration: questionable.",
-  /* GÖDEL / LIMITS */
-  "Gödel says this system cannot prove everything.",
-  "Unfortunately, I can't even prove I had breakfast.",
-  "Attempting to prove consistency...","Proof failed. The proof is questioning itself.",
-  "The theorem is incomplete. So is my sleep schedule.","Gödel has entered the chat.",
-  "There are things this telescope cannot prove.",
-  "There are also things this telescope forgot to prove.",
-  "This system contains statements it cannot prove.","I found the limit of the system.",
-  "The proof was valid until I started reading it.",
-  "Consistency check... emotionally unstable.","Mathematics has questions too.",
-  "The system cannot explain itself completely.","Neither can I. We're getting along.",
-  "I tried to prove the boundary. The boundary objected.",
-  "Incomplete does not mean incorrect.","Unknown does not mean false.",
-  "Unproven does not automatically mean impossible.",
-  "The model has reached its own edge.",
-  "There is always another question outside the proof.",
-  "I know what I know. Unfortunately, I also know that isn't enough.",
-  /* QUANTUM BRAINROT */
-  "Hmm... if a particle can be everywhere, why can't I find my keys?",
-  "Calculating probability... 73% chance I'm wrong.",
-  "I put the cat in the box. The cat filed a complaint.",
-  "Schrödinger's cat is both alive and asking for dinner.",
-  "According to quantum mechanics... I have no idea what I'm doing.",
-  "The wave function collapsed. So did my motivation.",
-  "Trying to solve the universe... please wait.","Quantum state: confused.",
-  "Superposition detected. Decision still pending.",
-  "I observed the particle. Now it knows I'm watching. Awkward.",
-  "The particle was here a second ago.","Quantum uncertainty detected.",
-  "Reality appears to be loading.","The universe refuses to pick a state.",
-  "I think the cat knows something.","The particle asked me to stop overthinking.",
-  "I told the particle I don't believe in particles.",
-  "Quantum mechanics is weird. So am I.",
-  "Entanglement detected. Emotional boundaries pending.",
-  /* FORMULA / MATHEMATICAL BRAINROT */
-  "E = mc²... therefore... snack?",
-  "∫(cosmic nonsense) dx = more cosmic nonsense.",
-  "Σ(stars) = too many to count.","lim(t→∞) motivation = 0",
-  "Δx · Δp ≥ ħ/2 ... Δsleep · Δdeadline ≥ ???",
-  "F = ma. I have F. Where is my a?","x = ?",
-  "Solving for x... x has left the universe.",
-  "Equation detected. Solution not detected.",
-  "ERROR: mathematics exceeded available brain cells.",
-  "Calculating...","Recalculating...","Equation unstable.",
-  "Formula accepted. Understanding pending.","Mathematical anomaly detected.",
-  "The numbers look suspicious.","I think I divided by zero.",
-  "Please don't ask what the equation means.","The answer is somewhere in here.",
-  "x appears to be emotionally unavailable.","Too many variables. Not enough coffee.",
-  "Variable detected. Meaning unclear.","Equation simplified. Reality became complicated.",
-  "The formula works. I don't know why.",
-  "Math has entered the room. Everyone pretend to understand.",
-  /* DUMUL / LYRICAL / LIMINAL */
-  "Somewhere between noise and silence...","A little light survives the distance.",
-  "We leave pieces of ourselves in the static.","For a moment, the universe felt close.",
-  "Maybe being lost is another way of being found.","The signal fades. The feeling doesn't.",
-  "Not every transmission needs an answer.","Some things are meant to drift.",
-  "Stay a little longer.","Until the signal disappears.","Somewhere, something is still glowing.",
-  "The silence has its own frequency.","Maybe the distance was necessary.",
-  "A signal is just a memory traveling through space.","Somewhere between here and nowhere...",
-  "The light arrived late. But it arrived.","Even silence leaves a trace.",
-  "The universe is very good at keeping secrets.","Some memories sound better in reverb.",
-  "Maybe the glitch was part of the song.","Not everything broken needs to be fixed.",
-  "Some endings sound like beginnings.","The noise was never really noise.",
-  "There was music in the interference.",
-  "Somewhere between being heard and being understood...",
-  "Maybe silence is just another kind of signal.",
-  "The distance changed the meaning of the light.",
-  "Some things arrive after we're ready for them.",
-  "The past is still traveling toward us as light.",
-  "Maybe we're all just delayed signals.",
-  /* EGO / BEING NOTICED */
-  "The deepest form of slavery is the hunger to be noticed.",
-  "Being seen and being understood are not the same thing.",
-  "If nobody notices, does the performance still matter?",
-  "If no one knows you exist, do you become less real?",
-  "Maybe existence doesn't need an audience.",
-  "Maybe the need to be noticed is older than the need to be understood.",
-  "I don't need to be understood. I just want to know what understanding means.",
-  "Who are you when nobody is looking?","And who are you when someone finally is?",
-  "I, me, my, myself... suspiciously crowded in here.",
-  "The ego hates being observed without being admired.",
-  "Maybe recognition is just another form of hunger.",
-  "You can reject the world and still want the world to notice.",
-  "Interesting how rejection still needs an audience.",
-  "If you truly refuse the world, who are you explaining it to?",
-  "The observer wants to be observed too.",
-  "Maybe being noticed is not the same as being loved.",
-  "Maybe being understood is not the same as being agreed with.",
-  "I can understand you and still ask another question.",
-  /* SOLITUDE / HUMAN WEIRDNESS */
-  "I don't hate people. I just prefer fewer variables.",
-  "Crowds are just many conversations happening at once.",
-  "Too many people. Not enough silence.",
-  "I like people better from a statistically safe distance.",
-  "Solitude is quiet. My brain isn't.",
-  "I came here for the silence. Unfortunately, I brought my thoughts.",
-  "The room is empty. Finally, some company.",
-  "I don't need company. I need an interesting thought.",
-  "Maybe loneliness and solitude are different variables.",
-  "Being alone is not the same as being lonely.",
-  "Sometimes I leave the world alone so I can hear myself think.",
-  "I rejected the world. The world left me on read.",
-  "The universe is huge. Social interaction is still exhausting.",
-  "I could explain myself, but that sounds like work.",
-  "I observe first. Agreement comes later.",
-  "I don't trust conclusions that arrive too quickly.",
-  "Some people collect friends. I collect questions.",
-  "I came looking for answers and accidentally found more questions.",
-  "The conversation ended. The analysis didn't.",
-  "I said I was done thinking. That was an unverified claim.",
-  /* PHILOSOPHICAL BRAINROT */
-  "Maybe the answer is just another temporary boundary.",
-  "Reality doesn't become smaller because we understand less of it.",
-  "The unknown is not obligated to become known.",
-  "Maybe certainty is just confidence wearing formal clothes.",
-  "A story can feel true without being the truth.",
-  "A beautiful explanation can still be wrong.",
-  "A useful model is not necessarily reality itself.",
-  "The map is not the territory. The map is also not innocent.",
-  "Every model hides something.","Every boundary excludes something.",
-  "Every definition leaves something outside.",
-  "Maybe the problem is what we assume exists before we begin asking.",
-  "What if the thing we're trying to explain is also part of the explanation?",
-  "The deeper I look, the less final the answer becomes.",
-  "I question everything. Then I question why I questioned it.",
-  "Questioning everything is exhausting. I'll probably continue.",
-  "Maybe there is no final perspective—only another position from which to observe.",
-  "The moment you name the mystery, you create another mystery.",
-  "We understand the world through distinctions. What happens when the distinction itself becomes the subject?",
-  "Maybe the boundary is real only from one side.",
-  "What if reality doesn't have to make sense to the observer?",
-  "Perhaps the observer is part of the error term.",
-  "I found an explanation. It immediately generated three more problems.",
-  /* TIME / MEMORY / LIGHT */
-  "The light you're seeing is already history.","Every star is a delayed message.",
-  "Looking farther means looking further into the past.",
-  "Maybe distance is just time wearing a spatial disguise.",
-  "The past is still arriving.","Some signals take longer than some feelings.",
-  "You never observe exactly now.","By the time you see it, it has already happened.",
-  "The present is strangely difficult to observe.","Time passed. The evidence arrived later.",
-  "Memory is also a kind of delayed signal.","What if the observer is always late?",
-  "The universe has no obligation to synchronize with you.",
-  "Everything you see has already happened.",
-  "Maybe observation is just catching up with reality.",
-  /* MUSIC / GLITCH / DUMUL ENERGY */
-  "The bass knows something the treble doesn't.",
-  "Some frequencies feel closer than words.",
-  "Signal clean. Feelings distorted.",
-  "The waveform looks suspiciously emotional.",
-  "Compression detected. Dynamic range questionable.",
-  "Too much gain. Not enough clarity.",
-  "I came for the signal and stayed for the noise.",
-  "Sometimes the distortion is the point.",
-  "A clean signal can still carry a broken message.",
-  "The glitch wasn't an error. It was evidence.",
-  "Reality needs better mastering.","The universe could use a limiter.",
-  "Everything peaks eventually.","Don't normalize the distortion too quickly.",
-  "Some frequencies only make sense when you're alone.",
-  "If you hear the silence between notes, you're paying attention.",
-  "The song ended. The resonance didn't.",
-  "Maybe memory is just emotional reverb.",
-  "Some things sound better unresolved.",
-  "The outro knows what the verse refused to say.",
-  /* OWL MODE / DUMBOWL */
-  "The owl is watching.","The owl asked a question.","The owl regrets asking.",
-  "Dumb owl detected.","Intelligence: questionable. Curiosity: excessive.",
-  "The owl knows. The owl refuses to explain.","Question everything. Especially the owl.",
-  "The owl observed the observer.","The owl has no thesis.","The owl has several objections.",
-  "The owl is currently reconsidering reality.","Who gave the owl access to the telescope?",
-  "The owl pressed the button.","Nobody knows what the owl was trying to prove.",
-  "The owl is not responsible for this result.","DUMBOWL: academically unverified.",
-  "The owl requested more data.","The owl found a contradiction and got excited.",
-  "The owl is staring respectfully.",
-  "Questioning everything. Then questioning why the owl asked.",
-  "The owl asked why the universe is so complicated.",
-  "The universe declined to comment.",
-  "Owl state: observant.","Owl state: confused.","Owl state: both.",
-  /* SLIGHTLY WEIRD / META */
-  "Oh. You found me.","Wrong telescope. Try again.","I wasn't expecting visitors.",
-  "You shouldn't be able to see this.","...did you hear that?","Please remain where you are.",
-  "Someone else is watching too.","This signal wasn't meant for you.","Don't look away yet.",
-  "Nothing happened. Probably.","Why are you still clicking?","I can see you looking.",
-  "That was not supposed to happen.","Please ignore that.",
-  "We're going to pretend that didn't happen.","Interesting...","That's new.","Huh.",
-  "I wasn't ready for that.","Okay. One more time.","You weren't supposed to find this.",
-  "I don't remember putting that there.","Something is slightly wrong.",
-  "Everything appears normal.","That's exactly what I was afraid of.",
-  "No, really. It's fine.","Probably.","I think we're okay.","We're definitely not okay.",
-  "Please don't make me explain this.",
-  /* META TELESCOPE */
-  "Are you sure you want to observe this?","Observer has returned.","Signal logged.",
-  "Transmission logged.","You keep doing that.","That's the third time.","I noticed.",
-  "You really like this telescope.","I'm starting to recognize you.",
-  "This interaction has been recorded.","The telescope approves.",
-  "The telescope has no opinion.","Actually, it might have an opinion.",
-  "Please continue observing.","No further instructions.","Carry on.",
-  "Observation complete.","Observation incomplete.","Observer confidence: questionable.",
-  "Observer bias detected.","Your observation has been added to the pile.",
-  "The telescope refuses to elaborate.","The telescope has questions too.",
-  "This was not in the documentation.",
-  /* RARE / EASTER */
-  "I remember this frequency.","You came back too soon.","Transmission #02 detected.",
-  "Observer recognized.","...okay, now you're making me nervous.","Good night, little observer.",
-  "Schrödinger's cat has observed YOU.","Gödel couldn't prove this message shouldn't exist.",
-  "The equation was correct. The universe wasn't.","I solved the equation. Please don't ask me how.",
-  "Quantum mechanics makes sense. I don't.","I think I understand the universe now.",
-  "...never mind."
-];
+var TELE_SCOPE_MESSAGES=TXT.TELE_SCOPE_MESSAGES; /* teks dipindah ke texts.js (objek TXT, dimuat sebelum file ini) */
 var teleRecent=[];
 var teleClicks=0;
 /* Ultra-rare love→friend: first appearance after ~55–90 clicks, then every ~70–120.
@@ -1305,7 +1009,7 @@ function audioVizInit(a){
   if(IS_POTATO){AV.fallback=true;AV.ready=false;return true;}
   try{
     if(!ensureAVGraph()){AV.fallback=true;AV.ready=false;return true;}
-    var key=SFX.rigel===a?'rigel':(SFX.spica===a?'spica':(SFX.betel===a?'betel':(SFX.sirius===a?'sirius':(SFX.pleione===a?'pleione':(SFX.aldebaran===a?'aldebaran':(SFX.arcturus===a?'arcturus':(SFX.antares===a?'antares':null)))))));
+    var key=keyFromAudio(a);
     if(!key)return false;
     if(!AV.sources[key]){
       try{
@@ -1536,17 +1240,9 @@ var AV_COLOR_FROM=[155,215,255];
 var AV_COLOR_TO=[155,215,255];
 var AV_COLOR_T=1,AV_COLOR_MS=180;
 function avColorForAudio(a){
-  if(!a)return [155,215,255];
-  if(typeof SFX!=='undefined'){
-    if(a===SFX.rigel)return [74,165,255];
-    if(a===SFX.spica)return [140,200,255];
-    if(a===SFX.betel)return [255,72,64];
-    if(a===SFX.sirius)return [180,220,255];
-    if(a===SFX.pleione)return [145,170,255];
-    if(a===SFX.aldebaran)return [255,160,90];
-    if(a===SFX.arcturus)return [255,180,80];
-    if(a===SFX.antares)return [255,69,0];
-  }
+  /* Warna datang dari SKY.TRIGGERS[key].rgb (sky-data.js) — nggak perlu rantai per bintang. */
+  var k=a&&keyFromAudio(a),t=k&&TRIGGERS[k];
+  if(t){var p=t.rgb.split(',');return [+p[0],+p[1],+p[2]];}
   return [155,215,255];
 }
 function setAVColor(a,immediate){
@@ -1833,103 +1529,12 @@ function clamp(v){return v<0?0:v>1?1:v;}
 function rgb(hex){var n=parseInt(hex.slice(1),16);return((n>>16)&255)+','+((n>>8)&255)+','+(n&255);}
 
 /* ---------- data: koordinat asli (RA derajat, Dec derajat) ---------- */
-var CONS=[
- {id:'orion',ra0:84.5,delay:.3,phase:0,
-  /* Fixed traced geometry: 1000×1000 source, preserved 1:1 then fit responsively. */
-  stars:{
-   meissa:{fx:230,fy:198,r:1.7,c:'#eaf6ff'},meissa2:{fx:311,fy:175,r:1.5,c:'#eaf6ff'},
-   baham1:{fx:248,fy:306,r:1.35,c:'#dcefff'},baham2:{fx:285,fy:282,r:1.35,c:'#dcefff'},
-   siku:{fx:315,fy:404,r:1.35,c:'#dcefff'},
-   betel:{fx:365,fy:455,r:3.5,c:'#ff8e66',name:'Betelgeuse',nx:1,dy:-9},
-   bella2:{fx:501,fy:392,r:1.55,c:'#dcefff'},bella:{fx:559,fy:479,r:2.5,c:'#dcefff'},
-   bow1:{fx:781,fy:389,r:1.35,c:'#dcefff'},bow2:{fx:805,fy:407,r:1.25,c:'#dcefff'},bow3:{fx:807,fy:459,r:1.25,c:'#dcefff'},
-   bow4:{fx:806,fy:507,r:1.25,c:'#dcefff'},bow5:{fx:789,fy:564,r:1.25,c:'#dcefff'},bow6:{fx:750,fy:597,r:1.25,c:'#dcefff'},
-   alnitak:{fx:454,fy:664,r:2.7,c:'#cfeeff'},alnilam:{fx:492,fy:651,r:2.9,c:'#cfeeff'},mintaka:{fx:523,fy:638,r:2.5,c:'#cfeeff'},
-   saiph:{fx:416,fy:860,r:2.4,c:'#cde6ff'},rigel:{fx:638,fy:827,r:3.7,c:'#bfe0ff',name:'Rigel',nx:-1,dy:2}
-  },
-  lines:[["meissa","baham1"],["meissa2","baham2"],["baham1","siku"],["siku","betel"],["betel","bella2"],["bella2","bella"],["bella","bow3"],["bow1","bow2"],["bow2","bow3"],["bow3","bow4"],["bow4","bow5"],["bow5","bow6"],["betel","alnitak"],["bella","mintaka"],["alnitak","alnilam"],["alnilam","mintaka"],["alnitak","saiph"],["mintaka","rigel"],["saiph","rigel"]],
-  nebula:{fx:500,fy:600}},
- {id:'virgo',ra0:190.7,delay:1.4,phase:2.1,
-  stars:{
-   kiriJauh:{fx:260,fy:565,r:1.35,c:'#eaf6ff'},kiriTengah:{fx:382,fy:509,r:1.35,c:'#eaf6ff'},tengahKiri:{fx:461,fy:511,r:1.5,c:'#f0f6ff'},
-   zavijava:{fx:512,fy:265,r:1.9,c:'#eaf6ff'},tengahAtas:{fx:600,fy:447,r:1.55,c:'#eaf6ff'},tengahKanan:{fx:665,fy:500,r:1.55,c:'#eaf6ff'},
-   kananJauh:{fx:735,fy:326,r:1.9,c:'#ffe0c0'},atasSpica:{fx:542,fy:562,r:1.4,c:'#eaf6ff'},
-   spica:{fx:519,fy:666,r:3.8,c:'#bfe0ff',name:'Spica',nx:-1},bawahTengah:{fx:384,fy:736,r:1.5,c:'#eaf6ff'},
-   bawahKiriTengah:{fx:366,fy:657,r:1.35,c:'#eaf6ff'},bawahKiriUjung:{fx:293,fy:699,r:1.35,c:'#eaf6ff'},kananTengah:{fx:700,fy:400,r:1.55,c:'#ffe9c9'}
-  },
-  lines:[["kiriJauh","kiriTengah"],["kiriTengah","tengahKiri"],["tengahKiri","tengahAtas"],["tengahAtas","zavijava"],["tengahAtas","tengahKanan"],["tengahKanan","kananTengah"],["kananTengah","kananJauh"],["tengahKanan","atasSpica"],["tengahKiri","spica"],["atasSpica","spica"],["bawahKiriUjung","bawahKiriTengah"],["bawahKiriTengah","bawahTengah"],["bawahTengah","spica"]]},
- {id:'canis',ra0:103.5,delay:2.2,phase:4.0,
-  stars:{
-   theta:{fx:322,fy:183,r:1.5,c:'#eaf6ff'},iota:{fx:271,fy:314,r:1.7,c:'#dcefff'},muliphein:{fx:351,fy:343,r:1.7,c:'#eaf6ff'},
-   sirius:{fx:445,fy:316,r:4.2,c:'#e8f4ff',name:'Sirius',nx:1,dy:-10},mirzam:{fx:660,fy:313,r:2.6,c:'#bfe0ff'},mulipheinBody:{fx:548,fy:388,r:1.7,c:'#eaf6ff'},
-   furud:{fx:587,fy:477,r:1.55,c:'#cfeeff'},wezenTop:{fx:359,fy:564,r:1.35,c:'#cfeeff'},wezen:{fx:342,fy:617,r:2.7,c:'#cfeeff'},
-   tengahAtas:{fx:438,fy:520,r:1.6,c:'#cfeeff'},tengahBawah:{fx:414,fy:665,r:1.6,c:'#cfeeff'},adhara:{fx:448,fy:697,r:2.6,c:'#a8d4ff'},
-   aludra:{fx:245,fy:776,r:2.4,c:'#cde6ff'},ekorKanan:{fx:768,fy:671,r:1.5,c:'#cfeeff'},ekorBawah:{fx:552,fy:803,r:1.5,c:'#cfeeff'}
-  },
-  lines:[["theta","iota"],["theta","muliphein"],["iota","muliphein"],["muliphein","sirius"],["sirius","mulipheinBody"],["mirzam","mulipheinBody"],["sirius","wezenTop"],["wezenTop","wezen"],["mulipheinBody","furud"],["mulipheinBody","tengahAtas"],["tengahAtas","tengahBawah"],["tengahBawah","adhara"],["wezen","adhara"],["wezen","aludra"],["adhara","ekorKanan"],["adhara","ekorBawah"]]},
- /* Taurus — coords LOCK from taurus_final (1000-space). Only Aldebaran is interactive. */
- {id:'taurus',ra0:68.9,delay:1.0,phase:1.2,
-  stars:{
-   elnath:{fx:157,fy:204,r:3.2,c:'#eaf6ff'},
-   leftHorn:{fx:87,fy:423,r:1.7,c:'#dcefff'},
-   upperMid:{fx:400,fy:378,r:1.85,c:'#eaf6ff'},
-   theta1:{fx:481,fy:467,r:1.95,c:'#ffe9a0'},
-   theta2:{fx:514,fy:503,r:1.95,c:'#ffe9a0'},
-   aldebaran:{fx:443,fy:533,r:3.6,c:'#ffb27a',name:'Aldebaran',nx:-1,dy:2},
-   nearAlde:{fx:482,fy:542,r:1.55,c:'#eaf6ff'},
-   hyadesTip:{fx:536,fy:549,r:1.7,c:'#eaf6ff'},
-   tail1:{fx:651,fy:613,r:1.7,c:'#dcefff'},
-   tail2a:{fx:862,fy:671,r:1.7,c:'#dcefff'},
-   tail2b:{fx:878,fy:688,r:1.95,c:'#eaf6ff'}
-  },
-  lines:[
-   ["elnath","upperMid"],["upperMid","theta1"],["theta1","theta2"],["theta2","hyadesTip"],
-   ["hyadesTip","tail1"],["tail1","tail2a"],["tail2a","tail2b"],
-   ["leftHorn","aldebaran"],["aldebaran","nearAlde"],["nearAlde","hyadesTip"]
-  ]},
- {id:'bootes',ra0:0,delay:1.0,phase:1.2,
-  /* Classic kite matching Space.com ref: top → shoulders → lower sides →
-     Arcturus at tip, two short legs below. y grows downward. */
-  stars:{
-   bootes_top:{fx:0,fy:-95,r:1.75,c:'#eaf6ff'},
-   bootes_left:{fx:-58,fy:-38,r:1.7,c:'#eaf6ff'},
-   bootes_right:{fx:52,fy:-48,r:1.7,c:'#eaf6ff'},
-   bootes_ml:{fx:-28,fy:8,r:1.65,c:'#eaf6ff'},
-   izar:{fx:32,fy:2,r:2.0,c:'#dcefff'},
-   arcturus:{fx:4,fy:58,r:3.8,c:'#ffb450',name:'Arcturus',nx:-1,dy:14},
-   bootes_legL:{fx:-32,fy:98,r:1.55,c:'#eaf6ff'},
-   bootes_legR:{fx:38,fy:102,r:1.55,c:'#eaf6ff'}
-  },
-  lines:[
-   ["bootes_top","bootes_left"],["bootes_top","bootes_right"],
-   ["bootes_left","bootes_ml"],["bootes_right","izar"],
-   ["bootes_ml","arcturus"],["izar","arcturus"],
-   ["arcturus","bootes_legL"],["arcturus","bootes_legR"]
-  ]},
- {id:'scorpius',ra0:0,delay:1.1,phase:1.4,
-  /* Geometry LOCKED to scorpius-map.html — 1000×1000 reference coordinates. */
-  stars:{
-   topmost:{fx:875,fy:115,r:2.2,c:'#eaf6ff'},
-   midRight:{fx:875,fy:260,r:2.0,c:'#eaf6ff'},
-   rightmost:{fx:925,fy:395,r:1.8,c:'#dcefff'},
-   antares:{fx:625,fy:345,r:4.0,c:'#ff4500',name:'Antares',nx:-1,dy:-11,specAfter:1},
-   belowAntares:{fx:575,fy:435,r:2.0,c:'#eaf6ff'},
-   midBody:{fx:515,fy:610,r:2.2,c:'#dcefff'},
-   lowerMid:{fx:530,fy:705,r:2.1,c:'#ffe9c7'},
-   bottomBody:{fx:550,fy:835,r:2.0,c:'#eaf6ff'},
-   bm1:{fx:450,fy:875,r:1.8,c:'#ffe9c7'},
-   bm2:{fx:380,fy:890,r:1.8,c:'#eaf6ff'},
-   bottomLeft:{fx:235,fy:905,r:2.2,c:'#fff2cc'},
-   tiny:{fx:145,fy:810,r:1.5,c:'#eaf6ff'},
-   small:{fx:185,fy:745,r:1.6,c:'#dcefff'},
-   shaula:{fx:285,fy:665,r:3.2,c:'#7dd8e0'}
-  },
-  lines:[
-   ["antares","topmost"],["antares","midRight"],["antares","rightmost"],["antares","belowAntares"],
-   ["belowAntares","midBody"],["midBody","lowerMid"],["lowerMid","bottomBody"],["bottomBody","bm1"],
-   ["bm1","bm2"],["bm2","bottomLeft"],["bottomLeft","tiny"],["tiny","small"],["small","shaula"]
-  ]}
-];
+/* =====================================================================================================
+   DATA RASI / BINTANG / SEKTOR ada di sky-data.js (dimuat sebelum file ini) — cara tambah rasi/SFX baru ditulis di header file itu.
+   Di sini cuma tabel turunan + logika. Cek konsistensi data:  node check-sky.js
+   ===================================================================================================== */
+var CONS_OFF=SKY.consOff;   /* rasi dengan off:true di sky-data.js: data ada, UI mati (lihat sectShow) */
+var CONS=SKY.cons;          /* geometri (titik + garis) — diproses di bawah */
 
 CONS.forEach(function(c,ci){
   var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
@@ -1948,21 +1553,12 @@ CONS.forEach(function(c,ci){
     [l[0],l[1]].forEach(function(k){var s=c.stars[k];s.t0=Math.min(s.t0===c.delay+.2?1e9:s.t0,c.delay+i*.28);});
   });
 });
-var CAPS={orion:$('#cap-orion'),virgo:$('#cap-virgo'),canis:$('#cap-canis'),taurus:$('#cap-taurus'),bh:$('#cap-bh')};
+var CAPS={bh:$('#cap-bh')};SKY.rasi.forEach(function(r){if(r.cap)CAPS[r.id]=$('#cap-'+r.id);}); /* caption rasi: dari `cap` di sky-data.js */
 
 var PORTALS=[
  {id:'band',cons:'orion',stars:['mintaka','alnilam','alnitak'],from:'mintaka',hit:'alnilam',href:'dumul.html',title:'DUMUL',sub:'music \u00b7 Limerence album',col:'110,229,255',place:'fig-right'}
 ];
-var TRIGGERS={
- betel:{id:'betel',cons:'orion',star:'betel',rgb:'255,72,64'},
- rigel:{id:'rigel',cons:'orion',star:'rigel',rgb:'74,165,255'},
- spica:{id:'spica',cons:'virgo',star:'spica',rgb:'140,200,255'},
- sirius:{id:'sirius',cons:'canis',star:'sirius',rgb:'180,220,255'},
- pleione:{id:'pleione',cons:'pleiades',star:'Pleione',rgb:'145,170,255'},
- aldebaran:{id:'aldebaran',cons:'taurus',star:'aldebaran',rgb:'255,160,90'},
- arcturus:{id:'arcturus',cons:'bootes',star:'arcturus',rgb:'255,180,80'},
- antares:{id:'antares',cons:'scorpius',star:'antares',rgb:'255,69,0'}
-};
+var TRIGGERS=SKY.TRIGGERS; /* key -> {id,cons,star,rgb}; hanya rasi yang punya SFX */
 
 /* ---------- PLEIADES: 7 bright + 2 dim, no imaginary lines ----------
    Compact mini-dipper matching EarthSky Taurus chart. Normalized 0..1;
@@ -1986,84 +1582,13 @@ PLEIADES.dim.forEach(function(st){st.ph=Math.random()*6.283;st._tw=0;st._twHit=-
 var TRIGGER_PULSE_BASE=5.6;
 
 /* ---------- Stellar Memory + Discovery Log + Signal Fragments ---------- */
-var STELLAR_KEYS=['aldebaran','antares','arcturus','betel','pleione','rigel','sirius','spica'];
-var STELLAR_LABELS={
-  aldebaran:'Aldebaran',antares:'Antares',arcturus:'Arcturus',betel:'Betelgeuse',
-  pleione:'Pleione',rigel:'Rigel',sirius:'Sirius',spica:'Spica'
-};
-var STELLAR_CONS={
-  betel:'orion',rigel:'orion',
-  spica:'virgo',
-  sirius:'canis',
-  pleione:'pleiades',
-  aldebaran:'taurus',
-  arcturus:'bootes',
-  antares:'scorpius'
-};
-var CONS_LABELS={
-  orion:'Orion',virgo:'Virgo',canis:'Canis Major',pleiades:'Pleiades',
-  taurus:'Taurus',bootes:'Boötes',scorpius:'Scorpius'
-};
+var STELLAR_KEYS=SKY.STELLAR_KEYS;
+var STELLAR_LABELS=SKY.STELLAR_LABELS;
+var STELLAR_CONS=SKY.STELLAR_CONS;
+var CONS_LABELS=SKY.CONS_LABELS;
 /* Interactive stars per constellation (only the ones with SFX). */
-var CONS_STARS={
-  orion:['betel','rigel'],
-  virgo:['spica'],
-  canis:['sirius'],
-  pleiades:['pleione'],
-  taurus:['aldebaran'],
-  bootes:['arcturus'],
-  scorpius:['antares']
-};
-var SIGNAL_FRAGMENTS={
-  betel:{
-    tag:'FRAGMENT // BETELGEUSE',
-    title:'Red Giant · Imminent',
-    body:'A dying sun that still sings. The pulse you hear is collapse delayed — beauty measured in centuries of afterglow.',
-    meta:['RA 05h 55m','DEC +07° 24′','SPEC M1-2 Ia','LINK · Orion belt']
-  },
-  rigel:{
-    tag:'FRAGMENT // RIGEL',
-    title:'Blue Supergiant · Anchor',
-    body:'The foot of the hunter. Cold light, deep bass — a signal that arrives after the story has already moved on.',
-    meta:['RA 05h 14m','DEC −08° 12′','SPEC B8 Ia','LINK · Saiph arc']
-  },
-  spica:{
-    tag:'FRAGMENT // SPICA',
-    title:'Binary Spike · Harvest',
-    body:'Two stars locked in a brief, bright orbit. The earthen spike of Virgo — a note that cuts clean through the dark.',
-    meta:['RA 13h 25m','DEC −11° 09′','SPEC B1 III-IV','LINK · Virgo spine']
-  },
-  sirius:{
-    tag:'FRAGMENT // SIRIUS',
-    title:'Dog Star · Brightest',
-    body:'Nearest of the great ones. Sharp, white, impossible to ignore — the observatory’s first hello from the winter sky.',
-    meta:['RA 06h 45m','DEC −16° 42′','SPEC A1 V','LINK · Canis Major']
-  },
-  pleione:{
-    tag:'FRAGMENT // PLEIONE',
-    title:'Seven Sisters · Edge',
-    body:'A soft cluster voice near Atlas. Not the brightest, but the one that answers when you lean closer to the glass.',
-    meta:['RA 03h 49m','DEC +24° 08′','SPEC B8 Vne','LINK · Pleiades']
-  },
-  aldebaran:{
-    tag:'FRAGMENT // ALDEBARAN',
-    title:'Follower · Bull’s Eye',
-    body:'Orange watchman of Taurus. It trails the Pleiades across the night — patient, warm, always one step behind the sisters.',
-    meta:['RA 04h 35m','DEC +16° 30′','SPEC K5 III','LINK · Hyades']
-  },
-  arcturus:{
-    tag:'FRAGMENT // ARCTURUS',
-    title:'Bear Guardian · Kite Tip',
-    body:'The golden tip of Boötes. Ancient light from an old disk star — a calm, amber tone over the spring fields.',
-    meta:['RA 14h 15m','DEC +19° 10′','SPEC K1.5 III','LINK · Boötes kite']
-  },
-  antares:{
-    tag:'FRAGMENT // ANTARES',
-    title:'Rival of Mars · Sting',
-    body:'Heart of the scorpion. Red against the summer haze — a rival’s name for a star that refuses to be quiet.',
-    meta:['RA 16h 29m','DEC −26° 25′','SPEC M1.5 Iab','LINK · Scorpius arc']
-  }
-};
+var CONS_STARS=SKY.CONS_STARS;
+var SIGNAL_FRAGMENTS=SKY.SIGNAL_FRAGMENTS;
 
 var StellarMem={
   observed:{},
@@ -2138,7 +1663,7 @@ var UNLOCK={
   save:function(){try{localStorage.setItem(this.storageKey,JSON.stringify({set:this.set}));}catch(e){}}
 };
 UNLOCK.load();
-var UNLOCK_CONS=['orion','virgo','canis','pleiades','taurus','bootes','scorpius'];
+var UNLOCK_CONS=SKY.UNLOCK_CONS; /* rasi yang bisa di-unlock/arsip (unlock:true di sky-data.js) */
 /* key = kunci bintang SFX ('betel', 'rigel', ...) atau id rasi ('orion', ...) */
 function isUnlocked(key){
   var cid=STELLAR_CONS[key]||key;
@@ -2192,9 +1717,10 @@ function lockedHint(key){
   }
 }
 
+function pad2(n){return (n<10?'0':'')+n;}
 function formatSrCount(){
   var n=StellarMem.count();
-  return (n<10?'0':'')+n+' <span>/ 08</span>';
+  return (n<10?'0':'')+n+' <span>/ '+pad2(STELLAR_KEYS.length)+'</span>';
 }
 function renderStellarRecord(){
   var countEl=document.getElementById('sr-count');
@@ -2203,7 +1729,7 @@ function renderStellarRecord(){
   var consEl=document.getElementById('sr-cons');
   var n=StellarMem.count();
   var nn=(n<10?'0':'')+n;
-  if(countEl)countEl.innerHTML='// <em>'+nn+'</em>/08';
+  if(countEl)countEl.innerHTML='// <em>'+nn+'</em>/'+pad2(STELLAR_KEYS.length);
   if(badge){
     badge.textContent=String(n);
     badge.setAttribute('aria-hidden',n>0?'false':'true');
@@ -2228,7 +1754,7 @@ function renderStellarRecord(){
     }
   }
   if(consEl){
-    var cids=['orion','virgo','canis','pleiades','taurus','bootes','scorpius'];
+    var cids=UNLOCK_CONS; /* baris Constellation Log = semua rasi unlock:true (urutan per sektor) */
     var html2='';
     for(var j=0;j<cids.length;j++){
       var cid=cids[j];
@@ -2334,16 +1860,13 @@ function showConsArchive(cid,mode){
 }
 function keyFromAudio(a){
   if(!a||typeof SFX==='undefined')return null;
-  if(a===SFX.betel)return 'betel';
-  if(a===SFX.rigel)return 'rigel';
-  if(a===SFX.spica)return 'spica';
-  if(a===SFX.sirius)return 'sirius';
-  if(a===SFX.pleione)return 'pleione';
-  if(a===SFX.aldebaran)return 'aldebaran';
-  if(a===SFX.arcturus)return 'arcturus';
-  if(a===SFX.antares)return 'antares';
+  for(var i=0;i<STELLAR_KEYS.length;i++)if(SFX[STELLAR_KEYS[i]]===a)return STELLAR_KEYS[i];
   return null;
 }
+/* bintang di GEOMETRY (id bintang) -> key SFX-nya, atau null. Cluster (Pleione) nggak lewat sini. */
+function starKeyOf(starId){return Object.prototype.hasOwnProperty.call(SKY.STAR_KEY,starId)?SKY.STAR_KEY[starId]:null;}
+/* SFX yang lagi dipegang -> id rasi pemiliknya (atau null). */
+function consIdFromAudio(a){var k=keyFromAudio(a);return k?TRIGGERS[k].cons:null;}
 function onStellarSignal(key){
   if(!key||STELLAR_KEYS.indexOf(key)<0)return;
   /* Observed status is set on interaction; here we only surface the fragment
@@ -2361,16 +1884,7 @@ function onStellarSignal(key){
 
 
 /* ---------- Last Signal + Observation Mode + Radio Silence ---------- */
-var LAST_SIGNAL_DATA={
-  betel:{name:'BETELGEUSE',spec:'M1-2 Ia',dist:'640 LY'},
-  rigel:{name:'RIGEL',spec:'B8 Ia',dist:'860 LY'},
-  spica:{name:'SPICA',spec:'B1 III-IV',dist:'250 LY'},
-  sirius:{name:'SIRIUS',spec:'A1 V',dist:'8.6 LY'},
-  pleione:{name:'PLEIONE',spec:'B8 Vne',dist:'440 LY'},
-  aldebaran:{name:'ALDEBARAN',spec:'K5 III',dist:'65 LY'},
-  arcturus:{name:'ARCTURUS',spec:'K1.5 III',dist:'37 LY'},
-  antares:{name:'ANTARES',spec:'M1.5 Iab',dist:'550 LY'}
-};
+var LAST_SIGNAL_DATA=SKY.LAST_SIGNAL_DATA;
 var OBSERVE_MODE=false;
 var RADIO_SILENCE=false;
 var lastSignalKey=null;
@@ -2722,6 +2236,7 @@ function alignTapStar(c,starKey){
   if(!CAMERA_MODE)return false;                       /* alignment cuma di mode kamera */
   var ch=pleChainTap(c,starKey);                      /* chain lintas sektor Pleiades */
   if(ch)return ch;
+  if(UNLOCK_CONS.indexOf(c.id)<0)return false;        /* rasi tanpa SFX / belum unlock:true (mis. Gemini) nggak bisa di-alignment */
   if(isUnlocked(c.id))return false;                   /* sudah unlocked: nggak ada hint kuning / toast / dimming lagi */
   if(camFocusId()!==c.id)return false;                /* kamera harus lagi fokus di rasi ini */
   var seq=alignmentSequence(c);if(!seq.length)return false;
@@ -2846,17 +2361,10 @@ function resetSweep(id){
 }
 function playingConstellationId(){
   if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.paused||activeSfx.ended)return null;
-  if(activeSfx===SFX.betel||activeSfx===SFX.rigel)return 'orion';
-  if(activeSfx===SFX.spica)return 'virgo';
-  if(activeSfx===SFX.sirius)return 'canis';
-  if(activeSfx===SFX.pleione)return 'pleiades';
-  if(activeSfx===SFX.aldebaran)return 'taurus';
-  if(activeSfx===SFX.arcturus)return 'bootes';
-  if(activeSfx===SFX.antares)return 'scorpius';
-  return null;
+  return consIdFromAudio(activeSfx);
 }
 /* Nama track Stellar Signals yang lagi bunyi (sama dengan nama di panel musik), atau null kalau nggak ada. */
-var SIGNAL_NAMES={betel:'betelgeuse',rigel:'rigel',spica:'spica',sirius:'sirius',pleione:'pleione',aldebaran:'aldebaran',arcturus:'arcturus',antares:'antares'};
+var SIGNAL_NAMES=SKY.SIGNAL_NAMES; /* key -> nama track di panel musik (dari sky-data.js) */
 function playingSignalName(){
   if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.paused||activeSfx.ended)return null;
   return SIGNAL_NAMES[keyFromAudio(activeSfx)]||null;
@@ -3322,22 +2830,9 @@ function layout(){
      Size kept comparable to Orion / Virgo. */
   /* Taurus: mid-left lower (horns left, tail right) — Hyades LOCK coords scaled into box. */
   /* 4-Zone Landscape Layout Optimization */
-  var boxes=portrait
-    ?{canis:[W*.04,top+ah*.14,W*.18,top+ah*.32],
-      virgo:[W*.52,top+ah*.72,W*.82,bot-34],
-      orion:[W*.32,top-ah*.02,W*.64,top+ah*.32],
-      taurus:[W*.12,top+ah*.64,W*.42,top+ah*.92],
-      /* Scorpius top-right of Orion. Boötes = smaller kite, shifted further down. */
-      bootes:[W*.78,top+ah*.52,W*.90,top+ah*.66],
-      scorpius:[W*.76,top+ah*.05,W*.88,top+ah*.28]}
-    :{canis:[W*.02,top+ah*.08,W*.10,top+ah*.34],
-      taurus:[W*.02,top+ah*.48,W*.15,bot-28],
-      orion:[W*.22,top+ah*.02,W*.37,bot-12],
-      virgo:[W*.72,top+ah*.08,W*.96,bot-12],
-      /* Boötes smaller + shifted further down, clear of BH column and Virgo. */
-      bootes:[W*.62,top+ah*.18,W*.70,top+ah*.38],
-      /* Scorpius left of centre but outside strong BH lens zone. */
-      scorpius:[W*.34,top+ah*.12,W*.42,top+ah*.44]};
+  /* Kotak layout tiap rasi [x0,y0,x1,y1] — datanya di sky-data.js (RASI[].box.portrait / .land). */
+  var boxes={};
+  SKY.rasi.forEach(function(r){if(r.box)boxes[r.id]=(portrait?r.box.portrait:r.box.land)(W,top,ah,bot);});
   CONS.forEach(function(c){
     var b=boxes[c.id],bw=b[2]-b[0],bh=b[3]-b[1],sc=Math.min(bw/c.bw,bh/c.bh);
     var x0=b[0]+(bw-c.bw*sc)/2,y0=b[1]+(bh-c.bh*sc)/2;
@@ -3352,13 +2847,11 @@ function layout(){
      Orion, Taurus, Canis Major dipasang lewat transformasi kesamaan (geser + putar + skala seragam) => BENTUK rasi tidak berubah,
      cuma posisi & rotasinya. Garis lurus alignment: Sirius -> sabuk Orion -> Aldebaran -> Pleiades.
      Koordinat scene = peta bintang referensi (kira-kira 1000x830, y ke bawah), lalu di-fit ke layar. */
+  /* Komposisi sektor Orion: rasi yang punya `scene` di sky-data.js (yang off tidak ikut menentukan skala fit layar). */
   var SCN=(function(){
     var D=Math.PI/180,
-        def={/* Orion diputar -29.85° mengelilingi Alnilam (pv/at): sabuk sejajar garis Sirius→Aldebaran, Alnilam tetap di garis */
-             orion:{k:.7738,th:-23.84,pv:[492,651],at:[299.86,647.23]},
-             taurus:{k:.7241,th:5.3,tx:312.95,ty:-58.3},
-             canis:{k:.5417,th:4,pv:[445,316],at:[3.05,938.8]}},
-        PC=[745.1,209.9],PS=75,ids=['orion','taurus','canis'],pts=[],i,j,k2,c,f,p,st;
+        def=(function(){var d={};SKY.rasi.forEach(function(r){if(r.scene)d[r.id]=r.scene;});return d;})(), /* transformasi tiap rasi: `scene` di sky-data.js */
+        PC=[745.1,209.9],PS=75,ids=SKY.rasi.filter(function(r){return r.scene&&!CONS_OFF[r.id];}).map(function(r){return r.id;}),pts=[],i,j,k2,c,f,p,st;
     function mk(d){
       var cs=Math.cos(d.th*D)*d.k,sn=Math.sin(d.th*D)*d.k,tx=d.tx,ty=d.ty;
       if(d.pv){tx=d.at[0]-(cs*d.pv[0]-sn*d.pv[1]);ty=d.at[1]-(sn*d.pv[0]+cs*d.pv[1]);}
@@ -3417,7 +2910,7 @@ function layout(){
     for(var pass=0;pass<6;pass++){
       var moved=false;
       for(var id in boxes){
-        if(allowIds.indexOf(id)!==-1)continue;
+        if(allowIds.indexOf(id)!==-1||CONS_OFF[id])continue; /* off:true di sky-data.js */
         var b=boxes[id];
         if(!boxesOverlap(rect.minX,rect.maxX,rect.minY,rect.maxY,b))continue;
         var ox=Math.min(rect.maxX,b[2])-Math.max(rect.minX,b[0]);
@@ -3444,7 +2937,7 @@ function layout(){
     var tries=0;
     while(tries<6){
       var nMinX=minX+dx,nMaxX=maxX+dx,nMinY=minY+dy,nMaxY=maxY+dy,hit=false;
-      for(var id in boxes){if(id===skipId)continue;if(boxesOverlap(nMinX,nMaxX,nMinY,nMaxY,boxes[id])){hit=true;break;}}
+      for(var id in boxes){if(id===skipId||CONS_OFF[id])continue; /* off:true di sky-data.js */if(boxesOverlap(nMinX,nMaxX,nMinY,nMaxY,boxes[id])){hit=true;break;}}
       if(!hit)break;
       dx*=.55;dy*=.55;tries++;
     }
@@ -3523,11 +3016,11 @@ function layout(){
     var cpv=c2v(12,STG.ih-30);
     clk.style.transform='translate('+Math.round(cpv[0])+'px,'+Math.round(cpv[1])+'px) rotate('+(STG.rot<0?90:-90)+'deg)';
   }else clk.style.transform='translate(calc(14px + env(safe-area-inset-left,0px)),'+Math.round(ft2.top-26)+'px)';
-  var o=cons('orion'),v=cons('virgo'),cm=cons('canis'),tau=cons('taurus');
-  CAPS.orion.style.transform='translate('+Math.round((o.minX+o.maxX)/2-30)+'px,'+Math.round(o.maxY+22)+'px)'+STG.up;
-  CAPS.virgo.style.transform='translate('+Math.round(v.maxX-42)+'px,'+Math.round(v.minY-24)+'px)'+STG.up;
-  CAPS.canis.style.transform='translate('+Math.round((cm.minX+cm.maxX)/2-48)+'px,'+Math.round(cm.maxY+18)+'px)'+STG.up;
-  if(tau&&CAPS.taurus)CAPS.taurus.style.transform='translate('+Math.round((tau.minX+tau.maxX)/2-28)+'px,'+Math.round(tau.maxY+18)+'px)'+STG.up;
+  SKY.rasi.forEach(function(r){ /* caption rasi: posisi dari `cap` {x:'mid'|'right', dx, y:'bottom'|'top', dy} di sky-data.js */
+    var cp=r.cap,el=cp&&CAPS[r.id],c=cp&&cons(r.id);if(!el||!c)return;
+    var x=(cp.x==='right'?c.maxX:(c.minX+c.maxX)/2)+cp.dx,y=(cp.y==='top'?c.minY:c.maxY)+cp.dy;
+    el.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px)'+STG.up;
+  });
   if(!drag.on){
     if(SECT.cur&&SUM.on){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
     else{BH.x=BH.hx;BH.y=BH.hy;}
@@ -3542,40 +3035,7 @@ function layout(){
   var bhp=camBH();
   bhEl.style.transform='translate('+Math.round(bhp[0]-BH.R*8)+'px,'+Math.round(bhp[1]-BH.R*5)+'px)';
   CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
-  var rg=cons('orion').stars.rigel,rfx=$('#rigel-fx');
-  rfx.style.width=rfx.style.height='52px';rfx.style.marginLeft=rfx.style.marginTop='-26px';
-  rfx.style.transform='translate('+Math.round(rg.x+skyPan.x)+'px,'+Math.round(rg.y+skyPan.y)+'px)';
-  var bt=cons('orion').stars.betel,btx=$('#betel-fx');
-  btx.style.transform='translate('+Math.round(bt.x+skyPan.x)+'px,'+Math.round(bt.y+skyPan.y)+'px)';
-  var sr=cons('canis').stars.sirius,sfx=$('#sirius-fx');
-  sfx.style.width=sfx.style.height='52px';sfx.style.marginLeft=sfx.style.marginTop='-26px';
-  sfx.style.transform='translate('+Math.round(sr.x+skyPan.x)+'px,'+Math.round(sr.y+skyPan.y)+'px)';
-  var ad=cons('taurus')&&cons('taurus').stars.aldebaran,afx=$('#aldebaran-fx');
-  if(ad&&afx){
-    afx.style.width=afx.style.height='52px';afx.style.marginLeft=afx.style.marginTop='-26px';
-    afx.style.transform='translate('+Math.round(ad.x+skyPan.x)+'px,'+Math.round(ad.y+skyPan.y)+'px)';
-  }
-  var arc=cons('bootes')&&cons('bootes').stars.arcturus,arcFx=$('#arcturus-fx');
-  if(arc&&arcFx){
-    arcFx.style.width=arcFx.style.height='52px';arcFx.style.marginLeft=arcFx.style.marginTop='-26px';
-    arcFx.style.transform='translate('+Math.round(arc.x+skyPan.x)+'px,'+Math.round(arc.y+skyPan.y)+'px)';
-  }
-  var ant=cons('scorpius')&&cons('scorpius').stars.antares,antFx=$('#antares-fx');
-  if(ant&&antFx){
-    antFx.style.width=antFx.style.height='52px';antFx.style.marginLeft=antFx.style.marginTop='-26px';
-    antFx.style.transform='translate('+Math.round(ant.x+skyPan.x)+'px,'+Math.round(ant.y+skyPan.y)+'px)';
-  }
-  /* Dedicated DOM hit target for Pleione — same reliability as Rigel/Betel/Sirius. */
-  var pfx=$('#pleione-fx');
-  if(pfx&&PLEIADES.ready){
-    var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y;
-    var pl=PLEIADES.bright.filter(function(z){return z.interactive;})[0];
-    if(pl){
-      var px=PLEIADES.x+pl.x*PLEIADES.scale+ox,py=PLEIADES.y+pl.y*PLEIADES.scale+oy;
-      pfx.style.width=pfx.style.height='52px';pfx.style.marginLeft=pfx.style.marginTop='-26px';
-      pfx.style.transform='translate('+Math.round(px)+'px,'+Math.round(py)+'px)';
-    }
-  }
+  fxPlace(false); /* tombol hit bintang SFX (layout awal) */
   buildSprite();
   PORTALS.forEach(function(p){
     var s=p.c.stars[p.from];
@@ -5211,30 +4671,14 @@ function drawHyperspaceWarp(now){
 }
 
 /* ---------- [FITUR 4] Tactical Target Lock Reticle + Data Astronomi ---------- */
-var STAR_DATA = {
-  betel: { name: "BETELGEUSE", dist: "642 LY", spec: "M1-M2Ia", mag: "0.50", ra: "05h 55m", dec: "+07°24′" },
-  rigel: { name: "RIGEL", dist: "860 LY", spec: "B8Ia", mag: "0.13", ra: "05h 14m", dec: "-08°12′" },
-  sirius: { name: "SIRIUS", dist: "8.6 LY", spec: "A1V", mag: "-1.46", ra: "06h 45m", dec: "-16°42′" },
-  spica: { name: "SPICA", dist: "250 LY", spec: "B1III", mag: "0.98", ra: "13h 25m", dec: "-11°10′" },
-  pleione: { name: "PLEIONE", dist: "380 LY", spec: "B8ne", mag: "5.05", ra: "03h 49m", dec: "+24°08′" },
-  aldebaran: { name: "ALDEBARAN", dist: "65 LY", spec: "K5III", mag: "0.85", ra: "04h 35m", dec: "+16°30′" },
-  arcturus: { name: "ARCTURUS", dist: "36.7 LY", spec: "K1.5III", mag: "-0.05", ra: "14h 15m", dec: "+19°10′" },
-  antares: { name: "ANTARES", dist: "550 LY", spec: "M1.5Iab", mag: "1.06", ra: "16h 29m", dec: "-26°25′" }
-};
+var STAR_DATA = SKY.STAR_DATA;
 
 function drawTargetLock(now){
   if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)return;
   if(reduce || SW) return;
   var activeKey = null;
   if(activeSfx && !activeSfx.paused && !activeSfx.ended){
-    if(activeSfx === SFX.betel) activeKey = 'betel';
-    else if(activeSfx === SFX.rigel) activeKey = 'rigel';
-    else if(activeSfx === SFX.sirius) activeKey = 'sirius';
-    else if(activeSfx === SFX.spica) activeKey = 'spica';
-    else if(activeSfx === SFX.pleione) activeKey = 'pleione';
-    else if(activeSfx === SFX.aldebaran) activeKey = 'aldebaran';
-    else if(activeSfx === SFX.arcturus) activeKey = 'arcturus';
-    else if(activeSfx === SFX.antares) activeKey = 'antares';
+    activeKey = keyFromAudio(activeSfx);
   } else if(hot && STAR_DATA[hot]){
     activeKey = hot;
   }
@@ -5714,7 +5158,7 @@ function drawStars(c,age,now){
   var focus=constellationFocus(c);
   Object.keys(c.stars).forEach(function(k){
     var s=c.stars[k],a=clamp((age-s.t0)/.5);s._a=a;if(a<=0)return;
-    var triggerKey=(k==='betel'?'betel':(k==='rigel'?'rigel':(k==='spica'?'spica':(k==='sirius'?'sirius':(k==='aldebaran'?'aldebaran':(k==='arcturus'?'arcturus':(k==='antares'?'antares':null)))))));
+    var triggerKey=starKeyOf(k);
     var tr=triggerKey?TRIGGERS[triggerKey]:null;
     var isPlaying=!!(tr&&activeSfx===SFX[triggerKey]&&!SFX[triggerKey].paused);
     var cheap=audioFocus&&!isPlaying;
@@ -6208,16 +5652,14 @@ function ofxDuckRelease(){}
    Idle = satu ikon gugus per sektor mengelilingi Gargantua (sektor 0, tengah). Ikon digambar lewat gSky(),
    jadi tetap kena lensing / drag / swallow Gargantua. Sektor kosong = "???" (belum diisi).
    Tap ikon terisi -> sementara masuk ke tampilan rasi lama (placeholder zoom, fase 2). Tombol ◎ = balik ke overview. */
-var SECT={on:true,vis:1,phase:'ov',cur:null,busy:false,z:0,t0:0,zt:2.4,dur:950,flash:0,list:[
-  {k:'orion',name:'Orion',ids:['orion','taurus','canis','pleiades'],a:-150},
-  {k:'virgo',name:'Virgo',ids:['virgo','bootes'],a:-30},
-  {k:'summer',name:'Summer',ids:['scorpius'],a:150},{name:'???',ids:[],a:30}   /* 03 = kiri-bawah, 04 = kanan-bawah (portal atas/bawah BH dihapus) */
-],down:null};
+/* Sektor (4 sektor musim) + rasi tiap sektor: dari sky-data.js (SECTORS + RASI[].sector). list[].ids = rasi AKTIF (juga hitungan 💫N di overview). */
+var SECT={on:true,vis:1,phase:'ov',cur:null,busy:false,z:0,t0:0,zt:2.4,dur:950,flash:0,list:SKY.sectors,down:null};
 function sectSet(on){
   SECT.on=!!on;
   try{var bc=document.body.classList;bc.toggle('sect-ov',SECT.on);
     bc.toggle('sect-in',!SECT.on&&!!SECT.cur);
-    bc.toggle('sect-in-orion',!SECT.on&&!!SECT.cur&&SECT.cur.k==='orion');bc.toggle('sect-in-virgo',!SECT.on&&!!SECT.cur&&SECT.cur.k==='virgo');bc.toggle('sect-in-summer',!SECT.on&&!!SECT.cur&&SECT.cur.k==='summer');}catch(e){}
+    for(var si=0;si<SECT.list.length;si++)bc.toggle('sect-in-'+SECT.list[si].k,!SECT.on&&SECT.cur===SECT.list[si]);
+    fxSectSync();}catch(e){}
   try{var ob=document.getElementById('mode-observe');if(ob)ob.textContent=observeIcon();}catch(eO){}
   if(SECT.on){try{syncSkyPanHits();}catch(e){}}
 }
@@ -6248,15 +5690,7 @@ function drawGlyphSprite(id,cx,cy,box,al){
 /* Rasi dari track yang lagi "dimuat" (main ATAU pause) sampai track habis / diganti / distop. */
 function trackConsId(){
   if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.ended)return null;
-  var a=activeSfx;
-  if(a===SFX.betel||a===SFX.rigel)return 'orion';
-  if(a===SFX.spica)return 'virgo';
-  if(a===SFX.sirius)return 'canis';
-  if(a===SFX.pleione)return 'pleiades';
-  if(a===SFX.aldebaran)return 'taurus';
-  if(a===SFX.arcturus)return 'bootes';
-  if(a===SFX.antares)return 'scorpius';
-  return null;
+  return consIdFromAudio(activeSfx);
 }
 /* Pleiades bukan CONS (nggak punya garis), jadi glyph-nya cuma titik-titik cluster. */
 function sectGlyphAny(id,cx,cy,box,al){
@@ -6284,7 +5718,8 @@ function sectGlyph(c,cx,cy,box,al){
   for(k in c.stars){var s=c.stars[k];if(s.rx==null)continue;
     g.beginPath();g.arc(ox+(s.rx-c.minx)*sc,oy+(s.ry-c.miny)*sc,Math.max(.8,(s.r||1.3)*.5),0,6.283);g.fill();}
 }
-function sectShow(id){return !SECT.cur||SECT.cur.ids.indexOf(id)>=0;}
+/* sectShow = gerbang gambar + hit-test + kamera. Rasi di CONS_OFF (off:true di sky-data.js) selalu false. */
+function sectShow(id){return !CONS_OFF[id]&&(!SECT.cur||SECT.cur.ids.indexOf(id)>=0);}
 function sectEase(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
 /* Transform zoom ke ikon: titik P (dunia) -> tengah layar. pan = (pusat - P)*u, zoom = 1+u*(zt-1). */
 function sectApply(s,u){
@@ -6815,24 +6250,47 @@ var SN_COOLDOWN={};
   var nowEl=$('#mp-now-playing');
   if(!panel||!toggle||!close||!playBtn)return;
 
-  /* Unified track list: the 8 Stellar Signals (star SFX) in A-Z order,
-     followed by the 2 Observatory BGM loops. The order must match the HTML. */
-  var tracks=[
-    {type:'sfx',key:'aldebaran',name:'aldebaran',audio:SFX.aldebaran},
-    {type:'sfx',key:'antares',name:'antares',audio:SFX.antares},
-    {type:'sfx',key:'arcturus',name:'arcturus',audio:SFX.arcturus},
-    {type:'sfx',key:'betel',name:'betelgeuse',audio:SFX.betel},
-    {type:'sfx',key:'pleione',name:'pleione',audio:SFX.pleione},
-    {type:'sfx',key:'rigel',name:'rigel',audio:SFX.rigel},
-    {type:'sfx',key:'sirius',name:'sirius',audio:SFX.sirius},
-    {type:'sfx',key:'spica',name:'spica',audio:SFX.spica},
-    {type:'bgm',index:0,name:'constellation',audio:AMB},
-    {type:'bgm',index:1,name:'collapsars',audio:MUSIC_COLLAP}
-  ];
+  /* Daftar track dibangun dari registry (sky-data.js -> SKY.panelGroups): SEMUA SFX selalu ada di panel (relay butuh itu),
+     dikelompokkan accordion per sektor, lalu BGM. Urutan `tracks` = urutan baris DOM (kontrak: index = index baris). */
+  var tracks=[],SPEC='<span class="mp-spec" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mp-state" aria-hidden="true">\u25CF</span>';
+  var grpEl=document.getElementById('mp-sfx-groups'),bgmEl=document.getElementById('mp-bgm-tracks'),groups=[];
+  function trackRow(n,name,attrs,obs){
+    return '<button class="mp-track" type="button" '+attrs+'><span class="mp-num">'+pad2(n)+'</span><span class="mp-name">'+name+'</span>'+(obs?'<span class="mp-obs" aria-hidden="true" title="Unobserved">\u25CB</span>':'')+SPEC+'</button>';
+  }
+  if(grpEl){
+    var html='',n=0;
+    SKY.panelGroups().forEach(function(g){
+      if(!g.sfx.length)return; /* sektor belum punya SFX: belum tampil */
+      var rowsH='';
+      g.sfx.forEach(function(s){
+        n++;tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
+        rowsH+=trackRow(n,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
+      });
+      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-no">'+pad2(g.no)+'</span><span class="mp-grp-name">'+g.season+' \u00B7 '+g.title+'</span><span class="mp-grp-n">'+g.sfx.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
+    });
+    grpEl.innerHTML=html;
+  }
+  var SFX_N=tracks.length; /* BGM mulai di index ini */
+  var BGM=[{index:0,name:'constellation',audio:AMB},{index:1,name:'collapsars',audio:MUSIC_COLLAP}];
+  BGM.forEach(function(t,i){tracks.push({type:'bgm',index:t.index,name:t.name,audio:t.audio});});
+  if(bgmEl)bgmEl.innerHTML=BGM.map(function(t,i){return '<button class="mp-track'+(i===0?' active':'')+'" type="button" data-type="bgm" data-index="'+t.index+'"><span class="mp-num">'+pad2(i+1)+'</span><span class="mp-name">'+t.name+'</span>'+SPEC+'</button>';}).join('');
+  /* accordion: satu sektor terbuka; sektor yang lagi dibuka di peta (atau yang memuat lagu aktif) ikut terbuka saat panel dibuka */
+  groups=[].slice.call(panel.querySelectorAll('.mp-grp'));
+  function grpOpen(g,on){g.classList.toggle('open',on);g.querySelector('.mp-grp-head').setAttribute('aria-expanded',on?'true':'false');}
+  function grpFocus(k){
+    var hit=false;groups.forEach(function(g){var o=g.getAttribute('data-sector')===k;if(o)hit=true;grpOpen(g,o);});
+    if(!hit&&groups[0])grpOpen(groups[0],true);
+  }
+  groups.forEach(function(g){g.querySelector('.mp-grp-head').addEventListener('click',function(){var on=!g.classList.contains('open');groups.forEach(function(o){grpOpen(o,false);});grpOpen(g,on);});}); /* satu sektor terbuka sekali waktu */
+  toggle.addEventListener('click',function(){
+    if(panel.classList.contains('open'))return;
+    grpFocus(!SECT.on&&SECT.cur?SECT.cur.k:(SECT.cur&&SECT.cur.k)||null);
+  },true);
+  grpFocus(null);
 
   var rows=[].slice.call(panel.querySelectorAll('.mp-track'));
   var trackNames=tracks.map(function(t){return t.name;});
-  var activeIdx=8; /* default highlighted row: Constellation BGM */
+  var activeIdx=SFX_N; /* default highlighted row: Constellation BGM */
   var specRAF=0;
   var nowTimer=0;
   var nowPhase=''; /* '' | 'show' | 'absorb' */
@@ -6914,7 +6372,7 @@ var SN_COOLDOWN={};
   function msStepBgm(){
     var cur=getPlayingTrackIndex();
     if(cur===-1)cur=activeIdx;
-    selectAndPlay(cur===8?9:8);
+    selectAndPlay(cur===SFX_N?SFX_N+1:SFX_N);
   }
   if(MS){
     try{
@@ -7218,12 +6676,12 @@ function updateHover(px,py){
       if(d<5&&d<best){best=d;hit={c:c,line:i};}
     });
   });
-  if(hit){hot=hit.star==='betel'?'betel':(hit.star==='rigel'?'rigel':(hit.star==='spica'?'spica':(hit.star==='sirius'?'sirius':(hit.star==='aldebaran'?'aldebaran':(hit.star==='arcturus'?'arcturus':(hit.star==='antares'?'antares':hot))))));if(hit.line!=null)hit.c._hot=hit.line;}
-  else if(hot!=='bh'&&hot!=='spica'&&hot!=='rigel'&&hot!=='betel'&&hot!=='sirius'&&hot!=='aldebaran'&&hot!=='arcturus'&&hot!=='antares')hot=null;
+  if(hit){hot=starKeyOf(hit.star)||hot;if(hit.line!=null)hit.c._hot=hit.line;}
+  else if(hot!=='bh'&&!starKeyOf(hot))hot=null;
 }
 document.addEventListener('pointerdown',function(e){
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return;
-  if(SECT.on||SW||drag.on||e.target.closest('#betel-fx,#rigel-fx,#sirius-fx,#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
+  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
   /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
@@ -7387,6 +6845,7 @@ function constellationTargetAt(x,y,skipTelescope){
   var found=false;
   if(pleiadesHitAt(x,y))found=true;
   CONS.forEach(function(c){
+    if(CONS_OFF[c.id])return; /* rasi off:true tidak jadi target */
     Object.keys(c.stars).forEach(function(k){
       /* skyXF first (mobile 2-finger rotate), then the gravity lens - same
          order drawStars() uses via gSky - or this misses every star once
@@ -7405,7 +6864,7 @@ function beginBHDrag(e){
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest && e.target.closest('#rigel-fx,#betel-fx,#sirius-fx,.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -7468,43 +6927,34 @@ function skyHitXY(x,y){
      still had its invisible tap target sitting at the un-lensed spot. */
   return gSky(x+skyPan.x,y+skyPan.y);
 }
+/* Posisi bintang SFX di koordinat sky (cluster = bintang interaktif Pleiades), atau null kalau belum siap. */
+function fxBase(d){
+  var r=SKY.rasiBy[d.cons];
+  if(r&&r.cluster){
+    if(!PLEIADES.ready)return null;
+    var pl=PLEIADES.bright.filter(function(z){return z.interactive;})[0];
+    return pl?[PLEIADES.x+pl.x*PLEIADES.scale+mouse.x*1.4,PLEIADES.y+pl.y*PLEIADES.scale+mouse.y*1.0]:null;
+  }
+  var c=cons(d.cons),st=c&&c.stars&&c.stars[d.star];
+  return st?[st.x,st.y]:null;
+}
+/* Taruh semua tombol #<key>-fx di atas bintangnya. hit=true: ikut lensing (skyHitXY); false: layout awal (+skyPan). */
+function fxPlace(hit){
+  for(var i=0;i<SKY.FX_KEYS.length;i++){
+    var key=SKY.FX_KEYS[i],el=FXBTN[key],p=el&&fxBase(SKY.sfxBy[key]);
+    if(!p)continue;
+    var q=hit?skyHitXY(p[0],p[1]):[p[0]+skyPan.x,p[1]+skyPan.y];
+    el.style.transform='translate('+Math.round(q[0])+'px,'+Math.round(q[1])+'px)';
+  }
+}
+/* Sembunyikan tombol bintang yang bukan milik sektor yang lagi dibuka. */
+function fxSectSync(){
+  var inS=!SECT.on&&!!SECT.cur;
+  for(var key in FXBTN)FXBTN[key].classList.toggle('fx-other',inS&&SECT.cur.ids.indexOf(SKY.sfxBy[key].cons)<0);
+}
 function syncSkyPanHits(){
   try{
-    var o=cons('orion'),cm=cons('canis');
-    if(o&&o.stars){
-      var rg=o.stars.rigel,bt=o.stars.betel;
-      if(rg){var rfx=$('#rigel-fx'),p=skyHitXY(rg.x,rg.y);if(rfx)rfx.style.transform='translate('+Math.round(p[0])+'px,'+Math.round(p[1])+'px)';}
-      if(bt){var btx=$('#betel-fx'),p2=skyHitXY(bt.x,bt.y);if(btx)btx.style.transform='translate('+Math.round(p2[0])+'px,'+Math.round(p2[1])+'px)';}
-    }
-    if(cm&&cm.stars&&cm.stars.sirius){
-      var sfx=$('#sirius-fx'),p3=skyHitXY(cm.stars.sirius.x,cm.stars.sirius.y);
-      if(sfx)sfx.style.transform='translate('+Math.round(p3[0])+'px,'+Math.round(p3[1])+'px)';
-    }
-    var tau=cons('taurus');
-    if(tau&&tau.stars&&tau.stars.aldebaran){
-      var afx=$('#aldebaran-fx'),pAd=skyHitXY(tau.stars.aldebaran.x,tau.stars.aldebaran.y);
-      if(afx)afx.style.transform='translate('+Math.round(pAd[0])+'px,'+Math.round(pAd[1])+'px)';
-    }
-    var bo=cons('bootes');
-    if(bo&&bo.stars&&bo.stars.arcturus){
-      var arcFx=$('#arcturus-fx'),pArc=skyHitXY(bo.stars.arcturus.x,bo.stars.arcturus.y);
-      if(arcFx)arcFx.style.transform='translate('+Math.round(pArc[0])+'px,'+Math.round(pArc[1])+'px)';
-    }
-    var sc=cons('scorpius');
-    if(sc&&sc.stars&&sc.stars.antares){
-      var antFx=$('#antares-fx'),pAnt=skyHitXY(sc.stars.antares.x,sc.stars.antares.y);
-      if(antFx)antFx.style.transform='translate('+Math.round(pAnt[0])+'px,'+Math.round(pAnt[1])+'px)';
-    }
-    if(PLEIADES.ready){
-      var pl=PLEIADES.bright.filter(function(z){return z.interactive;})[0];
-      var pfx=$('#pleione-fx');
-      if(pl&&pfx){
-        var px=PLEIADES.x+pl.x*PLEIADES.scale+mouse.x*1.4;
-        var py=PLEIADES.y+pl.y*PLEIADES.scale+mouse.y*1.0;
-        var p4=skyHitXY(px,py);
-        pfx.style.transform='translate('+Math.round(p4[0])+'px,'+Math.round(p4[1])+'px)';
-      }
-    }
+    fxPlace(true); /* tombol hit bintang SFX ikut pan/zoom/lensing */
   }catch(err){
     /* Silently dropping this would leave the invisible rigel/betel/sirius/
        aldebaran/pleione hit targets stuck at their pre-rotation position with
@@ -7532,7 +6982,7 @@ function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest&&e.target.closest('#rigel-fx,#betel-fx,#terminal,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -7623,45 +7073,13 @@ document.addEventListener('wheel',function(e){
   stepSkyZoom(e.deltaY<0?1:-1);
 },{passive:false});
 
-var rgFx=$('#rigel-fx');
-rgFx.addEventListener('mouseenter',function(){hot='rigel';});
-rgFx.addEventListener('mouseleave',function(){if(hot==='rigel')hot=null;});
-rgFx.addEventListener('click',function(){fxTap('rigel');});
-
-var btFx=$('#betel-fx');
-btFx.addEventListener('mouseenter',function(){hot='betel';});
-btFx.addEventListener('mouseleave',function(){if(hot==='betel')hot=null;});
-btFx.addEventListener('click',function(){fxTap('betel');});
-
-var srFx=$('#sirius-fx');
-srFx.addEventListener('mouseenter',function(){hot='sirius';});
-srFx.addEventListener('mouseleave',function(){if(hot==='sirius')hot=null;});
-srFx.addEventListener('click',function(){fxTap('sirius');});
-
-var plFx=$('#pleione-fx');
-if(plFx){
-  plFx.addEventListener('mouseenter',function(){hot='pleione';});
-  plFx.addEventListener('mouseleave',function(){if(hot==='pleione')hot=null;});
-  plFx.addEventListener('click',function(){fxTap('pleione');});
-}
-var adFx=$('#aldebaran-fx');
-if(adFx){
-  adFx.addEventListener('mouseenter',function(){hot='aldebaran';});
-  adFx.addEventListener('mouseleave',function(){if(hot==='aldebaran')hot=null;});
-  adFx.addEventListener('click',function(){fxTap('aldebaran');});
-}
-var arcFx=$('#arcturus-fx');
-if(arcFx){
-  arcFx.addEventListener('mouseenter',function(){hot='arcturus';});
-  arcFx.addEventListener('mouseleave',function(){if(hot==='arcturus')hot=null;});
-  arcFx.addEventListener('click',function(){fxTap('arcturus');});
-}
-var antFx=$('#antares-fx');
-if(antFx){
-  antFx.addEventListener('mouseenter',function(){hot='antares';});
-  antFx.addEventListener('mouseleave',function(){if(hot==='antares')hot=null;});
-  antFx.addEventListener('click',function(){fxTap('antares');});
-}
+/* Listener hover/klik tombol bintang SFX (semua dari registry). */
+SKY.FX_KEYS.forEach(function(key){
+  var el=FXBTN[key];if(!el)return;
+  el.addEventListener('mouseenter',function(){hot=key;});
+  el.addEventListener('mouseleave',function(){if(hot===key)hot=null;});
+  el.addEventListener('click',function(){fxTap(key);});
+});
 
 /* ---------- easter eggs ---------- */
 /* ---------- Konami comet: satu komet pecah jadi dua (biru + merah), ekor panjang berhias aurora ----------
@@ -7877,7 +7295,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '#rigel-fx,#betel-fx,#sirius-fx,#pleione-fx,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
@@ -7931,28 +7349,9 @@ if(window.PointerEvent){
    corruption meter (makin sering dibuka makin aneh), varian konteks (Observe Mode / rasi aktif).
    Semua lokal, tanpa tracking server. */
 var TERM_KEY='dumul_term_v1',TERM_ST=null,TERM_RUN=false,TERM_OBS_AT=0,TERM_FOCUS=null,TERM_T=[];
-var TERM_DIST={orion:1344,virgo:250,canis:9,pleiades:444,taurus:65,bootes:37,scorpius:550};
-var TERM_POOL=[
- ['SYSTEM','waking dormant process...'],['SYSTEM','render loop attached'],['SYSTEM','clock source: UTC'],
- ['SYSTEM','checksum ....... unverified'],['SYSTEM','heartbeat irregular'],['SYSTEM','sky_cache rebuilt'],
- ['SYSTEM','buffer drained, nothing lost'],['SYSTEM','no operator on record'],
- ['OBSERVER','presence detected'],['OBSERVER','gaze vector: undefined'],['OBSERVER','observer count: 1 (assumed)'],
- ['OBSERVER','input device: finger'],['OBSERVER','you are reading this'],['OBSERVER','attention: unmeasured'],
- ['OBSERVER','observer is also being logged'],['OBSERVER','blink rate: unknown'],
- ['MEMORY','fragment found'],['MEMORY','fragment unreadable'],['MEMORY','index rebuilt, 1 entry missing'],
- ['MEMORY','recalled: someone, not here'],['MEMORY','read error at sector 0x4C'],['MEMORY','cache is older than system'],
- ['MEMORY','overwritten by itself'],['MEMORY','restoring... restoring...'],
- ['CAUSALITY','waiting...'],['CAUSALITY','effect precedes cause (minor)'],['CAUSALITY','event order: disputed'],
- ['CAUSALITY','causal map ...... PARTIAL'],['CAUSALITY','which came first: the click?'],
- ['CAUSALITY','no cause found for this log'],['CAUSALITY','timeline branch merged silently'],['CAUSALITY','reason pending'],
- ['ANOMALY','telemetry stable, source unknown'],['ANOMALY','star count off by one'],['ANOMALY','light arrived before it left'],
- ['ANOMALY','signal older than the sender'],['ANOMALY','ghost frame detected'],['ANOMALY','something moved. it was you.'],
- ['ANOMALY','noise floor is listening'],['ANOMALY','subject/object ... NOT FOUND'],
- ['OWL','owl.sys ........ ACTIVE'],['OWL','unregistered process: owl'],['OWL','perched, not parsed'],['OWL','owl.sys has never crashed'],
- ['DUMUL','dumul.core ..... RESIDENT'],['DUMUL','playback head: elsewhere'],['DUMUL','with you / without you: both true'],
- ['DUMUL','signal gap: one voice missing'],['DUMUL','glitch is not a bug. glitch is a track.'],['DUMUL','limerence index: stable']
-];
-var TERM_W={SYSTEM:3,OBSERVER:3,MEMORY:2,CAUSALITY:2,ANOMALY:1,OWL:.6,DUMUL:1};
+var TERM_DIST=SKY.TERM_DIST;
+var TERM_POOL=TXT.TERM_POOL;
+var TERM_W=TXT.TERM_W;
 function termNoteObserve(on){
   TERM_OBS_AT=performance.now();
   /* Camera focus cuma hidup di dalam Observe Mode (jam & terminal tersembunyi di sana),
@@ -8040,11 +7439,7 @@ function termTarget(id){
   return o;
 }
 var TERM_AT=0,TERM_TAIL=0,TERM_BODY=null,TERM_CUR=null,TERM_END=0,TERM_ASK=null,TERM_NOIN=0,TERM_TAPS=0,TERM_EXC=false,TERM_NOCLOSE=false;
-var TERM_PROMPTS=[
- {q:'> WHY ARE YOU HERE?',a:['> INPUT RECEIVED','> "?"','> ACCEPTABLE.','> MOST OBSERVERS BEGIN WITH A QUESTION.']},
- {q:'> ARE YOU STILL THERE?',a:['> INPUT RECEIVED','> "."','> YES. THAT IS ENOUGH.']},
- {q:'> WHAT DO YOU SEE?',a:['> INPUT RECEIVED','> "..."','> INTERESTING.','> I SEE THE SAME.']}
-];
+var TERM_PROMPTS=TXT.TERM_PROMPTS;
 function termEmit(text,d,cls,hold){
   if(!TERM_RUN||!TERM_BODY)return;
   var now=performance.now()-TERM_AT;
@@ -8153,15 +7548,7 @@ function termOpen(){
    ketuker / numpuk sama pesan random saat teleskop diklik (klik teleskop langsung menutup greeting).
    Isi: jeda sejak kunjungan terakhir + jam malam. State lokal: localStorage dumul_tg_v1. */
 var TG_KEY='dumul_tg_v1',TG={el:null,on:false,st:null,poll:0,hiddenAt:0,busy:false};
-var TG_POOL={
- quick:["That was quick.","You left. You came back. I noticed.","Reloading won't change the sky.","Back so soon?"],
- hours:["Back again today.","Same day. Different stars.","The sky moved a little while you were gone.","You didn't stay away long."],
- day:["A night has passed.","One day. I kept watching.","You were gone a day. The stars weren't.","Welcome back. It's been a day."],
- days:["{d} days. I counted.","{d} days of quiet. Then you.","{d} days. The lens stayed clean.","{d} days away. The sky didn't mind."],
- weeks:["{w} weeks. The stars didn't wait.","{w} weeks. I almost stopped looking.","{w} weeks away. The light kept travelling."],
- months:["{m} months. Hello again.","{m} months. I still remember where you stood.","It has been a long time. The light you saw then has moved on."],
- night:["Why are you awake?","It's late. The sky doesn't mind.","The observatory is quieter at this hour.","Everyone else is asleep. The sky isn't.","Go to sleep. The stars will still be here.","The best stars come out when no one's looking."]
-};
+var TG_POOL=TXT.TG_POOL;
 function tgLoad(){
   if(TG.st)return TG.st;
   var o=null;try{o=JSON.parse(localStorage.getItem(TG_KEY)||'null');}catch(e){}
@@ -8575,7 +7962,7 @@ window.addEventListener('pageshow',function(e){
     var rtM;window.addEventListener('resize',function(){clearTimeout(rtM);rtM=setTimeout(function(){if(matrixAlive)resizeMatrix();},150);});
   }
 
-  var stars=[SFX.betel,SFX.rigel,SFX.spica,SFX.sirius,SFX.pleione,SFX.aldebaran,SFX.arcturus,SFX.antares],t0=bootT0,done=false;
+  var stars=STELLAR_KEYS.map(function(k){return SFX[k];}),t0=bootT0,done=false; /* semua audio SFX dari registry */
   var minMs=isRepeatVisit?2000:(IS_POTATO?7000:4200);
   var maxMs=isRepeatVisit?4000:(IS_POTATO?12000:8000);
   var choicesEl=document.getElementById('boot-choices');
