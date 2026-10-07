@@ -6258,15 +6258,21 @@ var SN_COOLDOWN={};
     return '<button class="mp-track" type="button" '+attrs+'><span class="mp-num">'+pad2(n)+'</span><span class="mp-name">'+name+'</span>'+(obs?'<span class="mp-obs" aria-hidden="true" title="Unobserved">\u25CB</span>':'')+SPEC+'</button>';
   }
   if(grpEl){
-    var html='',n=0;
+    var html='';
     SKY.panelGroups().forEach(function(g){
       if(!g.sfx.length)return; /* sektor belum punya SFX: belum tampil */
-      var rowsH='';
-      g.sfx.forEach(function(s){
-        n++;tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
-        rowsH+=trackRow(n,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
+      /* urut A-Z per accordion (label); nomor baris lokal 01..N di dalam grup */
+      var list=g.sfx.slice().sort(function(a,b){
+        return a.label.toLowerCase().localeCompare(b.label.toLowerCase());
       });
-      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-no">'+pad2(g.no)+'</span><span class="mp-grp-name">'+g.season+' \u00B7 '+g.title+'</span><span class="mp-grp-n">'+g.sfx.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
+      var rowsH='',ln=0;
+      list.forEach(function(s){
+        ln++;
+        tracks.push({type:'sfx',key:s.key,name:s.label.toLowerCase(),audio:SFX[s.key]});
+        rowsH+=trackRow(ln,s.label.toLowerCase(),'data-type="sfx" data-key="'+s.key+'"',true);
+      });
+      /* header: cuma judul (marquee) + jumlah + chevron — tanpa 01 Winter / 02 Spring */
+      html+='<div class="mp-grp" data-sector="'+g.k+'"><button type="button" class="mp-grp-head" aria-expanded="false"><span class="mp-grp-name"><span class="mp-grp-marq">'+g.title+'</span></span><span class="mp-grp-n">'+list.length+'</span><span class="mp-grp-chev" aria-hidden="true"></span></button><div class="mp-tracks">'+rowsH+'</div></div>';
     });
     grpEl.innerHTML=html;
   }
