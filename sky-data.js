@@ -40,7 +40,7 @@ var SECTORS=[
   {k:'winter', season:'Winter', name:'Winter', title:'The Pantheon of Radiant Heroes', a:-150, sky:{rgb:'110,185,255',a:.05,dim:.84,acc:{rgb:'225,95,190',a:.10,x:.26,y:.66,s:.40,sy:.70,rot:-.4}},
    stars:['Aldebaran','Betelgeuse','Capella','Pleione','Pollux','Procyon','Rigel','Sirius']},
   {k:'spring', season:'Spring', name:'Spring', title:'The Guardians of the Cosmic Balance', a:-30, sky:{rgb:'150,178,228',a:.20,dim:.30},
-   stars:['Arcturus','Regulus','Spica']},
+   stars:['Alioth','Arcturus','Regulus','Spica']},
   {k:'summer', season:'Summer', name:'Summer', title:'The Assembly of Celestial Beasts', a:150, sky:{rgb:'255,160,60',a:.20,dim:.45,acc:{rgb:'255,225,150',a:.26,x:.5,y:.55,s:.90,sy:.28,rot:-.5}},
    stars:['Altair','Deneb','Vega']},
   {k:'autumn', season:'Autumn', name:'Autumn', title:'The Royal Court of the Fallen Dynasty', a:30, sky:{rgb:'20,70,190',a:.22,dim:.55},
@@ -204,6 +204,10 @@ var SFX=[
    fragment:{"tag":"FRAGMENT // SIRIUS","title":"Dog Star · Brightest","body":"Nearest of the great ones. Sharp, white, impossible to ignore — the observatory’s first hello from the winter sky.","meta":["RA 06h 45m","DEC −16° 42′","SPEC A1 V","LINK · Winter Hexagon / Triangle"]}},
 
   /* ---- SPRING (A-Z) : Spring Triangle (Arcturus · Spica · Regulus) ---- */
+  {key:'alioth', label:'Alioth', cons:'ursa', star:'alioth', rgb:'200,210,255',
+   recap:{"name":"ALIOTH","spec":"A0pCr","dist":"83 LY"},
+   data:{"name":"ALIOTH","dist":"83 LY","spec":"A0pCr","mag":"1.77","ra":"12h 54m","dec":"+55°57′"},
+   fragment:{"tag":"FRAGMENT // ALIOTH","title":"Bear · Dipper Brightest","body":"The brightest light of the Great Bear. A steady point on the handle — the one that taught navigators where north still waits.","meta":["RA 12h 54m","DEC +55° 57′","SPEC A0pCr","LINK · Big Dipper / Spring"]}},
   {key:'arcturus', label:'Arcturus', cons:'bootes', star:'arcturus', rgb:'255,180,80',
    recap:{"name":"ARCTURUS","spec":"K1.5 III","dist":"37 LY"},
    data:{"name":"ARCTURUS","dist":"36.7 LY","spec":"K1.5III","mag":"-0.05","ra":"14h 15m","dec":"+19°10′"},
@@ -375,7 +379,7 @@ var GEOMETRY=[
   },
   lines:[["g1","g3"],["g2","g3"],["g3","g6"],["g6","g7"],["g7","g5"],["g5","g4"],["g6","g11"],["g3","g8"],["g8","g10"],["g9","g10"],["g10","g12"],["g10","g14"],["g14","g13"],["g13","g15"],["g14","g16"],["g16","g17"]]},
  /* Ursa Major / Big Dipper: 18 titik dari bigdipper-ursa-major.html
-    (viewBox 612×424, scale ×1000/612). UI NONAKTIF (RASI off:true). Bintang utama nanti: Alioth (u7). */
+    (viewBox 612×424, scale ×1000/612). UI NONAKTIF (RASI off:true). Bintang utama: Alioth. */
  {id:'ursa',ra0:0,delay:1.2,phase:1.0,
   stars:{
    u1:{fx:546,fy:116,r:3.2,c:'#eaf6ff'},
@@ -384,7 +388,7 @@ var GEOMETRY=[
    u4:{fx:418,fy:221,r:3.3,c:'#eaf6ff'},
    u5:{fx:531,fy:230,r:2.6,c:'#dcefff'},
    u6:{fx:183,fy:257,r:3.0,c:'#eaf6ff'},
-   u7:{fx:237,fy:265,r:3.4,c:'#ffe9a0',name:'Alioth',nx:-1,dy:-9},
+   alioth:{fx:237,fy:265,r:3.6,c:'#ffe9a0',name:'Alioth',nx:-1,dy:-9},
    u8:{fx:306,fy:266,r:3.0,c:'#eaf6ff'},
    u9:{fx:428,fy:286,r:2.5,c:'#dcefff'},
    u10:{fx:547,fy:291,r:2.6,c:'#dcefff'},
@@ -399,7 +403,7 @@ var GEOMETRY=[
   },
   lines:[
    /* handle kiri (Alkaid side): 11→6→7→8 */
-   ["u11","u6"],["u6","u7"],["u7","u8"],
+   ["u11","u6"],["u6","alioth"],["alioth","u8"],
    /* bowl / badan: 8→4→3→1→2→3 */
    ["u8","u4"],["u4","u3"],["u3","u1"],["u1","u2"],["u2","u3"],
    /* inner bowl: 3→5→10→12→14 */
