@@ -467,6 +467,23 @@ function updateCamZoomUI(){
     el.setAttribute('aria-hidden',show?'false':'true');
   }
 }
+
+/* Tap bintang non-SFX → pastikan Observation + Camera on, fokus ke rasi, tampilkan whisper/info. */
+function openCamOnCons(cid){
+  if(!cid||cid==='bh')return;
+  if(typeof setObserveMode==='function'&&!OBSERVE_MODE)setObserveMode(true);
+  if(typeof setCameraMode==='function'&&!CAMERA_MODE)setCameraMode(true);
+  if(!FOCUS.list)FOCUS.list=focusList();
+  var i,found=-1;
+  for(i=0;i<FOCUS.list.length;i++)if(FOCUS.list[i].id===cid){found=i;break;}
+  if(found<0){
+    /* rasi mungkin off/di luar sektor aktif — tetap tampilkan whisper kalau ada */
+    if(typeof focusFx==='function'){FFX.id=cid;FFX.t0=performance.now();showWhisper(cid);}
+    return;
+  }
+  FOCUS.i=found;FOCUS.anim=true;_freeReset=false;
+  focusUI();focusFx(cid);
+}
 function setCameraMode(on){
   if(on&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE))return;
   CAMERA_MODE=!!on;
@@ -2226,9 +2243,11 @@ function alignDone(cid,viaKey){
   endAlignment(true);
   unlock(cid);
   tapFlash={until:performance.now()+1500,cons:cid}; /* garis yang baru muncul ikut menyala */
+  /* viaKey ada = langkah terakhir adalah bintang SFX → supernova + audio.
+     viaKey null = rasi tanpa SFX → diam, cuma archive. */
   if(viaKey&&typeof triggerSupernova==='function')triggerSupernova(viaKey);
-  showConsArchive(cid,'unlock'); /* di mode kamera: masuk antrean, tampil setelah keluar kamera */
-  /* Fakta/data rasi yang tadinya terkunci ikut terbuka kalau kamera masih fokus di sana. */
+  var hasSfx=!!(SKY.CONS_STARS[cid]&&SKY.CONS_STARS[cid].length);
+  showConsArchive(cid, hasSfx ? 'unlock' : undefined); /* no-SFX → toast ARCHIVED saja */
   if(CAMERA_MODE&&FFX.id===cid)setTimeout(function(){if(CAMERA_MODE&&FFX.id===cid)showWhisper(cid);},1200);
   if(typeof haptic==='function')haptic(22);
 }
@@ -5562,6 +5581,46 @@ function ofxMakeTint(kind){
   }
   x.fillStyle=gr;x.fillRect(0,0,128,128);return c;
 }
+/* Warna langit per sektor: sprite radial kecil per sektor (di-cache), di-crossfade lewat alpha. Data: SECTORS[].sky = {rgb:'r,g,b', a:0..1} */
+var SKYT={};
+function sectSkySprite(rgb){
+  var c=document.createElement('canvas'),x,gr;c.width=c.height=128;x=c.getContext('2d');
+  gr=x.createRadialGradient(64,64,0,64,64,64);
+  gr.addColorStop(0,'rgba('+rgb+',1)');gr.addColorStop(.45,'rgba('+rgb+',.42)');gr.addColorStop(1,'rgba('+rgb+',0)');
+  x.fillStyle=gr;x.fillRect(0,0,128,128);return c;
+}
+/* Data: SECTORS[].sky = {rgb,a, dim:0..1 (redam kabut/dust default dulu, biar warna sektor nggak campur), dimRgb:'r,g,b', acc:{rgb,a,x,y,s,sy,rot}}
+   Urutan: (1) dim = source-over gelapin plate default, (2) tint aditif, (3) aksen aditif (blob/pita). Dua pass supaya crossfade antar sektor nggak saling nutup. */
+function sectDrawSky(){
+  var i,s,t,tgt,S=Math.max(W,H)*2.2,A;
+  for(i=0;i<SECT.list.length;i++){
+    s=SECT.list[i];if(!s.sky)continue;
+    t=SKYT[s.k]||(SKYT[s.k]={v:0,spr:null,spr2:null});
+    tgt=(!SECT.on&&SECT.cur===s)?1:0;                 /* overview = netral, tanpa tint */
+    t.v+=(tgt-t.v)*.06;if(Math.abs(tgt-t.v)<.004)t.v=tgt;
+  }
+  for(i=0;i<SECT.list.length;i++){                    /* pass 1: dim */
+    s=SECT.list[i];t=s.sky&&SKYT[s.k];
+    if(!t||t.v<.01||!s.sky.dim)continue;
+    g.save();g.globalAlpha=t.v*s.sky.dim;g.fillStyle='rgb('+(s.sky.dimRgb||'2,5,10')+')';g.fillRect(0,0,W,H);g.restore();
+  }
+  for(i=0;i<SECT.list.length;i++){                    /* pass 2: tint + aksen */
+    s=SECT.list[i];t=s.sky&&SKYT[s.k];
+    if(!t||t.v<.01)continue;
+    if(!t.spr)t.spr=sectSkySprite(s.sky.rgb);
+    g.save();g.globalCompositeOperation='lighter';g.globalAlpha=t.v*(s.sky.a==null?.22:s.sky.a);
+    g.drawImage(t.spr,W*.5-S/2,H*.45-S/2,S,S);
+    A=s.sky.acc;
+    if(A){
+      if(!t.spr2)t.spr2=sectSkySprite(A.rgb);
+      var as=S*(A.s||.6);
+      g.globalAlpha=t.v*A.a;
+      g.translate(W*A.x,H*A.y);if(A.rot)g.rotate(A.rot);if(A.sy)g.scale(1,A.sy);
+      g.drawImage(t.spr2,-as/2,-as/2,as,as);
+    }
+    g.restore();
+  }
+}
 function ofxDrawTint(now){
   if(OFX.p<.01)return;
   var S=Math.max(W,H)*2.2;
@@ -6093,6 +6152,7 @@ function frame(now){
             ddy=reduce?0:Math.cos(dt2*6.2832/(dl.per*1.37)+dl.ph)*dl.amp*.6;
         plateBlit(dl.c,pM,pW,pH,1+(skyZoom-1)*dl.zf,skyPan.x*dl.par+ddx,skyPan.y*dl.par+ddy);
       }
+      sectDrawSky();   /* warna langit per sektor (data: SECTORS[].sky di sky-data.js) */
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
       drawHud();
     }
@@ -6999,15 +7059,14 @@ document.addEventListener('pointerdown',function(e){
       if(!as)triggerSupernova(tk); /* terkunci -> bisu + hint (digate di triggerSupernova) */
     }
     else {
-      // Mainkan chime synthesizer kosmik untuk bintang biasa
+      /* Bintang non-SFX: chime + auto masuk Observation + Camera, fokus ke rasi itu (data/fact/whisper). */
       playStarChime(hit.c.stars[hit.star]);
-
-      /* Toggle portal DUMUL jika pengguna nge-tap bintang Sabuk Orion (Mintaka/Alnilam/Alnitak) */
       if(!aligning&&hit.c.id==='orion'&&(hit.star==='mintaka'||hit.star==='alnilam'||hit.star==='alnitak')){
         var bandP=PORTALS[0];
         if(bandP&&bandP.el)bandP.el.classList.toggle('mobile-show');
       }
       haptic(8);
+      if(!as && typeof openCamOnCons==='function')openCamOnCons(hit.c.id);
     }
   }
 },{passive:true});
