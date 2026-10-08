@@ -21,9 +21,9 @@ button{background:#6ee5ff;color:#060b11;border:0;border-radius:8px;padding:10px 
 <button onclick="render()">Refresh</button>
 <button onclick="clearAudio()">Hapus cache lagu</button>
 <script>
-var EXPECTED=['constellation','glitch-instrumental','collapsars','rigel','spica','betelgeuse','sirius','pleione','aldebaran','arcturus','antares','limerence','glitch','nastenka','larung'];
+var EXPECTED=['constellation','glitch-instrumental','collapsars','aldebaran','alioth','alpheratz','altair','arcturus','betelgeuse','capella','deneb','pleione','pollux','procyon','regulus','rigel','sirius','spica','vega','limerence','glitch','nastenka','larung'];
 async function precacheNow(){
-  if(!confirm('Unduh semua lagu untuk offline? Total sekitar 30-60 MB.'))return;
+  if(!confirm('Unduh semua lagu untuk offline? Total sekitar 40–70 MB (23 file).'))return;
   var reg=await navigator.serviceWorker.ready;
   reg.active.postMessage({type:'PRECACHE_AUDIO'});
   document.getElementById('sw').textContent='Mengunduh semua lagu… (daftar update otomatis)';
@@ -57,7 +57,7 @@ async function render(){
     ul.appendChild(li);
   });
   var cnt=Object.keys(found).length;
-  document.getElementById('sum').textContent=cnt+' lagu tersimpan • '+mb(total)+' (batas SW: 24 file)';
+  document.getElementById('sum').textContent=cnt+' lagu tersimpan • '+mb(total)+' (batas SW: 23 file expected)';
   if(navigator.storage&&navigator.storage.estimate){
     var e=await navigator.storage.estimate();
     document.getElementById('store').textContent='Storage situs ini: '+mb(e.usage||0)+' dari kuota '+mb(e.quota||0);
