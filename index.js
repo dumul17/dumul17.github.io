@@ -2929,6 +2929,7 @@ function layout(){
     PLEIADES.x=offx+PC[0]*fs-.53*psc;
     PLEIADES.y=offy+PC[1]*fs-.42*psc;
     PLEIADES.ready=true;
+    window.__scnFit={fs:fs,offx:offx,offy:offy,ids:ids.slice()};
     return {f:fs};
   })();
   /* ---- shared anti-lensing / anti-clip helpers ----
@@ -8423,6 +8424,270 @@ if(window.visualViewport){
 /* ready starts false: this object existing only means the script parsed,
    not that boot finished and the render loop is actually running. Flipped
    to true from startRenderLoop() once frames are really being produced. */
+
+/* ========== LAYOUT EDITOR (?layout=1) ==========
+   Drag rasi = geser scene.at
+   Tombol ↺↻ = rotasi th, −+ = scale k
+   SAVE → localStorage; COPY → clipboard (snippet scene buat sky-data.js)
+   Load otomatis dari localStorage saat boot kalau ada.
+   ================================================= */
+(function layoutEditor(){
+  var enabled=false;
+  try{enabled=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(e){}
+  if(!enabled)return;
+
+  var LS_KEY='obs_layout_v1';
+  var sel=null, drag=null, hud=null, info=null;
+
+  function loadSaved(){
+    try{
+      var raw=localStorage.getItem(LS_KEY);if(!raw)return;
+      var data=JSON.parse(raw);
+      SKY.rasi.forEach(function(r){
+        if(data[r.id]){
+          if(r.scene&&data[r.id].scene){
+            r.scene.k=data[r.id].scene.k;
+            r.scene.th=data[r.id].scene.th;
+            r.scene.at=data[r.id].scene.at.slice();
+            if(data[r.id].scene.pv)r.scene.pv=data[r.id].scene.pv.slice();
+          }
+          if(r.ple&&data[r.id].ple){
+            r.ple.at=data[r.id].ple.at.slice();
+            if(typeof data[r.id].ple.ps==='number')r.ple.ps=data[r.id].ple.ps;
+          }
+        }
+      });
+    }catch(e){console.warn('layout load',e);}
+  }
+  loadSaved();
+
+  function snapshot(){
+    var out={};
+    SKY.rasi.forEach(function(r){
+      if(r.scene)out[r.id]={scene:{k:r.scene.k,th:r.scene.th,pv:r.scene.pv?r.scene.pv.slice():null,at:r.scene.at.slice()}};
+      if(r.ple)out[r.id]=(out[r.id]||{}),out[r.id].ple={at:r.ple.at.slice(),ps:r.ple.ps};
+    });
+    return out;
+  }
+  function save(){
+    try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));toast('SAVED');}catch(e){toast('SAVE FAIL');}
+  }
+  function exportText(){
+    var lines=[], data=snapshot();
+    Object.keys(data).forEach(function(id){
+      var d=data[id];
+      if(d.scene){
+        var s=d.scene;
+        lines.push(id+": scene:{k:"+round(s.k)+", th:"+round(s.th)+", pv:["+(s.pv?s.pv.map(round).join(','):'')+"], at:["+s.at.map(round).join(',')+"]}");
+      }
+      if(d.ple)lines.push(id+": ple:{at:["+d.ple.at.map(round).join(',')+"], ps:"+round(d.ple.ps)+"}");
+    });
+    return lines.join('\n');
+  }
+  function round(n){return Math.round(n*1000)/1000;}
+  function toast(msg){
+    if(!info)return;
+    info.textContent=msg;
+    info.style.opacity='1';
+    clearTimeout(toast._t);
+    toast._t=setTimeout(function(){if(info)info.style.opacity='.7';updateInfo();},1200);
+  }
+  function updateInfo(){
+    if(!info)return;
+    if(!sel){info.textContent='TAP RASI · DRAG MOVE · ↺↻ ROT · −+ SCALE';return;}
+    var r=SKY.rasiBy[sel];
+    if(r&&r.scene){
+      info.textContent=sel.toUpperCase()+'  k='+round(r.scene.k)+'  th='+round(r.scene.th)+'°  at=['+r.scene.at.map(round).join(', ')+']';
+    }else if(r&&r.ple){
+      info.textContent=sel.toUpperCase()+'  ple.at=['+r.ple.at.map(round).join(', ')+']  ps='+round(r.ple.ps);
+    }else info.textContent=sel;
+  }
+
+  function applyAndRelayout(){
+    if(typeof layout==='function')layout();
+    updateInfo();
+  }
+
+  function hitCons(cx,cy){
+    /* screen coords → find constellation under pointer */
+    var best=null,bestD=1e9;
+    SKY.rasi.forEach(function(r){
+      if(CONS_OFF[r.id])return;
+      if(!sectShow(r.id,true))return;
+      var c=cons(r.id);
+      if(!c||c.minX==null)return;
+      var pad=28;
+      if(cx<c.minX-pad||cx>c.maxX+pad||cy<c.minY-pad||cy>c.maxY+pad)return;
+      var mx=(c.minX+c.maxX)/2,my=(c.minY+c.maxY)/2;
+      var d=(cx-mx)*(cx-mx)+(cy-my)*(cy-my);
+      if(d<bestD){bestD=d;best=r.id;}
+    });
+    /* Pleiades cluster */
+    if(typeof PLEIADES!=='undefined'&&PLEIADES.ready&&sectShow('pleiades',true)){
+      var px=PLEIADES.x+PLEIADES.scale*.53,py=PLEIADES.y+PLEIADES.scale*.42;
+      var d2=(cx-px)*(cx-px)+(cy-py)*(cy-py);
+      if(d2<bestD&&d2<80*80)best='pleiades';
+    }
+    return best;
+  }
+
+  function screenToSceneDelta(dx,dy){
+    var fit=window.__scnFit;
+    if(!fit||!fit.fs)return [dx,dy];
+    return [dx/fit.fs, dy/fit.fs];
+  }
+
+  function nudge(id, dk, dth, dax, day){
+    var r=SKY.rasiBy[id];if(!r)return;
+    if(r.scene){
+      if(dk)r.scene.k=Math.max(0.05,Math.min(3,r.scene.k+dk));
+      if(dth)r.scene.th=r.scene.th+dth;
+      if(dax||day){r.scene.at[0]+=dax;r.scene.at[1]+=day;}
+    }
+    if(r.ple){
+      if(dk)r.ple.ps=Math.max(10,Math.min(200,r.ple.ps+dk*40));
+      if(dax||day){r.ple.at[0]+=dax;r.ple.at[1]+=day;}
+    }
+    applyAndRelayout();
+  }
+
+  function buildHud(){
+    if(hud)return;
+    var css=[
+      '#lay-hud{position:fixed;left:0;right:0;bottom:0;z-index:80;pointer-events:none;font:11px/1.3 "Courier New",monospace;color:#cfeffa}',
+      '#lay-bar{pointer-events:auto;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(2,8,13,.88);border-top:1px solid rgba(110,229,255,.25)}',
+      '#lay-bar button{min-width:40px;min-height:36px;padding:6px 10px;border:1px solid rgba(110,229,255,.4);border-radius:4px;background:rgba(110,229,255,.08);color:#6ee5ff;font:700 12px "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent}',
+      '#lay-bar button:active{background:rgba(110,229,255,.22)}',
+      '#lay-bar button.on{border-color:#ff7ad9;color:#ff7ad9}',
+      '#lay-info{pointer-events:none;text-align:center;padding:6px 10px;background:rgba(2,8,13,.7);color:rgba(207,239,250,.85);font-size:10px;letter-spacing:.04em;opacity:.7}',
+      '#lay-sel{position:fixed;pointer-events:none;z-index:79;border:1px dashed rgba(110,229,255,.55);border-radius:4px;box-shadow:0 0 12px rgba(110,229,255,.2);display:none}'
+    ].join('');
+    var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+
+    hud=document.createElement('div');hud.id='lay-hud';
+    hud.innerHTML=
+      '<div id="lay-info"></div>'+
+      '<div id="lay-bar">'+
+      '<button type="button" data-a="prev" title="Prev">‹</button>'+
+      '<button type="button" data-a="next" title="Next">›</button>'+
+      '<button type="button" data-a="rotl" title="Rotate CCW">↺</button>'+
+      '<button type="button" data-a="rotr" title="Rotate CW">↻</button>'+
+      '<button type="button" data-a="zoout" title="Scale down">−</button>'+
+      '<button type="button" data-a="zoin" title="Scale up">+</button>'+
+      '<button type="button" data-a="save" title="Save">SAVE</button>'+
+      '<button type="button" data-a="copy" title="Copy scene snippet">COPY</button>'+
+      '<button type="button" data-a="reset" title="Reset saved">RESET</button>'+
+      '</div>';
+    document.body.appendChild(hud);
+    info=document.getElementById('lay-info');
+
+    var ring=document.createElement('div');ring.id='lay-sel';document.body.appendChild(ring);
+
+    hud.querySelector('#lay-bar').addEventListener('click',function(e){
+      var b=e.target.closest('button');if(!b)return;
+      var a=b.getAttribute('data-a');
+      e.preventDefault();e.stopPropagation();
+      if(a==='save'){save();return;}
+      if(a==='copy'){
+        var txt=exportText();
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(txt).then(function(){toast('COPIED');}).catch(function(){prompt('Copy:',txt);});
+        }else prompt('Copy:',txt);
+        console.log('[layout export]\n'+txt);
+        return;
+      }
+      if(a==='reset'){
+        try{localStorage.removeItem(LS_KEY);}catch(err){}
+        toast('RESET — reload page');
+        return;
+      }
+      if(!sel){toast('TAP A CONSTELLATION FIRST');return;}
+      if(a==='rotl')nudge(sel,0,-3,0,0);
+      if(a==='rotr')nudge(sel,0,3,0,0);
+      if(a==='zoout')nudge(sel,-0.03,0,0,0);
+      if(a==='zoin')nudge(sel,0.03,0,0,0);
+      if(a==='prev'||a==='next'){
+        var ids=(window.__scnFit&&window.__scnFit.ids)||[];
+        if(SKY.rasiBy.pleiades&&ids.indexOf('pleiades')<0)ids=ids.concat(['pleiades']);
+        if(!ids.length)return;
+        var i=ids.indexOf(sel);if(i<0)i=0;
+        i=a==='next'?(i+1)%ids.length:(i-1+ids.length)%ids.length;
+        sel=ids[i];updateInfo();paintSel();
+      }
+    },true);
+
+    function paintSel(){
+      var ring=document.getElementById('lay-sel');if(!ring)return;
+      if(!sel){ring.style.display='none';return;}
+      var c=sel==='pleiades'?null:cons(sel);
+      var x0,y0,x1,y1;
+      if(sel==='pleiades'&&PLEIADES.ready){
+        x0=PLEIADES.x;y0=PLEIADES.y;x1=PLEIADES.x+PLEIADES.scale;y1=PLEIADES.y+PLEIADES.scale;
+      }else if(c){x0=c.minX;y0=c.minY;x1=c.maxX;y1=c.maxY;}
+      else{ring.style.display='none';return;}
+      var pad=12;
+      /* convert virtual stage coords to screen if needed — client rect of canvas */
+      var cr=cv.getBoundingClientRect();
+      var sx=cr.width/W,sy=cr.height/H;
+      ring.style.display='block';
+      ring.style.left=(cr.left+(x0-pad)*sx)+'px';
+      ring.style.top=(cr.top+(y0-pad)*sy)+'px';
+      ring.style.width=Math.max(20,(x1-x0+pad*2)*sx)+'px';
+      ring.style.height=Math.max(20,(y1-y0+pad*2)*sy)+'px';
+    }
+    layoutEditor.paintSel=paintSel;
+
+    /* intercept pointer for select + drag (capture, only when not on HUD) */
+    document.addEventListener('pointerdown',function(e){
+      if(e.target.closest&&e.target.closest('#lay-hud'))return;
+      if(SECT.on||SECT.busy)return; /* only inside a sector */
+      var id=hitCons(e.clientX,e.clientY);
+      /* clientX may be transformed by stage hooks — use as virtual coords already */
+      if(!id){
+        /* try with raw if stage transform active */
+        id=hitCons(e.clientX,e.clientY);
+      }
+      if(id){
+        sel=id;updateInfo();paintSel();
+        drag={id:id,x0:e.clientX,y0:e.clientY,moved:false};
+        try{e.target.setPointerCapture&&e.target.setPointerCapture(e.pointerId);}catch(err){}
+        e.stopPropagation();e.preventDefault();
+      }
+    },true);
+
+    document.addEventListener('pointermove',function(e){
+      if(!drag)return;
+      var dx=e.clientX-drag.x0,dy=e.clientY-drag.y0;
+      if(!drag.moved&&dx*dx+dy*dy<25)return;
+      drag.moved=true;
+      var sc=screenToSceneDelta(dx,dy);
+      nudge(drag.id,0,0,sc[0],sc[1]);
+      drag.x0=e.clientX;drag.y0=e.clientY;
+      paintSel();
+      e.stopPropagation();e.preventDefault();
+    },true);
+
+    document.addEventListener('pointerup',function(e){
+      if(drag){drag=null;e.stopPropagation();}
+    },true);
+
+    updateInfo();
+    setInterval(function(){if(sel)paintSel();},500);
+    console.log('[layout editor] ON — tap constellation, drag to move, SAVE/COPY when done');
+  }
+
+  function waitReady(){
+    if(!document.body||typeof layout!=='function'){setTimeout(waitReady,200);return;}
+    /* wait until past boot */
+    if(typeof bootDone!=='undefined'&&!bootDone){setTimeout(waitReady,400);return;}
+    buildHud();
+    /* re-apply layout once with saved data */
+    setTimeout(function(){try{layout();}catch(e){}},600);
+  }
+  if(document.readyState==='complete')waitReady();
+  else window.addEventListener('load',waitReady);
+})();
+
 window.__hub={ready:false};
 if(document.fonts&&document.fonts.addEventListener){document.fonts.addEventListener('loadingdone',function(){if(W)layout();});}
 function boot(){

@@ -16,7 +16,7 @@ const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (15 file, se
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
 
 /* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
-importScripts('sky-data.js?v=14');
+importScripts('sky-data.js?v=15');
 const ALL_AUDIO = SKY.audioFiles();
 
 /* Harus sama persis dengan yang dipanggil HTML (termasuk ?v=) */
@@ -26,9 +26,9 @@ const SHELL = [
   'dumul.html',
   'index.css?v=34',
   /* harus sama persis dengan <script src> di index.html */
-  'sky-data.js?v=14',
+  'sky-data.js?v=15',
   'texts.js?v=1',
-  'index.js?v=74',
+  'index.js?v=75',
   'dumul.css?v=1',
   'dumul.js?v=2',
   'dumul-app.js?v=1',
