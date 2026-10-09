@@ -181,6 +181,9 @@ function uprBegin(x,y){
 function uprEnd(on){if(on)g.restore();}
 var skyRot=0;
 var skyZoom=1;
+window.__layoutEditMode=false;
+function isLayoutEdit(){return!!window.__layoutEditMode;}
+
 var CAMERA_MODE=false;
 /* Rasi yang digabung di overview (mis. Taurus nyambung ke Auriga lewat Elnath): `joinTo` di sky-data.js.
    Di overview keduanya gerak/goyang bareng (satu 'lead'), di mode kamera fokus rasi pasangannya disembunyikan. */
@@ -475,6 +478,7 @@ function updateCamZoomUI(){
 
 /* Tap bintang non-SFX → pastikan Observation + Camera on, fokus ke rasi, tampilkan whisper/info. */
 function openCamOnCons(cid){
+  if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(!cid||cid==='bh')return;
   if(typeof setObserveMode==='function'&&!OBSERVE_MODE)setObserveMode(true);
   if(typeof setCameraMode==='function'&&!CAMERA_MODE)setCameraMode(true);
@@ -490,6 +494,7 @@ function openCamOnCons(cid){
   focusUI();focusFx(cid);
 }
 function setCameraMode(on){
+  if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(on&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE))return;
   CAMERA_MODE=!!on;
   document.body.classList.toggle('camera-mode',CAMERA_MODE);
@@ -673,7 +678,7 @@ function drawFocusFx(now){
   }
   g.restore();
 }
-function bhDragAllowed(){return !CAMERA_MODE||!FOCUS.list||FOCUS.list[FOCUS.i].id==='bh';}
+function bhDragAllowed(){if(typeof isLayoutEdit==="function"&&isLayoutEdit())return false;return !CAMERA_MODE||!FOCUS.list||FOCUS.list[FOCUS.i].id==='bh';}
 function syncBHDom(){
   try{
     var bhEl=document.getElementById('bh');if(!bhEl||!W)return;
@@ -2026,6 +2031,7 @@ function observeIcon(){
   return (typeof SECT!=='undefined'&&SECT.cur)?'📡':'🌠';
 }
 function setObserveMode(on){
+  if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   OBSERVE_MODE=!!on;
   if(typeof termNoteObserve==='function')termNoteObserve(OBSERVE_MODE);
   document.body.classList.toggle('observe-mode',OBSERVE_MODE);
@@ -2135,7 +2141,7 @@ function setRadioSilence(on){
   loadLastSignalKey();
   var obs=document.getElementById('mode-observe');
   var sil=document.getElementById('mode-silence');
-  if(obs)obs.addEventListener('click',function(){setObserveMode(!OBSERVE_MODE);haptic(10);});
+  if(obs)obs.addEventListener('click',function(){if(typeof isLayoutEdit==='function'&&isLayoutEdit())return;setObserveMode(!OBSERVE_MODE);haptic(10);});
   if(sil)sil.addEventListener('click',function(e){
     e.preventDefault();e.stopPropagation();
     if(typeof window.__mpVolToggle==='function'){window.__mpVolToggle(e);haptic(8);return;}
@@ -2146,7 +2152,7 @@ function setRadioSilence(on){
     cam.hidden=true;
     cam.addEventListener('click',function(){
       if(!OBSERVE_MODE){showModeToast('CAMERA REQUIRES\nOBSERVATION MODE',null,1800);return;}
-      setCameraMode(!CAMERA_MODE);haptic(10);
+      if(typeof isLayoutEdit==='function'&&isLayoutEdit())return;setCameraMode(!CAMERA_MODE);haptic(10);
     });
   }
   maybeShowLastSignalOnReturn();
@@ -6900,6 +6906,7 @@ var SN_COOLDOWN={};
 })();
 
 function triggerSupernova(key){
+  if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(SW)return;
   if(!isUnlocked(key)){lockedHint(key);return;}
   var tr=TRIGGERS[key],
@@ -7064,7 +7071,7 @@ document.addEventListener('pointerdown',function(e){
   var ph=(aligning||!sectShow('pleiades'))?null:pleiadesHitAt(e.clientX,e.clientY);
   if(ph){
     tapFlash={until:now+420,cons:'pleiades'};
-    triggerSupernova('pleione');
+    if(!(typeof isLayoutEdit==='function'&&isLayoutEdit()))triggerSupernova('pleione');
     return;
   }
   CONS.forEach(function(c){
@@ -7081,17 +7088,14 @@ document.addEventListener('pointerdown',function(e){
       if(d<hr&&(isNext||d<best)){hit={c:c,star:k};best=isNext?-1:d;}
     });
   });
-  if(hit){
+  if(hit && !(typeof isLayoutEdit==="function"&&isLayoutEdit())){
     tapFlash={until:now+420,cons:hit.c.id};
-    /* as: false = bukan langkah alignment; 'step' = langkah biasa (dihitung doang, SFX diam);
-       'done' = langkah terakhir (unlock + SFX + popup sudah ditangani di alignTapStar). */
     var as=(typeof alignTapStar==='function')?alignTapStar(hit.c,hit.star):false;
-    var tk=(TRIGGERS[hit.star]&&TRIGGERS[hit.star].cons===hit.c.id)?hit.star:null; /* betel, rigel, spica, sirius, aldebaran, arcturus, antares */
+    var tk=(TRIGGERS[hit.star]&&TRIGGERS[hit.star].cons===hit.c.id)?hit.star:null;
     if(tk){
-      if(!as)triggerSupernova(tk); /* terkunci -> bisu + hint (digate di triggerSupernova) */
+      if(!as)triggerSupernova(tk);
     }
     else {
-      /* Bintang non-SFX: chime + auto masuk Observation + Camera, fokus ke rasi itu (data/fact/whisper). */
       playStarChime(hit.c.stars[hit.star]);
       if(!aligning&&hit.c.id==='orion'&&(hit.star==='mintaka'||hit.star==='alnilam'||hit.star==='alnitak')){
         var bandP=PORTALS[0];
@@ -8479,6 +8483,8 @@ window.__applyLayOV=function(){
   var enabled=false;
   try{enabled=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(e){}
   if(!enabled)return;
+  window.__layoutEditMode=true;
+  document.body.classList.add('layout-edit');
 
   var LS_KEY='obs_layout_v2';
   var sel=null, drag=null, hud=null, info=null;
@@ -8588,6 +8594,8 @@ window.__applyLayOV=function(){
     if(typeof layout==='function')layout();
     updateInfo();
     paintSel();
+    /* autosave so sector-switch doesn't lose work */
+    try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));}catch(e){}
   }
 
   /* Post-layout: apply screen-space overrides for non-scene rasi */
@@ -8664,13 +8672,17 @@ window.__applyLayOV=function(){
     var panelY=70; /* px from bottom — adjustable */
     try{var py=localStorage.getItem('obs_lay_panel_y');if(py)panelY=Math.max(8,Math.min(220,+py));}catch(e){}
     var css=[
-      '#lay-hud{position:fixed;left:6px;right:6px;bottom:calc(VARBOTTOMpx + env(safe-area-inset-bottom,0px));z-index:80;pointer-events:none;font:10px/1.25 "Courier New",monospace;color:#cfeffa}',
+      '#lay-hud{position:fixed;left:6px;right:6px;bottom:calc(VARBOTTOMpx + env(safe-area-inset-bottom,0px));z-index:9999;pointer-events:none;font:10px/1.25 "Courier New",monospace;color:#cfeffa}',
       '#lay-bar{pointer-events:auto;display:flex;flex-wrap:wrap;gap:3px;justify-content:center;align-items:center;padding:5px 6px;background:rgba(2,8,13,.92);border:1px solid rgba(110,229,255,.3);border-radius:5px;box-shadow:0 0 12px rgba(0,0,0,.45)}',
       '#lay-bar button{min-width:28px;min-height:28px;padding:3px 6px;border:1px solid rgba(110,229,255,.35);border-radius:3px;background:rgba(110,229,255,.07);color:#6ee5ff;font:700 10px "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1}',
       '#lay-bar button:active{background:rgba(110,229,255,.25)}',
       '#lay-bar button.dim{opacity:.55;font-size:9px}',
       '#lay-info{pointer-events:none;text-align:center;padding:2px 6px 1px;color:rgba(207,239,250,.88);font-size:9px;letter-spacing:.02em;opacity:.9;max-height:28px;overflow:hidden}',
-      '#lay-sel{position:fixed;pointer-events:none;z-index:79;border:1px dashed rgba(110,229,255,.5);border-radius:3px;box-shadow:0 0 10px rgba(110,229,255,.15);display:none}'
+      '#lay-sel{position:fixed;pointer-events:none;z-index:79;border:1px dashed rgba(110,229,255,.5);border-radius:3px;box-shadow:0 0 10px rgba(110,229,255,.15);display:none}',
+      'body.layout-edit #mode-cluster,body.layout-edit #cam-cluster,body.layout-edit #obs-btn,body.layout-edit #cam-btn,body.layout-edit #music-player,body.layout-edit #zoom-cluster,body.layout-edit .mp-wrap,body.layout-edit #owl-source,body.layout-edit #cf-bar,body.layout-edit #cam-whisper,body.layout-edit [id$="-fx"]{display:none!important;pointer-events:none!important}',
+      'body.layout-edit #bh,body.layout-edit #cap-bh{pointer-events:none!important}',
+      'body.layout-edit #lay-hud{z-index:99999}'
+
     ].join('').replace('VARBOTTOM',String(panelY));
     var st=document.createElement('style');st.id='lay-style';st.textContent=css;document.head.appendChild(st);
     hud=document.createElement('div');hud.id='lay-hud';
@@ -8759,9 +8771,20 @@ window.__applyLayOV=function(){
       }
     },true);
 
+    /* HUD must swallow all pointer events so they never hit the sky */
+    function onHudPtr(e){
+      if(e.target.closest&&e.target.closest('#lay-hud')){
+        e.stopPropagation();
+        /* don't preventDefault on buttons — need click to fire */
+        if(e.type==='pointerdown'||e.type==='pointerup'||e.type==='pointermove'){
+          /* allow default on buttons for click; stop sky handlers */
+        }
+        return true;
+      }
+      return false;
+    }
     document.addEventListener('pointerdown',function(e){
-      if(e.target.closest&&e.target.closest('#lay-hud'))return;
-      /* allow edit inside sector OR overview (all unlocked rasi visible) */
+      if(onHudPtr(e))return;
       if(SECT.busy)return;
       var id=hitCons(e.clientX,e.clientY);
       if(id){
@@ -8769,6 +8792,10 @@ window.__applyLayOV=function(){
         drag={id:id,x0:e.clientX,y0:e.clientY,moved:false};
         e.stopPropagation();e.preventDefault();
       }
+    },true);
+    document.addEventListener('pointerup',function(e){onHudPtr(e);},true);
+    document.addEventListener('click',function(e){
+      if(e.target.closest&&e.target.closest('#lay-hud')){e.stopPropagation();}
     },true);
 
     document.addEventListener('pointermove',function(e){
