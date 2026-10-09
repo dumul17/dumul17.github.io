@@ -174,6 +174,24 @@ function scrPt(e){STG.raw=true;try{return [e.clientX,e.clientY];}finally{STG.raw
 })();
 /* Teks/sprite di canvas ikut berputar bareng #stage di HP landscape. uprBegin putar balik terhadap titik (x,y) supaya tegak di layar. */
 function upAng(){return STG.rot<0?Math.PI/2:(STG.rot>0?-Math.PI/2:0);}
+/* Label bintang otomatis pindah sisi (kiri<->kanan) dan geser vertikal kalau mepet tepi layar, supaya nggak kepotong.
+   x,y = posisi bintang di kanvas; nx = sisi awal (<0 kiri, >0 kanan); gapH = jarak dari bintang; wT = lebar teks;
+   exL/exR = ruang ekstra (mis. batang spektrum) di sisi kiri/kanan teks. Mode ROT: teks tegak di layar, jadi diukur di koordinat layar asli. */
+function lblSide(x,y,nx,gapH,wT,exL,exR){
+  var cx=STG.rot?v2c(x,y)[0]:x,lim=STG.rot?STG.iw:W,m=6;
+  function over(sg){return sg>0?Math.max(0,cx+gapH+wT+exR-(lim-m)):Math.max(0,m-(cx-gapH-wT-exL));}
+  var sg=nx<0?-1:1,o1=over(sg);
+  if(o1<=0)return nx;
+  var o2=over(-sg);
+  return o2<o1?-nx:nx; /* pilih sisi yang paling sedikit kepotong */
+}
+function lblDY(x,y,dy){
+  var cy=STG.rot?v2c(x,y)[1]:y,lim=STG.rot?STG.ih:H;
+  var ny=cy+3+dy;
+  if(ny<10)return dy+(10-ny);
+  if(ny>lim-8)return dy-(ny-(lim-8));
+  return dy;
+}
 function uprBegin(x,y){
   if(!STG.rot)return false;
   g.save();g.translate(x,y);g.rotate(upAng());g.translate(-x,-y);return true;
@@ -5256,10 +5274,12 @@ function drawStars(c,age,now){
          can decide the cheap star path before any gradient work is allocated. */
       var _upL=uprBegin(x,y);
       g.font='500 10px "Space Grotesk",system-ui,sans-serif';
-      g.textAlign=s.nx<0?'right':'left';
       /* Closer gap for edge stars (Antares) so the label hugs the pulse. */
       var gapH=s.specAfter? (r*1.6+4) : (r*3.4+7);
-      var labelX=x+s.nx*gapH, labelY=y+3+(s.dy||0);
+      var _wT=g.measureText(s.name).width,_sp=(tr&&isPlaying)?(8+7*1.35+6*1.8):0;
+      var _nx=lblSide(x,y,s.nx,gapH,_wT,(s.specAfter?0:(s.nx<0?_sp:0)),(s.specAfter?_sp:(s.nx<0?0:_sp)));
+      g.textAlign=_nx<0?'right':'left';
+      var labelX=x+_nx*gapH, labelY=y+3+lblDY(x,y,(s.dy||0));
       var labelAlpha=isPlaying?.95:.62;
       g.fillStyle=tr?'rgba('+tr.rgb+','+labelAlpha+')':'rgba(184,198,214,'+labelAlpha+')';
       g.fillText(s.name,labelX,labelY);
@@ -5277,10 +5297,10 @@ function drawStars(c,age,now){
         var sx,sy=labelY-7;
         if(s.specAfter){
           /* Right of the text block, regardless of textAlign. */
-          var textRight=s.nx<0?labelX:(labelX+labelW);
+          var textRight=_nx<0?labelX:(labelX+labelW);
           sx=textRight+gapFromText;
         }else{
-          sx=(s.nx<0)
+          sx=(_nx<0)
             ? (labelX-labelW-gapFromText-total)
             : (labelX+labelW+gapFromText);
         }
@@ -8452,6 +8472,7 @@ window.__applyLayOV=function(){
   Object.keys(ov).forEach(function(id){
     var o=ov[id],c=cons(id);if(!c||c.minX==null||c.minX>1e8)return;
     var cx=(c.minX+c.maxX)/2,cy=(c.minY+c.maxY)/2,k=o.k,th=o.th*Math.PI/180,cs=Math.cos(th),sn=Math.sin(th);
+    (window.__ovPivot=window.__ovPivot||{})[id]=[cx,cy]; /* titik putar dasar tiap rasi (dipakai edit grup sektor) */
     var nMin=1e9,nMax=-1e9,nMinY=1e9,nMaxY=-1e9;
     Object.keys(c.stars).forEach(function(key){
       var s=c.stars[key],dx=(s.x-cx)*k,dy=(s.y-cy)*k;
@@ -8471,7 +8492,7 @@ window.__applyLayOV=function(){
   document.body.classList.add('layout-edit');
 
   var LS_KEY='obs_layout_v3';
-  var sel=null,drag=null,rs=null,hud=null,info=null,ring=null,preview=false,collapsed=false,stepI=1,rq=0,dropped=false;
+  var sel=null,drag=null,rs=null,hud=null,info=null,ring=null,preview=false,collapsed=false,stepI=1,rq=0,dropped=false,grp=false;
   var ST=[6,16,40],RT=[.5,2,5],SCF=[.01,.03,.08];
   window.__layOV=window.__layOV||{};
   try{localStorage.removeItem('obs_layout_v2');}catch(e0){}
@@ -8551,6 +8572,7 @@ window.__applyLayOV=function(){
     if(!info)return;
     var sec=SECT.cur?SECT.cur.k.toUpperCase():'OVERVIEW';
     if(!SECT.cur){info.textContent='OVERVIEW · tap ikon sektor buat masuk';return;}
+    if(sel==='*'){info.textContent='GRUP '+sec+' · '+sectorIds().length+' rasi · geser = pindah semua · ◢ = ukuran · ↺↻ −+';return;}
     if(!sel){info.textContent=sec+' · tap rasi lalu geser · tarik ◢ = ukuran'+(dropped?' · draft lama dibuang (sky-data berubah)':'');return;}
     var r=SKY.rasiBy[sel],t;
     if(r.scene)t='k='+rnd(r.scene.k)+' th='+rnd(r.scene.th)+' at='+r.scene.at.map(rnd);
@@ -8567,11 +8589,21 @@ window.__applyLayOV=function(){
   }
   function w2c(x,y){var t=skyXF(x+skyPan.x,y+skyPan.y);return v2c(t[0],t[1]);}
   function selRect(id){
+    if(id==='*'){ /* GRUP: gabungan kotak semua rasi di sektor aktif */
+      var u=null;
+      sectorIds().forEach(function(i2){var q=selRect(i2);if(!q)return;u=u?[Math.min(u[0],q[0]),Math.min(u[1],q[1]),Math.max(u[2],q[2]),Math.max(u[3],q[3])]:q.slice();});
+      return u;
+    }
     if(id==='pleiades'&&PLEIADES.ready){var s=PLEIADES.scale,cx=PLEIADES.x+.53*s,cy=PLEIADES.y+.42*s;return [cx-.4*s,cy-.32*s,cx+.4*s,cy+.32*s];}
     var c=cons(id);if(!c||c.minX==null||c.minX>1e8)return null;
     return [c.minX,c.minY,c.maxX,c.maxY];
   }
   function hitCons(cx,cy){
+    if(grp){
+      var gr=selRect('*');if(!gr)return null;
+      var gw=v2w(cx,cy),gp=18/(skyZoom||1);
+      return (gw[0]>=gr[0]-gp&&gw[0]<=gr[2]+gp&&gw[1]>=gr[1]-gp&&gw[1]<=gr[3]+gp)?'*':null;
+    }
     var w=v2w(cx,cy),pad=18/(skyZoom||1),best=null,ba=1e18;
     sectorIds().forEach(function(id){
       var r=selRect(id);if(!r)return;
@@ -8598,7 +8630,41 @@ window.__applyLayOV=function(){
   }
 
   /* ---- operasi edit ---- */
+  /* ---- EDIT GRUP: geser / putar / skala semua rasi di sektor sekaligus (susunan relatif tetap) ---- */
+  function gSnap(){
+    var S={G:null,fit:window.__scnFit?{fs:window.__scnFit.fs,offx:window.__scnFit.offx,offy:window.__scnFit.offy}:null,items:[]},r0=selRect('*');
+    if(r0)S.G=[(r0[0]+r0[2])/2,(r0[1]+r0[3])/2];
+    sectorIds().forEach(function(id){
+      var r=SKY.rasiBy[id];
+      if(r.scene)S.items.push({id:id,t:'s',at:r.scene.at.slice(),k:r.scene.k,th:r.scene.th});
+      else if(r.ple)S.items.push({id:id,t:'p',at:r.ple.at.slice(),ps:r.ple.ps});
+      else{
+        var o=getOV(id),pv=window.__ovPivot&&window.__ovPivot[id];
+        if(!pv){var c=cons(id);pv=(c&&c.minX<1e8)?[(c.minX+c.maxX)/2,(c.minY+c.maxY)/2]:[0,0];}
+        S.items.push({id:id,t:'o',o:{ox:o.ox,oy:o.oy,k:o.k,th:o.th},pv:pv.slice()});
+      }
+    });
+    return S;
+  }
+  function gApply(S,f,thDeg,dwx,dwy){
+    if(!S||!S.G)return;
+    var t=thDeg*Math.PI/180,cs=Math.cos(t)*f,sn=Math.sin(t)*f,G=S.G,fit=S.fit;
+    function tw(px,py){var x=px-G[0],y=py-G[1];return [G[0]+cs*x-sn*y+dwx,G[1]+sn*x+cs*y+dwy];}
+    S.items.forEach(function(it){
+      var r=SKY.rasiBy[it.id];
+      if(it.t==='o'){
+        var N=tw(it.pv[0]+it.o.ox,it.pv[1]+it.o.oy);
+        window.__layOV[it.id]={ox:N[0]-it.pv[0],oy:N[1]-it.pv[1],k:clamp(it.o.k*f,.05,12),th:it.o.th+thDeg};
+      }else if(fit&&fit.fs){
+        var N2=tw(fit.offx+it.at[0]*fit.fs,fit.offy+it.at[1]*fit.fs),at=[(N2[0]-fit.offx)/fit.fs,(N2[1]-fit.offy)/fit.fs];
+        if(it.t==='s'){r.scene.at=at;r.scene.k=clamp(it.k*f,.05,20);r.scene.th=it.th+thDeg;}
+        else{r.ple.at=at;r.ple.ps=clamp(it.ps*f,8,3000);}
+      }
+    });
+  }
+
   function moveW(id,dx,dy){
+    if(id==='*'){sectorIds().forEach(function(i2){moveW(i2,dx,dy);});return;}
     var r=SKY.rasiBy[id];if(!r)return;
     if(r.scene||r.ple){var f=(window.__scnFit&&window.__scnFit.fs)||1,at=(r.scene||r.ple).at;at[0]+=dx/f;at[1]+=dy/f;}
     else{var o=getOV(id);o.ox+=dx;o.oy+=dy;window.__layOV[id]=o;}
@@ -8655,7 +8721,13 @@ window.__applyLayOV=function(){
     if(a==='collapse'){collapsed=!collapsed;hud.classList.toggle('col',collapsed);return;}
     if(a==='step'){stepI=(stepI+1)%3;var sb=hud.querySelector('[data-a=step]');if(sb)sb.textContent='STEP '+(stepI+1);return;}
     if(a==='ovw'){if(SECT.cur&&!SECT.busy){sel=null;sectToggle();}else toast(SECT.cur?'TUNGGU ANIMASI':'SUDAH DI OVERVIEW');return;}
+    if(a==='grp'){
+      grp=!grp;sel=grp?'*':null;
+      var gb=hud.querySelector('[data-a=grp]');if(gb)gb.classList.toggle('on',grp);
+      updateInfo();paintSel();toast(grp?'MODE GRUP: semua rasi sektor':'MODE SATUAN');return;
+    }
     if(a==='prev'||a==='next'){
+      if(grp){toast('MATIKAN GRUP DULU');return;}
       var ids=sectorIds();if(!ids.length){toast('MASUK SEKTOR DULU');return;}
       var i=ids.indexOf(sel);if(i<0)i=a==='next'?-1:0;
       i=a==='next'?(i+1)%ids.length:(i-1+ids.length)%ids.length;
@@ -8665,6 +8737,14 @@ window.__applyLayOV=function(){
     if(a==='l'||a==='r'||a==='u'||a==='d'){
       var s=ST[stepI],d=screenStep(a==='l'?-s:a==='r'?s:0,a==='u'?-s:a==='d'?s:0);
       moveW(sel,d[0],d[1]);refresh();return;
+    }
+    if(sel==='*'){
+      var sn0=gSnap();
+      if(a==='rotl')gApply(sn0,1,-RT[stepI],0,0);
+      else if(a==='rotr')gApply(sn0,1,RT[stepI],0,0);
+      else if(a==='zoout')gApply(sn0,1-SCF[stepI]*2,0,0,0);
+      else if(a==='zoin')gApply(sn0,1+SCF[stepI]*2,0,0,0);
+      refresh();return;
     }
     if(a==='rotl'){rotateBy(sel,-RT[stepI]);refresh();return;}
     if(a==='rotr'){rotateBy(sel,RT[stepI]);refresh();return;}
@@ -8685,6 +8765,7 @@ window.__applyLayOV=function(){
       '#lay-hud button:active,#lay-fab:active{background:rgba(110,229,255,.3)}',
       '#lay-hud .g{flex:1}',
       '#lay-hud .a{border-color:rgba(255,154,217,.6);color:#ff9ad9}',
+      '#lay-hud .on{background:rgba(255,154,217,.35);color:#fff}',
       '#lay-hud .p{border-color:rgba(130,255,170,.6);color:#8dffb0}',
       '#lay-hud.col .r:not(:first-child){display:none}',
       '#lay-fab{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;z-index:99999;display:none;background:rgba(2,8,13,.85);min-height:32px}',
@@ -8701,7 +8782,7 @@ window.__applyLayOV=function(){
     hud=document.createElement('div');hud.id='lay-hud';
     hud.innerHTML=
       '<div class="r"><div id="lay-info"></div><button data-a="collapse" title="ciutkan">▾</button></div>'+
-      '<div class="r"><button class="p g" data-a="preview">👁 PREVIEW</button><button class="g" data-a="ovw">🛰 OVERVIEW</button><button data-a="prev">‹</button><button data-a="next">›</button></div>'+
+      '<div class="r"><button class="p g" data-a="preview">👁 PREVIEW</button><button class="g" data-a="ovw">🛰 OVERVIEW</button><button data-a="grp" title="Edit semua rasi di sektor sekaligus">◫ GRUP</button><button data-a="prev">‹</button><button data-a="next">›</button></div>'+
       '<div class="r"><button data-a="l">←</button><button data-a="u">↑</button><button data-a="d">↓</button><button data-a="r">→</button><button data-a="rotl">↺</button><button data-a="rotr">↻</button><button data-a="zoout">−</button><button data-a="zoin">+</button><button data-a="step">STEP 2</button></div>'+
       '<div class="r"><button class="a g" data-a="save">SAVE</button><button class="a g" data-a="copy">COPY</button><button class="g" data-a="fit">FIT</button><button class="g" data-a="rst">RST</button></div>';
     document.body.appendChild(hud);
@@ -8722,7 +8803,7 @@ window.__applyLayOV=function(){
       if(e.target&&e.target.id==='lay-hdl'||(e.target.closest&&e.target.closest('#lay-hdl'))){
         var b=ringBox(sel);if(!b)return;
         var cx=(b[0]+b[2])/2,cy=(b[1]+b[3])/2;
-        rs={id:sel,cx:cx,cy:cy,d0:Math.max(12,Math.hypot(e.clientX-cx,e.clientY-cy)),s0:getScale(sel)};
+        rs={id:sel,cx:cx,cy:cy,d0:Math.max(12,Math.hypot(e.clientX-cx,e.clientY-cy)),s0:sel==='*'?1:getScale(sel),snap:sel==='*'?gSnap():null};
         e.stopImmediatePropagation();e.preventDefault();return;
       }
       var id=hitCons(e.clientX,e.clientY);
@@ -8736,7 +8817,8 @@ window.__applyLayOV=function(){
       if(preview)return;
       if(rs){
         var f=Math.hypot(e.clientX-rs.cx,e.clientY-rs.cy)/rs.d0;
-        setScale(rs.id,rs.s0*f);refresh();
+        if(rs.snap)gApply(rs.snap,clamp(f,.2,5),0,0,0);else setScale(rs.id,rs.s0*f);
+        refresh();
         e.stopImmediatePropagation();e.preventDefault();return;
       }
       if(!drag)return;
