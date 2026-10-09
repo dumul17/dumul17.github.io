@@ -182,6 +182,11 @@ function uprEnd(on){if(on)g.restore();}
 var skyRot=0;
 var skyZoom=1;
 var CAMERA_MODE=false;
+/* Rasi yang digabung di overview (mis. Taurus nyambung ke Auriga lewat Elnath): `joinTo` di sky-data.js.
+   Di overview keduanya gerak/goyang bareng (satu 'lead'), di mode kamera fokus rasi pasangannya disembunyikan. */
+var JOIN_LEAD={};SKY.rasi.forEach(function(r){if(r.joinTo)JOIN_LEAD[r.id]=r.joinTo;});
+function joinPartner(id){if(JOIN_LEAD[id])return JOIN_LEAD[id];for(var k in JOIN_LEAD)if(JOIN_LEAD[k]===id)return k;return null;}
+function joinHide(id){if(!CAMERA_MODE)return false;var f=camFocusId();return !!f&&f!=='free'&&f!==id&&joinPartner(id)===f;}
 var ZOOM_LEVELS=[1,1.5,2,3];
 var skyDrag={on:false,moved:false,pid:null,x0:0,y0:0,px:0,py:0};
 var skyPtrs={};
@@ -518,7 +523,7 @@ function focusList(){
   var L=[{id:'free',n:'Free'}];
   for(var i=0;i<order.length;i++){
     var id=order[i];
-    if(sectShow(id))L.push({id:id,n:SKY.rasiBy[id].focusName||id});
+    if(sectShow(id,true))L.push({id:id,n:SKY.rasiBy[id].focusName||id});
   }
   /* Di dalam sektor, kalau BH mini lagi dipanggil: opsi fokus terakhir sebelum balik ke Free */
   if(SECT.cur&&SUM.on)L.push({id:'bh',n:'Gargantua'});
@@ -1571,6 +1576,7 @@ CONS.forEach(function(c,ci){
   });
 });
 var CAPS={bh:$('#cap-bh')};SKY.rasi.forEach(function(r){if(r.cap)CAPS[r.id]=$('#cap-'+r.id);}); /* caption rasi: dari `cap` di sky-data.js */
+CONS.forEach(function(c){if(JOIN_LEAD[c.id])c.lead=cons(JOIN_LEAD[c.id]);}); /* rasi gabungan: goyangan ikut rasi 'lead' */
 
 var PORTALS=[
  {id:'band',cons:'orion',stars:['mintaka','alnilam','alnitak'],from:'mintaka',hit:'alnilam',href:'dumul.html',title:'DUMUL',sub:'music \u00b7 Limerence album',col:'110,229,255',place:'fig-right'}
@@ -2874,7 +2880,8 @@ function layout(){
   var SCN=(function(){
     var D=Math.PI/180,
         def=(function(){var d={};SKY.rasi.forEach(function(r){if(r.scene)d[r.id]=r.scene;});return d;})(), /* transformasi tiap rasi: `scene` di sky-data.js */
-        PC=[745.1,209.9],PS=75,ids=SKY.rasi.filter(function(r){return r.scene&&!CONS_OFF[r.id];}).map(function(r){return r.id;}),pts=[],i,j,k2,c,f,p,st;
+        plr=SKY.rasiBy.pleiades||{},plp=plr.ple,
+        PC=plp?plp.at:[745.1,209.9],PS=plp?plp.ps:75,ids=SKY.rasi.filter(function(r){return r.scene&&!CONS_OFF[r.id];}).map(function(r){return r.id;}),pts=[],i,j,k2,c,f,p,st;
     function mk(d){
       var cs=Math.cos(d.th*D)*d.k,sn=Math.sin(d.th*D)*d.k,tx=d.tx,ty=d.ty;
       if(d.pv){tx=d.at[0]-(cs*d.pv[0]-sn*d.pv[1]);ty=d.at[1]-(sn*d.pv[0]+cs*d.pv[1]);}
@@ -2886,12 +2893,27 @@ function layout(){
       for(k2 in c.stars){st=c.stars[k2];p=f(st.rx,st.ry);st._sx=p[0];st._sy=p[1];pts.push(p);}
       if(c.nebula){p=f(c.nebula.rx,c.nebula.ry);c.nebula._sx=p[0];c.nebula._sy=p[1];}
     }
-    PLEIADES.bright.concat(PLEIADES.dim).forEach(function(z){pts.push([PC[0]+(z.x-.53)*PS,PC[1]+(z.y-.42)*PS]);});
+    var PK=.55; /* PK = pengecil khusus ukuran tampilan cluster Pleiades (titik tengah tetap) */
+    PLEIADES.bright.concat(PLEIADES.dim).forEach(function(z){pts.push([PC[0]+(z.x-.53)*PS*PK,PC[1]+(z.y-.42)*PS*PK]);});
     var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
     for(j=0;j<pts.length;j++){mnx=Math.min(mnx,pts[j][0]);mxx=Math.max(mxx,pts[j][0]);mny=Math.min(mny,pts[j][1]);mxy=Math.max(mxy,pts[j][1]);}
-    var m=Math.max(14,W*.04),aL=m,aR=W-m,aT=top+8,aB=bot-34,bw=mxx-mnx,bh=mxy-mny,
-        fs=Math.min((aR-aL)/bw,(aB-aT)/bh),
-        offx=aL+((aR-aL)-bw*fs)/2-mnx*fs,offy=aT+((aB-aT)-bh*fs)/2-mny*fs;
+    /* area fit: margin + ruang buat caption & label "Pleione" supaya semuanya muat di layar (diulang 4x karena ruang label bergantung skala) */
+    var m=Math.max(22,Math.min(W*.095,40)),aL=m,aR=W-m,aT=top+24,aB=bot-60,fs=1,offx=0,offy=0,ex=[],ei;
+    var capR=SKY.rasi.filter(function(r){return r.cap&&r.scene&&!CONS_OFF[r.id];});
+    for(var it=0;it<4;it++){
+      var x0=mnx,x1=mxx,y0=mny,y1=mxy;
+      for(ei=0;ei<ex.length;ei++){x0=Math.min(x0,ex[ei][0]);x1=Math.max(x1,ex[ei][0]);y0=Math.min(y0,ex[ei][1]);y1=Math.max(y1,ex[ei][1]);}
+      fs=Math.min((aR-aL)/(x1-x0),(aB-aT)/(y1-y0));
+      offx=aL+((aR-aL)-(x1-x0)*fs)/2-x0*fs;offy=aT+((aB-aT)-(y1-y0)*fs)/2-y0*fs;
+      ex=[];
+      capR.forEach(function(r){
+        var cc=cons(r.id),bx0=1e9,bx1=-1e9,by1=-1e9,kk;
+        for(kk in cc.stars){bx0=Math.min(bx0,cc.stars[kk]._sx);bx1=Math.max(bx1,cc.stars[kk]._sx);by1=Math.max(by1,cc.stars[kk]._sy);}
+        var cx=(r.cap.x==='right'?bx1:(bx0+bx1)/2)+r.cap.dx/fs,cw=r.cap.text.length*11;
+        ex.push([cx,by1+r.cap.dy/fs],[cx+cw/fs,by1+(r.cap.dy+14)/fs]);
+      });
+      if(STG.rot)ex.push([PC[0],PC[1]+(STG.rot<0?1:-1)*92/fs]);else ex.push([PC[0]+.31*PS*PK+92/fs,PC[1]-.02*PS*PK]); /* label Pleione (+ bar equalizer) di kanan bintangnya */
+    }
     for(i=0;i<ids.length;i++){
       c=cons(ids[i]);c.maxX=-1e9;c.maxY=-1e9;c.minX=1e9;c.minY=1e9;c.scale=fs*def[ids[i]].k;
       for(k2 in c.stars){
@@ -2902,7 +2924,7 @@ function layout(){
     }
     /* PS dikali fs (faktor fit-layar, bisa ~1.9 di HP) => PS=75 tampil ~140. PK = pengecil khusus ukuran tampilan,
        titik tengah cluster tetap di tempat yang sama. Mau lebih kecil/besar? ubah PK aja. */
-    var PK=.55,psc=PS*fs*PK;
+    var psc=PS*fs*PK;
     PLEIADES.scale=psc;
     PLEIADES.x=offx+PC[0]*fs-.53*psc;
     PLEIADES.y=offy+PC[1]*fs-.42*psc;
@@ -3042,6 +3064,10 @@ function layout(){
   SKY.rasi.forEach(function(r){ /* caption rasi: posisi dari `cap` {x:'mid'|'right', dx, y:'bottom'|'top', dy} di sky-data.js */
     var cp=r.cap,el=cp&&CAPS[r.id],c=cp&&cons(r.id);if(!el||!c)return;
     var x=(cp.x==='right'?c.maxX:(c.minX+c.maxX)/2)+cp.dx,y=(cp.y==='top'?c.minY:c.maxY)+cp.dy;
+    /* caption jangan kepotong layar. Mode ROT (HP landscape): teks diputar tegak terhadap stage, jadi lebarnya memanjang ke sumbu-y stage -> jepit pakai pusat teks. */
+    var cw=el.offsetWidth||(cp.text.length*11),chh=el.offsetHeight||12;
+    if(STG.rot){var ccx=x+cw/2,ccy=y+chh/2;ccx=Math.max(8+chh/2,Math.min(W-8-chh/2,ccx));ccy=Math.max(8+cw/2,Math.min(H-8-cw/2,ccy));x=ccx-cw/2;y=ccy-chh/2;}
+    else{x=Math.max(6,Math.min(W-6-cw,x));y=Math.max(top,Math.min(bot-14,y));}
     el.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px)'+STG.up;
   });
   if(!drag.on){
@@ -5032,12 +5058,13 @@ function drawCons(c,age,now){
   var focus=constellationFocus(c);
   var sway=(reduce||audioFocus)?0:1;
   var wildField=(drag.on&&drag.moved)?1:0;
-  var ox=Math.sin(tn*.00031+c.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(tn*.00027+c.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;
+  var ld=c.lead||c,tp=now-(TD.lag[ld.id]||0); /* rasi gabungan (Taurus+Auriga) pakai jam & fase yang sama => titik Elnath nggak lepas */
+  var ox=Math.sin(tp*.00031+ld.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(tp*.00027+ld.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;
   if(now<glitchUntil){ox+=(Math.random()-.5)*7;oy+=(Math.random()-.5)*4;}
-  if(OFX.pK>.01){ofxPull(c,now);ox+=OFX.px;oy+=OFX.py;} /* tarikan halus ke Gargantua */
+  if(OFX.pK>.01){ofxPull(ld,now);ox+=OFX.px;oy+=OFX.py;} /* tarikan halus ke Gargantua */
   c.ox=ox;c.oy=oy;
   var locked=!isUnlocked(c.id);
-  var obr=ofxBreath(c.phase,now); /* napas rasi: -1..1 x kehadiran BGM Constellation */
+  var obr=ofxBreath(ld.phase,now); /* napas rasi: -1..1 x kehadiran BGM Constellation */
   if(c.nebula){
     var na=clamp((age-c.delay-1.2)/1.5);
     if(na>0&&nebulaIn(c.nebula.x+ox,c.nebula.y+oy,c.scale*1.5)){var nt=skyXF(c.nebula.x+ox,c.nebula.y+oy),q0=pull(nt[0],nt[1]),nx=q0[0],ny=q0[1],nr=c.scale*1.5*(1-.7*q0[2]);na*=(1-q0[2]);
@@ -5323,7 +5350,8 @@ function drawPleiades(age,now){
         var _upP=uprBegin(x,y);
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
         g.textAlign='left';g.fillStyle='rgba('+tr.rgb+','+(hotP?.95:(selected?.78:.42))+')';
-        var labelX=x+r*3.4+7,labelY=y+3;
+        var labelX=x+r*3.4+7,labelY=y+3,labelW0=g.measureText('Pleione').width,flipL=(STG.rot?(v2c(x,y)[0]+(labelX-x)+labelW0+(selected?8+7*3.15:0)+8>STG.iw):(labelX+labelW0+(selected?8+7*3.15:0)+8>W)); /* mepet tepi kanan layar -> label pindah ke kiri bintang */
+        if(flipL){labelX=x-r*3.4-7-labelW0-(selected?8+7*3.15:0);}
         g.fillText('Pleione',labelX,labelY);
         if(selected){
           var bars=7,gap=1.8,bw=1.35;
@@ -5782,7 +5810,7 @@ function sectGlyph(c,cx,cy,box,al){
     g.beginPath();g.arc(ox+(s.rx-c.minx)*sc,oy+(s.ry-c.miny)*sc,Math.max(.8,(s.r||1.3)*.5),0,6.283);g.fill();}
 }
 /* sectShow = gerbang gambar + hit-test + kamera. Rasi di CONS_OFF (off:true di sky-data.js) selalu false. */
-function sectShow(id){return !CONS_OFF[id]&&(!SECT.cur||SECT.cur.ids.indexOf(id)>=0);}
+function sectShow(id,raw){return !CONS_OFF[id]&&(!SECT.cur||SECT.cur.ids.indexOf(id)>=0)&&(raw||!joinHide(id));}
 function sectEase(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
 /* Transform zoom ke ikon: titik P (dunia) -> tengah layar. pan = (pusat - P)*u, zoom = 1+u*(zt-1). */
 function sectApply(s,u){

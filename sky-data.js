@@ -52,38 +52,40 @@ var RASI=[
   {id:'orion', sector:'winter', label:'Orion', focusName:'Orion', focus:2, dist:1344, unlock:true,
    cap:{text:'Orion', x:'mid', dx:-30, y:'bottom', dy:22},
    box:{portrait:function(W,top,ah,bot){return [W*.32,top-ah*.02,W*.64,top+ah*.32];}, land:function(W,top,ah,bot){return [W*.22,top+ah*.02,W*.37,bot-12];}},
-   scene:{k:.7738, th:-23.84, pv:[492,651], at:[299.86,647.23]},
+   scene:{k:0.5587, th:3.61, pv:[674,875], at:[172.7,789.4]},
    whisper:["The hunter never moved. We just kept looking.","Three stars in a row, and somehow it became a story."],
    info:{"tag":"Constellation · The Hunter","rows":[["Brightest","Rigel · mag 0.13"],["Betelgeuse","~550–700 ly"],["Orion Nebula","M42 · ~1,350 ly"],["Area","594 sq°"]],"fact":"Betelgeuse is a red supergiant so vast it would swallow Mars’s orbit if it sat where the Sun does."}},
-  {id:'taurus', sector:'winter', label:'Taurus', focusName:'Taurus', focus:4, dist:65, unlock:true,
+  {id:'taurus', sector:'winter', label:'Taurus', focusName:'Taurus', focus:4, dist:65, unlock:true, joinTo:'auriga', /* overview: nyambung ke Auriga lewat Elnath; mode kamera fokus tetap 2 rasi terpisah */
    cap:{text:'Taurus', x:'mid', dx:-28, y:'bottom', dy:18},
    box:{portrait:function(W,top,ah,bot){return [W*.12,top+ah*.64,W*.42,top+ah*.92];}, land:function(W,top,ah,bot){return [W*.02,top+ah*.48,W*.15,bot-28];}},
-   scene:{k:.7241, th:5.3, tx:312.95, ty:-58.3},
+   scene:{k:0.5397, th:0.6, pv:[453,627], at:[351.8,-71.8]},
    whisper:["The bull is not charging. It has simply waited a very long time.","Seven sisters ride on its shoulder."],
    info:{"tag":"Constellation · The Bull","rows":[["Brightest","Aldebaran · ~65 ly"],["Cluster","Pleiades M45"],["Crab Nebula","M1 · ~6,500 ly"],["Area","797 sq°"]],"fact":"The Crab Nebula is the remnant of a supernova that Chinese astronomers recorded in 1054."}},
   {id:'canis', sector:'winter', label:'Canis Major', focusName:'Sirius', focus:1, dist:9, unlock:true,
    cap:{text:'Canis Major', x:'mid', dx:-48, y:'bottom', dy:18},
    box:{portrait:function(W,top,ah,bot){return [W*.04,top+ah*.14,W*.18,top+ah*.32];}, land:function(W,top,ah,bot){return [W*.02,top+ah*.08,W*.10,top+ah*.34];}},
-   scene:{k:.5417, th:4, pv:[445,316], at:[3.05,938.8]},
+   scene:{k:0.359, th:-30, pv:[729,312], at:[-217.5,875.6]},
    whisper:["The brightest dog in the sky, and it still follows.","Sirius answers if you wait long enough."],
    info:{"tag":"Constellation · The Great Dog","rows":[["Brightest","Sirius · mag −1.46"],["Distance","8.6 ly"],["Companion","Sirius B, white dwarf"],["Area","380 sq°"]],"fact":"Sirius is the brightest star in the night sky, and one of our nearest neighbours."}},
   {id:'pleiades', sector:'winter', label:'Pleiades', focusName:'Pleiades', focus:5, dist:444, cluster:true, unlock:true,
+   ple:{at:[448.3,-239.9], ps:55.9},
    whisper:["Seven voices, one soft cluster.","Lean closer. They only whisper."],
    info:{"tag":"Open cluster · M45","rgb":"145,170,255","rows":[["Distance","~444 ly"],["Age","~100 million years"],["Members","1,000+ stars"],["Naked eye","6–7 visible"]],"fact":"Blue light from its young stars is lighting a haze of dust around the cluster."}},
   {id:'gemini', sector:'winter', label:'Gemini', focusName:'Gemini', focus:3, dist:34, unlock:true,
    box:{portrait:function(W,top,ah,bot){return [W*.04,top+ah*.0,W*.30,top+ah*.2];}, land:function(W,top,ah,bot){return [W*.12,top+ah*.0,W*.30,top+ah*.3];}},
-   scene:{k:.9, th:0, tx:-160, ty:-10},
+   scene:{k:0.8729, th:0.04, pv:[181,196], at:[-255.9,-681.8]},
    whisper:["Two brothers, one light. They never leave the winter sky.","Castor and Pollux still share the same story."],
    info:{"tag":"Constellation · The Twins","rows":[["Brightest","Pollux · mag 1.14"],["Castor","binary system"],["Distance","~34–52 ly"],["Area","514 sq°"]],"fact":"Pollux is an orange giant; Castor is a complex multiple-star system of six stars."}},
   /* ANCHOR — Capella saja sampai layout Auriga penuh */
   {id:'auriga', sector:'winter', label:'Auriga', focusName:'Auriga', focus:6, dist:43, unlock:true,
-   box:{portrait:function(W,top,ah,bot){return [W*.72,top+ah*.02,W*.92,top+ah*.18];}, land:function(W,top,ah,bot){return [W*.55,top+ah*.02,W*.72,top+ah*.22];}},
+   box:{portrait:function(W,top,ah,bot){return [W*.68,top+ah*.02,W*.95,top+ah*.42];}, land:function(W,top,ah,bot){return [W*.52,top+ah*.02,W*.78,top+ah*.48];}},
+   scene:{k:0.802, th:8.87, pv:[315,113], at:[204.7,-968.9]},
    whisper:["Capella waits where the chariot will stand.","A single warm point — the rest of Auriga is still arriving."],
    info:{"tag":"Constellation · The Charioteer","rows":[["Brightest","Capella · mag 0.08"],["Distance","~43 ly"],["Type","G-type giant pair"],["Area","657 sq°"]],"fact":"Capella is the sixth-brightest star in the night sky and a cornerstone of the Winter Hexagon."}},
   /* ANCHOR — Procyon saja sampai layout Canis Minor penuh */
   {id:'canmin', sector:'winter', label:'Canis Minor', focusName:'Procyon', focus:7, dist:11, unlock:true,
-   /* kanan-bawah winter — jauh dari Orion (tengah) & Capella (kanan-atas) */
-   box:{portrait:function(W,top,ah,bot){return [W*.72,top+ah*.52,W*.92,top+ah*.68];}, land:function(W,top,ah,bot){return [W*.58,top+ah*.48,W*.76,top+ah*.66];}},
+   box:{portrait:function(W,top,ah,bot){return [W*.70,top+ah*.48,W*.95,top+ah*.78];}, land:function(W,top,ah,bot){return [W*.55,top+ah*.42,W*.82,top+ah*.75];}},
+   scene:{k:0.4, th:-0.06, pv:[263,620], at:[-351.8,50.2]},
    whisper:["The little dog holds one lamp.","Procyon keeps the Winter Triangle until the outline is drawn."],
    info:{"tag":"Constellation · The Little Dog","rows":[["Brightest","Procyon · mag 0.34"],["Distance","~11.5 ly"],["Companion","white dwarf"],["Area","183 sq°"]],"fact":"Procyon means “before the dog” — it rises ahead of Sirius."}},
   {id:'virgo', sector:'spring', label:'Virgo', focusName:'Virgo', focus:2, dist:250, unlock:true,
@@ -92,7 +94,8 @@ var RASI=[
    whisper:["Spica burns quietly, like it knows something.","Spring sleeps here, folded in blue light."],
    info:{"tag":"Constellation · The Maiden","rows":[["Brightest","Spica · ~250 ly"],["Rank","2nd largest of 88"],["Cluster","Virgo · ~1,300 galaxies"],["Area","1,294 sq°"]],"fact":"Galaxy M87 hides here, home of the first black hole ever photographed."}},
   {id:'bootes', sector:'spring', label:'Boötes', focusName:'Boötes', focus:1, dist:37, unlock:true,
-   box:{portrait:function(W,top,ah,bot){return [W*.087,top+ah*.338,W*.249,top+ah*.496];}, land:function(W,top,ah,bot){return [W*.087,top+ah*.338,W*.249,top+ah*.496];}},
+   /* scale naik: kite baru lebih tinggi (fy ~88–590) */
+   box:{portrait:function(W,top,ah,bot){return [W*.05,top+ah*.28,W*.30,top+ah*.62];}, land:function(W,top,ah,bot){return [W*.05,top+ah*.22,W*.28,top+ah*.58];}},
    whisper:["The herdsman holds a lantern called Arcturus.","Amber light, older than the question."],
    info:{"tag":"Constellation · The Herdsman","rows":[["Brightest","Arcturus · ~37 ly"],["Type","Orange giant"],["Rank","4th brightest star"],["Area","907 sq°"]],"fact":"Nearby lies the Boötes Void, an emptiness about 330 million light-years wide."}},
   {id:'ursa', sector:'spring', label:'Ursa Major', focusName:'Ursa Major', focus:4, unlock:true, dist:83,
@@ -261,76 +264,138 @@ var DUMUL_AUDIO=['limerence','glitch','nastenka','larung'];
 /* ---------- 4. GEOMETRI (titik + garis imajiner hasil trace) ---------- */
 var GEOMETRY=[
  {id:'orion',ra0:84.5,delay:.3,phase:0,
-  /* Fixed traced geometry: 1000×1000 source, preserved 1:1 then fit responsively. */
+  /* Orion FIX V6 dari orion.html (viewBox 1000×1000). Betelgeuse + Rigel SFX. */
   stars:{
-   meissa:{fx:230,fy:198,r:1.7,c:'#eaf6ff'},meissa2:{fx:311,fy:175,r:1.5,c:'#eaf6ff'},
-   baham1:{fx:248,fy:306,r:1.35,c:'#dcefff'},baham2:{fx:285,fy:282,r:1.35,c:'#dcefff'},
-   siku:{fx:315,fy:404,r:1.35,c:'#dcefff'},
-   betel:{fx:365,fy:455,r:3.5,c:'#ff8e66',name:'Betelgeuse',nx:1,dy:-9},
-   bella2:{fx:501,fy:392,r:1.55,c:'#dcefff'},bella:{fx:559,fy:479,r:2.5,c:'#dcefff'},
-   bow1:{fx:781,fy:389,r:1.35,c:'#dcefff'},bow2:{fx:805,fy:407,r:1.25,c:'#dcefff'},bow3:{fx:807,fy:459,r:1.25,c:'#dcefff'},
-   bow4:{fx:806,fy:507,r:1.25,c:'#dcefff'},bow5:{fx:789,fy:564,r:1.25,c:'#dcefff'},bow6:{fx:750,fy:597,r:1.25,c:'#dcefff'},
-   alnitak:{fx:454,fy:664,r:2.7,c:'#cfeeff'},alnilam:{fx:492,fy:651,r:2.9,c:'#cfeeff'},mintaka:{fx:523,fy:638,r:2.5,c:'#cfeeff'},
-   saiph:{fx:416,fy:860,r:2.4,c:'#cde6ff'},rigel:{fx:638,fy:827,r:3.7,c:'#bfe0ff',name:'Rigel',nx:-1,dy:2}
-  },
-  lines:[["meissa","baham1"],["meissa2","baham2"],["baham1","siku"],["siku","betel"],["betel","bella2"],["bella2","bella"],["bella","bow3"],["bow1","bow2"],["bow2","bow3"],["bow3","bow4"],["bow4","bow5"],["bow5","bow6"],["betel","alnitak"],["bella","mintaka"],["alnitak","alnilam"],["alnilam","mintaka"],["alnitak","saiph"],["mintaka","rigel"],["saiph","rigel"]],
-  nebula:{fx:500,fy:600}},
- {id:'virgo',ra0:190.7,delay:1.4,phase:2.1,
-  stars:{
-   kiriJauh:{fx:260,fy:565,r:1.35,c:'#eaf6ff'},kiriTengah:{fx:382,fy:509,r:1.35,c:'#eaf6ff'},tengahKiri:{fx:461,fy:511,r:1.5,c:'#f0f6ff'},
-   zavijava:{fx:512,fy:265,r:1.9,c:'#eaf6ff'},tengahAtas:{fx:600,fy:447,r:1.55,c:'#eaf6ff'},tengahKanan:{fx:665,fy:500,r:1.55,c:'#eaf6ff'},
-   kananJauh:{fx:735,fy:326,r:1.9,c:'#ffe0c0'},atasSpica:{fx:542,fy:562,r:1.4,c:'#eaf6ff'},
-   spica:{fx:519,fy:666,r:3.8,c:'#bfe0ff',name:'Spica',nx:-1},bawahTengah:{fx:384,fy:736,r:1.5,c:'#eaf6ff'},
-   bawahKiriTengah:{fx:366,fy:657,r:1.35,c:'#eaf6ff'},bawahKiriUjung:{fx:293,fy:699,r:1.35,c:'#eaf6ff'},kananTengah:{fx:700,fy:400,r:1.55,c:'#ffe9c9'}
-  },
-  lines:[["kiriJauh","kiriTengah"],["kiriTengah","tengahKiri"],["tengahKiri","tengahAtas"],["tengahAtas","zavijava"],["tengahAtas","tengahKanan"],["tengahKanan","kananTengah"],["kananTengah","kananJauh"],["tengahKanan","atasSpica"],["tengahKiri","spica"],["atasSpica","spica"],["bawahKiriUjung","bawahKiriTengah"],["bawahKiriTengah","bawahTengah"],["bawahTengah","spica"]]},
- {id:'canis',ra0:103.5,delay:2.2,phase:4.0,
-  stars:{
-   theta:{fx:322,fy:183,r:1.5,c:'#eaf6ff'},iota:{fx:271,fy:314,r:1.7,c:'#dcefff'},muliphein:{fx:351,fy:343,r:1.7,c:'#eaf6ff'},
-   sirius:{fx:445,fy:316,r:4.2,c:'#e8f4ff',name:'Sirius',nx:1,dy:-10},mirzam:{fx:660,fy:313,r:2.6,c:'#bfe0ff'},mulipheinBody:{fx:548,fy:388,r:1.7,c:'#eaf6ff'},
-   furud:{fx:587,fy:477,r:1.55,c:'#cfeeff'},wezenTop:{fx:359,fy:564,r:1.35,c:'#cfeeff'},wezen:{fx:342,fy:617,r:2.7,c:'#cfeeff'},
-   tengahAtas:{fx:438,fy:520,r:1.6,c:'#cfeeff'},tengahBawah:{fx:414,fy:665,r:1.6,c:'#cfeeff'},adhara:{fx:448,fy:697,r:2.6,c:'#a8d4ff'},
-   aludra:{fx:245,fy:776,r:2.4,c:'#cde6ff'},ekorKanan:{fx:768,fy:671,r:1.5,c:'#cfeeff'},ekorBawah:{fx:552,fy:803,r:1.5,c:'#cfeeff'}
-  },
-  lines:[["theta","iota"],["theta","muliphein"],["iota","muliphein"],["muliphein","sirius"],["sirius","mulipheinBody"],["mirzam","mulipheinBody"],["sirius","wezenTop"],["wezenTop","wezen"],["mulipheinBody","furud"],["mulipheinBody","tengahAtas"],["tengahAtas","tengahBawah"],["tengahBawah","adhara"],["wezen","adhara"],["wezen","aludra"],["adhara","ekorKanan"],["adhara","ekorBawah"]]},
- /* Taurus — coords LOCK from taurus_final (1000-space). Only Aldebaran is interactive. */
- {id:'taurus',ra0:68.9,delay:1.0,phase:1.2,
-  stars:{
-   elnath:{fx:157,fy:204,r:3.2,c:'#eaf6ff'},
-   leftHorn:{fx:87,fy:423,r:1.7,c:'#dcefff'},
-   upperMid:{fx:400,fy:378,r:1.85,c:'#eaf6ff'},
-   theta1:{fx:481,fy:467,r:1.95,c:'#ffe9a0'},
-   theta2:{fx:514,fy:503,r:1.95,c:'#ffe9a0'},
-   aldebaran:{fx:443,fy:533,r:3.6,c:'#ffb27a',name:'Aldebaran',nx:-1,dy:2},
-   nearAlde:{fx:482,fy:542,r:1.55,c:'#eaf6ff'},
-   hyadesTip:{fx:536,fy:549,r:1.7,c:'#eaf6ff'},
-   tail1:{fx:651,fy:613,r:1.7,c:'#dcefff'},
-   tail2a:{fx:862,fy:671,r:1.7,c:'#dcefff'},
-   tail2b:{fx:878,fy:688,r:1.95,c:'#eaf6ff'}
+   o1:{fx:328,fy:60,r:2.6,c:'#eaf6ff'},
+   o2:{fx:263,fy:75,r:2.6,c:'#eaf6ff'},
+   o3:{fx:233,fy:221,r:2.3,c:'#dcefff'},
+   o4:{fx:203,fy:236,r:2.3,c:'#dcefff'},
+   o5:{fx:268,fy:371,r:2.9,c:'#eaf6ff'},
+   betel:{fx:315,fy:435,r:4.2,c:'#ff8e66',name:'Betelgeuse',nx:1,dy:-10},
+   o7:{fx:464,fy:363,r:2.9,c:'#eaf6ff'},
+   o8:{fx:538,fy:465,r:2.9,c:'#eaf6ff'},
+   o9:{fx:753,fy:349,r:2.3,c:'#dcefff'},
+   o10:{fx:785,fy:385,r:2.3,c:'#dcefff'},
+   o11:{fx:793,fy:440,r:2.6,c:'#eaf6ff'},
+   o12:{fx:783,fy:482,r:2.3,c:'#dcefff'},
+   o13:{fx:772,fy:574,r:2.3,c:'#dcefff'},
+   o14:{fx:733,fy:597,r:2.3,c:'#dcefff'},
+   alnitak:{fx:490,fy:658,r:3.1,c:'#cfeeff'},
+   alnilam:{fx:460,fy:688,r:3.1,c:'#cfeeff'},
+   mintaka:{fx:428,fy:708,r:3.1,c:'#cfeeff'},
+   rigel:{fx:674,fy:875,r:4.2,c:'#bfe0ff',name:'Rigel',nx:-1,dy:2},
+   saiph:{fx:378,fy:936,r:3.1,c:'#cde6ff'}
   },
   lines:[
-   ["elnath","upperMid"],["upperMid","theta1"],["theta1","theta2"],["theta2","hyadesTip"],
-   ["hyadesTip","tail1"],["tail1","tail2a"],["tail2a","tail2b"],
-   ["leftHorn","aldebaran"],["aldebaran","nearAlde"],["nearAlde","hyadesTip"]
+   ["o1","o3"],["o2","o4"],["o3","o5"],["o4","o5"],
+   ["o5","betel"],["betel","o7"],["betel","mintaka"],
+   ["o7","o8"],["o8","o11"],
+   ["o9","o10"],["o10","o11"],["o11","o12"],["o12","o13"],["o13","o14"],
+   ["o8","alnitak"],["alnitak","alnilam"],["alnilam","mintaka"],
+   ["mintaka","saiph"],["alnitak","rigel"],["saiph","rigel"]
+  ]},
+ {id:'virgo',ra0:190.7,delay:1.4,phase:2.1,
+  /* Virgo dari virgo.html (viewBox 720×860 → ×1000/720). Spica SFX. */
+  stars:{
+   v1:{fx:820,fy:102,r:2.2,c:'#eaf6ff'},
+   v2:{fx:799,fy:383,r:2.5,c:'#eaf6ff'},
+   v3:{fx:716,fy:493,r:2.4,c:'#eaf6ff'},
+   v4:{fx:594,fy:463,r:2.5,c:'#eaf6ff'},
+   v5:{fx:461,fy:350,r:2.5,c:'#eaf6ff'},
+   v6:{fx:498,fy:695,r:2.7,c:'#eaf6ff'},
+   v7:{fx:361,fy:758,r:2.3,c:'#eaf6ff'},
+   v8:{fx:179,fy:960,r:2.3,c:'#eaf6ff'},
+   spica:{fx:685,fy:860,r:4.5,c:'#bfe0ff',name:'Spica',nx:-1},
+   v10:{fx:489,fy:1044,r:2.5,c:'#eaf6ff'},
+   v11:{fx:413,fy:981,r:2.5,c:'#eaf6ff'},
+   v12:{fx:304,fy:1088,r:2.5,c:'#eaf6ff'}
+  },
+  lines:[
+   ["v1","v2"],["v2","v3"],["v3","v4"],["v4","v5"],
+   ["v4","v6"],["v6","v7"],["v7","v8"],
+   ["v3","spica"],["v6","spica"],
+   ["spica","v10"],["v10","v11"],["v11","v12"]
+  ]},
+ {id:'canis',ra0:103.5,delay:2.2,phase:4.0,
+  /* Canis Major dari canis major.html (viewBox 720×720 → ×1000/720). Sirius SFX. */
+  stars:{
+   cm1:{fx:639,fy:111,r:2.2,c:'#eaf6ff'},
+   cm2:{fx:839,fy:72,r:2.2,c:'#eaf6ff'},
+   cm3:{fx:639,fy:221,r:2.2,c:'#eaf6ff'},
+   sirius:{fx:729,fy:312,r:4.5,c:'#e8f4ff',name:'Sirius',nx:1,dy:-10},
+   cm5:{fx:722,fy:417,r:2.7,c:'#eaf6ff'},
+   cm6:{fx:72,fy:421,r:2.4,c:'#eaf6ff'},
+   cm7:{fx:229,fy:403,r:2.4,c:'#eaf6ff'},
+   wezen:{fx:288,fy:435,r:2.9,c:'#eaf6ff',name:'Wezen',nx:-1,dy:-8},
+   cm9:{fx:415,fy:390,r:2.4,c:'#eaf6ff'},
+   cm10:{fx:286,fy:536,r:2.1,c:'#eaf6ff'},
+   cm11:{fx:469,fy:471,r:2.1,c:'#eaf6ff'},
+   cm12:{fx:274,fy:594,r:2.6,c:'#eaf6ff'},
+   cm13:{fx:654,fy:583,r:2.4,c:'#eaf6ff'},
+   cm14:{fx:922,fy:529,r:2.6,c:'#eaf6ff'},
+   cm15:{fx:214,fy:776,r:2.1,c:'#eaf6ff'},
+   cm16:{fx:500,fy:924,r:2.6,c:'#eaf6ff'}
+  },
+  lines:[
+   ["cm1","cm2"],["cm1","cm3"],["cm3","cm2"],
+   ["sirius","cm3"],["sirius","cm5"],
+   ["cm5","cm13"],["cm5","cm11"],["cm5","cm14"],
+   ["sirius","cm9"],["cm9","wezen"],
+   ["cm6","cm7"],["cm7","wezen"],
+   ["wezen","cm10"],["cm10","cm11"],["cm10","cm12"],
+   ["cm12","cm15"],["cm12","cm16"]
+  ]},
+ {id:'taurus',ra0:68.9,delay:1.0,phase:1.2,
+  /* Taurus dari taurus.html (viewBox 720×860 → ×1000/720). Aldebaran SFX. */
+  stars:{
+   elnath:{fx:218,fy:180,r:2.9,c:'#eaf6ff',name:'Alnath',nx:-1,dy:-8},
+   t2:{fx:424,fy:399,r:2.9,c:'#eaf6ff'},
+   t3:{fx:145,fy:438,r:2.5,c:'#eaf6ff'},
+   t4:{fx:495,fy:539,r:2.2,c:'#eaf6ff'},
+   t5:{fx:522,fy:588,r:2.2,c:'#eaf6ff'},
+   aldebaran:{fx:453,fy:627,r:4.5,c:'#ffb450',name:'Aldebaran',nx:1,dy:-8},
+   t7:{fx:507,fy:653,r:2.1,c:'#eaf6ff'},
+   t8:{fx:545,fy:661,r:2.1,c:'#eaf6ff'},
+   t9:{fx:648,fy:788,r:2.6,c:'#eaf6ff'},
+   t10:{fx:800,fy:756,r:2.5,c:'#eaf6ff'},
+   t11:{fx:823,fy:843,r:2.1,c:'#eaf6ff'},
+   t12:{fx:847,fy:880,r:2.0,c:'#eaf6ff'},
+   t13:{fx:568,fy:916,r:2.4,c:'#eaf6ff'},
+   t14:{fx:636,fy:1005,r:2.5,c:'#eaf6ff'}
+  },
+  lines:[
+   ["elnath","t2"],["t3","aldebaran"],
+   ["t2","t4"],["t4","t5"],["t5","t8"],
+   ["aldebaran","t7"],["t7","t8"],
+   ["t8","t9"],["t9","t10"],["t10","t11"],["t11","t12"],
+   ["t9","t13"],["t13","t14"]
   ]},
  {id:'bootes',ra0:0,delay:1.0,phase:1.2,
-  /* Classic kite matching Space.com ref: top → shoulders → lower sides →
-     Arcturus at tip, two short legs below. y grows downward. */
+  /* Boötes dari bootes.html (viewBox 720×480 → ×1000/720). Arcturus α Boo. */
   stars:{
-   bootes_top:{fx:0,fy:-95,r:1.75,c:'#eaf6ff'},
-   bootes_left:{fx:-58,fy:-38,r:1.7,c:'#eaf6ff'},
-   bootes_right:{fx:52,fy:-48,r:1.7,c:'#eaf6ff'},
-   bootes_ml:{fx:-28,fy:8,r:1.65,c:'#eaf6ff'},
-   izar:{fx:32,fy:2,r:2.0,c:'#dcefff'},
-   arcturus:{fx:4,fy:58,r:3.8,c:'#ffb450',name:'Arcturus',nx:-1,dy:14},
-   bootes_legL:{fx:-32,fy:98,r:1.55,c:'#eaf6ff'},
-   bootes_legR:{fx:38,fy:102,r:1.55,c:'#eaf6ff'}
+   b1:{fx:536,fy:88,r:2.2,c:'#eaf6ff'},
+   b2:{fx:556,fy:88,r:2.2,c:'#eaf6ff'},
+   b3:{fx:549,fy:147,r:2.2,c:'#eaf6ff'},
+   nekkar:{fx:407,fy:233,r:2.5,c:'#eaf6ff'},
+   seginus:{fx:501,fy:268,r:2.5,c:'#eaf6ff'},
+   princeps:{fx:362,fy:336,r:2.5,c:'#eaf6ff'},
+   b7:{fx:511,fy:361,r:2.7,c:'#eaf6ff'},
+   izar:{fx:456,fy:418,r:3.0,c:'#eaf6ff'},
+   arcturus:{fx:550,fy:501,r:4.5,c:'#ffb450',name:'Arcturus',nx:-1,dy:12},
+   muphrid:{fx:615,fy:508,r:2.7,c:'#eaf6ff'},
+   b11:{fx:492,fy:590,r:2.4,c:'#eaf6ff'}
   },
   lines:[
-   ["bootes_top","bootes_left"],["bootes_top","bootes_right"],
-   ["bootes_left","bootes_ml"],["bootes_right","izar"],
-   ["bootes_ml","arcturus"],["izar","arcturus"],
-   ["arcturus","bootes_legL"],["arcturus","bootes_legR"]
+   /* top double → neck */
+   ["b1","b3"],["b2","b3"],["b3","seginus"],
+   /* Seginus → Nekkar & middle */
+   ["seginus","nekkar"],["seginus","b7"],
+   /* Nekkar → Princeps → Izar → Arcturus */
+   ["nekkar","princeps"],["princeps","izar"],["izar","arcturus"],
+   /* middle → Arcturus direct */
+   ["b7","arcturus"],
+   /* Arcturus → Muphrid & bawah */
+   ["arcturus","muphrid"],["arcturus","b11"]
   ]},
  {id:'scorpius',ra0:0,delay:1.1,phase:1.4,
   /* Geometry LOCKED to scorpius-map.html — 1000×1000 reference coordinates. */
@@ -381,40 +446,35 @@ var GEOMETRY=[
  /* Ursa Major / Big Dipper: 18 titik dari bigdipper-ursa-major.html
     (viewBox 612×424, scale ×1000/612). UI NONAKTIF (RASI off:true). Bintang utama: Alioth. */
  {id:'ursa',ra0:0,delay:1.2,phase:1.0,
+  /* Ursa Major dari ursa major.html (viewBox 1000×1000). Alioth SFX. */
   stars:{
-   u1:{fx:546,fy:116,r:3.2,c:'#eaf6ff'},
-   u2:{fx:634,fy:152,r:3.0,c:'#eaf6ff'},
-   u3:{fx:541,fy:173,r:3.1,c:'#eaf6ff'},
-   u4:{fx:418,fy:221,r:3.3,c:'#eaf6ff'},
-   u5:{fx:531,fy:230,r:2.6,c:'#dcefff'},
-   u6:{fx:183,fy:257,r:3.0,c:'#eaf6ff'},
-   alioth:{fx:237,fy:265,r:3.6,c:'#ffe9a0',name:'Alioth',nx:-1,dy:-9},
-   u8:{fx:306,fy:266,r:3.0,c:'#eaf6ff'},
-   u9:{fx:428,fy:286,r:2.5,c:'#dcefff'},
-   u10:{fx:547,fy:291,r:2.6,c:'#dcefff'},
-   u11:{fx:116,fy:297,r:3.2,c:'#eaf6ff'},
-   u12:{fx:592,fy:304,r:2.4,c:'#dcefff'},
-   u13:{fx:335,fy:315,r:3.0,c:'#eaf6ff'},
-   u14:{fx:670,fy:328,r:2.5,c:'#dcefff'},
-   u15:{fx:343,fy:391,r:2.6,c:'#dcefff'},
-   u16:{fx:415,fy:430,r:2.9,c:'#eaf6ff'},
-   u17:{fx:525,fy:454,r:2.7,c:'#dcefff'},
-   u18:{fx:400,fy:572,r:2.6,c:'#dcefff'}
+   alkaid:{fx:80,fy:55,r:3.2,c:'#eaf6ff'},
+   mizar:{fx:215,fy:83,r:3.2,c:'#eaf6ff'},
+   alioth:{fx:284,fy:173,r:4.2,c:'#ffe9a0',name:'Alioth',nx:-1,dy:-10},
+   megrez:{fx:370,fy:274,r:2.9,c:'#eaf6ff'},
+   u5:{fx:360,fy:399,r:2.9,c:'#eaf6ff'},
+   u6:{fx:517,fy:472,r:2.9,c:'#eaf6ff'},
+   u7:{fx:576,fy:348,r:2.9,c:'#eaf6ff'},
+   u8:{fx:780,fy:441,r:2.9,c:'#eaf6ff'},
+   u9:{fx:918,fy:541,r:3.2,c:'#eaf6ff'},
+   u10:{fx:708,fy:531,r:2.6,c:'#dcefff'},
+   u11:{fx:670,fy:649,r:2.6,c:'#dcefff'},
+   u12:{fx:301,fy:537,r:2.6,c:'#dcefff'},
+   u13:{fx:357,fy:714,r:2.6,c:'#dcefff'},
+   u14:{fx:473,fy:906,r:2.4,c:'#dcefff'},
+   u15:{fx:501,fy:878,r:2.4,c:'#dcefff'},
+   u16:{fx:710,fy:737,r:2.6,c:'#dcefff'},
+   u17:{fx:777,fy:888,r:2.4,c:'#dcefff'},
+   u18:{fx:797,fy:871,r:2.4,c:'#dcefff'}
   },
   lines:[
-   /* handle kiri (Alkaid side): 11→6→7→8 */
-   ["u11","u6"],["u6","alioth"],["alioth","u8"],
-   /* bowl / badan: 8→4→3→1→2→3 */
-   ["u8","u4"],["u4","u3"],["u3","u1"],["u1","u2"],["u2","u3"],
-   /* inner bowl: 3→5→10→12→14 */
-   ["u3","u5"],["u5","u10"],["u10","u12"],["u12","u14"],
-   /* cross body: 4→9→13, 8→13, 9→5 */
-   ["u4","u9"],["u9","u13"],["u8","u13"],["u9","u5"],
-   /* legs: 13→15→16→17, 15→18 */
-   ["u13","u15"],["u15","u16"],["u16","u17"],["u15","u18"]
+   ["alkaid","mizar"],["mizar","alioth"],["alioth","megrez"],
+   ["megrez","u7"],["u7","u8"],
+   ["u5","megrez"],["u5","u6"],["u6","u7"],["u6","u11"],
+   ["u8","u9"],["u10","u9"],["u10","u11"],
+   ["u12","u5"],["u12","u13"],["u13","u14"],["u13","u15"],
+   ["u11","u16"],["u16","u17"],["u16","u18"]
   ]},
- /* Leo: 9 titik dari leo-constellation.html (viewBox 581×612 → scale ×1000/581).
-    UI NONAKTIF (RASI off:true). Bintang utama nanti: Denebola (l5 — ekor/kiri badan). */
  {id:'leo',ra0:0,delay:1.3,phase:1.1,
   stars:{
    l1:{fx:774,fy:167,r:3.4,c:'#eaf6ff'},
@@ -440,35 +500,31 @@ var GEOMETRY=[
  /* Hydra: 16 titik dari hydra.html (viewBox 581×612 → ×1000/581).
     UI NONAKTIF (off). Bintang utama nanti: Alphard (h9). */
  {id:'hydra',ra0:0,delay:1.4,phase:1.2,
+  /* Hydra V2 dari hydra.html (viewBox 1000×1000). Alphard utama (belum SFX). */
   stars:{
-   h1:{fx:139,fy:763,r:2.6,c:'#dcefff'},
-   h2:{fx:234,fy:668,r:3.3,c:'#eaf6ff'},
-   h3:{fx:478,fy:690,r:2.6,c:'#dcefff'},
-   h4:{fx:514,fy:655,r:2.6,c:'#dcefff'},
-   h5:{fx:567,fy:463,r:3.6,c:'#eaf6ff'},
-   h6:{fx:629,fy:453,r:2.8,c:'#eaf6ff'},
-   h7:{fx:655,fy:397,r:2.8,c:'#eaf6ff'},
-   h8:{fx:708,fy:413,r:2.8,c:'#eaf6ff'},
-   h9:{fx:755,fy:334,r:4.0,c:'#ffe9a0',name:'Alphard',nx:-1,dy:-10},
-   h10:{fx:706,fy:262,r:2.0,c:'#dcefff'},
-   h11:{fx:766,fy:210,r:2.6,c:'#eaf6ff'},
-   /* head cluster */
-   h12:{fx:807,fy:151,r:3.0,c:'#eaf6ff'},
-   h13:{fx:831,fy:139,r:2.4,c:'#dcefff'},
-   h14:{fx:858,fy:142,r:2.4,c:'#dcefff'},
-   h15:{fx:847,fy:170,r:2.0,c:'#dcefff'},
-   h16:{fx:862,fy:170,r:2.2,c:'#dcefff'}
+   h1:{fx:140,fy:725,r:2.9,c:'#eaf6ff'},
+   h2:{fx:236,fy:624,r:3.2,c:'#eaf6ff'},
+   h3:{fx:480,fy:631,r:2.9,c:'#eaf6ff'},
+   h4:{fx:515,fy:595,r:2.9,c:'#eaf6ff'},
+   h5:{fx:566,fy:446,r:2.9,c:'#eaf6ff'},
+   h6:{fx:629,fy:431,r:2.9,c:'#eaf6ff'},
+   h7:{fx:656,fy:386,r:2.9,c:'#eaf6ff'},
+   h8:{fx:707,fy:402,r:2.9,c:'#eaf6ff'},
+   alphard:{fx:795,fy:320,r:4.2,c:'#ffe9a0',name:'Alphard',nx:-1,dy:-10},
+   h10:{fx:711,fy:247,r:2.6,c:'#eaf6ff'},
+   h11:{fx:770,fy:197,r:2.6,c:'#eaf6ff'},
+   h12:{fx:809,fy:137,r:2.6,c:'#eaf6ff'},
+   h13:{fx:839,fy:129,r:2.6,c:'#eaf6ff'},
+   h14:{fx:862,fy:136,r:2.6,c:'#eaf6ff'},
+   h15:{fx:859,fy:161,r:2.6,c:'#eaf6ff'},
+   h16:{fx:820,fy:151,r:2.6,c:'#eaf6ff'}
   },
   lines:[
-   /* body chain → head */
-   ["h1","h2"],["h2","h3"],["h3","h4"],["h4","h5"],["h5","h6"],["h6","h7"],
-   ["h7","h8"],["h8","h9"],["h9","h10"],["h10","h11"],["h11","h12"],
-   /* head loop */
-   ["h12","h13"],["h13","h14"],["h14","h16"],["h16","h15"],["h15","h12"],
-   ["h13","h15"],["h14","h15"]
+   ["h1","h2"],["h2","h3"],["h3","h4"],["h4","h5"],["h5","h6"],
+   ["h6","h7"],["h7","h8"],["h8","alphard"],
+   ["alphard","h10"],["h10","h11"],["h11","h12"],
+   ["h12","h13"],["h13","h14"],["h14","h15"],["h15","h16"],["h16","h12"]
   ]},
- /* Sagittarius: 21 titik dari sagittarius.html (viewBox 860×860 → ×1000/860).
-    UI NONAKTIF (off). Bintang utama nanti: Nunki (s14). Teapot + bow. */
  {id:'sagit',ra0:0,delay:1.5,phase:1.3,
   stars:{
    s1:{fx:314,fy:116,r:2.8,c:'#eaf6ff'},
@@ -668,47 +724,61 @@ var GEOMETRY=[
   ]},
  /* Pisces: 17 titik dari Pisces.html (viewBox 540×540 → ×1000/540). UI NONAKTIF (off). Bintang utama nanti: Alpherg (ps4; di HTML dilabeli "Kullat Nunu" = nama lain η Piscium). Subtitle HTML bilang "20 bintang" tapi SVG-nya cuma 17 titik — data ikut SVG. */
  {id:'pisces',ra0:0,delay:1.5,phase:.7,
+  /* Pisces dari pisces.html (viewBox 1000×1000). Alpherg utama. */
   stars:{
-   ps1:{fx:111,fy:361,r:2.6,c:'#eaf6ff'},
-   ps2:{fx:254,fy:330,r:1.9,c:'#dcefff'},
-   ps3:{fx:380,fy:294,r:2.2,c:'#dcefff'},
-   ps4:{fx:561,fy:228,r:2.9,c:'#ffe9a0',name:'Alpherg',nx:-1,dy:-8},
-   ps5:{fx:574,fy:122,r:2.0,c:'#dcefff'},
-   ps6:{fx:693,fy:100,r:1.9,c:'#dcefff'},
-   ps7:{fx:146,fy:383,r:1.7,c:'#dcefff'},
-   ps8:{fx:219,fy:396,r:1.8,c:'#dcefff'},
-   ps9:{fx:267,fy:435,r:1.7,c:'#dcefff'},
-   ps10:{fx:380,fy:531,r:2.0,c:'#dcefff'},
-   ps11:{fx:424,fy:607,r:1.8,c:'#dcefff'},
-   ps12:{fx:533,fy:713,r:1.9,c:'#dcefff'},
-   ps13:{fx:591,fy:831,r:2.2,c:'#dcefff'},
-   ps14:{fx:661,fy:867,r:1.8,c:'#dcefff'},
-   ps15:{fx:663,fy:944,r:1.9,c:'#dcefff'},
-   ps16:{fx:574,fy:944,r:1.9,c:'#dcefff'},
-   ps17:{fx:504,fy:887,r:1.8,c:'#dcefff'}
+   ps1:{fx:852,fy:50,r:2.6,c:'#eaf6ff'},
+   ps2:{fx:770,fy:68,r:2.6,c:'#eaf6ff'},
+   ps3:{fx:747,fy:133,r:2.6,c:'#eaf6ff'},
+   alpherg:{fx:420,fy:260,r:4.2,c:'#ffe9a0',name:'Alpherg',nx:-1,dy:-10},
+   ps5:{fx:290,fy:300,r:2.6,c:'#eaf6ff'},
+   ps6:{fx:135,fy:350,r:2.9,c:'#eaf6ff'},
+   ps7:{fx:170,fy:365,r:2.2,c:'#dcefff'},
+   ps8:{fx:250,fy:375,r:2.4,c:'#dcefff'},
+   ps9:{fx:285,fy:400,r:2.4,c:'#dcefff'},
+   ps10:{fx:420,fy:500,r:2.6,c:'#eaf6ff'},
+   ps11:{fx:480,fy:570,r:2.6,c:'#eaf6ff'},
+   ps12:{fx:580,fy:670,r:2.4,c:'#dcefff'},
+   ps13:{fx:620,fy:750,r:2.4,c:'#dcefff'},
+   ps14:{fx:712,fy:855,r:3.2,c:'#eaf6ff'},
+   ps15:{fx:778,fy:886,r:3.0,c:'#eaf6ff'},
+   ps16:{fx:780,fy:986,r:3.2,c:'#eaf6ff'},
+   ps17:{fx:704,fy:984,r:3.2,c:'#eaf6ff'},
+   ps18:{fx:643,fy:917,r:3.0,c:'#eaf6ff'}
   },
   lines:[
-   ["ps1","ps2"],["ps2","ps3"],["ps3","ps4"],["ps4","ps5"],
-   ["ps5","ps6"],["ps4","ps6"],["ps1","ps7"],["ps7","ps8"],
-   ["ps8","ps9"],["ps9","ps10"],["ps10","ps11"],["ps11","ps12"],
-   ["ps12","ps13"],["ps13","ps14"],["ps14","ps15"],["ps15","ps16"],
-   ["ps16","ps17"],["ps17","ps13"]
+   ["ps1","ps2"],["ps2","ps3"],["ps3","ps1"],
+   ["ps3","alpherg"],["alpherg","ps5"],["ps5","ps6"],
+   ["ps6","ps7"],["ps7","ps8"],["ps8","ps9"],["ps9","ps10"],
+   ["ps10","ps11"],["ps11","ps12"],["ps12","ps13"],["ps13","ps14"],
+   ["ps14","ps15"],["ps15","ps16"],["ps16","ps17"],["ps17","ps18"],["ps18","ps14"]
   ]},
- /* Auriga ANCHOR: Capella + companion (layout penuh belakangan). */
  {id:'auriga',ra0:0,delay:1.0,phase:0.5,
+  /* Auriga full dari auriga.html (viewBox 1000×1000). Capella SFX. */
   stars:{
-   capella:{fx:500,fy:420,r:4.2,c:'#ffe9a0',name:'Capella',nx:1,dy:-10},
-   au2:{fx:560,fy:480,r:1.6,c:'#dcefff'}
+   capella:{fx:315,fy:113,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
+   menkalinan:{fx:306,fy:404,r:3.2,c:'#eaf6ff'},
+   mahassim:{fx:490,fy:365,r:3.2,c:'#eaf6ff'},
+   au4:{fx:557,fy:407,r:2.8,c:'#eaf6ff'},
+   au5:{fx:542,fy:501,r:2.8,c:'#eaf6ff'},
+   au6:{fx:570,fy:492,r:2.8,c:'#eaf6ff'},
+   almaaz:{fx:299,fy:646,r:3.2,c:'#eaf6ff'},
+   haedus:{fx:609,fy:749,r:3.2,c:'#eaf6ff'},
+   elnath:{fx:469,fy:915,r:3.4,c:'#eaf6ff'}
   },
-  lines:[["capella","au2"]]},
- /* Canis Minor ANCHOR: Procyon + companion (layout penuh belakangan). */
+  lines:[
+   ["capella","menkalinan"],["capella","mahassim"],["menkalinan","mahassim"],
+   ["mahassim","au4"],["mahassim","au5"],["au4","au6"],["au5","au6"],
+   ["au5","haedus"],["menkalinan","almaaz"],["almaaz","elnath"],["elnath","haedus"]
+  ]},
  {id:'canmin',ra0:0,delay:1.1,phase:0.6,
+  /* Canis Minor full dari canis minor.html (viewBox 1000×1000). Procyon SFX. */
   stars:{
-   procyon:{fx:480,fy:500,r:4.0,c:'#e8f0ff',name:'Procyon',nx:1,dy:-10},
-   cm2:{fx:540,fy:560,r:1.6,c:'#dcefff'}
+   procyon:{fx:263,fy:620,r:4.5,c:'#e8f0ff',name:'Procyon',nx:1,dy:12},
+   gomeisa:{fx:705,fy:227,r:3.8,c:'#eaf6ff'},
+   cm3:{fx:673,fy:143,r:2.6,c:'#dcefff'},
+   cm4:{fx:799,fy:80,r:2.6,c:'#dcefff'}
   },
-  lines:[["procyon","cm2"]]},
-
+  lines:[["procyon","gomeisa"]]},
 ];
 
 /* =====================================================================================================
