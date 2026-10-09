@@ -8432,6 +8432,47 @@ if(window.visualViewport){
    SAVE → localStorage; COPY → clipboard (snippet scene buat sky-data.js)
    Load otomatis dari localStorage saat boot kalau ada.
    ================================================= */
+
+/* Permanent layout overrides from sky-data.js (r.ov) — always applied after layout() */
+window.__applyLayOV=function(){
+  var ov={};
+  SKY.rasi.forEach(function(r){
+    if(r.ov&&!r.scene&&!r.ple)ov[r.id]={ox:r.ov.ox||0,oy:r.ov.oy||0,k:r.ov.k||1,th:r.ov.th||0};
+  });
+  if(window.__layOV){
+    Object.keys(window.__layOV).forEach(function(id){
+      var a=ov[id]||{ox:0,oy:0,k:1,th:0}, b=window.__layOV[id];
+      /* editor session replaces permanent when both exist for same keys - use editor as delta on top */
+      ov[id]={ox:(a.ox||0)+(b.ox||0),oy:(a.oy||0)+(b.oy||0),k:(a.k||1)*(b.k||1),th:(a.th||0)+(b.th||0)};
+    });
+  }
+  Object.keys(ov).forEach(function(id){
+    var o=ov[id], r=SKY.rasiBy[id];
+    if(!o||!r||r.scene||r.ple)return;
+    if(typeof sectShow==='function'&&!sectShow(id,true))return;
+    var c=cons(id);if(!c||c.minX==null)return;
+    var cx=(c.minX+c.maxX)/2,cy=(c.minY+c.maxY)/2;
+    var k=o.k||1, th=(o.th||0)*Math.PI/180, cos=Math.cos(th), sin=Math.sin(th);
+    var ox=o.ox||0, oy=o.oy||0;
+    var nMin=1e9,nMax=-1e9,nMinY=1e9,nMaxY=-1e9;
+    Object.keys(c.stars).forEach(function(key){
+      var s=c.stars[key];
+      var dx=(s.x-cx)*k, dy=(s.y-cy)*k;
+      s.x=cx+dx*cos-dy*sin+ox;
+      s.y=cy+dx*sin+dy*cos+oy;
+      if(s.x<nMin)nMin=s.x;if(s.x>nMax)nMax=s.x;
+      if(s.y<nMinY)nMinY=s.y;if(s.y>nMaxY)nMaxY=s.y;
+    });
+    c.minX=nMin;c.maxX=nMax;c.minY=nMinY;c.maxY=nMaxY;
+    if(c.nebula){
+      var s=c.nebula;
+      var dx=(s.x-cx)*k, dy=(s.y-cy)*k;
+      s.x=cx+dx*cos-dy*sin+ox;
+      s.y=cy+dx*sin+dy*cos+oy;
+    }
+  });
+};
+
 (function layoutEditor(){
   var enabled=false;
   try{enabled=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(e){}
@@ -8543,34 +8584,7 @@ if(window.visualViewport){
   }
 
   /* Post-layout: apply screen-space overrides for non-scene rasi */
-  window.__applyLayOV=function(){
-    var ov=window.__layOV;if(!ov)return;
-    Object.keys(ov).forEach(function(id){
-      var o=ov[id], r=SKY.rasiBy[id];
-      if(!o||!r||r.scene||r.ple)return; /* scene/ple handled via data */
-      if(!sectShow(id,true))return;
-      var c=cons(id);if(!c||c.minX==null)return;
-      var cx=(c.minX+c.maxX)/2,cy=(c.minY+c.maxY)/2;
-      var k=o.k||1, th=(o.th||0)*Math.PI/180, cos=Math.cos(th), sin=Math.sin(th);
-      var ox=o.ox||0, oy=o.oy||0;
-      var nMin=1e9,nMax=-1e9,nMinY=1e9,nMaxY=-1e9;
-      Object.keys(c.stars).forEach(function(key){
-        var s=c.stars[key];
-        var dx=(s.x-cx)*k, dy=(s.y-cy)*k;
-        s.x=cx+dx*cos-dy*sin+ox;
-        s.y=cy+dx*sin+dy*cos+oy;
-        if(s.x<nMin)nMin=s.x;if(s.x>nMax)nMax=s.x;
-        if(s.y<nMinY)nMinY=s.y;if(s.y>nMaxY)nMaxY=s.y;
-      });
-      c.minX=nMin;c.maxX=nMax;c.minY=nMinY;c.maxY=nMaxY;
-      if(c.nebula){
-        var s=c.nebula;
-        var dx=(s.x-cx)*k, dy=(s.y-cy)*k;
-        s.x=cx+dx*cos-dy*sin+ox;
-        s.y=cy+dx*sin+dy*cos+oy;
-      }
-    });
-  };
+  /* __applyLayOV is global (sky-data ov + session) */
 
   function hitCons(cx,cy){
     var best=null,bestD=1e9;
