@@ -2897,32 +2897,24 @@ function layout(){
       if(c.nebula){p=f(c.nebula.rx,c.nebula.ry);c.nebula._sx=p[0];c.nebula._sy=p[1];}
     }
     var PK=.55; /* PK = pengecil khusus ukuran tampilan cluster Pleiades */
-    var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,anch=[];
-    for(i=0;i<ids.length;i++){var aa=def[ids[i]].at;anch.push(aa);mnx=Math.min(mnx,aa[0]);mxx=Math.max(mxx,aa[0]);mny=Math.min(mny,aa[1]);mxy=Math.max(mxy,aa[1]);}
-    anch.push(PC);mnx=Math.min(mnx,PC[0]);mxx=Math.max(mxx,PC[0]);mny=Math.min(mny,PC[1]);mxy=Math.max(mxy,PC[1]);
-    /* Fixed figure pad in scene units (covers typical constellation span at k~1).
-       NOT derived from actual star extents — keeps zoom stable when editing k. */
-    var pad=300;
-    mnx-=pad;mxx+=pad;mny-=pad;mxy+=pad;
-    /* area fit: generous margins so labels/captions never clip on portrait */
-    var m=Math.max(28,Math.min(W*.11,48)),aL=m,aR=W-m,aT=top+36,aB=bot-72,fs=1,offx=0,offy=0,ex=[],ei;
-    var capR=SKY.rasi.filter(function(r){return r.cap&&r.scene&&!CONS_OFF[r.id];});
-    for(var it=0;it<4;it++){
-      var x0=mnx,x1=mxx,y0=mny,y1=mxy;
-      for(ei=0;ei<ex.length;ei++){x0=Math.min(x0,ex[ei][0]);x1=Math.max(x1,ex[ei][0]);y0=Math.min(y0,ex[ei][1]);y1=Math.max(y1,ex[ei][1]);}
-      var dx=x1-x0,dy=y1-y0;if(dx<1)dx=1;if(dy<1)dy=1;
+    var m=Math.max(28,Math.min(W*.11,48)),aL=m,aR=W-m,aT=top+36,aB=bot-72,fs=1,offx=0,offy=0;
+    /* EDITOR LOCK: during ?layout=1, freeze fs/offx/offy so drag/scale of one rasi
+       never reflows the whole sky. REFIT button clears the lock. */
+    var editOn=false;
+    try{editOn=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(eE){}
+    var lock=window.__scnFitLock;
+    if(editOn&&lock&&lock.W===W&&lock.H===H&&lock.fs>0){
+      fs=lock.fs;offx=lock.offx;offy=lock.offy;
+    }else{
+      var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+      for(i=0;i<ids.length;i++){var aa=def[ids[i]].at;mnx=Math.min(mnx,aa[0]);mxx=Math.max(mxx,aa[0]);mny=Math.min(mny,aa[1]);mxy=Math.max(mxy,aa[1]);}
+      mnx=Math.min(mnx,PC[0]);mxx=Math.max(mxx,PC[0]);mny=Math.min(mny,PC[1]);mxy=Math.max(mxy,PC[1]);
+      var pad=300;
+      mnx-=pad;mxx+=pad;mny-=pad;mxy+=pad;
+      var dx=mxx-mnx,dy=mxy-mny;if(dx<1)dx=1;if(dy<1)dy=1;
       fs=Math.min((aR-aL)/dx,(aB-aT)/dy);
-      offx=aL+((aR-aL)-dx*fs)/2-x0*fs;offy=aT+((aB-aT)-dy*fs)/2-y0*fs;
-      ex=[];
-      /* Caption space estimated from ANCHOR positions (not full figure) so k-scale doesn't expand fit */
-      capR.forEach(function(r){
-        var at=def[r.id]&&def[r.id].at;if(!at)return;
-        var cx=at[0]+(r.cap.dx||0)/Math.max(fs,.001),cy=at[1]+(r.cap.dy||20)/Math.max(fs,.001);
-        var cw=(r.cap.text?r.cap.text.length:6)*11/Math.max(fs,.001);
-        ex.push([cx,cy],[cx+cw,cy+18/Math.max(fs,.001)]);
-      });
-      if(STG.rot)ex.push([PC[0],PC[1]+(STG.rot<0?1:-1)*80/Math.max(fs,.001)]);
-      else ex.push([PC[0]+.31*PS*PK+80/Math.max(fs,.001),PC[1]-.02*PS*PK]);
+      offx=aL+((aR-aL)-dx*fs)/2-mnx*fs;offy=aT+((aB-aT)-dy*fs)/2-mny*fs;
+      if(editOn)window.__scnFitLock={fs:fs,offx:offx,offy:offy,W:W,H:H};
     }
     for(i=0;i<ids.length;i++){
       c=cons(ids[i]);c.maxX=-1e9;c.maxY=-1e9;c.minX=1e9;c.minY=1e9;c.scale=fs*def[ids[i]].k;
@@ -8697,7 +8689,7 @@ window.__applyLayOV=function(){
       '<button type="button" data-a="zoin">+</button>'+
       '<button type="button" data-a="save" class="dim">SAVE</button>'+
       '<button type="button" data-a="copy" class="dim">COPY</button>'+
-      '<button type="button" data-a="reset" class="dim">RST</button>'+
+      '<button type="button" data-a="refit" class="dim" title="Recompute sky fit">FIT</button><button type="button" data-a="reset" class="dim">RST</button>'+
       '</div>';
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
@@ -8729,9 +8721,16 @@ window.__applyLayOV=function(){
         console.log('[layout export]\n'+txt);
         return;
       }
+      if(a==='refit'){
+        window.__scnFitLock=null;
+        applyAndRelayout();
+        toast('REFIT');
+        return;
+      }
       if(a==='reset'){
         try{localStorage.removeItem(LS_KEY);}catch(err){}
         window.__layOV={};
+        window.__scnFitLock=null;
         toast('RESET — reload');
         return;
       }
