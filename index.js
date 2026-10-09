@@ -8493,6 +8493,16 @@ window.__applyLayOV=function(){
       });
     }catch(e){console.warn('layout load',e);}
   }
+  /* Bounds fit ASLI dihitung dari data sky-data.js SEBELUM draft diterapkan. Dikunci selama edit, jadi
+     menggeser anchor / memperbesar rasi nggak pernah ikut mengubah skala layar (cuma tombol FIT yang menghitung ulang). */
+  (function(){
+    if(window.__scnBounds)return;
+    if(SKY.fit&&SKY.fit.length===4){window.__scnBounds=SKY.fit.slice();return;}
+    var a=[1e9,-1e9,1e9,-1e9];
+    function add(p){a[0]=Math.min(a[0],p[0]);a[1]=Math.max(a[1],p[0]);a[2]=Math.min(a[2],p[1]);a[3]=Math.max(a[3],p[1]);}
+    SKY.rasi.forEach(function(r){if(r.off)return;if(r.scene)add(r.scene.at);else if(r.ple)add(r.ple.at);});
+    if(a[0]<1e8)window.__scnBounds=[a[0]-300,a[1]+300,a[2]-300,a[3]+300];
+  })();
   loadSaved();
 
   function rnd(n){return Math.round(n*1000)/1000;}

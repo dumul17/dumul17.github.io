@@ -913,5 +913,5 @@ return {
 };
 })();
 
-/* Batas fit layar scene winter (dari layout editor). Harus setelah SKY dibuat. */
-SKY.fit=[-1864.068,3139.015,-8452.728,-1907.522];
+/* Batas fit layar scene winter = bounds ASLI sebelum edit (dikunci supaya skala sama kayak di editor). Harus setelah SKY dibuat. */
+SKY.fit=[-1223.505,2400.975,-5553.053,-911.865];
