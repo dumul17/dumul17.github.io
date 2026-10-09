@@ -80,7 +80,7 @@ var RASI=[
   /* ANCHOR — Capella saja sampai layout Auriga penuh */
   {id:'auriga', sector:'winter', label:'Auriga', focusName:'Auriga', focus:6, dist:43, unlock:true,
    box:{portrait:function(W,top,ah,bot){return [W*.68,top+ah*.02,W*.95,top+ah*.42];}, land:function(W,top,ah,bot){return [W*.52,top+ah*.02,W*.78,top+ah*.48];}},
-   scene:{k:2.905, th:2, pv:[380,160], at:[687.107,-7413.935]},
+   scene:{k:2.905, th:2, pv:[315,113], at:[687.107,-7413.935]},
    whisper:["Capella waits where the chariot will stand.","A single warm point — the rest of Auriga is still arriving."],
    info:{"tag":"Constellation · The Charioteer","rows":[["Brightest","Capella · mag 0.08"],["Distance","~43 ly"],["Type","G-type giant pair"],["Area","657 sq°"]],"fact":"Capella is the sixth-brightest star in the night sky and a cornerstone of the Winter Hexagon."}},
   /* ANCHOR — Procyon saja sampai layout Canis Minor penuh */
@@ -771,10 +771,11 @@ var GEOMETRY=[
   ]},
  {id:'auriga',ra0:0,delay:1.0,phase:0.5,
   /* Auriga full dari auriga.html (viewBox 1000×1000). Capella SFX.
-     Capella digeser sedikit ke kanan+bawah biar proporsi lebih mirip referensi classic (bukan ekstrem top). */
+     Label Capella dipindah ke bintang bawah (ex-menkalinan) biar cocok referensi.
+     Koordinat SEMUA bintang tetap — posisi rasi + join Elnath↔Taurus utuh. */
   stars:{
-   capella:{fx:380,fy:160,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
-   menkalinan:{fx:306,fy:404,r:3.2,c:'#eaf6ff'},
+   menkalinan:{fx:315,fy:113,r:3.2,c:'#eaf6ff'},
+   capella:{fx:306,fy:404,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
    mahassim:{fx:490,fy:365,r:3.2,c:'#eaf6ff'},
    au4:{fx:557,fy:407,r:2.8,c:'#eaf6ff'},
    au5:{fx:542,fy:501,r:2.8,c:'#eaf6ff'},
@@ -784,9 +785,9 @@ var GEOMETRY=[
    elnath:{fx:469,fy:915,r:3.4,c:'#eaf6ff'}
   },
   lines:[
-   ["capella","menkalinan"],["capella","mahassim"],["menkalinan","mahassim"],
+   ["menkalinan","capella"],["menkalinan","mahassim"],["capella","mahassim"],
    ["mahassim","au4"],["mahassim","au5"],["au4","au6"],["au5","au6"],
-   ["au5","haedus"],["menkalinan","almaaz"],["almaaz","elnath"],["elnath","haedus"]
+   ["au5","haedus"],["capella","almaaz"],["almaaz","elnath"],["elnath","haedus"]
   ]},
  {id:'canmin',ra0:0,delay:1.1,phase:0.6,
   /* Canis Minor full dari canis minor.html (viewBox 1000×1000). Procyon SFX. */
