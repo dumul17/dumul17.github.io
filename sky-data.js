@@ -771,12 +771,12 @@ var GEOMETRY=[
   ]},
  {id:'auriga',ra0:0,delay:1.0,phase:0.5,
   /* Auriga full dari auriga.html (viewBox 1000×1000). Capella SFX.
-     Label Capella dipindah ke bintang bawah (ex-menkalinan) biar cocok referensi.
+     Label Capella dipindah ke bintang kanan (ex-mahassim) sesuai chart referensi.
      Koordinat SEMUA bintang tetap — posisi rasi + join Elnath↔Taurus utuh. */
   stars:{
-   menkalinan:{fx:315,fy:113,r:3.2,c:'#eaf6ff'},
-   capella:{fx:306,fy:404,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
-   mahassim:{fx:490,fy:365,r:3.2,c:'#eaf6ff'},
+   au1:{fx:315,fy:113,r:3.2,c:'#eaf6ff'},
+   menkalinan:{fx:306,fy:404,r:3.2,c:'#eaf6ff'},
+   capella:{fx:490,fy:365,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
    au4:{fx:557,fy:407,r:2.8,c:'#eaf6ff'},
    au5:{fx:542,fy:501,r:2.8,c:'#eaf6ff'},
    au6:{fx:570,fy:492,r:2.8,c:'#eaf6ff'},
@@ -785,9 +785,9 @@ var GEOMETRY=[
    elnath:{fx:469,fy:915,r:3.4,c:'#eaf6ff'}
   },
   lines:[
-   ["menkalinan","capella"],["menkalinan","mahassim"],["capella","mahassim"],
-   ["mahassim","au4"],["mahassim","au5"],["au4","au6"],["au5","au6"],
-   ["au5","haedus"],["capella","almaaz"],["almaaz","elnath"],["elnath","haedus"]
+   ["au1","menkalinan"],["au1","capella"],["menkalinan","capella"],
+   ["capella","au4"],["capella","au5"],["au4","au6"],["au5","au6"],
+   ["au5","haedus"],["menkalinan","almaaz"],["almaaz","elnath"],["elnath","haedus"]
   ]},
  {id:'canmin',ra0:0,delay:1.1,phase:0.6,
   /* Canis Minor full dari canis minor.html (viewBox 1000×1000). Procyon SFX. */
