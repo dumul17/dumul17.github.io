@@ -3146,6 +3146,7 @@ function layout(){
     bakeAstroPlates();
     bgDirty=false;
   }
+  if(typeof window.__applyLayOV==='function')try{window.__applyLayOV();}catch(eOV){}
 }
 
 /* ---------- lubang hitam Gargantua ---------- */
@@ -8436,98 +8437,158 @@ if(window.visualViewport){
   try{enabled=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(e){}
   if(!enabled)return;
 
-  var LS_KEY='obs_layout_v1';
+  var LS_KEY='obs_layout_v2';
   var sel=null, drag=null, hud=null, info=null;
+
+  /* ov[id] = {ox,oy,k,th} screen-space override (non-scene rasi). scene rasi edit SKY.rasi[].scene directly. */
+  window.__layOV=window.__layOV||{};
 
   function loadSaved(){
     try{
       var raw=localStorage.getItem(LS_KEY);if(!raw)return;
       var data=JSON.parse(raw);
-      SKY.rasi.forEach(function(r){
-        if(data[r.id]){
-          if(r.scene&&data[r.id].scene){
-            r.scene.k=data[r.id].scene.k;
-            r.scene.th=data[r.id].scene.th;
-            r.scene.at=data[r.id].scene.at.slice();
-            if(data[r.id].scene.pv)r.scene.pv=data[r.id].scene.pv.slice();
+      if(data.ov)window.__layOV=data.ov;
+      if(data.scene){
+        SKY.rasi.forEach(function(r){
+          var s=data.scene[r.id];if(!s)return;
+          if(s.scene&&r.scene){
+            r.scene.k=s.scene.k;r.scene.th=s.scene.th;
+            r.scene.at=s.scene.at.slice();
+            if(s.scene.pv)r.scene.pv=s.scene.pv.slice();
           }
-          if(r.ple&&data[r.id].ple){
-            r.ple.at=data[r.id].ple.at.slice();
-            if(typeof data[r.id].ple.ps==='number')r.ple.ps=data[r.id].ple.ps;
-          }
-        }
-      });
+          if(s.ple&&r.ple){r.ple.at=s.ple.at.slice();if(typeof s.ple.ps==='number')r.ple.ps=s.ple.ps;}
+        });
+      }
     }catch(e){console.warn('layout load',e);}
   }
   loadSaved();
 
+  function sectorIds(){
+    var k=SECT.cur&&SECT.cur.k;
+    var ids=SKY.rasi.filter(function(r){return !r.off&&(!k||r.sector===k);}).map(function(r){return r.id;});
+    return ids;
+  }
+
+  function isScene(id){
+    var r=SKY.rasiBy[id];
+    return !!(r&&(r.scene||r.ple));
+  }
+
+  function round(n){return Math.round(n*1000)/1000;}
+
   function snapshot(){
-    var out={};
+    var scene={}, ov=JSON.parse(JSON.stringify(window.__layOV||{}));
     SKY.rasi.forEach(function(r){
-      if(r.scene)out[r.id]={scene:{k:r.scene.k,th:r.scene.th,pv:r.scene.pv?r.scene.pv.slice():null,at:r.scene.at.slice()}};
-      if(r.ple)out[r.id]=(out[r.id]||{}),out[r.id].ple={at:r.ple.at.slice(),ps:r.ple.ps};
+      if(r.scene)scene[r.id]={scene:{k:r.scene.k,th:r.scene.th,pv:r.scene.pv?r.scene.pv.slice():null,at:r.scene.at.slice()}};
+      if(r.ple){scene[r.id]=scene[r.id]||{};scene[r.id].ple={at:r.ple.at.slice(),ps:r.ple.ps};}
     });
-    return out;
+    return {scene:scene, ov:ov};
   }
+
   function save(){
-    try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));toast('SAVED');}catch(e){toast('SAVE FAIL');}
+    try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));toast('SAVED ALL SECTORS');}catch(e){toast('SAVE FAIL');}
   }
+
   function exportText(){
-    var lines=[], data=snapshot();
-    Object.keys(data).forEach(function(id){
-      var d=data[id];
-      if(d.scene){
-        var s=d.scene;
-        lines.push(id+": scene:{k:"+round(s.k)+", th:"+round(s.th)+", pv:["+(s.pv?s.pv.map(round).join(','):'')+"], at:["+s.at.map(round).join(',')+"]}");
+    var data=snapshot(), lines=[], sectors=['winter','spring','summer','autumn'];
+    sectors.forEach(function(sec){
+      var block=[];
+      SKY.rasi.forEach(function(r){
+        if(r.sector!==sec||r.off)return;
+        var s=data.scene[r.id], o=data.ov[r.id];
+        if(s&&s.scene){
+          var sc=s.scene;
+          block.push(r.id+': scene:{k:'+round(sc.k)+', th:'+round(sc.th)+', pv:['+(sc.pv?sc.pv.map(round).join(','):'')+'], at:['+sc.at.map(round).join(',')+']}');
+        }
+        if(s&&s.ple)block.push(r.id+': ple:{at:['+s.ple.at.map(round).join(',')+'], ps:'+round(s.ple.ps)+'}');
+        if(o&&(o.ox||o.oy||(o.k&&o.k!==1)||(o.th&&o.th!==0))){
+          block.push(r.id+': override:{ox:'+round(o.ox||0)+', oy:'+round(o.oy||0)+', k:'+round(o.k||1)+', th:'+round(o.th||0)+'}');
+        }
+      });
+      if(block.length){
+        lines.push('=== '+sec.toUpperCase()+' ===');
+        lines=lines.concat(block);
+        lines.push('');
       }
-      if(d.ple)lines.push(id+": ple:{at:["+d.ple.at.map(round).join(',')+"], ps:"+round(d.ple.ps)+"}");
     });
     return lines.join('\n');
   }
-  function round(n){return Math.round(n*1000)/1000;}
+
   function toast(msg){
     if(!info)return;
-    info.textContent=msg;
-    info.style.opacity='1';
+    info.textContent=msg;info.style.opacity='1';
     clearTimeout(toast._t);
-    toast._t=setTimeout(function(){if(info)info.style.opacity='.7';updateInfo();},1200);
+    toast._t=setTimeout(function(){if(info)info.style.opacity='.85';updateInfo();},1400);
   }
+
   function updateInfo(){
     if(!info)return;
-    if(!sel){info.textContent='TAP RASI · DRAG MOVE · ↺↻ ROT · −+ SCALE';return;}
+    var sec=SECT.cur?SECT.cur.k:'(overview)';
+    if(!sel){info.textContent='['+sec+'] TAP RASI · DRAG · ↺↻ −+ · SAVE/COPY';return;}
     var r=SKY.rasiBy[sel];
     if(r&&r.scene){
-      info.textContent=sel.toUpperCase()+'  k='+round(r.scene.k)+'  th='+round(r.scene.th)+'°  at=['+r.scene.at.map(round).join(', ')+']';
+      info.textContent='['+sec+'] '+sel+'  k='+round(r.scene.k)+' th='+round(r.scene.th)+' at=['+r.scene.at.map(round).join(',')+']';
     }else if(r&&r.ple){
-      info.textContent=sel.toUpperCase()+'  ple.at=['+r.ple.at.map(round).join(', ')+']  ps='+round(r.ple.ps);
-    }else info.textContent=sel;
+      info.textContent='['+sec+'] '+sel+'  ple=['+r.ple.at.map(round).join(',')+'] ps='+round(r.ple.ps);
+    }else{
+      var o=window.__layOV[sel]||{ox:0,oy:0,k:1,th:0};
+      info.textContent='['+sec+'] '+sel+'  ov ox='+round(o.ox||0)+' oy='+round(o.oy||0)+' k='+round(o.k||1)+' th='+round(o.th||0);
+    }
   }
 
   function applyAndRelayout(){
     if(typeof layout==='function')layout();
     updateInfo();
+    paintSel();
   }
 
+  /* Post-layout: apply screen-space overrides for non-scene rasi */
+  window.__applyLayOV=function(){
+    var ov=window.__layOV;if(!ov)return;
+    Object.keys(ov).forEach(function(id){
+      var o=ov[id], r=SKY.rasiBy[id];
+      if(!o||!r||r.scene||r.ple)return; /* scene/ple handled via data */
+      if(!sectShow(id,true))return;
+      var c=cons(id);if(!c||c.minX==null)return;
+      var cx=(c.minX+c.maxX)/2,cy=(c.minY+c.maxY)/2;
+      var k=o.k||1, th=(o.th||0)*Math.PI/180, cos=Math.cos(th), sin=Math.sin(th);
+      var ox=o.ox||0, oy=o.oy||0;
+      var nMin=1e9,nMax=-1e9,nMinY=1e9,nMaxY=-1e9;
+      Object.keys(c.stars).forEach(function(key){
+        var s=c.stars[key];
+        var dx=(s.x-cx)*k, dy=(s.y-cy)*k;
+        s.x=cx+dx*cos-dy*sin+ox;
+        s.y=cy+dx*sin+dy*cos+oy;
+        if(s.x<nMin)nMin=s.x;if(s.x>nMax)nMax=s.x;
+        if(s.y<nMinY)nMinY=s.y;if(s.y>nMaxY)nMaxY=s.y;
+      });
+      c.minX=nMin;c.maxX=nMax;c.minY=nMinY;c.maxY=nMaxY;
+      if(c.nebula){
+        var s=c.nebula;
+        var dx=(s.x-cx)*k, dy=(s.y-cy)*k;
+        s.x=cx+dx*cos-dy*sin+ox;
+        s.y=cy+dx*sin+dy*cos+oy;
+      }
+    });
+  };
+
   function hitCons(cx,cy){
-    /* screen coords → find constellation under pointer */
     var best=null,bestD=1e9;
-    SKY.rasi.forEach(function(r){
-      if(CONS_OFF[r.id])return;
-      if(!sectShow(r.id,true))return;
-      var c=cons(r.id);
-      if(!c||c.minX==null)return;
-      var pad=28;
+    sectorIds().forEach(function(id){
+      if(!sectShow(id,true))return;
+      if(id==='pleiades'&&typeof PLEIADES!=='undefined'&&PLEIADES.ready){
+        var px=PLEIADES.x+PLEIADES.scale*.53,py=PLEIADES.y+PLEIADES.scale*.42;
+        var d=(cx-px)*(cx-px)+(cy-py)*(cy-py);
+        if(d<bestD&&d<90*90){bestD=d;best=id;}
+        return;
+      }
+      var c=cons(id);if(!c||c.minX==null)return;
+      var pad=36;
       if(cx<c.minX-pad||cx>c.maxX+pad||cy<c.minY-pad||cy>c.maxY+pad)return;
       var mx=(c.minX+c.maxX)/2,my=(c.minY+c.maxY)/2;
       var d=(cx-mx)*(cx-mx)+(cy-my)*(cy-my);
-      if(d<bestD){bestD=d;best=r.id;}
+      if(d<bestD){bestD=d;best=id;}
     });
-    /* Pleiades cluster */
-    if(typeof PLEIADES!=='undefined'&&PLEIADES.ready&&sectShow('pleiades',true)){
-      var px=PLEIADES.x+PLEIADES.scale*.53,py=PLEIADES.y+PLEIADES.scale*.42;
-      var d2=(cx-px)*(cx-px)+(cy-py)*(cy-py);
-      if(d2<bestD&&d2<80*80)best='pleiades';
-    }
     return best;
   }
 
@@ -8540,47 +8601,68 @@ if(window.visualViewport){
   function nudge(id, dk, dth, dax, day){
     var r=SKY.rasiBy[id];if(!r)return;
     if(r.scene){
-      if(dk)r.scene.k=Math.max(0.05,Math.min(3,r.scene.k+dk));
-      if(dth)r.scene.th=r.scene.th+dth;
+      if(dk)r.scene.k=Math.max(0.05,Math.min(4,r.scene.k+dk));
+      if(dth)r.scene.th+=dth;
       if(dax||day){r.scene.at[0]+=dax;r.scene.at[1]+=day;}
+      applyAndRelayout();return;
     }
     if(r.ple){
-      if(dk)r.ple.ps=Math.max(10,Math.min(200,r.ple.ps+dk*40));
+      if(dk)r.ple.ps=Math.max(8,Math.min(200,r.ple.ps+dk*40));
       if(dax||day){r.ple.at[0]+=dax;r.ple.at[1]+=day;}
+      applyAndRelayout();return;
     }
+    /* screen-space override */
+    var o=window.__layOV[id]||{ox:0,oy:0,k:1,th:0};
+    if(dk)o.k=Math.max(0.2,Math.min(3,o.k+dk));
+    if(dth)o.th+=dth;
+    if(dax||day){o.ox=(o.ox||0)+dax;o.oy=(o.oy||0)+day;}
+    window.__layOV[id]=o;
     applyAndRelayout();
+  }
+
+  function paintSel(){
+    var ring=document.getElementById('lay-sel');if(!ring)return;
+    if(!sel){ring.style.display='none';return;}
+    var x0,y0,x1,y1;
+    if(sel==='pleiades'&&typeof PLEIADES!=='undefined'&&PLEIADES.ready){
+      x0=PLEIADES.x;y0=PLEIADES.y;x1=PLEIADES.x+PLEIADES.scale;y1=PLEIADES.y+PLEIADES.scale;
+    }else{
+      var c=cons(sel);if(!c||c.minX==null){ring.style.display='none';return;}
+      x0=c.minX;y0=c.minY;x1=c.maxX;y1=c.maxY;
+    }
+    var pad=14, cr=cv.getBoundingClientRect(), sx=cr.width/W, sy=cr.height/H;
+    ring.style.display='block';
+    ring.style.left=(cr.left+(x0-pad)*sx)+'px';
+    ring.style.top=(cr.top+(y0-pad)*sy)+'px';
+    ring.style.width=Math.max(24,(x1-x0+pad*2)*sx)+'px';
+    ring.style.height=Math.max(24,(y1-y0+pad*2)*sy)+'px';
   }
 
   function buildHud(){
     if(hud)return;
     var css=[
-      '#lay-hud{position:fixed;left:0;right:0;bottom:0;z-index:80;pointer-events:none;font:11px/1.3 "Courier New",monospace;color:#cfeffa}',
-      '#lay-bar{pointer-events:auto;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(2,8,13,.88);border-top:1px solid rgba(110,229,255,.25)}',
-      '#lay-bar button{min-width:40px;min-height:36px;padding:6px 10px;border:1px solid rgba(110,229,255,.4);border-radius:4px;background:rgba(110,229,255,.08);color:#6ee5ff;font:700 12px "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent}',
+      '#lay-hud{position:fixed;left:0;right:0;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:80;pointer-events:none;font:11px/1.3 "Courier New",monospace;color:#cfeffa}',
+      '#lay-bar{pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;padding:8px 8px 6px;background:rgba(2,8,13,.9);border:1px solid rgba(110,229,255,.28);border-radius:6px;margin:0 8px;box-shadow:0 0 18px rgba(0,0,0,.4)}',
+      '#lay-bar button{min-width:36px;min-height:34px;padding:5px 8px;border:1px solid rgba(110,229,255,.4);border-radius:4px;background:rgba(110,229,255,.08);color:#6ee5ff;font:700 11px "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent}',
       '#lay-bar button:active{background:rgba(110,229,255,.22)}',
-      '#lay-bar button.on{border-color:#ff7ad9;color:#ff7ad9}',
-      '#lay-info{pointer-events:none;text-align:center;padding:6px 10px;background:rgba(2,8,13,.7);color:rgba(207,239,250,.85);font-size:10px;letter-spacing:.04em;opacity:.7}',
+      '#lay-info{pointer-events:none;text-align:center;padding:4px 10px 2px;color:rgba(207,239,250,.9);font-size:10px;letter-spacing:.03em;opacity:.9}',
       '#lay-sel{position:fixed;pointer-events:none;z-index:79;border:1px dashed rgba(110,229,255,.55);border-radius:4px;box-shadow:0 0 12px rgba(110,229,255,.2);display:none}'
     ].join('');
     var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
-
     hud=document.createElement('div');hud.id='lay-hud';
-    hud.innerHTML=
-      '<div id="lay-info"></div>'+
-      '<div id="lay-bar">'+
-      '<button type="button" data-a="prev" title="Prev">‹</button>'+
-      '<button type="button" data-a="next" title="Next">›</button>'+
-      '<button type="button" data-a="rotl" title="Rotate CCW">↺</button>'+
-      '<button type="button" data-a="rotr" title="Rotate CW">↻</button>'+
-      '<button type="button" data-a="zoout" title="Scale down">−</button>'+
-      '<button type="button" data-a="zoin" title="Scale up">+</button>'+
-      '<button type="button" data-a="save" title="Save">SAVE</button>'+
-      '<button type="button" data-a="copy" title="Copy scene snippet">COPY</button>'+
-      '<button type="button" data-a="reset" title="Reset saved">RESET</button>'+
+    hud.innerHTML='<div id="lay-info"></div><div id="lay-bar">'+
+      '<button type="button" data-a="prev">‹</button>'+
+      '<button type="button" data-a="next">›</button>'+
+      '<button type="button" data-a="rotl">↺</button>'+
+      '<button type="button" data-a="rotr">↻</button>'+
+      '<button type="button" data-a="zoout">−</button>'+
+      '<button type="button" data-a="zoin">+</button>'+
+      '<button type="button" data-a="save">SAVE</button>'+
+      '<button type="button" data-a="copy">COPY</button>'+
+      '<button type="button" data-a="reset">RESET</button>'+
       '</div>';
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
-
     var ring=document.createElement('div');ring.id='lay-sel';document.body.appendChild(ring);
 
     hud.querySelector('#lay-bar').addEventListener('click',function(e){
@@ -8591,66 +8673,37 @@ if(window.visualViewport){
       if(a==='copy'){
         var txt=exportText();
         if(navigator.clipboard&&navigator.clipboard.writeText){
-          navigator.clipboard.writeText(txt).then(function(){toast('COPIED');}).catch(function(){prompt('Copy:',txt);});
+          navigator.clipboard.writeText(txt).then(function(){toast('COPIED ALL SECTORS');}).catch(function(){prompt('Copy:',txt);});
         }else prompt('Copy:',txt);
         console.log('[layout export]\n'+txt);
         return;
       }
       if(a==='reset'){
         try{localStorage.removeItem(LS_KEY);}catch(err){}
+        window.__layOV={};
         toast('RESET — reload page');
         return;
       }
       if(!sel){toast('TAP A CONSTELLATION FIRST');return;}
       if(a==='rotl')nudge(sel,0,-3,0,0);
       if(a==='rotr')nudge(sel,0,3,0,0);
-      if(a==='zoout')nudge(sel,-0.03,0,0,0);
-      if(a==='zoin')nudge(sel,0.03,0,0,0);
+      if(a==='zoout')nudge(sel,-0.04,0,0,0);
+      if(a==='zoin')nudge(sel,0.04,0,0,0);
       if(a==='prev'||a==='next'){
-        var ids=(window.__scnFit&&window.__scnFit.ids)||[];
-        if(SKY.rasiBy.pleiades&&ids.indexOf('pleiades')<0)ids=ids.concat(['pleiades']);
-        if(!ids.length)return;
+        var ids=sectorIds();if(!ids.length)return;
         var i=ids.indexOf(sel);if(i<0)i=0;
         i=a==='next'?(i+1)%ids.length:(i-1+ids.length)%ids.length;
         sel=ids[i];updateInfo();paintSel();
       }
     },true);
 
-    function paintSel(){
-      var ring=document.getElementById('lay-sel');if(!ring)return;
-      if(!sel){ring.style.display='none';return;}
-      var c=sel==='pleiades'?null:cons(sel);
-      var x0,y0,x1,y1;
-      if(sel==='pleiades'&&PLEIADES.ready){
-        x0=PLEIADES.x;y0=PLEIADES.y;x1=PLEIADES.x+PLEIADES.scale;y1=PLEIADES.y+PLEIADES.scale;
-      }else if(c){x0=c.minX;y0=c.minY;x1=c.maxX;y1=c.maxY;}
-      else{ring.style.display='none';return;}
-      var pad=12;
-      /* convert virtual stage coords to screen if needed — client rect of canvas */
-      var cr=cv.getBoundingClientRect();
-      var sx=cr.width/W,sy=cr.height/H;
-      ring.style.display='block';
-      ring.style.left=(cr.left+(x0-pad)*sx)+'px';
-      ring.style.top=(cr.top+(y0-pad)*sy)+'px';
-      ring.style.width=Math.max(20,(x1-x0+pad*2)*sx)+'px';
-      ring.style.height=Math.max(20,(y1-y0+pad*2)*sy)+'px';
-    }
-    layoutEditor.paintSel=paintSel;
-
-    /* intercept pointer for select + drag (capture, only when not on HUD) */
     document.addEventListener('pointerdown',function(e){
       if(e.target.closest&&e.target.closest('#lay-hud'))return;
-      if(SECT.on||SECT.busy)return; /* only inside a sector */
+      if(!SECT.cur||SECT.busy)return; /* must be inside a sector */
       var id=hitCons(e.clientX,e.clientY);
-      /* clientX may be transformed by stage hooks — use as virtual coords already */
-      if(!id){
-        /* try with raw if stage transform active */
-        id=hitCons(e.clientX,e.clientY);
-      }
       if(id){
         sel=id;updateInfo();paintSel();
         drag={id:id,x0:e.clientX,y0:e.clientY,moved:false};
-        try{e.target.setPointerCapture&&e.target.setPointerCapture(e.pointerId);}catch(err){}
         e.stopPropagation();e.preventDefault();
       }
     },true);
@@ -8658,30 +8711,32 @@ if(window.visualViewport){
     document.addEventListener('pointermove',function(e){
       if(!drag)return;
       var dx=e.clientX-drag.x0,dy=e.clientY-drag.y0;
-      if(!drag.moved&&dx*dx+dy*dy<25)return;
+      if(!drag.moved&&dx*dx+dy*dy<20)return;
       drag.moved=true;
-      var sc=screenToSceneDelta(dx,dy);
-      nudge(drag.id,0,0,sc[0],sc[1]);
+      var r=SKY.rasiBy[drag.id];
+      if(r&&(r.scene||r.ple)){
+        var sc=screenToSceneDelta(dx,dy);
+        nudge(drag.id,0,0,sc[0],sc[1]);
+      }else{
+        nudge(drag.id,0,0,dx,dy); /* screen px for override */
+      }
       drag.x0=e.clientX;drag.y0=e.clientY;
-      paintSel();
       e.stopPropagation();e.preventDefault();
     },true);
 
     document.addEventListener('pointerup',function(e){
-      if(drag){drag=null;e.stopPropagation();}
+      if(drag){drag=null;}
     },true);
 
     updateInfo();
-    setInterval(function(){if(sel)paintSel();},500);
-    console.log('[layout editor] ON — tap constellation, drag to move, SAVE/COPY when done');
+    setInterval(function(){if(sel)paintSel();updateInfo();},800);
+    console.log('[layout editor v2] all 4 sectors — SAVE/COPY exports per sector');
   }
 
   function waitReady(){
     if(!document.body||typeof layout!=='function'){setTimeout(waitReady,200);return;}
-    /* wait until past boot */
     if(typeof bootDone!=='undefined'&&!bootDone){setTimeout(waitReady,400);return;}
     buildHud();
-    /* re-apply layout once with saved data */
     setTimeout(function(){try{layout();}catch(e){}},600);
   }
   if(document.readyState==='complete')waitReady();
