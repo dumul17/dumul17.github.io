@@ -2887,32 +2887,42 @@ function layout(){
       if(d.pv){tx=d.at[0]-(cs*d.pv[0]-sn*d.pv[1]);ty=d.at[1]-(sn*d.pv[0]+cs*d.pv[1]);}
       return function(x,y){return [cs*x-sn*y+tx,sn*x+cs*y+ty];};
     }
+    /* Transform all stars to scene space (_sx/_sy). Fit uses ANCHORS only
+       (scene.at + Pleiades centre) + fixed pad — so scaling individual k
+       does NOT zoom the whole sky out. Figures can grow/shrink independently. */
     for(i=0;i<ids.length;i++){
       c=cons(ids[i]);if(!c)return null;
       f=mk(def[ids[i]]);
-      for(k2 in c.stars){st=c.stars[k2];p=f(st.rx,st.ry);st._sx=p[0];st._sy=p[1];pts.push(p);}
+      for(k2 in c.stars){st=c.stars[k2];p=f(st.rx,st.ry);st._sx=p[0];st._sy=p[1];}
       if(c.nebula){p=f(c.nebula.rx,c.nebula.ry);c.nebula._sx=p[0];c.nebula._sy=p[1];}
     }
-    var PK=.55; /* PK = pengecil khusus ukuran tampilan cluster Pleiades (titik tengah tetap) */
-    PLEIADES.bright.concat(PLEIADES.dim).forEach(function(z){pts.push([PC[0]+(z.x-.53)*PS*PK,PC[1]+(z.y-.42)*PS*PK]);});
-    var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
-    for(j=0;j<pts.length;j++){mnx=Math.min(mnx,pts[j][0]);mxx=Math.max(mxx,pts[j][0]);mny=Math.min(mny,pts[j][1]);mxy=Math.max(mxy,pts[j][1]);}
-    /* area fit: margin + ruang buat caption & label "Pleione" supaya semuanya muat di layar (diulang 4x karena ruang label bergantung skala) */
-    var m=Math.max(22,Math.min(W*.095,40)),aL=m,aR=W-m,aT=top+24,aB=bot-60,fs=1,offx=0,offy=0,ex=[],ei;
+    var PK=.55; /* PK = pengecil khusus ukuran tampilan cluster Pleiades */
+    var mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,anch=[];
+    for(i=0;i<ids.length;i++){var aa=def[ids[i]].at;anch.push(aa);mnx=Math.min(mnx,aa[0]);mxx=Math.max(mxx,aa[0]);mny=Math.min(mny,aa[1]);mxy=Math.max(mxy,aa[1]);}
+    anch.push(PC);mnx=Math.min(mnx,PC[0]);mxx=Math.max(mxx,PC[0]);mny=Math.min(mny,PC[1]);mxy=Math.max(mxy,PC[1]);
+    /* Fixed figure pad in scene units (covers typical constellation span at k~1).
+       NOT derived from actual star extents — keeps zoom stable when editing k. */
+    var pad=300;
+    mnx-=pad;mxx+=pad;mny-=pad;mxy+=pad;
+    /* area fit: generous margins so labels/captions never clip on portrait */
+    var m=Math.max(28,Math.min(W*.11,48)),aL=m,aR=W-m,aT=top+36,aB=bot-72,fs=1,offx=0,offy=0,ex=[],ei;
     var capR=SKY.rasi.filter(function(r){return r.cap&&r.scene&&!CONS_OFF[r.id];});
     for(var it=0;it<4;it++){
       var x0=mnx,x1=mxx,y0=mny,y1=mxy;
       for(ei=0;ei<ex.length;ei++){x0=Math.min(x0,ex[ei][0]);x1=Math.max(x1,ex[ei][0]);y0=Math.min(y0,ex[ei][1]);y1=Math.max(y1,ex[ei][1]);}
-      fs=Math.min((aR-aL)/(x1-x0),(aB-aT)/(y1-y0));
-      offx=aL+((aR-aL)-(x1-x0)*fs)/2-x0*fs;offy=aT+((aB-aT)-(y1-y0)*fs)/2-y0*fs;
+      var dx=x1-x0,dy=y1-y0;if(dx<1)dx=1;if(dy<1)dy=1;
+      fs=Math.min((aR-aL)/dx,(aB-aT)/dy);
+      offx=aL+((aR-aL)-dx*fs)/2-x0*fs;offy=aT+((aB-aT)-dy*fs)/2-y0*fs;
       ex=[];
+      /* Caption space estimated from ANCHOR positions (not full figure) so k-scale doesn't expand fit */
       capR.forEach(function(r){
-        var cc=cons(r.id),bx0=1e9,bx1=-1e9,by1=-1e9,kk;
-        for(kk in cc.stars){bx0=Math.min(bx0,cc.stars[kk]._sx);bx1=Math.max(bx1,cc.stars[kk]._sx);by1=Math.max(by1,cc.stars[kk]._sy);}
-        var cx=(r.cap.x==='right'?bx1:(bx0+bx1)/2)+r.cap.dx/fs,cw=r.cap.text.length*11;
-        ex.push([cx,by1+r.cap.dy/fs],[cx+cw/fs,by1+(r.cap.dy+14)/fs]);
+        var at=def[r.id]&&def[r.id].at;if(!at)return;
+        var cx=at[0]+(r.cap.dx||0)/Math.max(fs,.001),cy=at[1]+(r.cap.dy||20)/Math.max(fs,.001);
+        var cw=(r.cap.text?r.cap.text.length:6)*11/Math.max(fs,.001);
+        ex.push([cx,cy],[cx+cw,cy+18/Math.max(fs,.001)]);
       });
-      if(STG.rot)ex.push([PC[0],PC[1]+(STG.rot<0?1:-1)*92/fs]);else ex.push([PC[0]+.31*PS*PK+92/fs,PC[1]-.02*PS*PK]); /* label Pleione (+ bar equalizer) di kanan bintangnya */
+      if(STG.rot)ex.push([PC[0],PC[1]+(STG.rot<0?1:-1)*80/Math.max(fs,.001)]);
+      else ex.push([PC[0]+.31*PS*PK+80/Math.max(fs,.001),PC[1]-.02*PS*PK]);
     }
     for(i=0;i<ids.length;i++){
       c=cons(ids[i]);c.maxX=-1e9;c.maxY=-1e9;c.minX=1e9;c.minY=1e9;c.scale=fs*def[ids[i]].k;
@@ -8506,7 +8516,12 @@ window.__applyLayOV=function(){
 
   function sectorIds(){
     var k=SECT.cur&&SECT.cur.k;
-    var ids=SKY.rasi.filter(function(r){return !r.off&&(!k||r.sector===k);}).map(function(r){return r.id;});
+    /* overview (no cur): all non-off rasi; inside sector: that sector only */
+    var ids=SKY.rasi.filter(function(r){
+      if(r.off)return false;
+      if(!k)return true; /* overview — all */
+      return r.sector===k;
+    }).map(function(r){return r.id;});
     return ids;
   }
 
@@ -8654,40 +8669,62 @@ window.__applyLayOV=function(){
 
   function buildHud(){
     if(hud)return;
+    var panelY=70; /* px from bottom — adjustable */
+    try{var py=localStorage.getItem('obs_lay_panel_y');if(py)panelY=Math.max(8,Math.min(220,+py));}catch(e){}
     var css=[
-      '#lay-hud{position:fixed;left:0;right:0;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:80;pointer-events:none;font:11px/1.3 "Courier New",monospace;color:#cfeffa}',
-      '#lay-bar{pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;justify-content:center;padding:8px 8px 6px;background:rgba(2,8,13,.9);border:1px solid rgba(110,229,255,.28);border-radius:6px;margin:0 8px;box-shadow:0 0 18px rgba(0,0,0,.4)}',
-      '#lay-bar button{min-width:36px;min-height:34px;padding:5px 8px;border:1px solid rgba(110,229,255,.4);border-radius:4px;background:rgba(110,229,255,.08);color:#6ee5ff;font:700 11px "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent}',
-      '#lay-bar button:active{background:rgba(110,229,255,.22)}',
-      '#lay-info{pointer-events:none;text-align:center;padding:4px 10px 2px;color:rgba(207,239,250,.9);font-size:10px;letter-spacing:.03em;opacity:.9}',
-      '#lay-sel{position:fixed;pointer-events:none;z-index:79;border:1px dashed rgba(110,229,255,.55);border-radius:4px;box-shadow:0 0 12px rgba(110,229,255,.2);display:none}'
-    ].join('');
-    var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+      '#lay-hud{position:fixed;left:6px;right:6px;bottom:calc(VARBOTTOMpx + env(safe-area-inset-bottom,0px));z-index:80;pointer-events:none;font:10px/1.25 "Courier New",monospace;color:#cfeffa}',
+      '#lay-bar{pointer-events:auto;display:flex;flex-wrap:wrap;gap:3px;justify-content:center;align-items:center;padding:5px 6px;background:rgba(2,8,13,.92);border:1px solid rgba(110,229,255,.3);border-radius:5px;box-shadow:0 0 12px rgba(0,0,0,.45)}',
+      '#lay-bar button{min-width:28px;min-height:28px;padding:3px 6px;border:1px solid rgba(110,229,255,.35);border-radius:3px;background:rgba(110,229,255,.07);color:#6ee5ff;font:700 10px "Courier New",monospace;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1}',
+      '#lay-bar button:active{background:rgba(110,229,255,.25)}',
+      '#lay-bar button.dim{opacity:.55;font-size:9px}',
+      '#lay-info{pointer-events:none;text-align:center;padding:2px 6px 1px;color:rgba(207,239,250,.88);font-size:9px;letter-spacing:.02em;opacity:.9;max-height:28px;overflow:hidden}',
+      '#lay-sel{position:fixed;pointer-events:none;z-index:79;border:1px dashed rgba(110,229,255,.5);border-radius:3px;box-shadow:0 0 10px rgba(110,229,255,.15);display:none}'
+    ].join('').replace('VARBOTTOM',String(panelY));
+    var st=document.createElement('style');st.id='lay-style';st.textContent=css;document.head.appendChild(st);
     hud=document.createElement('div');hud.id='lay-hud';
     hud.innerHTML='<div id="lay-info"></div><div id="lay-bar">'+
+      '<button type="button" data-a="pup" title="Panel up" class="dim">⬆</button>'+
+      '<button type="button" data-a="pdn" title="Panel down" class="dim">⬇</button>'+
       '<button type="button" data-a="prev">‹</button>'+
       '<button type="button" data-a="next">›</button>'+
+      '<button type="button" data-a="left" title="Nudge left">←</button>'+
+      '<button type="button" data-a="up" title="Nudge up">↑</button>'+
+      '<button type="button" data-a="down" title="Nudge down">↓</button>'+
+      '<button type="button" data-a="right" title="Nudge right">→</button>'+
       '<button type="button" data-a="rotl">↺</button>'+
       '<button type="button" data-a="rotr">↻</button>'+
       '<button type="button" data-a="zoout">−</button>'+
       '<button type="button" data-a="zoin">+</button>'+
-      '<button type="button" data-a="save">SAVE</button>'+
-      '<button type="button" data-a="copy">COPY</button>'+
-      '<button type="button" data-a="reset">RESET</button>'+
+      '<button type="button" data-a="save" class="dim">SAVE</button>'+
+      '<button type="button" data-a="copy" class="dim">COPY</button>'+
+      '<button type="button" data-a="reset" class="dim">RST</button>'+
       '</div>';
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
     var ring=document.createElement('div');ring.id='lay-sel';document.body.appendChild(ring);
 
+    var STEP=12; /* screen px nudge for override; scene units derived for scene rasi */
+
+    function setPanelY(y){
+      panelY=Math.max(8,Math.min(240,y));
+      try{localStorage.setItem('obs_lay_panel_y',String(panelY));}catch(e){}
+      var el=document.getElementById('lay-style');
+      if(el)el.textContent=el.textContent.replace(/bottom:calc\([^)]+\)/,'bottom:calc('+panelY+'px + env(safe-area-inset-bottom,0px))');
+      /* also force on element */
+      hud.style.bottom='calc('+panelY+'px + env(safe-area-inset-bottom,0px))';
+    }
+
     hud.querySelector('#lay-bar').addEventListener('click',function(e){
       var b=e.target.closest('button');if(!b)return;
       var a=b.getAttribute('data-a');
       e.preventDefault();e.stopPropagation();
+      if(a==='pup'){setPanelY(panelY+16);return;}
+      if(a==='pdn'){setPanelY(panelY-16);return;}
       if(a==='save'){save();return;}
       if(a==='copy'){
         var txt=exportText();
         if(navigator.clipboard&&navigator.clipboard.writeText){
-          navigator.clipboard.writeText(txt).then(function(){toast('COPIED ALL SECTORS');}).catch(function(){prompt('Copy:',txt);});
+          navigator.clipboard.writeText(txt).then(function(){toast('COPIED');}).catch(function(){prompt('Copy:',txt);});
         }else prompt('Copy:',txt);
         console.log('[layout export]\n'+txt);
         return;
@@ -8695,14 +8732,26 @@ window.__applyLayOV=function(){
       if(a==='reset'){
         try{localStorage.removeItem(LS_KEY);}catch(err){}
         window.__layOV={};
-        toast('RESET — reload page');
+        toast('RESET — reload');
         return;
       }
-      if(!sel){toast('TAP A CONSTELLATION FIRST');return;}
+      if(!sel){toast('TAP RASI DULU');return;}
       if(a==='rotl')nudge(sel,0,-3,0,0);
       if(a==='rotr')nudge(sel,0,3,0,0);
       if(a==='zoout')nudge(sel,-0.04,0,0,0);
       if(a==='zoin')nudge(sel,0.04,0,0,0);
+      if(a==='left'||a==='right'||a==='up'||a==='down'){
+        var dx=0,dy=0;
+        if(a==='left')dx=-STEP;if(a==='right')dx=STEP;
+        if(a==='up')dy=-STEP;if(a==='down')dy=STEP;
+        var r=SKY.rasiBy[sel];
+        if(r&&(r.scene||r.ple)){
+          var sc=screenToSceneDelta(dx,dy);
+          nudge(sel,0,0,sc[0],sc[1]);
+        }else{
+          nudge(sel,0,0,dx,dy);
+        }
+      }
       if(a==='prev'||a==='next'){
         var ids=sectorIds();if(!ids.length)return;
         var i=ids.indexOf(sel);if(i<0)i=0;
@@ -8713,7 +8762,8 @@ window.__applyLayOV=function(){
 
     document.addEventListener('pointerdown',function(e){
       if(e.target.closest&&e.target.closest('#lay-hud'))return;
-      if(!SECT.cur||SECT.busy)return; /* must be inside a sector */
+      /* allow edit inside sector OR overview (all unlocked rasi visible) */
+      if(SECT.busy)return;
       var id=hitCons(e.clientX,e.clientY);
       if(id){
         sel=id;updateInfo();paintSel();
@@ -8725,26 +8775,24 @@ window.__applyLayOV=function(){
     document.addEventListener('pointermove',function(e){
       if(!drag)return;
       var dx=e.clientX-drag.x0,dy=e.clientY-drag.y0;
-      if(!drag.moved&&dx*dx+dy*dy<20)return;
+      if(!drag.moved&&dx*dx+dy*dy<16)return;
       drag.moved=true;
       var r=SKY.rasiBy[drag.id];
       if(r&&(r.scene||r.ple)){
         var sc=screenToSceneDelta(dx,dy);
         nudge(drag.id,0,0,sc[0],sc[1]);
       }else{
-        nudge(drag.id,0,0,dx,dy); /* screen px for override */
+        nudge(drag.id,0,0,dx,dy);
       }
       drag.x0=e.clientX;drag.y0=e.clientY;
       e.stopPropagation();e.preventDefault();
     },true);
 
-    document.addEventListener('pointerup',function(e){
-      if(drag){drag=null;}
-    },true);
+    document.addEventListener('pointerup',function(){drag=null;},true);
 
     updateInfo();
-    setInterval(function(){if(sel)paintSel();updateInfo();},800);
-    console.log('[layout editor v2] all 4 sectors — SAVE/COPY exports per sector');
+    setInterval(function(){if(sel)paintSel();},700);
+    console.log('[layout editor v3] compact + arrows + panel ⬆⬇');
   }
 
   function waitReady(){
