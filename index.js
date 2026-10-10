@@ -5103,6 +5103,61 @@ function drawLockedSignal(c,age,now,ox,oy,focus){
   g.restore();
 }
 function nebulaIn(x,y,r){var t=skyXF(x,y);CULL.tot++;if(cullIn(t[0],t[1],r)){CULL.drawn++;return true;}CULL.saved+=2;return false;}
+/* ---------- Teks nama rasi (watermark) di viewport sektor ----------
+   Nama rasi (CONS_LABELS di sky-data.js) huruf renggang "O R I O N" / "C A N I S  M A J O R" / "P L E I A D E S", horizontal atau vertikal
+   (acak tapi tetap per rasi; bisa dipaksa lewat field nameDir:'h'|'v' di RASI sky-data.js), tipis, di lapisan paling bawah rasi.
+   Di-render SEKALI ke canvas kecil (sprite) lalu per frame cuma drawImage; warna ikut sky sektor. */
+var NAME_SPR={},NAME_FS=48;
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){NAME_SPR={};});
+function consNameVert(id){
+  var r=SKY.rasiBy[id];if(r&&r.nameDir)return r.nameDir==='v';
+  var h=0,i;for(i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))|0;
+  return ((h>>>3)&1)===1;
+}
+function consNameText(id){var r=SKY.rasiBy[id];return String(CONS_LABELS[id]||(r&&r.name)||id).toUpperCase();} /* nama RASI (bukan nama bintang fokus): Canis Major, Scorpius, Canis Minor, dst */
+function consSkyRgb(id){for(var i=0;i<SECT.list.length;i++){var s=SECT.list[i];if(s.sky&&s.ids.indexOf(id)>=0)return s.sky.rgb;}return '184,198,214';}
+function consNameSprite(id){
+  var vert=consNameVert(id),k=id+(vert?'v':'h'),e=NAME_SPR[k];
+  if(e)return e;
+  var txt=consNameText(id),rgb=consSkyRgb(id),FS=NAME_FS,gap=FS*.62,pad=8,i;
+  var m=document.createElement('canvas').getContext('2d');
+  m.font='500 '+FS+'px "Space Grotesk",system-ui,sans-serif';
+  var ws=[],tot=0;
+  for(i=0;i<txt.length;i++){var w=m.measureText(txt[i]).width;ws.push(w);tot+=w;}
+  tot+=gap*(txt.length-1);
+  var L=Math.ceil(tot)+pad*2,T=Math.ceil(FS*1.2)+pad*2;
+  var c=document.createElement('canvas');c.width=vert?T:L;c.height=vert?L:T;
+  var x=c.getContext('2d');
+  x.font=m.font;x.fillStyle='rgb('+rgb+')';x.textBaseline='middle';x.textAlign='left';
+  if(vert){x.translate(T/2,0);x.rotate(Math.PI/2);}else x.translate(0,T/2);
+  var px=pad;
+  for(i=0;i<txt.length;i++){x.fillText(txt[i],px,0);px+=ws[i]+gap;}
+  e=NAME_SPR[k]={c:c,vert:vert,em:tot/FS};
+  return e;
+}
+/* t1/t2 = pojok bbox rasi di layar (stage). al = opacity dasar. */
+function drawNameBox(id,t1,t2,al){
+  if(!(al>.005))return;
+  var cx=(t1[0]+t2[0])*.5,cy=(t1[1]+t2[1])*.5,bw=Math.abs(t2[0]-t1[0]),bh=Math.abs(t2[1]-t1[1]);
+  if(!cullIn(cx,cy,Math.max(bw,bh)*.7+40))return;
+  var sp=consNameSprite(id);
+  /* span utama teks searah layar tegak: landscape HP memutar stage 90deg -> bw/bh tertukar */
+  var span=sp.vert?(STG.rot?bw:bh):(STG.rot?bh:bw);
+  var fs=clamp(span*.92/sp.em,9,30);
+  var s=fs/NAME_FS,dw=sp.c.width*s,dh=sp.c.height*s;
+  var up=uprBegin(cx,cy),pa=g.globalAlpha;
+  g.globalAlpha=pa*al;
+  g.drawImage(sp.c,cx-dw/2,cy-dh/2,dw,dh);
+  g.globalAlpha=pa;
+  uprEnd(up);
+}
+function drawConsName(c,age,now,ox,oy,focus,locked){
+  if(locked||!(c.maxX>-1e8)||!(c.minX<1e8))return;
+  var a0=clamp((age-c.delay-1.6)/1.6)*focus;
+  if(a0<=.01)return;
+  var t1=skyXF(c.minX+ox,c.minY+oy),t2=skyXF(c.maxX+ox,c.maxY+oy);
+  drawNameBox(c.id,t1,t2,(CAMERA_MODE&&camFocusId()===c.id?.2:.12)*a0);
+}
 function drawCons(c,age,now){
   var tn=now-(TD.lag[c.id]||0); /* time-dilated clock */
   var audioFocus=potatoAudioFocus();
@@ -5123,6 +5178,7 @@ function drawCons(c,age,now){
       gr.addColorStop(0,'rgba(255,122,217,'+(.34*na)+')');gr.addColorStop(.5,'rgba(110,229,255,'+(.12*na)+')');gr.addColorStop(1,'rgba(110,229,255,0)');
       g.fillStyle=gr;g.beginPath();g.arc(nx,ny,nr,0,6.283);g.fill();}
   }
+  drawConsName(c,age,now,ox,oy,focus,locked); /* teks nama rasi: lapisan paling bawah, di bawah garis & bintang */
   g.lineCap='round';
   /* Terkunci: garis disembunyikan, diganti pulse di tiap bintang + titik cahaya yang jalan sesuai urutan alignment. */
   if(locked)drawLockedSignal(c,age,now,ox,oy,focus);
@@ -5284,13 +5340,26 @@ function drawStars(c,age,now){
       g.strokeStyle='rgba(255,226,140,'+((.45+.4*hp)*a)+')';g.lineWidth=1.1;
       g.beginPath();g.arc(x,y,Math.max(5,r*2.6)+2*hp,0,6.283);g.stroke();
     }
+    /* Label bintang (+ reticle silang + spektrum) tersembunyi dulu:
+       - bintang ber-SFX: tampil pas SFX-nya main, cuma di bintang yang lagi aktif
+       - bintang tanpa SFX: tampil tipis cuma pas mode cam fokus di rasi ini
+       Fade halus lewat s._la (mengejar target lblT). */
+    var lblT=0;
+    if(s.name&&age>3.5&&kq<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
+      if(isPlaying)lblT=1;
+      else if(!tr&&CAMERA_MODE&&camFocusId()===c.id)lblT=.34;
+    }
+    var lblA=s._la||0;
+    if(reduce)lblA=lblT;
+    else{var dtL=Math.min(.1,(now-(s._lt||now))/1000);lblA+=(lblT-lblA)*Math.min(1,dtL*9);}
+    s._la=lblA;s._lt=now;
     /* Cross reticle only on named bright stars — skips Scorpius tail (Shaula)
        and other anonymous bright points so the sting doesn't show a "+". */
-    if(s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath')){
-      g.strokeStyle='rgba('+s.rgb+','+(.4*a*tw)+')';g.lineWidth=.8;
+    if(lblA>.02 && s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath')){
+      g.strokeStyle='rgba('+s.rgb+','+(.4*a*tw*Math.min(1,lblA*1.6))+')';g.lineWidth=.8;
       g.beginPath();g.moveTo(x-r*2.2,y);g.lineTo(x+r*2.2,y);g.moveTo(x,y-r*2.2);g.lineTo(x,y+r*2.2);g.stroke();
     }
-    if(s.name&&age>3.5&&kq<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
+    if(lblA>.02){
       /* Audio-trigger labels: each one inherits its own pulse color. */
       /* triggerKey / tr / isPlaying were resolved above so potato audio-focus
          can decide the cheap star path before any gradient work is allocated. */
@@ -5302,7 +5371,7 @@ function drawStars(c,age,now){
       var _nx=lblSide(x,y,s.nx,gapH,_wT,(s.specAfter?0:(s.nx<0?_sp:0)),(s.specAfter?_sp:(s.nx<0?0:_sp)));
       g.textAlign=_nx<0?'right':'left';
       var labelX=x+_nx*gapH, labelY=y+3+lblDY(x,y,(s.dy||0));
-      var labelAlpha=isPlaying?.95:.62;
+      var labelAlpha=lblA*(isPlaying?.95:1);
       g.fillStyle=tr?'rgba('+tr.rgb+','+labelAlpha+')':'rgba(184,198,214,'+labelAlpha+')';
       g.fillText(s.name,labelX,labelY);
 
@@ -5331,7 +5400,7 @@ function drawStars(c,age,now){
           var wave=.5+.5*Math.sin(tn*.009+bi*1.17+s.ph);
           var center=1-Math.abs((bi-(bars-1)/2)/((bars-1)/2));
           var bhh=2+7.2*wave*(.35+.65*center);
-          var ba=.38+.52*wave;
+          var ba=(.38+.52*wave)*lblA;
           g.fillStyle='rgba('+tr.rgb+','+ba+')';
           g.fillRect(sx+bi*(bw+gap),sy+6-bhh,bw,bhh);
         }
@@ -5348,6 +5417,10 @@ function drawPleiades(age,now){
   var k2=W<500?.95:1.1;
   var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y;
   var selected=activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended;
+  if(isUnlocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
+    var pS=PLEIADES.scale,pA=clamp((age-1.6)/1.6);
+    drawNameBox('pleiades',skyXF(PLEIADES.x+.22*pS+ox,PLEIADES.y+.22*pS+oy),skyXF(PLEIADES.x+.84*pS+ox,PLEIADES.y+.62*pS+oy),(CAMERA_MODE&&camFocusId()==='pleiades'?.2:.12)*pA);
+  }
   /* Full cluster when Pleione plays (or focus still on pleiades); otherwise dim.
      Sweep-driven _tw gives the same sequential twinkle language as Orion/Virgo/Canis. */
   var clusterFade=selected?1:.30;
@@ -5399,7 +5472,7 @@ function drawPleiades(age,now){
       g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
       g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
       g.restore();
-      if(age>3.5&&q[2]<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
+      if(selected&&age>3.5&&q[2]<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){ /* label Pleione cuma pas SFX-nya main */
         var _upP=uprBegin(x,y);
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
         g.textAlign='left';g.fillStyle='rgba('+tr.rgb+','+(hotP?.95:(selected?.78:.42))+')';
@@ -6158,20 +6231,14 @@ function drawSectorOverview(now,age){
       if(s.gprev!=null)drawGlyphSprite(s.gprev,p[0],p[1],r*1.45,1-gp);
       drawGlyphSprite(s.gid,p[0],p[1],r*1.45,gp);
     }
-    /* label */
+    /* label '01 - *4' di bawah portal dibuang (dikosongkan dulu); sisa: penanda relay / 'no signal yet' */
     g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
-    g.fillStyle=empty?'rgba(184,198,214,.4)':'rgba(214,236,248,.82)';
-    /* Label: "01 · ✦4" (nomor sektor · jumlah rasi). Pas SFX Stellar Signals aktif di sektor ini -> "01 · <nama track>"; balik normal pas SFX stop/pause. */
-    var sigN=empty?null:playingSignalName(),pidL=empty?null:playingConstellationId(),hotL=!!(sigN&&pidL&&s.ids.indexOf(pidL)>=0);
-    var lab=(i<9?'0':'')+(i+1)+' - '+(empty?'unmapped':(hotL?sigN:'*'+s.ids.length));
-    if(hotL)g.fillStyle='rgba(110,229,255,.95)';
-    g.fillText(lab,p[0],p[1]+lo);
     if(s.relay&&!(s.flash&&now-s.flash<1500)){
-      g.fillStyle='rgba(110,229,255,.7)';g.fillText('\u25c9 relay',p[0],p[1]+lo+12);
+      g.fillStyle='rgba(110,229,255,.7)';g.fillText('\u25c9 relay',p[0],p[1]+lo);
     }
     if(s.flash&&now-s.flash<1500){
       g.fillStyle='rgba(255,154,217,'+(.85*(1-(now-s.flash)/1500))+')';
-      g.fillText('no signal yet',p[0],p[1]+lo+12);
+      g.fillText('no signal yet',p[0],p[1]+lo);
     }
     g.restore();g.restore();
   }
