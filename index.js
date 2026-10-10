@@ -2045,8 +2045,16 @@ function showModeToast(text,kind,ms){
 }
 
 function observeIcon(){
-  /* Overview: 🌠 · inside a sector: 📡 */
-  return (typeof SECT!=='undefined'&&SECT.cur)?'📡':'🌠';
+  /* Overview: out (shooting star) · inside a sector: in (signal dish) */
+  return (typeof SECT!=='undefined'&&SECT.cur)?'in':'out';
+}
+function applyObserveIcon(btn){
+  if(!btn)return;
+  var state=observeIcon();
+  var out=btn.querySelector('.ico-obs-out');
+  var inn=btn.querySelector('.ico-obs-in');
+  if(out)out.hidden=state!=='out';
+  if(inn)inn.hidden=state!=='in';
 }
 function setObserveMode(on){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
@@ -2057,7 +2065,7 @@ function setObserveMode(on){
   if(btn){
     btn.classList.toggle('on',OBSERVE_MODE);
     btn.setAttribute('aria-pressed',OBSERVE_MODE?'true':'false');
-    btn.textContent=observeIcon();
+    applyObserveIcon(btn);
     btn.title=OBSERVE_MODE?'Exit Observation':'Observation Mode';
     btn.setAttribute('aria-label',OBSERVE_MODE?'Exit Observation':'Observation Mode');
   }
@@ -5782,7 +5790,7 @@ function sectSet(on){
     bc.toggle('sect-in',!SECT.on&&!!SECT.cur);
     for(var si=0;si<SECT.list.length;si++)bc.toggle('sect-in-'+SECT.list[si].k,!SECT.on&&SECT.cur===SECT.list[si]);
     fxSectSync();}catch(e){}
-  try{var ob=document.getElementById('mode-observe');if(ob)ob.textContent=observeIcon();}catch(eO){}
+  try{applyObserveIcon(document.getElementById('mode-observe'));}catch(eO){}
   if(SECT.on){try{syncSkyPanHits();}catch(e){}}
 }
 var SECT_HALO=[null,null];
