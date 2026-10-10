@@ -5143,7 +5143,7 @@ function drawNameBox(id,t1,t2,al){
   var sp=consNameSprite(id);
   /* span utama teks searah layar tegak: landscape HP memutar stage 90deg -> bw/bh tertukar */
   var span=sp.vert?(STG.rot?bw:bh):(STG.rot?bh:bw);
-  var fs=clamp(span*.92/sp.em,9,30);
+  var fs=Math.max(9,Math.min(30,span*.92/sp.em)); /* clamp() global cuma 1 argumen (0..1) -> dulu fs jadi 1px = teks nggak kelihatan */
   var s=fs/NAME_FS,dw=sp.c.width*s,dh=sp.c.height*s;
   var up=uprBegin(cx,cy),pa=g.globalAlpha;
   g.globalAlpha=pa*al;
