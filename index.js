@@ -5812,6 +5812,32 @@ function sectHaloSprite(empty){
   x.fillStyle=gr;x.beginPath();x.arc(48,48,48,0,6.283);x.fill();
   SECT_HALO[k]=c;return c;
 }
+/* Frame SVG per sektor (pengganti ring putus-putus di portal overview). Tiap SVG 200x200, tengahnya transparan:
+   cincin dalam (titik-titik) r68, cincin utama r75, ornamen sampai ~r90. Di-rasterisasi SEKALI ke canvas (sprite),
+   lalu per frame cuma drawImage. Selama belum selesai dimuat / kalau gagal, portal pakai ring putus-putus lama. */
+var SECT_FRAME_SVG={"winter": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 200\" width=\"200\" height=\"200\" fill=\"none\"><defs><filter id=\"glow\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\"><feGaussianBlur stdDeviation=\"1.8\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter></defs><g stroke=\"#91D7FF\" stroke-width=\"1.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" filter=\"url(#glow)\"><circle cx=\"100\" cy=\"100\" r=\"68\" stroke-dasharray=\"1 5\" opacity=\".65\"/><circle cx=\"100\" cy=\"100\" r=\"75\" opacity=\".9\"/><circle cx=\"100\" cy=\"100\" r=\"80\" opacity=\".55\"/><path d=\"M100 10 L105 27 L100 23 L95 27 Z M100 190 L105 173 L100 177 L95 173 Z M10 100 L27 95 L23 100 L27 105 Z M190 100 L173 95 L177 100 L173 105 Z\" fill=\"#91D7FF\" fill-opacity=\".75\"/><path d=\"M42 45 L48 54 L57 60 L48 66 L42 75 L36 66 L27 60 L36 54 Z M158 45 L164 54 L173 60 L164 66 L158 75 L152 66 L143 60 L152 54 Z\" opacity=\".9\"/><path d=\"M67 25 l4 8 -4 8 -4 -8 Z M133 25 l4 8 -4 8 -4 -8 Z M67 167 l4 8 -4 8 -4 -8 Z M133 167 l4 8 -4 8 -4 -8 Z\"/><path d=\"M84 178 l5 -7 5 7 M106 178 l5 -7 5 7 M89 184 l11 -7 11 7 M100 177 v13\"/><path d=\"M22 83 l6 4 -6 4 M178 83 l-6 4 6 4 M22 117 l6 -4 -6 -4 M178 117 l-6 -4 6 -4\"/></g><g fill=\"#DDF5FF\"><circle cx=\"100\" cy=\"10\" r=\"2\"/><circle cx=\"100\" cy=\"190\" r=\"2\"/><circle cx=\"10\" cy=\"100\" r=\"2\"/><circle cx=\"190\" cy=\"100\" r=\"2\"/><circle cx=\"42\" cy=\"60\" r=\"1.7\"/><circle cx=\"158\" cy=\"60\" r=\"1.7\"/></g></svg>", "spring": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 200\" width=\"200\" height=\"200\" fill=\"none\"><defs><filter id=\"glow\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\"><feGaussianBlur stdDeviation=\"1.8\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter></defs><g stroke=\"#A7D982\" stroke-width=\"1.35\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"100\" cy=\"100\" r=\"68\" stroke-dasharray=\"1 5\" opacity=\".65\"/><circle cx=\"100\" cy=\"100\" r=\"75\"/><circle cx=\"100\" cy=\"100\" r=\"80\" opacity=\".45\"/><path d=\"M34 139 C18 111 25 77 47 54 C54 47 60 44 65 42 M166 139 C182 111 175 77 153 54 C146 47 140 44 135 42\"/><path d=\"M38 126 C25 113 28 102 43 106 C48 117 45 123 38 126 Z M34 91 C20 82 26 72 39 78 C44 84 41 89 34 91 Z M51 59 C39 47 48 39 58 49 C60 55 57 59 51 59 Z\" fill=\"#A7D982\" fill-opacity=\".22\"/><path d=\"M162 126 C175 113 172 102 157 106 C152 117 155 123 162 126 Z M166 91 C180 82 174 72 161 78 C156 84 159 89 166 91 Z M149 59 C161 47 152 39 142 49 C140 55 143 59 149 59 Z\" fill=\"#A7D982\" fill-opacity=\".22\"/><path d=\"M100 8 L104 19 L100 16 L96 19 Z M100 192 L104 181 L100 184 L96 181 Z\"/><g stroke=\"#E8DCA0\"><path d=\"M42 153 l0 -5 M39 150 h6 M42 147 l-3 3 3 3 3 -3 Z\"/><path d=\"M158 153 l0 -5 M155 150 h6 M158 147 l-3 3 3 3 3 -3 Z\"/><path d=\"M100 177 l0 -7 M96 173 h8 M100 169 l-4 4 4 4 4 -4 Z\"/></g><path d=\"M60 29 C67 20 76 22 75 31 C68 36 63 34 60 29 Z M140 29 C133 20 124 22 125 31 C132 36 137 34 140 29 Z\" fill=\"#A7D982\" fill-opacity=\".3\"/></g><g fill=\"#E8DCA0\"><circle cx=\"100\" cy=\"8\" r=\"2\"/><circle cx=\"100\" cy=\"192\" r=\"2\"/><circle cx=\"42\" cy=\"150\" r=\"2\"/><circle cx=\"158\" cy=\"150\" r=\"2\"/></g></svg>", "summer": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 200\" width=\"200\" height=\"200\" fill=\"none\"><defs><filter id=\"glow\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\"><feGaussianBlur stdDeviation=\"1.8\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter></defs><g stroke=\"#FFB44D\" stroke-width=\"1.35\" stroke-linecap=\"round\" stroke-linejoin=\"round\" filter=\"url(#glow)\"><circle cx=\"100\" cy=\"100\" r=\"68\" stroke-dasharray=\"1 5\" opacity=\".6\"/><circle cx=\"100\" cy=\"100\" r=\"75\"/><circle cx=\"100\" cy=\"100\" r=\"80\" opacity=\".45\"/><path d=\"M100 7 L105 24 L100 20 L95 24 Z M100 193 L105 176 L100 180 L95 176 Z\" fill=\"#FFB44D\" fill-opacity=\".65\"/><path d=\"M31 70 C18 62 20 49 32 43 C29 55 37 56 40 62 M169 70 C182 62 180 49 168 43 C171 55 163 56 160 62\"/><path d=\"M31 70 C41 63 45 53 42 43 C54 50 55 62 46 72 M169 70 C159 63 155 53 158 43 C146 50 145 62 154 72\"/><circle cx=\"100\" cy=\"25\" r=\"8\"/><path d=\"M100 11 v5 M100 34 v5 M86 25 h5 M109 25 h5 M90 15 l4 4 M106 31 l4 4 M110 15 l-4 4 M94 31 l-4 4\"/><path d=\"M54 153 L62 145 L66 155 L73 149 M146 153 L138 145 L134 155 L127 149\"/><path d=\"M80 178 L86 168 L92 178 L100 166 L108 178 L114 168 L120 178\"/><path d=\"M24 100 l8 -4 -2 7 7 3 -8 2 Z M176 100 l-8 -4 2 7 -7 3 8 2 Z\" fill=\"#FFB44D\" fill-opacity=\".25\"/></g><g fill=\"#FFE3A6\"><circle cx=\"100\" cy=\"7\" r=\"2\"/><circle cx=\"100\" cy=\"193\" r=\"2\"/><circle cx=\"32\" cy=\"60\" r=\"2\"/><circle cx=\"168\" cy=\"60\" r=\"2\"/></g></svg>", "autumn": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 200 200\" width=\"200\" height=\"200\" fill=\"none\"><defs><filter id=\"glow\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\"><feGaussianBlur stdDeviation=\"1.8\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/></feMerge></filter></defs><g stroke=\"#D87961\" stroke-width=\"1.35\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"100\" cy=\"100\" r=\"68\" stroke-dasharray=\"1 5\" opacity=\".6\"/><circle cx=\"100\" cy=\"100\" r=\"75\"/><circle cx=\"100\" cy=\"100\" r=\"80\" opacity=\".45\"/><path d=\"M75 26 L81 16 L88 25 L100 8 L112 25 L119 16 L125 26 L121 39 L79 39 Z\" fill=\"#D87961\" fill-opacity=\".22\"/><path d=\"M79 39 H121 M86 32 L100 19 L114 32\"/><path d=\"M35 129 C22 119 21 104 31 95 C31 108 40 112 45 118 M165 129 C178 119 179 104 169 95 C169 108 160 112 155 118\"/><path d=\"M39 143 C28 137 27 127 37 123 C44 130 44 137 39 143 Z M47 157 C35 155 33 145 43 142 C51 147 52 152 47 157 Z M161 143 C172 137 173 127 163 123 C156 130 156 137 161 143 Z M153 157 C165 155 167 145 157 142 C149 147 148 152 153 157 Z\" fill=\"#D87961\" fill-opacity=\".24\"/><path d=\"M83 178 L91 165 L100 174 L109 165 L117 178 L100 188 Z\" fill=\"#D87961\" fill-opacity=\".2\"/><path d=\"M100 174 V188 M91 165 L100 174 L109 165\"/><path d=\"M25 77 l7 4 -7 4 M175 77 l-7 4 7 4 M27 91 l6 3 -6 3 M173 91 l-6 3 6 3\"/></g><g fill=\"#F4B08B\"><circle cx=\"100\" cy=\"8\" r=\"2\"/><circle cx=\"100\" cy=\"188\" r=\"2\"/><circle cx=\"31\" cy=\"95\" r=\"1.8\"/><circle cx=\"169\" cy=\"95\" r=\"1.8\"/></g></svg>"};
+var SECT_FRAME_SPR={},SECT_FRAME_PX=256;
+function sectFrameSprite(k){
+  var e=SECT_FRAME_SPR[k];
+  if(e!==undefined)return e&&e.ready?e.c:null;
+  var svg=SECT_FRAME_SVG[k];
+  if(!svg){SECT_FRAME_SPR[k]=null;return null;}
+  e=SECT_FRAME_SPR[k]={ready:false,c:null};
+  try{
+    var im=new Image();
+    im.onload=function(){
+      try{
+        var c=document.createElement('canvas');c.width=c.height=SECT_FRAME_PX;
+        c.getContext('2d').drawImage(im,0,0,SECT_FRAME_PX,SECT_FRAME_PX);
+        e.c=c;e.ready=true;
+      }catch(eD){SECT_FRAME_SPR[k]=null;}
+    };
+    im.onerror=function(){SECT_FRAME_SPR[k]=null;};
+    im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  }catch(eI){SECT_FRAME_SPR[k]=null;}
+  return null;
+}
+['winter','spring','summer','autumn'].forEach(sectFrameSprite);
 /* Glyph rasi di-render SEKALI ke canvas kecil (sprite), lalu tinggal drawImage per frame. */
 var GLYPH_SPR={},GLYPH_URL={},GLYPH_PX=96;
 function glyphSprite(id){
@@ -6098,11 +6124,18 @@ function drawSectorOverview(now,age){
     uprBegin(p[0],p[1]); /* ikon+teks sektor tegak di landscape (restore ikut g.restore di bawah) */
     /* halo */
     g.drawImage(sectHaloSprite(empty),p[0]-r*2.1,p[1]-r*2.1,r*4.2,r*4.2);
-    /* dashed ring */
-    g.lineWidth=1;g.strokeStyle=empty?'rgba(184,198,214,.28)':'rgba(110,229,255,.5)';
-    if(g.setLineDash){g.setLineDash([3,5]);g.lineDashOffset=reduce?0:-now*.012;}
-    g.beginPath();g.arc(p[0],p[1],r,0,6.283);g.stroke();
-    if(g.setLineDash)g.setLineDash([]);
+    /* frame SVG sektor (kalau sudah siap & sektor sudah terpetakan); kalau belum -> ring putus-putus. Cincin utama frame (r75/200) = jari-jari r. */
+    var frSpr=empty?null:sectFrameSprite(s.k),useFrame=!!frSpr,lo=r+7;
+    if(useFrame){
+      var fh=r*(100/75);
+      g.drawImage(frSpr,p[0]-fh,p[1]-fh,fh*2,fh*2);
+      lo=r*1.22+5; /* ornamen bawah frame menjorok ~1.2r, label digeser turun */
+    }else{
+      g.lineWidth=1;g.strokeStyle=empty?'rgba(184,198,214,.28)':'rgba(110,229,255,.5)';
+      if(g.setLineDash){g.setLineDash([3,5]);g.lineDashOffset=reduce?0:-now*.012;}
+      g.beginPath();g.arc(p[0],p[1],r,0,6.283);g.stroke();
+      if(g.setLineDash)g.setLineDash([]);
+    }
     g.textAlign='center';g.textBaseline='middle';
     if(empty){
       g.fillStyle='rgba(184,198,214,.5)';g.font='600 '+Math.round(r*.62)+'px "Space Grotesk",system-ui,sans-serif';
@@ -6125,13 +6158,13 @@ function drawSectorOverview(now,age){
     var sigN=empty?null:playingSignalName(),pidL=empty?null:playingConstellationId(),hotL=!!(sigN&&pidL&&s.ids.indexOf(pidL)>=0);
     var lab=(i<9?'0':'')+(i+1)+' - '+(empty?'unmapped':(hotL?sigN:'*'+s.ids.length));
     if(hotL)g.fillStyle='rgba(110,229,255,.95)';
-    g.fillText(lab,p[0],p[1]+r+7);
+    g.fillText(lab,p[0],p[1]+lo);
     if(s.relay&&!(s.flash&&now-s.flash<1500)){
-      g.fillStyle='rgba(110,229,255,.7)';g.fillText('\u25c9 relay',p[0],p[1]+r+19);
+      g.fillStyle='rgba(110,229,255,.7)';g.fillText('\u25c9 relay',p[0],p[1]+lo+12);
     }
     if(s.flash&&now-s.flash<1500){
       g.fillStyle='rgba(255,154,217,'+(.85*(1-(now-s.flash)/1500))+')';
-      g.fillText('no signal yet',p[0],p[1]+r+19);
+      g.fillText('no signal yet',p[0],p[1]+lo+12);
     }
     g.restore();g.restore();
   }
