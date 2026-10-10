@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=35">
+<link rel="stylesheet" href="index.css?v=36">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -117,6 +117,11 @@
 <section id="music-player" aria-label="Music player" aria-hidden="true">
   <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker">Dumul's Observatory</span><div class="mp-title-row"><strong>Music Transmission</strong><div class="mp-vol-wrap" title="Volume"><button type="button" id="mode-silence" class="mp-silence mp-vol-btn" aria-pressed="false" aria-label="Volume" title="Volume"><svg class="ico ico-vol-on" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/><path d="M15.2 9.2 a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 7 a5.5 5.5 0 0 1 0 10"/></svg><svg class="ico ico-vol-off" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/><path d="M16 9 l5 6 M21 9 l-5 6"/></svg></button><input type="range" id="mp-vol" class="mp-vol" min="0" max="100" value="85" step="1" aria-label="Volume level"></div></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
   <div class="mp-scroll">
+  <button type="button" id="mp-av-toggle" class="mp-av" role="switch" aria-checked="true" aria-label="Gargantua spectrum visualizer">
+    <span class="mp-av-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+    <span class="mp-av-txt"><b>Gargantua Spectrum</b><i>Radial visualizer · signals</i></span>
+    <span class="mp-av-sw" aria-hidden="true"></span>
+  </button>
   <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/00</span></div>
   <!-- Baris track SFX (accordion per sektor) dibangun index.js dari sky-data.js. Jangan tulis manual. -->
   <div id="mp-sfx-groups"></div>
@@ -167,6 +172,9 @@
   <button type="button" id="mode-bh" aria-pressed="false" aria-label="Summon Gargantua" title="Summon Gargantua">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5 a8.5 8.5 0 0 1 0 17"/><path d="M12 6 a6 6 0 0 1 0 12" opacity=".7"/><path d="M12 8.5 a3.5 3.5 0 0 1 0 7" opacity=".45"/></svg>
   </button>
+  <button type="button" id="mode-bhset" aria-label="Gargantua settings" title="Gargantua settings" aria-expanded="false" aria-controls="bh-panel">
+    <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.2"/><circle cx="9.5" cy="17" r="2.2"/></svg>
+  </button>
   <button type="button" id="mode-sectors" aria-label="Back to sector overview" title="Back to overview">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M12 4 v3 M12 17 v3 M4 12 h3 M17 12 h3"/><path d="M7.2 7.2 l2 2 M14.8 14.8 l2 2 M16.8 7.2 l-2 2 M9.2 14.8 l-2 2"/><circle cx="12" cy="12" r="8" stroke-dasharray="2 3" opacity=".55"/></svg>
   </button>
@@ -177,6 +185,15 @@
   <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous focus target">‹</button><button type="button" id="cf-name" aria-label="Next focus target">FOCUS · FREE</button><button type="button" id="cf-next" aria-label="Next focus target">›</button></div>
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
+<div id="bh-panel" role="dialog" aria-label="Gargantua settings" aria-hidden="true">
+  <div class="bp-head"><span class="bp-tag">Gargantua // Tune</span><button type="button" id="bp-close" aria-label="Close">×</button></div>
+  <label class="bp-row"><span class="bp-k">Size</span><input type="range" class="bp-range" id="bp-size" min="50" max="180" step="1" value="100"><output id="bp-size-v">1.00×</output></label>
+  <label class="bp-row"><span class="bp-k">Strength</span><input type="range" class="bp-range" id="bp-str" min="0" max="250" step="1" value="100"><output id="bp-str-v">1.00×</output></label>
+  <label class="bp-row"><span class="bp-k">Bloom</span><input type="range" class="bp-range" id="bp-bloom" min="0" max="200" step="1" value="100"><output id="bp-bloom-v">1.00×</output></label>
+  <label class="bp-row"><span class="bp-k">Speed</span><input type="range" class="bp-range" id="bp-speed" min="0" max="300" step="1" value="100"><output id="bp-speed-v">1.00×</output></label>
+  <div class="bp-row bp-tog"><span class="bp-k">Asteroids</span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true">Show</button></div>
+  <div class="bp-act"><button type="button" id="bp-save">Save</button><button type="button" id="bp-reset">Reset</button></div>
+</div>
 <div id="sector-scan" aria-hidden="true">
   <div class="ss-head"><span>MAP</span><span class="ss-sec" id="ss-sec">—</span></div>
   <canvas id="sector-radar" width="168" height="168"></canvas>
@@ -203,7 +220,7 @@
 <!-- DEPLOY: naikkan ?v= sky-data.js / texts.js / index.js / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
 <script defer src="sky-data.js?v=22"></script>
 <script defer src="texts.js?v=1"></script>
-<script defer src="index.js?v=93"></script>
+<script defer src="index.js?v=94"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">

@@ -211,6 +211,7 @@ function joinHide(id){if(!CAMERA_MODE)return false;var f=camFocusId();return !!f
 var ZOOM_LEVELS=[1,1.5,2,3];
 var skyDrag={on:false,moved:false,pid:null,x0:0,y0:0,px:0,py:0};
 var skyPtrs={};
+var skyAll={},skyGestureAt=0; /* semua kontak sentuh (termasuk yang jatuh di bintang) + waktu gesture 2 jari terakhir */
 var skyRotDrag={on:false,a0:0,r0:0};
 var skyPinch={on:false,d0:0,z0:1};
 var tapFlash={until:0,cons:null};
@@ -431,6 +432,21 @@ function sectorScanUpdate(now){
 }
 var BHZ=1,BHK=0,BHSC=1;
 var SUM={on:false},SUM_R=6;
+/* Gargantua di OVERVIEW sekarang bisa di-summon/recall (tombol 🕳️ sama seperti di dalam sektor).
+   HOME_BH_DEFAULT = kondisi awal kalau pengunjung belum pernah memilih; pilihan terakhir diingat di localStorage.dumul_bh_home. */
+var HOME_BH_DEFAULT=true;
+var HBH={on:HOME_BH_DEFAULT};
+try{var _hb=localStorage.getItem('dumul_bh_home');if(_hb==='0')HBH.on=false;else if(_hb==='1')HBH.on=true;}catch(e){}
+/* Tune Gargantua (panel 🎚️): size = ukuran, str = kekuatan lensing, bloom = glow hangat, speed = kecepatan animasi. Disimpan di localStorage.dumul_bh_cfg. */
+var BHU_DEF={size:1,str:1,bloom:1,speed:1,ast:1};
+var BHU={size:1,str:1,bloom:1,speed:1,ast:1};
+var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3],ast:[0,1]};
+/* Orbit asteroid ikut slider Strength (fisika): 1.0x = jarak asli, makin kuat tarikannya makin merapat (min 0.4x), makin lemah makin jauh (max 1.45x). Dihaluskan lewat AST_K. */
+var AST_K=1;
+function astOrbitTarget(){return Math.max(.4,1.45-.45*BHU.str);}
+function bhuClamp(k,v){var r=BHU_RNG[k];v=+v;if(!(v===v))v=BHU_DEF[k];return Math.max(r[0],Math.min(r[1],v));}
+try{var _bc=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');if(_bc)for(var _bk in BHU_DEF)if(typeof _bc[_bk]==='number')BHU[_bk]=bhuClamp(_bk,_bc[_bk]);}catch(e){}
+var bhTuneSync=null; /* diisi controller panel tune */
 function camBH(){
   var px=BH.x+skyPan.x*BHK,py=BH.y+skyPan.y*BHK;
   if(skyZoom===1)return [px,py];
@@ -1406,7 +1422,10 @@ function buildAVProfile(){
 /* Bentuk visualizer: titik-titik radial (dotted) dengan bagian dalam lebih transparan.
    Set localStorage.dumul_av_shape='bars' buat balik ke bar garis lama. */
 var AV_DOTS=(function(){var o=null;try{o=localStorage.getItem('dumul_av_shape');}catch(e){}return o!=='bars';})();
+/* Toggle spectrum Gargantua (panel music). Disimpan di localStorage.dumul_av_on ('0' = mati). */
+var AV_ON=(function(){var o=null;try{o=localStorage.getItem('dumul_av_on');}catch(e){}return o!=='0';})();
 function drawAudioVisualizer(now,R){
+  if(!AV_ON)return;
   if(!AV_DOTS)return drawAudioVisualizerBars(now,R);
   updateAVColor(now);
   if(reduce||!activeSfx||activeSfx.paused||activeSfx.ended)return;
@@ -1569,7 +1588,7 @@ function playSfx(a){
   requestAnimationFrame(function(){if(activeSfx===a)audioVizInit(a);});
 }
 
-var BH={x:0,y:0,hx:0,hy:0,R:26,Rr:0,h:0,sprite:null,S:0};
+var BH={x:0,y:0,hx:0,hy:0,R:26,Rr:0,h:0,sprite:null,S:0,ang:-.48};
 function clamp(v){return v<0?0:v>1?1:v;}
 function rgb(hex){var n=parseInt(hex.slice(1),16);return((n>>16)&255)+','+((n>>8)&255)+','+(n&255);}
 
@@ -3216,9 +3235,9 @@ function lens(x,y){                       /* smooth gravitational lens: bounded,
      previous R²/d² singular jump that sent constellation lines off-screen. */
   var fall=u*u*(3-2*u);
   var wild=(drag.on&&drag.moved);
-  var strength=wild?2.35:1.25;
+  var strength=(wild?2.35:1.25)*BHU.str;
   var f=1+(R*R*strength)/d2;
-  f=Math.min(f,wild?2.85:1.72);
+  f=Math.min(f,1+((wild?2.85:1.72)-1)*BHU.str);
   f=1+(f-1)*fall;
 
   if(wild){
@@ -3235,6 +3254,35 @@ function gravityPos(x,y){
   if(SW)return pull(x,y);
   var q=lens(x,y);
   return q ? [q[0],q[1],0] : [x,y,1];
+}
+/* ===== Visual Gargantua: "Interstellar Blackhole Gargantua #2 - Pure CSS" =====
+   Karya Josetxu, https://codepen.io/josetxu/pen/rNWgNeq — lisensi MIT, Copyright (c) 2026 Josetxu. Palet warna diubah ke nuansa film Interstellar (putih-krem panas -> amber -> ember).
+   Teks lisensi lengkap: licenses/gargantua-css-LICENSE.txt (wajib ikut tersimpan di repo).
+   CSS-nya di-bake SEKALI jadi sprite lewat SVG <foreignObject> (satuan vmax/px diganti variabel --u supaya horizon = BH.R),
+   lalu dipakai sebagai BH.sprite. Per frame tetap cuma drawImage di canvas: lensing, swallow, ring spectrum, drag, mode ROT
+   nggak berubah. Kalau bake gagal (engine lama), sprite kanvas lama tetap dipakai. Bandingkan dengan visual lama: ?bh=old */
+var BH_CSS={on:!/[?&]bh=old\b/.test(location.search),key:'',spr:null,tok:0,ang:-23.5*Math.PI/180,S:0,R:0};
+var BH_CSS_SRC=".gx { display:flex; justify-content:center; align-items:center; overflow:hidden; --white: #fff0e8; --yellow: #e9ab8e; --ember: #8f4a38; --black: #000000; } *, *:before, *:after { box-sizing: border-box; } *:before, *:after { position: absolute; } .gargantua { width: calc(var(--u)*90); height: calc(var(--u)*60); display: flex; justify-content: center; align-items: center; position: relative; transform: rotate(-23.5deg); filter: saturate(1.04); } .gargantua > div { position: absolute; } .bot-photon-ring { width: calc(var(--u)*18); height: calc(var(--u)*10); border-radius: calc(var(--u)*1) calc(var(--u)*1) calc(var(--u)*20) calc(var(--u)*20); box-shadow: 0 0 calc(var(--u)*0.625) calc(var(--u)*0.25) var(--black); top: calc(var(--u)*28.5); border: calc(var(--u)*0.25) solid var(--white); border-top: 0; background: var(--black); margin-left: calc(var(--u)*0.75); box-shadow: 0 0 calc(var(--u)*0.625) calc(var(--u)*0.25) var(--black), calc(var(--u)*0) calc(var(--u)*0) calc(var(--u)*0.625) calc(var(--u)*0.25) var(--yellow), calc(var(--u)*0) calc(var(--u)*-0.375) calc(var(--u)*1.25) calc(var(--u)*-0.375) var(--yellow) inset; } .image-disk { width: calc(var(--u)*22); height: calc(var(--u)*22); border-radius: 100%; top: calc(var(--u)*19); border: calc(var(--u)*2) solid var(--white); box-shadow: 0 calc(var(--u)*0) calc(var(--u)*1.875) calc(var(--u)*0.375) var(--yellow), 0 calc(var(--u)*0) calc(var(--u)*0.625) calc(var(--u)*0.25) var(--yellow) inset; } .image-disk:before, .image-disk:after { content: \"\"; position: absolute; left: calc(var(--u)*-5.365); top: calc(var(--u)*3.85); width: calc(var(--u)*3.5); height: calc(var(--u)*4.5); border-radius: calc(var(--u)*0) calc(var(--u)*0) calc(var(--u)*4.25) calc(var(--u)*1.25); transform: rotate(23deg); box-shadow: calc(var(--u)*2) calc(var(--u)*0.25) calc(var(--u)*0) calc(var(--u)*0.125) white; } .image-disk:after { left: calc(var(--u)*19.885); transform: rotateY(180deg) rotateZ(23deg); } .image-disk-lines { width: calc(var(--u)*22); height: calc(var(--u)*22); border-radius: 100%; background: radial-gradient( circle at 50% 50%, transparent, transparent calc(var(--u)*9.25), var(--yellow) calc(var(--u)*9.5), var(--yellow) calc(var(--u)*9.55), var(--white) calc(var(--u)*9.55), var(--white) calc(var(--u)*9.95), var(--yellow) calc(var(--u)*9.95), var(--yellow) calc(var(--u)*10.05), var(--white) calc(var(--u)*10.05), var(--white) calc(var(--u)*10.35), var(--yellow) calc(var(--u)*10.35), var(--yellow) calc(var(--u)*10.42), var(--white) calc(var(--u)*10.42), var(--white) calc(var(--u)*10.75), var(--yellow) calc(var(--u)*10.75), var(--yellow) calc(var(--u)*10.79), var(--white) calc(var(--u)*10.79), var(--white) calc(var(--u)*10.95), var(--ember) calc(var(--u)*22) ) ; } .accretion-disk { background: radial-gradient( ellipse at 49.5% 40%, transparent, transparent calc(var(--u)*11.15), var(--white) calc(var(--u)*11.15), var(--yellow) calc(var(--u)*11.15), var(--yellow) calc(var(--u)*11.2), var(--white) calc(var(--u)*11.2), var(--white) calc(var(--u)*12.5), var(--yellow) calc(var(--u)*12.5), var(--yellow) calc(var(--u)*12.65), var(--white) calc(var(--u)*12.65), var(--white) calc(var(--u)*13.5), var(--yellow) calc(var(--u)*13.5), var(--yellow) calc(var(--u)*13.55), var(--white) calc(var(--u)*13.55), var(--white) calc(var(--u)*14.45), var(--yellow) calc(var(--u)*14.45), var(--yellow) calc(var(--u)*14.55), var(--white) calc(var(--u)*14.55), var(--white) calc(var(--u)*15.5), var(--yellow) calc(var(--u)*15.5), var(--yellow) calc(var(--u)*15.65), var(--white) calc(var(--u)*15.65), var(--white) calc(var(--u)*16.5), var(--yellow) calc(var(--u)*16.5), var(--yellow) calc(var(--u)*16.65), var(--white) calc(var(--u)*16.65), var(--white) calc(var(--u)*17.6), var(--yellow) calc(var(--u)*17.6), var(--yellow) calc(var(--u)*17.65), var(--white) calc(var(--u)*17.65), var(--white) calc(var(--u)*18.25), var(--yellow) calc(var(--u)*18.25), var(--yellow) calc(var(--u)*18.35), var(--white) calc(var(--u)*18.35), var(--white) calc(var(--u)*19.15), var(--yellow) calc(var(--u)*19.15), var(--yellow) calc(var(--u)*19.35), var(--white) calc(var(--u)*19.35), var(--white) calc(var(--u)*19.95), var(--yellow) calc(var(--u)*19.95), var(--yellow) calc(var(--u)*20.05), var(--white) calc(var(--u)*20.05), var(--white) calc(var(--u)*20.75), var(--yellow) calc(var(--u)*20.75), var(--yellow) calc(var(--u)*20.85), var(--white) calc(var(--u)*20.85), var(--white) calc(var(--u)*21.5), var(--yellow) calc(var(--u)*21.5), var(--yellow) calc(var(--u)*21.55), var(--white) calc(var(--u)*21.55), var(--white) calc(var(--u)*22.5), var(--yellow) calc(var(--u)*22.5), var(--yellow) calc(var(--u)*22.65), var(--white) calc(var(--u)*22.65), var(--white) calc(var(--u)*23.45), var(--yellow) calc(var(--u)*23.45), var(--yellow) calc(var(--u)*23.52), var(--white) calc(var(--u)*23.55) ), radial-gradient( ellipse at 49.5% 37%, var(--black), var(--black) calc(var(--u)*9.25), var(--white) calc(var(--u)*9.5), var(--white) ) ; width: calc(var(--u)*54); height: calc(var(--u)*6); border-radius: 100%; top: calc(var(--u)*28.5); box-shadow: 0 0 calc(var(--u)*0.375) 0 var(--white), 0 calc(var(--u)*0) calc(var(--u)*1.875) calc(var(--u)*0.375) var(--yellow), 0 0 calc(var(--u)*4.5) calc(var(--u)*1.2) rgba(190,105,78,.34), 0 calc(var(--u)*1.875) calc(var(--u)*1.25) calc(var(--u)*1.25) var(--black); } .top-photon-ring { width: calc(var(--u)*17); height: calc(var(--u)*9); border-radius: calc(var(--u)*20) calc(var(--u)*20) calc(var(--u)*1) calc(var(--u)*1); background: var(--black); top: calc(var(--u)*21.5); box-shadow: 0 calc(var(--u)*0.625) calc(var(--u)*0) calc(var(--u)*0.25) var(--black), calc(var(--u)*-0.375) calc(var(--u)*0.625) calc(var(--u)*0) calc(var(--u)*0.25) var(--black), calc(var(--u)*0.5) calc(var(--u)*0.625) calc(var(--u)*0) calc(var(--u)*0.25) var(--black), calc(var(--u)*-0.25) calc(var(--u)*0.375) calc(var(--u)*0.375) calc(var(--u)*0) var(--yellow); } .top-photon-ring:before { content: \"\"; width: calc(var(--u)*18); height: calc(var(--u)*3); background: black; left: calc(var(--u)*-0.5); border-radius: 100%; bottom: calc(var(--u)*-7.6); box-shadow: 0 0 calc(var(--u)*0.125) calc(var(--u)*0.125) var(--black); position: relative; display: block; } .top-photon-ring:after { content: \"\"; opacity: 0.75; width: calc(var(--u)*17); height: calc(var(--u)*17); border: calc(var(--u)*0.25) solid var(--white); border-radius: 100%; border-bottom-color: transparent; border-left-color: transparent; transform: rotate(-46deg); left: calc(var(--u)*0.25); top: calc(var(--u)*1.25); box-shadow: calc(var(--u)*-0.625) calc(var(--u)*0.625) calc(var(--u)*0.625) calc(var(--u)*-0.5) var(--yellow) inset, calc(var(--u)*0.25) calc(var(--u)*-0.25) calc(var(--u)*0.5) calc(var(--u)*-0.25) var(--yellow); }";
+function bhCssApply(R,S,d){
+  if(!BH_CSS.on||typeof Image==='undefined')return;
+  var key=Math.round(R*100)+'|'+d+'|'+S;
+  if(BH_CSS.spr&&BH_CSS.key===key){BH.sprite=BH_CSS.spr;BH.S=S;BH.ang=BH_CSS.ang;return;} /* ukuran sama: pakai ulang, nggak bake lagi */
+  /* Selama bake ukuran baru jalan, tetap pakai sprite CSS lama (diskalakan ke R baru) -> nggak kedip ke visual kanvas lama. */
+  if(BH_CSS.spr&&BH_CSS.R>0){BH.sprite=BH_CSS.spr;BH.S=BH_CSS.S*R/BH_CSS.R;BH.ang=BH_CSS.ang;}
+  var tok=++BH_CSS.tok,P=Math.ceil(S*d),u=(R*d)/9.1;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+P+'" height="'+P+'"><foreignObject x="0" y="0" width="'+P+'" height="'+P+'">'+
+    '<div xmlns="http://www.w3.org/1999/xhtml" class="gx" style="--u:'+u.toFixed(3)+'px;width:'+P+'px;height:'+P+'px"><style>'+BH_CSS_SRC+'</style>'+
+    '<div class="gargantua"><div class="bot-photon-ring"></div><div class="image-disk"></div><div class="image-disk-lines"></div><div class="accretion-disk"></div><div class="top-photon-ring"></div></div></div></foreignObject></svg>';
+  var img=new Image();
+  img.onload=function(){
+    if(tok!==BH_CSS.tok)return; /* sudah ada permintaan ukuran yang lebih baru */
+    try{
+      var c=document.createElement('canvas');c.width=c.height=P;c.getContext('2d').drawImage(img,0,0,P,P);
+      BH_CSS.spr=c;BH_CSS.key=key;BH_CSS.S=S;BH_CSS.R=R;BH.sprite=c;BH.S=S;BH.ang=BH_CSS.ang;
+    }catch(e){window.__hub&&(window.__hub.renderError='bhCss: '+(e&&e.message||e));}
+  };
+  img.onerror=function(){}; /* tetap pakai sprite lama */
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
 function buildSprite(){                   /* layered gravitational lens: luminous, deep, photorealistic feel + Doppler / photon ring / secondary lens */
   var R=BH.R,S=Math.ceil(R*13),d=DPR,c=document.createElement('canvas');
@@ -3336,9 +3384,73 @@ function buildSprite(){                   /* layered gravitational lens: luminou
   s.restore();
 
   s.shadowBlur=0;s.globalCompositeOperation='source-over';
-  BH.sprite=c;BH.S=S;
+  BH.sprite=c;BH.S=S;BH.ang=-.48;
+  bhCssApply(R,S,d); /* ganti dengan visual Gargantua CSS (sync kalau sudah pernah di-bake untuk ukuran ini) */
 }
 
+var BH_BLOOM=null;
+function bhBloomSprite(){
+  if(BH_BLOOM)return BH_BLOOM;
+  var c=document.createElement('canvas');c.width=c.height=192;
+  var x=c.getContext('2d'),gr=x.createRadialGradient(96,96,17,96,96,96);
+  gr.addColorStop(0,'rgba(255,228,210,.55)');gr.addColorStop(.28,'rgba(242,164,132,.26)');
+  gr.addColorStop(.55,'rgba(176,84,62,.10)');gr.addColorStop(1,'rgba(112,46,36,0)');
+  x.fillStyle=gr;x.fillRect(0,0,192,192);
+  return (BH_BLOOM=c);
+}
+/* Overlay serat cakram + lengkung lensa (mirip render film): di-bake SEKALI ke satu kanvas, lalu per frame cuma 1x drawImage.
+   Isi: haze bidang cakram, serat tipis yang melebar di kiri-kanan, serat lengkung tebal di atas lubang, dan lengkung lensa bawah.
+   Dibuat dalam frame cakram (sudah diputar BH.ang). Re-bake hanya kalau BH.R / DPR berubah. */
+var BH_FIB=null;
+function bhFiberSprite(){
+  var R=BH.R,d=DPR||1,key=Math.round(R*d*10);
+  if(BH_FIB&&BH_FIB.key===key)return BH_FIB;
+  if(!(R>2))return BH_FIB;
+  var w=R*13,h=R*8,c=document.createElement('canvas');
+  c.width=Math.ceil(w*d);c.height=Math.ceil(h*d);
+  var x=c.getContext('2d');x.scale(d,d);x.translate(w/2,h/2);
+  x.globalCompositeOperation='lighter';x.lineCap='round';
+  var seed=1337;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
+  var lite=IS_POTATO,lw0=Math.max(.35,.5/d);
+  /* haze tipis sepanjang bidang cakram */
+  x.save();x.scale(1,.075);
+  var hz=x.createRadialGradient(0,0,R*1.2,0,0,R*5.4);
+  hz.addColorStop(0,'rgba(255,214,190,0)');hz.addColorStop(.28,'rgba(255,214,190,.20)');hz.addColorStop(.55,'rgba(228,142,108,.09)');hz.addColorStop(1,'rgba(150,70,50,0)');
+  x.fillStyle=hz;x.beginPath();x.arc(0,0,R*5.4,0,6.283);x.fill();x.restore();
+  /* serat horizontal: makin jauh makin tipis, hangat, ujung kiri sedikit lebih panjang (kayak referensi) */
+  var NS=lite?20:52;
+  for(var side=-1;side<=1;side+=2){
+    for(var i=0;i<NS;i++){
+      var x0=R*(1.75+rnd()*.9),len=R*(1.1+Math.pow(rnd(),1.3)*2.9)*(side<0?1.18:1),x1=x0+len;
+      var up=(rnd()<.62)?1:-.25,hh=R*(.02+rnd()*.17)*up,ty=R*(rnd()-.5)*.09,a=.10+rnd()*.24;
+      var gr=x.createLinearGradient(side*x0,0,side*x1,0);
+      gr.addColorStop(0,'rgba(255,238,228,'+a+')');gr.addColorStop(.32,'rgba(240,176,142,'+(a*.72)+')');
+      gr.addColorStop(.72,'rgba(176,102,72,'+(a*.36)+')');gr.addColorStop(1,'rgba(96,52,40,0)');
+      x.strokeStyle=gr;x.lineWidth=Math.max(lw0,R*(.005+rnd()*.016));
+      x.beginPath();x.moveTo(side*x0,-hh);
+      x.quadraticCurveTo(side*(x0+len*.5),-hh*.35+R*(rnd()-.5)*.03,side*x1,ty);x.stroke();
+    }
+  }
+  /* serat lengkung: half-annulus; dir=-1 atas (lensa depan), dir=+1 bawah (lensa belakang cakram) */
+  function arcs(dir,n,r0,r1,cy,aMax,ry){
+    for(var i=0;i<n;i++){
+      var u=Math.pow(rnd(),1.35),r=R*(r0+u*(r1-r0)),a=aMax*(.55+.45*rnd())*(1-.45*u);
+      var ca=Math.PI*(.015+rnd()*.16),cb=Math.PI*(.985-rnd()*.16),segs=lite?5:9;
+      var cr=Math.round(255-(41*u)),cg=Math.round(238-(98*u)),cbl=Math.round(232-(122*u));
+      x.lineWidth=Math.max(lw0,R*(.008+rnd()*.02));
+      for(var s=0;s<segs;s++){
+        var t0=s/segs,t1=(s+1)/segs,tm=(t0+t1)/2,env=Math.pow(Math.sin(Math.PI*tm),.8);
+        x.strokeStyle='rgba('+cr+','+cg+','+cbl+','+(a*env)+')';
+        x.beginPath();
+        x.ellipse(0,dir*R*cy,r,r*ry,0,dir*(ca+(cb-ca)*t0),dir*(ca+(cb-ca)*t1),dir<0);
+        x.stroke();
+      }
+    }
+  }
+  arcs(-1,lite?26:70,1.2,1.9,.04,.36,.93); /* tebalkan lengkung atas */
+  arcs(1,lite?22:64,1.12,1.68,.08,.34,.95);  /* lengkung lensa bawah */
+  return(BH_FIB={key:key,c:c,w:w,h:h});
+}
 function drawHoleFallback(now,age){
   /* Compatibility fallback for older/mobile canvas engines.  If the layered
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
@@ -3375,22 +3487,42 @@ function drawHoleSafe(now,age){
 }
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  BH.Rr=BH.R*sc*(1+1.6*e)*BHSC;
+  BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*BHU.size;
   if(BH.Rr<1||!BH.sprite)return;
 
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
-  var R=BH.Rr*BHZ,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016))),S=BH.S*k*BHZ;
+  var R=BH.Rr*BHZ,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016*BHU.speed))),S=BH.S*k*BHZ;
   var bp=camBH();
   var gk=OFX.pK; /* 0..1: seberapa "hidup" Gargantua saat BGM Collapsars main */
+  var bhFull=!!(BH_CSS.spr&&BH.sprite===BH_CSS.spr),bhCS=bhFull?.72:1; /* disk CSS lebih pendek dari sprite lama: overlay horizontal ikut diskalakan */
 
   g.save();
   g.translate(bp[0],bp[1]);
   if(STG.rot)g.rotate(upAng()); /* BH tegak seperti di portrait */
 
   /* Core + static portal artwork */
+  /* Bloom hangat (warna film) di belakang sprite: satu drawImage dari sprite gradien yang di-cache. */
+  if(bhFull&&BHU.bloom>.01){
+    var bhr=R*4.6,bha=Math.min(1,.42*BHU.bloom*(1+.35*gk+.15*BH.h+.3*e));
+    g.globalCompositeOperation='lighter';g.globalAlpha=bha;
+    g.drawImage(bhBloomSprite(),-bhr,-bhr,bhr*2,bhr*2);
+    g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  }
   g.globalAlpha=Math.min(1,.86+.14*BH.h+.5*e+.08*gk);
   g.drawImage(BH.sprite,-S/2,-S/2,S,S);
   g.globalAlpha=1;
+  /* Overlay serat cakram: slider Bloom mengatur intensitas; berkedip halus kecuali reduce-motion / potato. */
+  if(bhFull&&BHU.bloom>.01&&BH.S>0){
+    var fb=bhFiberSprite();
+    if(fb){
+      var fk=S/BH.S,fsh=(reduce||IS_POTATO)?0:Math.sin(now*.0011*BHU.speed);
+      var fa=Math.min(1,(.8+.2*BH.h+.4*e+.12*gk)*Math.min(1,.5+.5*BHU.bloom))*(1+.1*(reduce||IS_POTATO?0:Math.sin(now*.0007*BHU.speed+1.3)));
+      var fw=fb.w*fk*(1+.012*fsh),fh=fb.h*fk;
+      g.save();g.rotate(BH.ang);g.globalCompositeOperation='lighter';g.globalAlpha=Math.min(1,fa);
+      g.drawImage(fb.c,-fw/2,-fh/2,fw,fh);
+      g.restore();
+    }
+  }
 
   /* Audio-reactive Gargantua ring. The black hole core and drag physics are
      untouched; this is a visual layer drawn on top of the normal ring only
@@ -3405,9 +3537,11 @@ function drawHole(now,age){
   if(!reduce){
     g.globalCompositeOperation='lighter';
 
+    if(!bhFull){ /* visual CSS sudah lengkap sendiri: hiasan kanvas lama dilewati (lebih ringan juga) */
     /* One restrained breathing Einstein ring: slow, shallow, photorealistic. */
     var breathe=.5+.5*Math.sin(now*.00115);
     var ringR=R*(1.022+.012*breathe);
+    g.globalAlpha=bhCS<1?.5:1; /* ring CSS sudah ada: redam breathing ring */
     /* Blur-free breathing ring: wide translucent halo stroke + bright core.
        Avoid dynamic shadowBlur on every frame for mobile canvas performance. */
     g.strokeStyle='rgba(185,215,245,'+(.09+.06*breathe+.05*gk)+')';
@@ -3417,6 +3551,7 @@ function drawHole(now,age){
     g.lineWidth=Math.max(.65,R*(.022+.008*breathe));
     g.beginPath();g.arc(0,0,ringR,0,6.283);g.stroke();
 
+    g.globalAlpha=1;
     /* Extremely faint expanding lens ripples, spaced far apart. */
     var pulseT=now*.00022;
     for(var pr=0;pr<(IS_POTATO?1:3);pr++){
@@ -3428,27 +3563,38 @@ function drawHole(now,age){
       g.beginPath();g.arc(0,0,rr,0,6.283);g.stroke();
     }
 
+    } /* end !bhFull */
     /* Disk plane is fixed at ang=-.48 (matches the baked sprite).
        Secondary lens + plasma MUST use this same angle always — never apply
        drag wobble here, or they separate from the sprite disk. */
-    var diskAng=-.48;
+    var diskAng=BH.ang; /* bidang cakram sprite (-.48 visual lama, -23.5deg visual CSS) */
     var sp=.00024*(1+.55*BH.h+1.8*e);
     g.save();g.rotate(diskAng);
     if(gk>.01){
       /* Collapsars: cakram akresi berdenyut pelan (hangat), lebih terang dari biasanya. */
-      var gp=.5+.5*Math.sin(now*.0013);
+      var gp=.5+.5*Math.sin(now*.0013*BHU.speed);
       g.fillStyle='rgba(255,176,110,'+(.07*gk*(.65+.35*gp))+')';
-      g.beginPath();g.ellipse(0,0,R*(3.9+.25*gp),R*(.20+.03*gp),0,0,6.283);g.fill();
+      g.beginPath();g.ellipse(0,0,R*(3.9+.25*gp)*bhCS,R*(.20+.03*gp),0,0,6.283);g.fill();
       g.fillStyle='rgba(255,222,184,'+(.10*gk*(.5+.5*gp))+')';
-      g.beginPath();g.ellipse(0,0,R*2.5,R*.09,0,0,6.283);g.fill();
+      g.beginPath();g.ellipse(0,0,R*2.5*bhCS,R*.09,0,0,6.283);g.fill();
     }
+    if(bhFull&&BHU.speed>.01){ /* kilau plasma di sepanjang cakram CSS; kecepatan = slider speed */
+      var sp2=.00020*BHU.speed*(1+.55*BH.h+1.8*e);
+      for(var m2=0;m2<(IS_POTATO?3:6);m2++){
+        var q2=(now*sp2+OFX.dph+m2/6)%1,uu=q2*2-1;
+        var al3=Math.pow(1-Math.abs(uu),1.8)*(.22+.14*BH.h+.10*gk)*Math.min(1,.6+.4*BHU.bloom);
+        g.fillStyle='rgba(255,233,216,'+al3+')';
+        g.beginPath();g.ellipse(uu*R*2.7,R*(.015+((m2%3)-1)*.05),R*(.05+.025*(1-Math.abs(uu))),R*.02,0,0,6.283);g.fill();
+      }
+    }
+    if(!bhFull){
     for(var m=0;m<(IS_POTATO?3:7);m++){
       var ph2=(now*sp+OFX.dph+m/7)%1,u=ph2*2-1;
       var al2=Math.pow(1-Math.abs(u),1.9)*(.16+.12*BH.h+.10*e+.10*gk);
       var tilt=(m%3-1)*.18;
       g.fillStyle='rgba(235,240,245,'+al2+')';
       g.beginPath();
-      g.ellipse(u*R*4.1,R*(.02+tilt*.04),R*(.025+.012*(1-Math.abs(u))),R*.016,tilt,0,6.283);
+      g.ellipse(u*R*4.1*bhCS,R*(.02+tilt*.04),R*(.025+.012*(1-Math.abs(u))),R*.016,tilt,0,6.283);
       g.fill();
     }
     if(!IS_POTATO){
@@ -3458,9 +3604,10 @@ function drawHole(now,age){
         g.strokeStyle='rgba(200,220,240,'+saAl+')';
         g.lineWidth=.55;
         g.beginPath();
-        g.ellipse(0,0,R*(3.2+sa*.55),R*(.045+sa*.012),sph*.4-0.2,0,6.283);
+        g.ellipse(0,0,R*(3.2+sa*.55)*bhCS,R*(.045+sa*.012),sph*.4-0.2,0,6.283);
         g.stroke();
       }
+      if(bhCS===1){ /* visual CSS sudah punya photon ring sendiri -> secondary lens kanvas dilewati */
       /* Secondary lens — locked to sprite disk plane (no drag wobble). */
       g.lineWidth=Math.max(.55,R*.016);
       g.strokeStyle='rgba(200,220,245,'+(.28+.14*gk)+')';
@@ -3479,7 +3626,9 @@ function drawHole(now,age){
       g.beginPath();
       g.ellipse(0,R*.02,R*1.42,R*.28,0,Math.PI*.2,Math.PI*.8);
       g.stroke();
+      }
     }
+    } /* end !bhFull */
     g.restore();
   }
 
@@ -3497,13 +3646,13 @@ function drawHole(now,age){
     var wobS2=Math.min(1,Math.hypot(vx2,vy2)*8);
     g.save();
     g.translate(bp[0],bp[1]);
-    g.rotate(-.48+upAng()); /* landscape: ikut tegak bareng BH */
-    g.strokeStyle='rgba(180,210,240,'+(.10+.08*wobS2)+')';
+    g.rotate(BH.ang+upAng()); /* landscape: ikut tegak bareng BH */
+    g.strokeStyle='rgba(255,200,140,'+(.10+.08*wobS2)+')';
     g.lineWidth=Math.max(.7,R*.02);
-    g.beginPath();g.ellipse(0,0,R*4.3,R*.09,0,0,6.283);g.stroke();
+    g.beginPath();g.ellipse(0,0,R*4.3*bhCS,R*.09,0,0,6.283);g.stroke();
     g.strokeStyle='rgba(255,220,190,'+(.06+.05*wobS2)+')';
     g.lineWidth=Math.max(.5,R*.012);
-    g.beginPath();g.ellipse(0,0,R*3.6,R*.04,0,0,6.283);g.stroke();
+    g.beginPath();g.ellipse(0,0,R*3.6*bhCS,R*.04,0,0,6.283);g.stroke();
     g.restore();
     /* Warp-ring loop is the expensive part of this effect (one arc+stroke
        call per ring, every frame, for the whole drag gesture). Cut the
@@ -3513,14 +3662,14 @@ function drawHole(now,age){
     var ringN=IS_POTATO?4:9;
     for(var di=1;di<=ringN;di++){
       var dr=R*(2.2+di*(66.6/ringN)), da2=.34*(1-di/(ringN+2));
-      g.strokeStyle='rgba(130,170,205,'+(da2*.42)+')';g.lineWidth=.8+(di===1?.5:0);
+      g.strokeStyle='rgba(205,150,100,'+(da2*.42)+')';g.lineWidth=.8+(di===1?.5:0);
       g.beginPath();g.arc(bp[0],bp[1],dr,0,6.283);g.stroke();
     }
     var grd=g.createRadialGradient(bp[0],bp[1],R*.8,bp[0],bp[1],R*28);
-    grd.addColorStop(0,'rgba(175,205,230,.10)');
-    grd.addColorStop(.22,'rgba(210,220,225,.035)');
-    grd.addColorStop(.5,'rgba(110,145,180,.018)');
-    grd.addColorStop(1,'rgba(90,120,155,0)');
+    grd.addColorStop(0,'rgba(255,200,140,.10)');
+    grd.addColorStop(.22,'rgba(240,190,140,.035)');
+    grd.addColorStop(.5,'rgba(190,120,80,.018)');
+    grd.addColorStop(1,'rgba(150,90,60,0)');
     g.fillStyle=grd;g.beginPath();g.arc(bp[0],bp[1],R*11,0,6.283);g.fill();
     g.restore();
   }
@@ -4917,11 +5066,11 @@ function drawShooting(now){
   }
 }
 function asteroidScreenAt(x,y){
-  if(!AST.length||BHSC<.6)return -1;
+  if(!AST.length||BHSC<.6||BHU.ast<.5)return -1;
   var best=-1,bd=Infinity,now=performance.now();
   var bp=camBH();
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed))*BHZ;
+    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed))*BHZ;
     var ax=bp[0]+Math.cos(t)*rr,ay=bp[1]+Math.sin(t)*rr*a.e;
     var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*skyZoom;
     if(SW){var q=pull(ax,ay);ax=q[0];ay=q[1];sz*=1-.45*q[2];}
@@ -4933,7 +5082,7 @@ function asteroidScreenAt(x,y){
 }
 function scatterAsteroid(i,x,y){
   if(i<0||!AST[i]||SW)return false;
-  var a=AST[i],now=performance.now(),t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
+  var a=AST[i],now=performance.now(),t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed));
   var ax=BH.x+Math.cos(t)*rr,ay=BH.y+Math.sin(t)*rr*a.e;
   var dx=ax-BH.x,dy=ay-BH.y,dl=Math.hypot(dx,dy)||1;
   var nx=dx/dl,ny=dy/dl;
@@ -4995,6 +5144,8 @@ function ensureAsteroidSprites(){
 }
 function drawAsteroids(now){
   if(!AST.length)return;
+  AST_K+=(astOrbitTarget()-AST_K)*.12;if(Math.abs(astOrbitTarget()-AST_K)<.001)AST_K=astOrbitTarget(); /* orbit melebar/menyempit halus */
+  if(BHU.ast<.5)return;
   var bv=clamp((BHSC-.6)/.4);if(bv<=.02)return;
   var fxDim=(typeof secondaryFxScale==='function')?secondaryFxScale():0;
   if(fxDim>0.9)return;
@@ -5002,7 +5153,7 @@ function drawAsteroids(now){
   var sprites=ensureAsteroidSprites();
   var invR=1/AST_SPRITE_R;
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*(1+.035*Math.sin(now*.0007+a.seed));
+    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed));
     var bp=camBH();
     var x=bp[0]+Math.cos(t)*rr*BHZ;
     var y=bp[1]+Math.sin(t)*rr*a.e*BHZ;
@@ -6004,6 +6155,7 @@ function sectZoomOut(){
   sumStash();
   SECT.busy=true;SECT.phase='out';SECT.t0=performance.now();
   SECT.cur=null;SECT.flash=SECT.t0;
+  try{sumUI();}catch(eU1){}
   sectSet(true);sectApply(s,1);
   try{syncSkyPanHits();}catch(e){}
 }
@@ -6061,7 +6213,7 @@ function bhScaleTarget(){
     return base+(1-base)*(0.08*f+0.92*f*f);
   }
   if(SECT.phase==='in')return 0;
-  return 1;
+  return HBH.on?1:0; /* overview: Gargantua muncul/hilang lewat summon (BHSC mengalir halus ke target) */
 }
 /* Critically-damped-ish scale so drag growth feels heavy, not laggy or snappy. */
 var _bhScV=0,_bhScT=0;
@@ -6151,10 +6303,25 @@ function sumRestore(s){
   SUM.on=true;s.relay=true;SUM.x0=s.sum.x0==null?s.sum.x:s.sum.x0;SUM.y0=s.sum.y0==null?s.sum.y:s.sum.y0;SUM.moved=!!s.sum.moved;sumUI();
 }
 function sumUI(){
-  var b=document.getElementById('mode-bh');if(!b)return;
-  b.classList.toggle('on',SUM.on);b.setAttribute('aria-pressed',SUM.on?'true':'false');
-  b.title=b.ariaLabel=SUM.on?'Recall Gargantua':'Summon Gargantua';
-  b.setAttribute('aria-label',b.title);
+  var b=document.getElementById('mode-bh');
+  var vis=SECT.cur?SUM.on:HBH.on;   /* di sektor: BH mini; di overview: BH utama */
+  try{document.body.classList.toggle('bh-live',!!vis);}catch(e){}
+  if(b){
+    b.classList.toggle('on',!!vis);b.setAttribute('aria-pressed',vis?'true':'false');
+    b.title=vis?'Recall Gargantua':'Summon Gargantua';
+    b.setAttribute('aria-label',b.title);
+  }
+  if(typeof bhTuneSync==='function')bhTuneSync();
+}
+/* Summon / recall Gargantua di OVERVIEW (kembaran sumSet yang dipakai di dalam sektor). */
+function homeSet(on){
+  if(SECT.cur||SECT.busy||SW)return;
+  on=!!on;if(on===HBH.on)return;
+  HBH.on=on;
+  try{localStorage.setItem('dumul_bh_home',on?'1':'0');}catch(e){}
+  if(!on){drag.on=false;BH.x=BH.hx;BH.y=BH.hy;}
+  try{if(typeof showModeToast==='function')showModeToast(on?'GARGANTUA SUMMONED':'GARGANTUA RECALLED',null,on?2000:1600);}catch(e){}
+  haptic(10);sumUI();
 }
 function sectStep(now){
   if(!SECT.busy)return;
@@ -6165,6 +6332,7 @@ function sectStep(now){
     if(u>=1){
       SECT.flash=now;SECT.cur=s;SECT.phase='sec';SECT.busy=false;
       try{sumRestore(s);}catch(eSR){}
+      try{sumUI();}catch(eU2){}
       skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
       sectSet(false);
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
@@ -6264,14 +6432,58 @@ function drawSectorOverview(now,age){
   try{if(/[?&]dbg\b/.test(location.search)){g.save();g.fillStyle='rgba(255,255,255,.5)';g.font='9px monospace';g.textAlign='left';g.textBaseline='top';
     g.fillText('build 2026-10-06a \u00b7 PLE '+(PLEIADES.scale||0).toFixed(1),8,top+4);g.restore();}}catch(eD){}
 }
+/* ---------- panel tune Gargantua: size / strength / bloom / speed + SAVE ---------- */
+(function bhTune(){
+  var panel=document.getElementById('bh-panel'),btn=document.getElementById('mode-bhset');
+  if(!panel||!btn)return;
+  var keys=['size','str','bloom','speed'],allKeys=keys.concat(['ast']),astBtn=document.getElementById('bp-ast'),inp={},out={},bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),bClose=document.getElementById('bp-close');
+  keys.forEach(function(k){inp[k]=document.getElementById('bp-'+k);out[k]=document.getElementById('bp-'+k+'-v');});
+  function stored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');}catch(e){}var r={};allKeys.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?bhuClamp(k,o[k]):BHU_DEF[k];});return r;}
+  function paint(){
+    keys.forEach(function(k){if(inp[k])inp[k].value=String(Math.round(BHU[k]*100));if(out[k])out[k].textContent=BHU[k].toFixed(2)+'\u00d7';});
+    if(astBtn){var ao=BHU.ast>=.5;astBtn.setAttribute('aria-pressed',ao?'true':'false');astBtn.textContent=ao?'Show':'Hide';astBtn.classList.toggle('off',!ao);}
+    var st=stored(),d=false;allKeys.forEach(function(k){if(Math.abs(st[k]-BHU[k])>.004)d=true;});
+    if(bSave)bSave.classList.toggle('dirty',d);
+  }
+  function open(on){
+    on=!!on&&document.body.classList.contains('bh-live');
+    panel.classList.toggle('on',on);panel.setAttribute('aria-hidden',on?'false':'true');
+    btn.classList.toggle('on',on);btn.setAttribute('aria-expanded',on?'true':'false');
+    if(on)paint();
+  }
+  bhTuneSync=function(){if(!document.body.classList.contains('bh-live'))open(false);};
+  btn.addEventListener('click',function(e){e.stopPropagation();open(!panel.classList.contains('on'));haptic(6);});
+  if(bClose)bClose.addEventListener('click',function(e){e.stopPropagation();open(false);});
+  keys.forEach(function(k){
+    if(!inp[k])return;
+    inp[k].addEventListener('input',function(){BHU[k]=bhuClamp(k,inp[k].value/100);if(out[k])out[k].textContent=BHU[k].toFixed(2)+'\u00d7';paint();});
+  });
+  if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();BHU.ast=BHU.ast>=.5?0:1;paint();haptic(6);});
+  if(bSave)bSave.addEventListener('click',function(e){
+    e.stopPropagation();
+    try{localStorage.setItem('dumul_bh_cfg',JSON.stringify(BHU));}catch(er){}
+    paint();haptic(10);
+    try{if(typeof showModeToast==='function')showModeToast('GARGANTUA SETTINGS SAVED',null,1500);}catch(er){}
+  });
+  if(bReset)bReset.addEventListener('click',function(e){
+    e.stopPropagation();
+    allKeys.forEach(function(k){BHU[k]=BHU_DEF[k];});
+    try{localStorage.removeItem('dumul_bh_cfg');}catch(er){}
+    paint();haptic(8);
+  });
+  panel.addEventListener('pointerdown',function(e){e.stopPropagation();});
+  paint();
+})();
+
 (function sectInit(){
   var b=document.getElementById('mode-sectors');
   if(b)b.addEventListener('click',sectToggle);
   var bb=document.getElementById('mode-bh');
-  if(bb)bb.addEventListener('click',function(){sumSet(!SUM.on);});
+  if(bb)bb.addEventListener('click',function(){if(SECT.cur)sumSet(!SUM.on);else homeSet(!HBH.on);});
+  try{sumUI();}catch(eU0){}
   sectSet(true);
   try{if(window.__hub)window.__hub.sect=SECT;}catch(e){}
-  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#boot-screen,#terminal,#signal-fragment';
+  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#bh-panel,#boot-screen,#terminal,#signal-fragment';
   function owlShut(){var bc=document.body.classList;return bc.contains('owl-open')||bc.contains('owl-block');}
   document.addEventListener('pointerdown',function(e){
     if(owlShut()){SECT.down=null;return;} /* panel owl terbuka / baru ditutup: tap tidak boleh tembus ke ikon sektor (Virgo dll) */
@@ -6507,6 +6719,17 @@ document.addEventListener('visibilitychange',function(){
 });
 
 var SN_COOLDOWN={};
+/* ---------- toggle spectrum visualizer Gargantua (markup #mp-av-toggle ada di index.html) ---------- */
+(function(){
+  var b=document.getElementById('mp-av-toggle');if(!b)return;
+  function sync(){b.setAttribute('aria-checked',AV_ON?'true':'false');}
+  b.addEventListener('click',function(e){
+    e.stopPropagation();AV_ON=!AV_ON;sync();
+    try{localStorage.setItem('dumul_av_on',AV_ON?'1':'0');}catch(er){}
+  });
+  sync();
+})();
+
 /* ---------- mini music player + fake spectrum ----------
    When the HUD is open and a track plays: spectrum sits beside the track name.
    When the HUD is closed while music still plays: spectrum moves into the
@@ -7234,7 +7457,7 @@ function updateHover(px,py){
 }
 document.addEventListener('pointerdown',function(e){
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return;
-  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-observe,#mode-silence'))return;
+  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
   /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
@@ -7387,7 +7610,7 @@ function bhGrabRadius(){
      Once the drag is active, moveBHDrag() still lets it travel across the whole canvas.
      This keeps the Konami swipe area open without shrinking Gargantua's movement range. */
   var base=Math.min(W,H);
-  var full=Math.max(BH.R*2.8,Math.min(base*.18,110));
+  var full=Math.max(BH.R*2.8*Math.max(1,BHU.size),Math.min(base*.18,110));
   return BHSC>=.9?full:Math.max(26,full*Math.max(0,BHSC));
 }
 function constellationTargetAt(x,y,skipTelescope){
@@ -7413,7 +7636,7 @@ function beginBHDrag(e){
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -7436,7 +7659,7 @@ function moveBHDrag(e){
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);
     BH.x=drag.bx+Math.max(-limX,Math.min(limX,dx));
     BH.y=drag.by+Math.max(-limY,Math.min(limY,dy));
-    var bm=BH.R*BHSC*1.15;
+    var bm=BH.R*BHSC*1.15*Math.max(1,BHU.size);
     BH.x=Math.max(bm,Math.min(W-bm,BH.x));
     BH.y=Math.max(bm,Math.min(H-bm,BH.y));
     mouse.tx=Math.max(-1,Math.min(1,dx/(Math.min(W,H)*.24)));
@@ -7531,13 +7754,32 @@ function beginSkyPan(e){
   // Pengecekan !touchMode || e.pointerType==='mouse' telah dihapus agar desktop bisa drag
   if(reduce||SW||drag.on)return false;
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  /* FIX pinch zoom di cam fokus (dalam sektor): dulu SETIAP jari dicek ke hit-test bintang/asteroid/BH, dan di dalam sektor
+     hampir seluruh layar = target bintang -> jari ke-2 ditolak -> pinch nggak pernah mulai. Sekarang semua kontak sentuh dicatat,
+     dan jari ke-2 cuma ditolak kalau jatuh di UI (panel/tombol), bukan di bintang. */
+  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#title,#footer,#owl-source,#bh-clock,#music-toggle';
+  if(e.target.closest&&e.target.closest(UI_T))return false;
+  var multi=false;
+  if(e.pointerType!=='mouse'){
+    var tNow=performance.now(),ak;
+    for(ak in skyAll)if(!skyPtrs[ak]&&tNow-skyAll[ak].t>10000)delete skyAll[ak];
+    skyAll[e.pointerId]={x:e.clientX,y:e.clientY,t:tNow};
+    multi=Object.keys(skyAll).length>=2;
+  }
+  if(multi){
+    var ids2=Object.keys(skyAll);
+    for(var qi=0;qi<ids2.length&&Object.keys(skyPtrs).length<2;qi++){
+      if(!skyPtrs[ids2[qi]])skyPtrs[ids2[qi]]={x:skyAll[ids2[qi]].x,y:skyAll[ids2[qi]].y};
+    }
+  }else{
+  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
   var dBH=Math.hypot(e.clientX-bpSky[0],e.clientY-bpSky[1]);
   if(BHSC>.05&&bhDragAllowed()&&dBH<=bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   skyPtrs[e.pointerId]={x:e.clientX,y:e.clientY};
+  }
   var n=Object.keys(skyPtrs).length;
   if(n>=2){
     /* 2-finger: rotate (+ pinch-zoom when Constellation Camera is on). */
@@ -7558,6 +7800,7 @@ function beginSkyPan(e){
   return true;
 }
 function moveSkyPan(e){
+  if(skyAll[e.pointerId]){skyAll[e.pointerId].x=e.clientX;skyAll[e.pointerId].y=e.clientY;skyAll[e.pointerId].t=performance.now();}
   if(skyPtrs[e.pointerId]){skyPtrs[e.pointerId].x=e.clientX;skyPtrs[e.pointerId].y=e.clientY;}
   if(skyRotDrag.on&&Object.keys(skyPtrs).length>=2){
     var a=skyTwoAngle();
@@ -7588,9 +7831,11 @@ function moveSkyPan(e){
   syncSkyPanHits();
 }
 function endSkyPan(e){
+  delete skyAll[e.pointerId];
   if(skyPtrs[e.pointerId])delete skyPtrs[e.pointerId];
   var n=Object.keys(skyPtrs).length;
   if(n<2){
+    if(skyRotDrag.on||skyPinch.on)skyGestureAt=performance.now();
     skyRotDrag.on=false;
     if(skyPinch.on){
       skyPinch.on=false;
@@ -7605,12 +7850,17 @@ function endSkyPan(e){
   try{cv.releasePointerCapture(e.pointerId);}catch(err){}
   syncSkyPanHits();
 }
+document.addEventListener('click',function(e){
+  if(skyGestureAt&&performance.now()-skyGestureAt<350){e.preventDefault();e.stopImmediatePropagation();}
+},true);
 document.addEventListener('pointerdown',function(e){
   if(drag.on)return;
   /* preventDefault only — never stopPropagation, so Konami swipe still sees the gesture. */
   if(beginSkyPan(e))e.preventDefault();
 },{passive:false,capture:true});
 document.addEventListener('pointermove',moveSkyPan,{passive:true});
+document.addEventListener('pointerup',function(e){delete skyAll[e.pointerId];},true);
+document.addEventListener('pointercancel',function(e){delete skyAll[e.pointerId];},true);
 document.addEventListener('pointerup',endSkyPan,{passive:true});
 document.addEventListener('pointercancel',endSkyPan,{passive:true});
 
@@ -7844,7 +8094,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){

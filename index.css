@@ -1025,3 +1025,65 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 }
 /* Panel tertutup: stop marquee CSS (hemat compositor) */
 #music-player:not(.open) .mp-grp-marq{animation:none;transform:none}
+
+/* ===== v36: Gargantua summon di overview + panel tune + toggle spectrum + fix pinch cam fokus ===== */
+body.sect-ov #mode-bh{display:grid}
+#mode-bhset{width:32px;height:32px;padding:0;display:none;place-items:center;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
+body.bh-live #mode-bhset{display:grid}
+#mode-bhset:hover,#mode-bhset:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
+#mode-bhset.on{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);box-shadow:0 0 12px rgba(110,229,255,.15)}
+@media (max-width:520px){#mode-bhset{width:31px;height:31px}}
+@media (max-height:520px) and (orientation:landscape){#mode-bhset{width:28px;height:28px}}
+/* now-playing minggir sesuai jumlah tombol di cluster */
+body.sect-ov #mp-now-playing{right:calc(12px + 32px + 6px + 70px + 8px)!important}
+body.sect-ov.bh-live #mp-now-playing,body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)!important}
+body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 152px + 8px)!important}
+@media (max-width:520px){body.sect-in.bh-live #mp-now-playing{right:200px!important}}
+
+/* Panel tune Gargantua: gaya sama dengan #cam-zoom */
+#bh-panel{
+  position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:7;
+  width:min(86vw,290px);transform:translateX(-50%) translateY(8px);
+  padding:8px 11px 10px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
+  background:rgba(2,7,12,.9);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  font:600 10px/1 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;color:#8eeeff;
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .3s ease,transform .35s ease,visibility 0s linear .35s;
+}
+#bh-panel.on{opacity:1;pointer-events:auto;visibility:visible;transform:translateX(-50%) translateY(0);transition:opacity .3s ease,transform .35s ease,visibility 0s}
+body.camera-mode #bh-panel{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.bp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.bp-tag{font-size:7.5px;letter-spacing:.18em;color:rgba(110,229,255,.65)}
+#bp-close{width:22px;height:22px;padding:0;display:grid;place-items:center;border:1px solid rgba(110,229,255,.18);border-radius:4px;background:rgba(110,229,255,.04);color:rgba(214,228,240,.8);font:500 14px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#bp-close:hover,#bp-close:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
+.bp-row{display:grid;grid-template-columns:58px minmax(0,1fr) 42px;align-items:center;gap:8px;margin:8px 0;cursor:pointer}
+.bp-k{font-size:8.5px;color:rgba(184,224,238,.7)}
+.bp-row output{text-align:right;font-size:9px;letter-spacing:.06em;color:#eafcff}
+.bp-range{-webkit-appearance:none;appearance:none;width:100%;height:4px;margin:0;padding:0;border-radius:2px;background:rgba(110,229,255,.15);accent-color:#6ee5ff;touch-action:none;cursor:pointer}
+.bp-range::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#6ee5ff;box-shadow:0 0 6px rgba(110,229,255,.5);cursor:pointer}
+.bp-range::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:#6ee5ff;cursor:pointer}
+.bp-tog{cursor:default}
+.bp-switch{grid-column:2 / 4;justify-self:end;min-width:64px;min-height:24px;padding:0 10px;font:600 9px/1 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.bp-switch.off{color:rgba(214,228,240,.55);border-color:rgba(214,228,240,.2);background:transparent}
+.bp-act{display:flex;gap:6px;margin-top:10px}
+.bp-act button{flex:1;min-height:30px;font:600 10px/1 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);border-radius:4px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.bp-act button:active{background:rgba(110,229,255,.22)}
+#bp-save.dirty{color:#ffd29a;border-color:rgba(240,152,58,.6);background:rgba(240,152,58,.12);box-shadow:0 0 10px rgba(240,152,58,.16)}
+
+/* Toggle spectrum Gargantua di panel music: gaya baris track */
+.mp-av{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:0 8px;width:100%;margin:0 0 6px;padding:6px 8px;border:1px solid rgba(110,229,255,.14);border-radius:5px;background:rgba(110,229,255,.03);color:rgba(214,228,240,.78);text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:color .25s,border-color .25s,background .25s}
+.mp-av:hover,.mp-av:focus-visible{border-color:rgba(110,229,255,.3)}
+.mp-av-ico{display:grid;place-items:center;color:rgba(110,229,255,.55)}
+.mp-av-txt{display:grid;gap:3px;min-width:0}
+.mp-av-txt b{font:600 9px/1.1 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;color:inherit}
+.mp-av-txt i{font:500 7.5px/1.2 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;font-style:normal;color:rgba(184,224,238,.45)}
+.mp-av-sw{position:relative;width:26px;height:12px;border-radius:7px;border:1px solid rgba(110,229,255,.3);background:rgba(110,229,255,.05);transition:border-color .25s,background .25s}
+.mp-av-sw::after{content:"";position:absolute;top:1px;left:1px;width:8px;height:8px;border-radius:50%;background:rgba(214,228,240,.5);transition:transform .2s,background .2s,box-shadow .2s}
+.mp-av[aria-checked="true"]{color:#eafcff;border-color:rgba(110,229,255,.3);background:rgba(110,229,255,.06)}
+.mp-av[aria-checked="true"] .mp-av-ico{color:#6ee5ff}
+.mp-av[aria-checked="true"] .mp-av-sw{border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.14)}
+.mp-av[aria-checked="true"] .mp-av-sw::after{transform:translateX(14px);background:#6ee5ff;box-shadow:0 0 6px rgba(110,229,255,.6)}
+
+/* FIX pinch zoom (cam fokus di sektor): jari yang jatuh di tombol bintang/BH harus tetap jadi gesture sky,
+   bukan diambil browser (page-zoom/pan -> pointercancel -> pinch mati). touch-action hanya aktif di mode yang butuh. */
+body.camera-mode .hit,body.camera-mode #bh,body.sect-in .hit,body.sect-in #bh{touch-action:none}
