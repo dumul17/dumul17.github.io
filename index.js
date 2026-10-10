@@ -443,9 +443,28 @@ var BHU={size:1,str:1,bloom:1,speed:1,ast:1};
 var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3],ast:[0,1]};
 /* Orbit asteroid ikut slider Strength (fisika): 1.0x = jarak asli, makin kuat tarikannya makin merapat (min 0.4x), makin lemah makin jauh (max 1.45x). Dihaluskan lewat AST_K. */
 var AST_K=1;
-function astOrbitTarget(){return Math.max(.4,1.45-.45*BHU.str);}
+/* Orbit asteroid (fisika): makin kuat tarikan makin rapat. Di sector ikut ukuran BH (BHSC = size/1.8). */
+function astOrbitTarget(){return Math.max(.4,1.45-.45*BHU.str)*(BHU_CTX?BHSC:1);}
 function bhuClamp(k,v){var r=BHU_RNG[k];v=+v;if(!(v===v))v=BHU_DEF[k];return Math.max(r[0],Math.min(r[1],v));}
 try{var _bc=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');if(_bc)for(var _bk in BHU_DEF)if(typeof _bc[_bk]==='number')BHU[_bk]=bhuClamp(_bk,_bc[_bk]);}catch(e){}
+/* ===== Tune terpisah: overview vs BH yang di-summon di dalam sector =====
+   Sector: ukuran 1.80x = ukuran BH overview 1.00x (jadi 0.50x jauh lebih kecil dari overview), strength/bloom/speed 1.00x = sama dgn overview,
+   asteroid default Show. BH sector TIDAK lagi membesar/mengecil karena dekat/jauh dari rasi (ukuran murni dari slider). */
+var BHU_SDEF={size:1,str:1,bloom:1,speed:1,ast:1},BH_SECT_MAXSIZE=1.8;
+var BHU_O={},BHU_S={},BHU_CTX=0,bhuRepaint=null;
+(function(){for(var k in BHU_DEF){BHU_O[k]=BHU[k];BHU_S[k]=BHU_SDEF[k];}
+  try{var c=JSON.parse(localStorage.getItem('dumul_bh_cfg_s')||'null');if(c)for(var k2 in BHU_SDEF)if(typeof c[k2]==='number')BHU_S[k2]=bhuClamp(k2,c[k2]);}catch(e){}})();
+function bhuDef(){return BHU_CTX?BHU_SDEF:BHU_DEF;}
+function bhuKey(){return BHU_CTX?'dumul_bh_cfg_s':'dumul_bh_cfg';}
+function bhSizeMul(){return BHU_CTX?1:BHU.size;} /* sector: ukuran sudah masuk ke BHSC */
+function bhuCtxSync(){ /* tukar set tune aktif saat masuk/keluar sector */
+  var cx=(typeof SECT!=='undefined'&&SECT.cur)?1:0;if(cx===BHU_CTX)return;
+  var from=BHU_CTX?BHU_S:BHU_O,to=cx?BHU_S:BHU_O,k;
+  for(k in BHU_DEF){from[k]=BHU[k];}
+  for(k in BHU_DEF){BHU[k]=to[k];}
+  BHU_CTX=cx;try{if(bhuRepaint)bhuRepaint();}catch(e){}
+}
+var bhTuneClose=null; /* diisi controller panel tune: tutup panel dari luar (mode kamera) */
 var bhTuneSync=null; /* diisi controller panel tune */
 function camBH(){
   var px=BH.x+skyPan.x*BHK,py=BH.y+skyPan.y*BHK;
@@ -531,6 +550,7 @@ function setCameraMode(on){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(on&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE))return;
   CAMERA_MODE=!!on;
+  if(CAMERA_MODE&&typeof bhTuneClose==='function')bhTuneClose(); /* panel tune BH ketutup otomatis di mode kamera */
   document.body.classList.toggle('camera-mode',CAMERA_MODE);
   var btn=document.getElementById('mode-camera');
   if(btn){
@@ -3487,7 +3507,7 @@ function drawHoleSafe(now,age){
 }
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*BHU.size;
+  BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*bhSizeMul();
   if(BH.Rr<1||!BH.sprite)return;
 
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
@@ -5065,14 +5085,15 @@ function drawShooting(now){
     g.strokeStyle=gr;g.lineWidth=s.lw||1.4;g.beginPath();g.moveTo(x,y);g.lineTo(x-s.vx*tl,y-s.vy*tl);g.stroke();
   }
 }
+function astSzK(){return BHU_CTX?Math.max(.5,Math.min(1,Math.sqrt(BHSC))):1;}
 function asteroidScreenAt(x,y){
-  if(!AST.length||BHSC<.6||BHU.ast<.5)return -1;
+  if(!AST.length||BHSC<(BHU_CTX?.05:.6)||BHU.ast<.5)return -1;
   var best=-1,bd=Infinity,now=performance.now();
   var bp=camBH();
   for(var i=0;i<AST.length;i++){
     var a=AST[i],t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed))*BHZ;
     var ax=bp[0]+Math.cos(t)*rr,ay=bp[1]+Math.sin(t)*rr*a.e;
-    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*skyZoom;
+    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*skyZoom*astSzK();
     if(SW){var q=pull(ax,ay);ax=q[0];ay=q[1];sz*=1-.45*q[2];}
     ax+=a.ox;ay+=a.oy;
     var d=Math.hypot(x-ax,y-ay);
@@ -5146,7 +5167,7 @@ function drawAsteroids(now){
   if(!AST.length)return;
   AST_K+=(astOrbitTarget()-AST_K)*.12;if(Math.abs(astOrbitTarget()-AST_K)<.001)AST_K=astOrbitTarget(); /* orbit melebar/menyempit halus */
   if(BHU.ast<.5)return;
-  var bv=clamp((BHSC-.6)/.4);if(bv<=.02)return;
+  var bv=BHU_CTX?clamp(BHSC/.2):clamp((BHSC-.6)/.4);if(bv<=.02)return;
   var fxDim=(typeof secondaryFxScale==='function')?secondaryFxScale():0;
   if(fxDim>0.9)return;
   var alphaMul=(fxDim>0.35?(1-fxDim*.85):1)*bv;
@@ -5157,7 +5178,7 @@ function drawAsteroids(now){
     var bp=camBH();
     var x=bp[0]+Math.cos(t)*rr*BHZ;
     var y=bp[1]+Math.sin(t)*rr*a.e*BHZ;
-    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z;
+    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*astSzK();
     if(SW){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
     /* Damped spring: the rock gets one impulse, flies a little, then settles back. */
     var last=a._lastNow||now,dt=Math.min(.032,Math.max(.001,(now-last)/1000));
@@ -6207,10 +6228,7 @@ function bhScaleTarget(){
   if(SECT.cur){
     if(!SUM.on)return 0;
     if(CAMERA_MODE&&SUM.on&&camFocusId()==='bh')return 1; /* fokus kamera ke BH mini (cam 1x): seukuran BH overview; keluar fokus/kamera -> balik ke ukuran parkir */
-    var base=Math.min(1,SUM_R/Math.max(1,BH.R)); /* mini parked size */
-    var f=bhNearFactor();
-    /* Near mass → grow toward full overview size; curve keeps mid-range readable */
-    return base+(1-base)*(0.08*f+0.92*f*f);
+    return Math.max(.05,Math.min(1,BHU.size/BH_SECT_MAXSIZE)); /* ukuran tetap dari slider: 1.80x = BH overview 1.00x */
   }
   if(SECT.phase==='in')return 0;
   return HBH.on?1:0; /* overview: Gargantua muncul/hilang lewat summon (BHSC mengalir halus ke target) */
@@ -6218,6 +6236,7 @@ function bhScaleTarget(){
 /* Critically-damped-ish scale so drag growth feels heavy, not laggy or snappy. */
 var _bhScV=0,_bhScT=0;
 function bhScaleStep(){
+  bhuCtxSync();
   var t=bhScaleTarget();
   var now=performance.now();
   var dt=Math.min(50,_bhScT?now-_bhScT:16)/1000;_bhScT=now;
@@ -6438,8 +6457,10 @@ function drawSectorOverview(now,age){
   if(!panel||!btn)return;
   var keys=['size','str','bloom','speed'],allKeys=keys.concat(['ast']),astBtn=document.getElementById('bp-ast'),inp={},out={},bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),bClose=document.getElementById('bp-close');
   keys.forEach(function(k){inp[k]=document.getElementById('bp-'+k);out[k]=document.getElementById('bp-'+k+'-v');});
-  function stored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');}catch(e){}var r={};allKeys.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?bhuClamp(k,o[k]):BHU_DEF[k];});return r;}
+  function stored(){var o=null;try{o=JSON.parse(localStorage.getItem(bhuKey())||'null');}catch(e){}var r={},df=bhuDef();allKeys.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?bhuClamp(k,o[k]):df[k];});return r;}
+  var tag=panel.querySelector('.bp-tag');
   function paint(){
+    if(tag)tag.textContent=BHU_CTX?'Gargantua // Sector Tune':'Gargantua // Tune';
     keys.forEach(function(k){if(inp[k])inp[k].value=String(Math.round(BHU[k]*100));if(out[k])out[k].textContent=BHU[k].toFixed(2)+'\u00d7';});
     if(astBtn){var ao=BHU.ast>=.5;astBtn.setAttribute('aria-pressed',ao?'true':'false');astBtn.textContent=ao?'Show':'Hide';astBtn.classList.toggle('off',!ao);}
     var st=stored(),d=false;allKeys.forEach(function(k){if(Math.abs(st[k]-BHU[k])>.004)d=true;});
@@ -6451,6 +6472,7 @@ function drawSectorOverview(now,age){
     btn.classList.toggle('on',on);btn.setAttribute('aria-expanded',on?'true':'false');
     if(on)paint();
   }
+  bhuRepaint=paint;
   bhTuneSync=function(){if(!document.body.classList.contains('bh-live'))open(false);};
   btn.addEventListener('click',function(e){e.stopPropagation();open(!panel.classList.contains('on'));haptic(6);});
   if(bClose)bClose.addEventListener('click',function(e){e.stopPropagation();open(false);});
@@ -6461,17 +6483,30 @@ function drawSectorOverview(now,age){
   if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();BHU.ast=BHU.ast>=.5?0:1;paint();haptic(6);});
   if(bSave)bSave.addEventListener('click',function(e){
     e.stopPropagation();
-    try{localStorage.setItem('dumul_bh_cfg',JSON.stringify(BHU));}catch(er){}
+    try{localStorage.setItem(bhuKey(),JSON.stringify(BHU));}catch(er){}
     paint();haptic(10);
     try{if(typeof showModeToast==='function')showModeToast('GARGANTUA SETTINGS SAVED',null,1500);}catch(er){}
   });
   if(bReset)bReset.addEventListener('click',function(e){
     e.stopPropagation();
-    allKeys.forEach(function(k){BHU[k]=BHU_DEF[k];});
-    try{localStorage.removeItem('dumul_bh_cfg');}catch(er){}
+    allKeys.forEach(function(k){BHU[k]=bhuDef()[k];});
+    try{localStorage.removeItem(bhuKey());}catch(er){}
     paint();haptic(8);
   });
   panel.addEventListener('pointerdown',function(e){e.stopPropagation();});
+  /* Isolasi: sentuhan/scroll/klik di panel tidak boleh tembus ke langit, BH, asteroid, atau zoom kamera. */
+  ['pointerup','click','touchstart','touchmove','wheel','contextmenu'].forEach(function(t){
+    panel.addEventListener(t,function(e){e.stopPropagation();},{passive:true});
+  });
+  /* Tap di luar panel menutup (pola sama dengan panel music); tombol gear ditangani handler-nya sendiri. */
+  document.addEventListener('pointerdown',function(e){
+    if(!panel.classList.contains('on'))return;
+    var t=e.target;
+    if(panel.contains(t)||(btn&&btn.contains(t)))return;
+    open(false);
+  },true);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panel.classList.contains('on'))open(false);});
+  bhTuneClose=function(){if(panel.classList.contains('on'))open(false);};
   paint();
 })();
 
@@ -7501,6 +7536,7 @@ document.addEventListener('pointerdown',function(e){
 },{passive:true});
 document.addEventListener('pointerdown',function(e){
   if(SW||reduce)return;
+  if(e.target&&e.target.closest&&e.target.closest('#bh-panel'))return; /* panel tune: jangan tembus ke asteroid */
   var ai=asteroidScreenAt(e.clientX,e.clientY);
   if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
@@ -7610,7 +7646,7 @@ function bhGrabRadius(){
      Once the drag is active, moveBHDrag() still lets it travel across the whole canvas.
      This keeps the Konami swipe area open without shrinking Gargantua's movement range. */
   var base=Math.min(W,H);
-  var full=Math.max(BH.R*2.8*Math.max(1,BHU.size),Math.min(base*.18,110));
+  var full=Math.max(BH.R*2.8*Math.max(1,bhSizeMul()),Math.min(base*.18,110));
   return BHSC>=.9?full:Math.max(26,full*Math.max(0,BHSC));
 }
 function constellationTargetAt(x,y,skipTelescope){
@@ -7659,7 +7695,7 @@ function moveBHDrag(e){
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);
     BH.x=drag.bx+Math.max(-limX,Math.min(limX,dx));
     BH.y=drag.by+Math.max(-limY,Math.min(limY,dy));
-    var bm=BH.R*BHSC*1.15*Math.max(1,BHU.size);
+    var bm=BH.R*BHSC*1.15*Math.max(1,bhSizeMul());
     BH.x=Math.max(bm,Math.min(W-bm,BH.x));
     BH.y=Math.max(bm,Math.min(H-bm,BH.y));
     mouse.tx=Math.max(-1,Math.min(1,dx/(Math.min(W,H)*.24)));
@@ -7867,7 +7903,7 @@ document.addEventListener('pointercancel',endSkyPan,{passive:true});
 /* Constellation Camera: mouse wheel / trackpad zoom (sky layer only). */
 document.addEventListener('wheel',function(e){
   if(!CAMERA_MODE||!OBSERVE_MODE||SW)return;
-  if(e.target&&e.target.closest&&e.target.closest('#music-player,#boot-screen,#terminal,#signal-fragment'))return;
+  if(e.target&&e.target.closest&&e.target.closest('#music-player,#bh-panel,#boot-screen,#terminal,#signal-fragment'))return;
   e.preventDefault();
   stepSkyZoom(e.deltaY<0?1:-1);
 },{passive:false});
@@ -8540,6 +8576,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
 },{passive:true});
 document.addEventListener('pointerdown',function(e){
   if(SW)return;
+  if(e.target&&e.target.closest&&e.target.closest('#bh-panel'))return; /* panel tune: jangan tembus ke teleskop */
   if(telescopeHitAt(e.clientX,e.clientY)){
     /* Priority: bintang menang dari teleskop. Saat alignment aktif, teleskop pasif total
        (tidak muncul bubble, tidak makan tap). Tap di bintang yang lagi ketimpa teleskop

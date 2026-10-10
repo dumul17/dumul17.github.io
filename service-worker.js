@@ -24,11 +24,11 @@ const SHELL = [
   './',
   'index.html',
   'dumul.html',
-  'index.css?v=36',
+  'index.css?v=37',
   /* harus sama persis dengan <script src> di index.html */
   'sky-data.js?v=22',
   'texts.js?v=1',
-  'index.js?v=94',
+  'index.js?v=95',
   'dumul.css?v=1',
   'dumul.js?v=2',
   'dumul-app.js?v=1',

@@ -1042,6 +1042,7 @@ body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 152px + 8px)
 
 /* Panel tune Gargantua: gaya sama dengan #cam-zoom */
 #bh-panel{
+  touch-action:manipulation;overscroll-behavior:contain;-webkit-user-select:none;user-select:none;
   position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:7;
   width:min(86vw,290px);transform:translateX(-50%) translateY(8px);
   padding:8px 11px 10px;border:1px solid rgba(110,229,255,.28);border-radius:5px;
