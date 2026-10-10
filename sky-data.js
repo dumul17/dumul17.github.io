@@ -138,7 +138,7 @@ var RASI=[
    info:{"tag":"Constellation · The Swan","rows":[["Brightest","Deneb · mag 1.25"],["Distance","~2,600 ly"],["Type","Blue-white supergiant"],["Area","804 sq°"]],"fact":"Deneb is one of the most luminous stars known; its light left when the Bronze Age was ending."}},
   {id:'ophiuchus', sector:'summer', label:'Ophiuchus', focusName:'Ophiuchus', focus:5, unlock:true, dist:49,
    ov:{ox:42.369, oy:-60.376, k:1.547, th:0},
-   box:{portrait:function(W,top,ah,bot){return [W*.311,top+ah*.416,W*.718,top+ah*.597];}, land:function(W,top,ah,bot){return [W*.311,top+ah*.416,W*.718,top+ah*.597];}},
+   box:{portrait:function(W,top,ah,bot){return [W*.391,top+ah*.416,W*.798,top+ah*.597];}, land:function(W,top,ah,bot){return [W*.391,top+ah*.416,W*.798,top+ah*.597];}},
    whisper:["The serpent-bearer stands between the seasons.","Rasalhague watches from the north edge."],
    info:{"tag":"Constellation · The Serpent Bearer","rows":[["Brightest","Rasalhague · mag 2.07"],["Distance","~49 ly"],["Zodiac","13th constellation"],["Area","948 sq°"]],"fact":"Ophiuchus is the forgotten thirteenth zodiacal constellation the Sun still crosses."}},
   {id:'aquila', sector:'summer', label:'Aquila', focusName:'Aquila', focus:2, dist:17, unlock:true,

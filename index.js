@@ -4759,6 +4759,27 @@ function drawHyperspaceWarp(now){
 /* ---------- [FITUR 4] Tactical Target Lock Reticle + Data Astronomi ---------- */
 var STAR_DATA = SKY.STAR_DATA;
 
+/* Posisi panel HUD (LOCK/DIST/SPEC) relatif ke bintang. Coba beberapa sisi berurutan (HP: bawah/atas dulu,
+   desktop: sisi yang berlawanan dengan nama bintang dulu), jepit ke area kelihatan vb=[x0,y0,x1,y1], lalu pilih
+   yang tidak menyentuh zona reticle (radius R). Kalau semua menyentuh, ambil yang paling longgar. */
+function hudPlace(sx,sy,R,pw,ph,vb,mobile,labelRight){
+  var gp=4,below=[-pw*.5,R+gp],above=[-pw*.5,-R-gp-ph],right=[R+gp,-ph*.5],left=[-R-gp-pw,-ph*.5];
+  var side=labelRight?[left,right]:[right,left];
+  var order=mobile?[below,above].concat(side):side.concat([below,above]);
+  var best=null,bestShort=1e9,i;
+  for(i=0;i<order.length;i++){
+    var rx=order[i][0],ry=order[i][1];
+    var loX=vb[0]-sx,hiX=vb[2]-sx-pw,loY=vb[1]-sy,hiY=vb[3]-sy-ph;
+    rx=hiX<loX?loX:Math.max(loX,Math.min(hiX,rx));
+    ry=hiY<loY?loY:Math.max(loY,Math.min(hiY,ry));
+    var dx=rx>0?rx:(rx+pw<0?-(rx+pw):0),dy=ry>0?ry:(ry+ph<0?-(ry+ph):0);
+    var short=Math.max(0,R-Math.sqrt(dx*dx+dy*dy));
+    if(short<bestShort){bestShort=short;best=[rx,ry];}
+    if(short===0)break;
+  }
+  return best;
+}
+
 function drawTargetLock(now){
   if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)return;
   if(reduce || SW) return;
@@ -4818,57 +4839,45 @@ function drawTargetLock(now){
 
   g.restore();
 
-  // Telemetry HUD Text — Smart Adaptive Offset
+  // Telemetry HUD Text — panel diukur dari lebar teks asli, dijepit ke area layar yang kelihatan,
+  // dan dijauhkan dari reticle (lingkaran + bracket) supaya frame & teks nggak numpuk / kepotong.
   var _upT=uprBegin(x,y);
   g.save();
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   var isMobile = (W < 600 || H < 520);
-  var labelOnRight = (s.nx && s.nx > 0);
-  var tx, ty;
-
-  if(isMobile){
-    // Pada tampilan mobile (Portrait/Landscape), posisikan telemetri di bawah bintang
-    // agar jalur horizontal aman untuk Nama Bintang + Visualizer Spectrogram
-    tx = x - 40;
-    ty = y + sz + 20;
-
-    // Proteksi agar tidak terpotong tepi layar HP
-    if(tx < 10) tx = 10;
-    if(tx + 110 > W) tx = W - 115;
-    if(ty + 26 > H - 35) ty = y - sz - 30; // Lempar ke atas jika terlalu dekat dengan footer/bawah
-    if(STG.rot){ /* landscape: batas dihitung di ruang LAYAR (teks sudah tegak) */
-      var spT=v2c(x,y),lx=-40,ly=sz+20,ex=spT[0]+lx,ey=spT[1]+ly;
-      if(ex<10)lx+=10-ex;
-      if(ex+115>STG.iw)lx-=ex+115-STG.iw;
-      if(ey+26>STG.ih-10)ly=-sz-30;
-      tx=x+lx;ty=y+ly;
-    }
-  } else {
-    // Pada Desktop: Posisikan di arah berlawanan dari nama bintang (s.nx)
-    if(labelOnRight){
-      tx = x - sz - 118; // Pindah ke kiri jika nama bintang di kanan
-    } else {
-      tx = x + sz + 12;  // Pindah ke kanan jika nama bintang di kiri
-    }
-    ty = y - 10;
-
-    // Proteksi batas layar Desktop
-    if(tx < 10) tx = x + sz + 12;
-    if(tx + 115 > W) tx = x - sz - 118;
-    if(ty - 8 < 0) ty = y + sz + 10;
+  var l1 = 'LOCK: ' + d.name;
+  var l2 = 'DIST: ' + d.dist;
+  var l3 = 'SPEC: ' + d.spec + ' (MAG ' + d.mag + ')';
+  g.font = '600 8.5px "Courier New", monospace';
+  var wMax = g.measureText(l1).width;
+  g.font = '500 7.5px "Courier New", monospace';
+  wMax = Math.max(wMax, g.measureText(l2).width, g.measureText(l3).width);
+  var pw = Math.ceil(wMax) + 16, ph = 34;
+  /* Batas area kelihatan di ruang tempat teks digambar (layar tegak). Landscape HP (stage diputar):
+     petakan kotak virtual [margin..W-margin]x[margin..H-footer] ke koordinat layar. */
+  var sp0 = [x, y], vb = [8, 8, W - 8, H - 35];
+  if(STG.rot){
+    var pA = v2c(vb[0], vb[1]), pB = v2c(vb[2], vb[3]);
+    sp0 = v2c(x, y);
+    vb = [Math.min(pA[0], pB[0]), Math.min(pA[1], pB[1]), Math.max(pA[0], pB[0]), Math.max(pA[1], pB[1])];
   }
+  var pos = hudPlace(sp0[0], sp0[1], sz * 1.45 + 6, pw, ph, vb, isMobile, !!(s.nx && s.nx > 0));
+  var tx = x + pos[0], ty = y + pos[1];   /* pojok kiri-atas panel */
+
+  g.fillStyle = 'rgba(2, 8, 13, 0.55)';
+  g.fillRect(tx, ty, pw, ph);
+  g.strokeStyle = 'rgba(' + tr.rgb + ', 0.45)';
+  g.lineWidth = 0.8;
+  g.beginPath();g.moveTo(tx + 0.5, ty);g.lineTo(tx + 0.5, ty + ph);g.stroke();
 
   g.font = '600 8.5px "Courier New", monospace';
   g.fillStyle = 'rgba(' + tr.rgb + ', 0.95)';
-  g.fillText('LOCK: ' + d.name, tx, ty);
+  g.fillText(l1, tx + 8, ty + 12);
 
   g.font = '500 7.5px "Courier New", monospace';
   g.fillStyle = 'rgba(184, 224, 238, 0.8)';
-  g.fillText('DIST: ' + d.dist, tx, ty + 10);
-  g.fillText('SPEC: ' + d.spec + ' (MAG ' + d.mag + ')', tx, ty + 19);
-
-  g.strokeStyle = 'rgba(' + tr.rgb + ', 0.35)';
-  g.lineWidth = 0.8;
-  g.beginPath();g.moveTo(tx - 4, ty - 8);g.lineTo(tx - 4, ty + 23);g.stroke();
+  g.fillText(l2, tx + 8, ty + 22);
+  g.fillText(l3, tx + 8, ty + 31);
 
   g.restore();
   uprEnd(_upT);
@@ -6675,11 +6684,17 @@ var SN_COOLDOWN={};
   try{repeatMode=Math.max(0,Math.min(2,Number(localStorage.getItem('mp_repeat')||0)|0));}catch(eRp){}
   window.__mpMasterVol=masterVol;
 
+  /* Ikon volume = SVG (bukan emoji) biar seragam dgn ikon lain. 4 level: mute / rendah / sedang / tinggi */
+  var VOL_SVG_HEAD='<svg class="ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/>';
+  var VOL_SVG=[
+    VOL_SVG_HEAD+'<path d="M16 9 l5 6 M21 9 l-5 6"/></svg>',
+    VOL_SVG_HEAD+'<path d="M15.2 9.2 a3.2 3.2 0 0 1 0 5.6"/></svg>',
+    VOL_SVG_HEAD+'<path d="M15.2 9.2 a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 7 a5.5 5.5 0 0 1 0 10"/></svg>',
+    VOL_SVG_HEAD+'<path d="M15.2 9.2 a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 7 a5.5 5.5 0 0 1 0 10"/><path d="M19.6 4.8 a8.4 8.4 0 0 1 0 14.4"/></svg>'
+  ];
+  var _volLv=-1;
   function volIcon(v){
-    if(v<.01)return '🔇';
-    if(v<.34)return '🔈';
-    if(v<.67)return '🔉';
-    return '🔊';
+    return v<.01?0:(v<.34?1:(v<.67?2:3));
   }
   function applyMasterVol(){
     function setA(a){
@@ -6695,7 +6710,7 @@ var SN_COOLDOWN={};
     var muted=masterVol<.01;
     RADIO_SILENCE=muted;
     if(volBtn){
-      volBtn.textContent=volIcon(masterVol);
+      var lv=volIcon(masterVol);if(lv!==_volLv){_volLv=lv;volBtn.innerHTML=VOL_SVG[lv];}
       volBtn.classList.toggle('on',muted);
       volBtn.classList.toggle('muted',muted);
       volBtn.setAttribute('aria-pressed',muted?'true':'false');
@@ -8790,12 +8805,12 @@ window.__applyLayOV=function(){
     hud=document.createElement('div');hud.id='lay-hud';
     hud.innerHTML=
       '<div class="r"><div id="lay-info"></div><button data-a="collapse" title="ciutkan">▾</button></div>'+
-      '<div class="r"><button class="p g" data-a="preview">👁 PREVIEW</button><button class="g" data-a="ovw">🛰 OVERVIEW</button><button data-a="grp" title="Edit semua rasi di sektor sekaligus">◫ GRUP</button><button data-a="prev">‹</button><button data-a="next">›</button></div>'+
+      '<div class="r"><button class="p g" data-a="preview"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M2 12 C5 6.5 8.5 5 12 5 s7 1.5 10 7 c-3 5.5 -6.5 7 -10 7 S5 17.5 2 12 Z"/><circle cx="12" cy="12" r="3"/></svg>PREVIEW</button><button class="g" data-a="ovw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="3.6" transform="rotate(-25 12 12)"/></svg>OVERVIEW</button><button data-a="grp" title="Edit semua rasi di sektor sekaligus">◫ GRUP</button><button data-a="prev">‹</button><button data-a="next">›</button></div>'+
       '<div class="r"><button data-a="l">←</button><button data-a="u">↑</button><button data-a="d">↓</button><button data-a="r">→</button><button data-a="rotl">↺</button><button data-a="rotr">↻</button><button data-a="zoout">−</button><button data-a="zoin">+</button><button data-a="step">STEP 2</button></div>'+
       '<div class="r"><button class="a g" data-a="save">SAVE</button><button class="a g" data-a="copy">COPY</button><button class="g" data-a="fit">FIT</button><button class="g" data-a="rst">RST</button></div>';
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
-    var fab=document.createElement('button');fab.id='lay-fab';fab.type='button';fab.setAttribute('data-a','edit');fab.textContent='✎ EDIT';document.body.appendChild(fab);
+    var fab=document.createElement('button');fab.id='lay-fab';fab.type='button';fab.setAttribute('data-a','edit');fab.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M4 20 l1 -4.5 L16.5 4 a2 2 0 0 1 3 3 L8 18.5 Z"/><path d="M14.5 6 l3 3"/></svg>EDIT';document.body.appendChild(fab);
     ring=document.createElement('div');ring.id='lay-sel';ring.innerHTML='<div id="lay-hdl"><i>◢</i></div>';document.body.appendChild(ring);
 
     function opt(){return {capture:true,passive:false};}
