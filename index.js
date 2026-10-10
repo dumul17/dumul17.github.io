@@ -5108,6 +5108,8 @@ function nebulaIn(x,y,r){var t=skyXF(x,y);CULL.tot++;if(cullIn(t[0],t[1],r)){CUL
    (acak tapi tetap per rasi; bisa dipaksa lewat field nameDir:'h'|'v' di RASI sky-data.js), tipis, di lapisan paling bawah rasi.
    Di-render SEKALI ke canvas kecil (sprite) lalu per frame cuma drawImage; warna ikut sky sektor. */
 var NAME_SPR={},NAME_FS=48;
+var NAME_AL=.2,NAME_ALF=.34; /* opacity dasar nama rasi / saat difokus kamera. Naikin kalau masih tipis */
+function nameMix(rgb){var p=rgb.split(','),t=[205,232,255],o=[],i;for(i=0;i<3;i++)o.push(Math.round(+p[i]*.6+t[i]*.4));return o.join(',');} /* warna sky sektor digeser ke biru muda supaya kebaca */
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){NAME_SPR={};});
 function consNameVert(id){
   var r=SKY.rasiBy[id];if(r&&r.nameDir)return r.nameDir==='v';
@@ -5119,9 +5121,9 @@ function consSkyRgb(id){for(var i=0;i<SECT.list.length;i++){var s=SECT.list[i];i
 function consNameSprite(id){
   var vert=consNameVert(id),k=id+(vert?'v':'h'),e=NAME_SPR[k];
   if(e)return e;
-  var txt=consNameText(id),rgb=consSkyRgb(id),FS=NAME_FS,gap=FS*.62,pad=8,i;
+  var txt=consNameText(id),rgb=nameMix(consSkyRgb(id)),FS=NAME_FS,gap=FS*.62,pad=8,i;
   var m=document.createElement('canvas').getContext('2d');
-  m.font='500 '+FS+'px "Space Grotesk",system-ui,sans-serif';
+  m.font='700 '+FS+'px "Space Grotesk",system-ui,sans-serif';
   var ws=[],tot=0;
   for(i=0;i<txt.length;i++){var w=m.measureText(txt[i]).width;ws.push(w);tot+=w;}
   tot+=gap*(txt.length-1);
@@ -5135,19 +5137,33 @@ function consNameSprite(id){
   e=NAME_SPR[k]={c:c,vert:vert,em:tot/FS};
   return e;
 }
-/* t1/t2 = pojok bbox rasi di layar (stage). al = opacity dasar. */
-function drawNameBox(id,t1,t2,al){
+/* t1/t2 = pojok bbox rasi di layar (stage). al = opacity dasar. now = penanda frame (buat daftar label yang sudah digambar).
+   Posisi: tengah bbox; kalau keluar layar dijepit masuk, kalau nabrak label rasi lain digeser ke bawah/atas/samping bbox. */
+var NAME_R=[],NAME_T=-1;
+function drawNameBox(id,t1,t2,al,now){
   if(!(al>.005))return;
   var cx=(t1[0]+t2[0])*.5,cy=(t1[1]+t2[1])*.5,bw=Math.abs(t2[0]-t1[0]),bh=Math.abs(t2[1]-t1[1]);
   if(!cullIn(cx,cy,Math.max(bw,bh)*.7+40))return;
   var sp=consNameSprite(id);
   /* span utama teks searah layar tegak: landscape HP memutar stage 90deg -> bw/bh tertukar */
   var span=sp.vert?(STG.rot?bw:bh):(STG.rot?bh:bw);
-  var fs=Math.max(9,Math.min(30,span*.92/sp.em)); /* clamp() global cuma 1 argumen (0..1) -> dulu fs jadi 1px = teks nggak kelihatan */
+  var fs=Math.max(9,Math.min(30,span*.92/sp.em)); /* clamp() global cuma 1 argumen (0..1), jadi jangan dipakai buat rentang */
   var s=fs/NAME_FS,dw=sp.c.width*s,dh=sp.c.height*s;
-  var up=uprBegin(cx,cy),pa=g.globalAlpha;
+  var rw=STG.rot?dh:dw,rh=STG.rot?dw:dh; /* ukuran teks di ruang stage (tegak di layar) */
+  if(now!==NAME_T){NAME_T=now;NAME_R.length=0;}
+  var gp=3,mx=6,my=6,myb=H-40,i,j,best=null;
+  var cand=[[0,0],[0,bh*.5+rh*.5+gp],[0,-(bh*.5+rh*.5+gp)],[bw*.5+rw*.5+gp,0],[-(bw*.5+rw*.5+gp),0]];
+  for(i=0;i<cand.length;i++){
+    var px=Math.max(mx+rw*.5,Math.min(W-mx-rw*.5,cx+cand[i][0])),py=Math.max(my+rh*.5,Math.min(myb-rh*.5,cy+cand[i][1]));
+    var r0=[px-rw*.5,py-rh*.5,px+rw*.5,py+rh*.5],hit=false;
+    for(j=0;j<NAME_R.length;j++){var q=NAME_R[j];if(r0[0]<q[2]+2&&r0[2]>q[0]-2&&r0[1]<q[3]+2&&r0[3]>q[1]-2){hit=true;break;}}
+    if(!best)best=[px,py,r0]; /* kandidat pertama (tengah, sudah dijepit) = cadangan kalau semua nabrak */
+    if(!hit){best=[px,py,r0];break;}
+  }
+  NAME_R.push(best[2]);
+  var up=uprBegin(best[0],best[1]),pa=g.globalAlpha;
   g.globalAlpha=pa*al;
-  g.drawImage(sp.c,cx-dw/2,cy-dh/2,dw,dh);
+  g.drawImage(sp.c,best[0]-dw/2,best[1]-dh/2,dw,dh);
   g.globalAlpha=pa;
   uprEnd(up);
 }
@@ -5155,8 +5171,9 @@ function drawConsName(c,age,now,ox,oy,focus,locked){
   if(locked||!(c.maxX>-1e8)||!(c.minX<1e8))return;
   var a0=clamp((age-c.delay-1.6)/1.6)*focus;
   if(a0<=.01)return;
-  var t1=skyXF(c.minX+ox,c.minY+oy),t2=skyXF(c.maxX+ox,c.maxY+oy);
-  drawNameBox(c.id,t1,t2,(CAMERA_MODE&&camFocusId()===c.id?.2:.12)*a0);
+  var q1=skyXF(c.minX+ox,c.minY+oy),t1=[q1[0],q1[1]]; /* skyXF() balikin array yang dipakai ulang tiap panggilan: WAJIB disalin, kalau nggak t1===t2 */
+  var q2=skyXF(c.maxX+ox,c.maxY+oy),t2=[q2[0],q2[1]];
+  drawNameBox(c.id,t1,t2,(CAMERA_MODE&&camFocusId()===c.id?NAME_ALF:NAME_AL)*a0,now);
 }
 function drawCons(c,age,now){
   var tn=now-(TD.lag[c.id]||0); /* time-dilated clock */
@@ -5419,7 +5436,9 @@ function drawPleiades(age,now){
   var selected=activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended;
   if(isUnlocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
     var pS=PLEIADES.scale,pA=clamp((age-1.6)/1.6);
-    drawNameBox('pleiades',skyXF(PLEIADES.x+.22*pS+ox,PLEIADES.y+.22*pS+oy),skyXF(PLEIADES.x+.84*pS+ox,PLEIADES.y+.62*pS+oy),(CAMERA_MODE&&camFocusId()==='pleiades'?.2:.12)*pA);
+    var pq1=skyXF(PLEIADES.x+.22*pS+ox,PLEIADES.y+.22*pS+oy),pt1=[pq1[0],pq1[1]];
+    var pq2=skyXF(PLEIADES.x+.84*pS+ox,PLEIADES.y+.62*pS+oy),pt2=[pq2[0],pq2[1]];
+    drawNameBox('pleiades',pt1,pt2,(CAMERA_MODE&&camFocusId()==='pleiades'?NAME_ALF:NAME_AL)*pA,now);
   }
   /* Full cluster when Pleione plays (or focus still on pleiades); otherwise dim.
      Sweep-driven _tw gives the same sequential twinkle language as Orion/Virgo/Canis. */
