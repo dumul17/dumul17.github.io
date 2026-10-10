@@ -299,21 +299,21 @@ function cullPtAt(x,y,pad){var t=skyXF(x,y);return cullIn(t[0],t[1],pad);}
 /* ---------- Sector Scan HUD — per-sector minimap (camera / observe) ----------
    Di dalam sector: radar di-frame ke bounds rasi/cluster sector itu saja (bukan 4 kuadran full sky).
    Fokus kamera: target aktif di-highlight. Draw/cull stats tetap dari CULL. */
-var SS={el:null,cv:null,cx:null,sec:null,draw:null,cull:null,on:false,t:0,sT:'',dT:'',cT:''};
+var SSC={el:null,cv:null,cx:null,sec:null,draw:null,cull:null,on:false,t:0,sT:'',dT:'',cT:''};
 function ssInit(){
-  SS.el=document.getElementById('sector-scan');SS.cv=document.getElementById('sector-radar');
-  SS.sec=document.getElementById('ss-sec');SS.draw=document.getElementById('ss-draw');SS.cull=document.getElementById('ss-cull');
-  if(SS.cv)SS.cx=SS.cv.getContext('2d');
+  SSC.el=document.getElementById('sector-scan');SSC.cv=document.getElementById('sector-radar');
+  SSC.sec=document.getElementById('ss-sec');SSC.draw=document.getElementById('ss-draw');SSC.cull=document.getElementById('ss-cull');
+  if(SSC.cv)SSC.cx=SSC.cv.getContext('2d');
   try{if(window.__hub)window.__hub.cull=CULL;}catch(e){}
 }
 function sectorScanUpdate(now){
-  if(!SS.el)ssInit();
-  if(!SS.el)return;
+  if(!SSC.el)ssInit();
+  if(!SSC.el)return;
   var on=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE&&!SECT.on&&!!SECT.cur);
-  if(on!==SS.on){SS.on=on;SS.el.classList.toggle('on',on);SS.el.setAttribute('aria-hidden',on?'false':'true');}
-  if(!on||!SS.cx||!W||!H)return;
-  if(now-SS.t<(IS_POTATO?250:100))return;
-  SS.t=now;
+  if(on!==SSC.on){SSC.on=on;SSC.el.classList.toggle('on',on);SSC.el.setAttribute('aria-hidden',on?'false':'true');}
+  if(!on||!SSC.cx||!W||!H)return;
+  if(now-SSC.t<(IS_POTATO?250:100))return;
+  SSC.t=now;
 
   var sect=SECT.cur,ids=sect.ids||[],fid=null;
   try{fid=typeof camFocusId==='function'?camFocusId():null;}catch(eF){}
@@ -355,7 +355,7 @@ function sectorScanUpdate(now){
   if(bw>bh){var d=(bw-bh)*.5;minY-=d;maxY+=d;bh=bw;}
   else if(bh>bw){var d2=(bh-bw)*.5;minX-=d2;maxX+=d2;bw=bh;}
 
-  var c=SS.cx,S=168,pad=6,I=S-pad*2;
+  var c=SSC.cx,S=168,pad=6,I=S-pad*2;
   function RX(x){return pad+(x-minX)/bw*I;}
   function RY(y){return pad+(y-minY)/bh*I;}
 
@@ -426,9 +426,9 @@ function sectorScanUpdate(now){
   var tot=CULL.lTot,dr=CULL.lDrawn;
   var drawT='DRAW '+dr+'/'+tot;
   var cullT='CULL '+(tot>0?Math.round((1-dr/tot)*100):0)+'% \u2212'+CULL.lSaved;
-  if(secT!==SS.sT){SS.sT=secT;if(SS.sec)SS.sec.textContent=secT;}
-  if(drawT!==SS.dT){SS.dT=drawT;if(SS.draw)SS.draw.textContent=drawT;}
-  if(cullT!==SS.cT){SS.cT=cullT;if(SS.cull)SS.cull.textContent=cullT;}
+  if(secT!==SSC.sT){SSC.sT=secT;if(SSC.sec)SSC.sec.textContent=secT;}
+  if(drawT!==SSC.dT){SSC.dT=drawT;if(SSC.draw)SSC.draw.textContent=drawT;}
+  if(cullT!==SSC.cT){SSC.cT=cullT;if(SSC.cull)SSC.cull.textContent=cullT;}
 }
 var BHZ=1,BHK=0,BHSC=1;
 var SUM={on:false},SUM_R=6;
@@ -1129,7 +1129,7 @@ function activeStarScreenPos(){
   try{
     if(tr.cons==='pleiades'){
       if(!PLEIADES.ready)return null;
-      var st=PLEIADES.bright.filter(function(z){return z.interactive;})[0];
+      var st=plInteractive();
       if(!st)return null;
       var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y;
       return gSky(PLEIADES.x+st.x*PLEIADES.scale+ox,PLEIADES.y+st.y*PLEIADES.scale+oy);
@@ -1155,8 +1155,8 @@ function spatialTarget(){
   var cx=W*.5,cy=H*.5,maxD=Math.max(120,Math.hypot(W,H)*.48),t,p,s;
   if(SECT.on||SECT.busy){                       /* home/overview + transisi antar sektor */
     s=sfxSector();
-    if(typeof HBH!=='undefined'&&HBH.on&&SECT.on&&!SECT.busy&&SECT.phase!=='in')return 0;   /* BH overview di-summon = sinyal jernih; recall -> teredam */
-    if(s&&s.relay&&SECT.on&&SECT.phase!=='in')return 0;   /* relay Gargantua mini = sinyal jernih */
+    /* Jernih HANYA kalau dua-duanya aktif: BH overview di-summon DAN BH di sektor sumber di-summon (relay). Salah satu saja = teredam. */
+    if(HBH.on&&s&&s.relay&&SECT.on&&SECT.phase!=='in')return 0;
     if(s&&s.sx!=null){t=Math.min(1,Math.hypot(s.sx-cx,s.sy-cy)/maxD);t=Math.max(0,(t-.12)/.88);}
     else t=.7;
     if(!SECT.busy)t=Math.max(.7,t);             /* diam di overview: selalu jelas teredam */
@@ -1174,16 +1174,19 @@ function spatialTarget(){
 function spatialHint(t){
   var st='',s=sfxSector();
   if(SECT.on&&!SECT.busy){
-    if(HBH.on)st='home';   /* BH overview aktif: jernih, tanpa toast tambahan */
-    else if(t>.5)st='muffled';else if(s&&s.relay)st='relay';
+    var rel=!!(s&&s.relay);
+    if(HBH.on&&rel)st='relay';                       /* dua sisi terhubung */
+    else if(t>.5)st=HBH.on?'muffled-sec':(rel?'muffled-ov':'muffled');
   }else if(SECT.cur&&!SECT.busy&&s&&s!==SECT.cur){
     st=SUM.on?(s.relay?'relay-here':'norelay'):'far';   /* lagi di sektor lain dari sumber suara */
   }
   if(st===AV._hint)return;
   AV._hint=st;
-  if(!st||st==='home'||typeof showModeToast!=='function')return;
-  if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON BH (OR RELAY THE SOURCE SECTOR) TO CLEAR IT',null,4200);
-  else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL BH IN THAT SECTOR TO MUFFLE AGAIN',null,3600);
+  if(!st||typeof showModeToast!=='function')return;
+  if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON BH IN THE SOURCE SECTOR AND IN OVERVIEW',null,4400);
+  else if(st==='muffled-ov')showModeToast('SIGNAL MUFFLED \u00b7 OVERVIEW BH RECALLED\nSUMMON THE OVERVIEW BH TO LINK THE RELAY',null,4400);
+  else if(st==='muffled-sec')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE SECTOR HAS NO RELAY\nENTER IT AND SUMMON BH THERE',null,4400);
+  else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL EITHER BH TO MUFFLE AGAIN',null,3600);
   else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nRELAY THE SOURCE SECTOR FIRST, THEN SUMMON BH HERE',null,4600);
   else if(st==='norelay')showModeToast('RELAY NOT LINKED \u00b7 SOURCE SECTOR HAS NO RELAY\nSUMMON BH IN THE SOURCE SECTOR FIRST',null,4600);
   else showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL BH TO MUFFLE AGAIN',null,3600);
@@ -1665,6 +1668,9 @@ var PLEIADES={
 };
 PLEIADES.bright.forEach(function(st){st.ph=Math.random()*6.283;st._tw=0;st._twHit=-1;});
 PLEIADES.dim.forEach(function(st){st.ph=Math.random()*6.283;st._tw=0;st._twHit=-1;});
+/* Lookup tanpa alokasi (dulu .filter(...)[0] tiap frame / tiap partikel). */
+function plStarByName(n){var a=PLEIADES.bright;for(var i=0;i<a.length;i++)if(a[i].name===n)return a[i];}
+function plInteractive(){var a=PLEIADES.bright;for(var i=0;i<a.length;i++)if(a[i].interactive)return a[i];}
 /* Shared compact breath/pulse geometry — same size language as Orion belt portal rings (~8). */
 var TRIGGER_PULSE_BASE=5.6;
 
@@ -2574,7 +2580,7 @@ function updateConstellationFocus(now){
       var c=cons(aid);
       if(c){
         var minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-        Object.keys(c.stars).forEach(function(key){
+        (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(key){
           var st=c.stars[key];
           if(isFinite(st.x)&&isFinite(st.y)){
             if(st.x<minX)minX=st.x;if(st.x>maxX)maxX=st.x;
@@ -2597,7 +2603,7 @@ function updateConstellationFocus(now){
           }
           var offset=-extent-margin+travel*SWEEP.t;
           var hitBand=Math.max(4.5,Math.min(9,Math.sqrt(hw*hw+hh*hh)*.045));
-          Object.keys(c.stars).forEach(function(key){
+          (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(key){
             var st=c.stars[key];if(!isFinite(st.x)||!isFinite(st.y))return;
             var relx=st.x-cx,rely=st.y-cy;
             var perpendicular=relx*nx+rely*ny;
@@ -2612,7 +2618,6 @@ function updateConstellationFocus(now){
   if(typeof updateAlignmentDim==='function')updateAlignmentDim(now);
 }
 function constellationFocus(c){var i=CONS.indexOf(c);return i<0?1:CF.current[i];}
-function constellationTwinkle(c){var i=CONS.indexOf(c);return i<0?1:CF.tw[i];}
 function cons(id){for(var i=0;i<CONS.length;i++)if(CONS[i].id===id)return CONS[i];}
 function clockText(){
   var now=new Date(),h=now.getUTCHours(),m=now.getUTCMinutes(),sec=now.getUTCSeconds();
@@ -4416,59 +4421,6 @@ function startSwallow(href){
 }
 
 /* ---------- gambar ---------- */
-/* Galaxy sprites: CanvasGradient is bound to the transform at creation time, so
-   caching the gradient object itself is unsafe under per-frame translate/rotate.
-   Pre-render each colour scheme once to an offscreen canvas; drawImage scales
-   the pulse. Eliminates createRadialGradient + color-stop work every frame. */
-var GALAXY_SPRITE_CACHE=Object.create(null);
-function getGalaxySprite(gc){
-  var key=gc.core+'|'+gc.outer+'|'+gc.halo;
-  var hit=GALAXY_SPRITE_CACHE[key];
-  if(hit)return hit;
-  /* Canonical size matching the old (6+5*scale≈11, 2.6+2.4*scale≈5) at scale=1. */
-  var bw=11,bh=5;
-  var pad=Math.ceil(bw*2.05);
-  var sc=document.createElement('canvas');
-  sc.width=sc.height=pad*2;
-  var sg=sc.getContext('2d');
-  sg.translate(pad,pad);
-  var halo=sg.createRadialGradient(0,0,0,0,0,bw*1.9);
-  halo.addColorStop(0,'rgba('+gc.core+',.20)');
-  halo.addColorStop(.30,'rgba('+gc.outer+',.09)');
-  halo.addColorStop(.68,'rgba('+gc.halo+',.045)');
-  halo.addColorStop(1,'rgba('+gc.halo+',0)');
-  sg.fillStyle=halo;sg.globalAlpha=.78;
-  sg.beginPath();sg.ellipse(0,0,bw*1.7,bh*1.8,0,0,6.283);sg.fill();
-  sg.globalAlpha=.255;sg.strokeStyle='rgba('+gc.outer+',.82)';sg.lineWidth=.5;
-  sg.beginPath();sg.ellipse(0,0,bw,bh,.06,0,6.283);sg.stroke();
-  sg.globalAlpha=.15;sg.strokeStyle='rgba('+gc.halo+',.78)';sg.lineWidth=.55;
-  sg.beginPath();sg.ellipse(0,0,bw*.62,bh*.52,.12,0,6.283);sg.stroke();
-  sg.globalAlpha=1;sg.fillStyle='rgba('+gc.core+',.30)';
-  sg.beginPath();sg.ellipse(0,0,Math.max(.8,bw*.17),Math.max(.55,bh*.24),0,0,6.283);sg.fill();
-  sg.fillStyle='rgba(5,11,18,0.45)';
-  sg.beginPath();sg.ellipse(0,0,bw*1.2,bh*0.15,0,0,6.283);sg.fill();
-  hit={c:sc,pad:pad,bw:bw,bh:bh};
-  GALAXY_SPRITE_CACHE[key]=hit;
-  return hit;
-}
-function drawDistantGalaxies(now){
-  /* Tiny, faint galaxies: deliberately small so they read as very distant objects. */
-  for(var i=0;i<GAL.length;i++){
-    var d=GAL[i],px=d.x*W+mouse.x*d.rx*8,py=d.y*H+mouse.y*d.ry*6;
-    var pulse=.84+.16*Math.sin(now*.00022*d.tw+d.p);
-    /* Match previous radius formulas; pulse rides on drawImage scale. */
-    var w=(6+5*d.scale)*pulse,h=(2.6+2.4*d.scale)*pulse;
-    var gc=d.col||{core:'255,225,185',outer:'205,225,255',halo:'135,175,230'};
-    var sp=getGalaxySprite(gc);
-    var sx=w/sp.bw,sy=h/sp.bh;
-    g.save();
-    g.translate(px,py);
-    g.rotate(d.rot+Math.sin(now*.00007+d.p)*.04);
-    g.scale(sx,sy);
-    g.drawImage(sp.c,-sp.pad,-sp.pad);
-    g.restore();
-  }
-}
 /* ---- Teleskop x sektor ----
    Home/overview : teleskop ngorbit IKON sektor yang SFX-nya lagi aktif.
    Dalam sektor sumber : ngorbit bintangnya (alur lama via triggerSupernova).
@@ -4477,7 +4429,7 @@ var TELE_BUSY_MSG=["I'm busy tracking {s}. Can't come along.","Occupied. The sig
 function teleStarFollow(key){
   var tr=TRIGGERS[key];if(!tr)return null;
   var c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons);if(!c)return null;
-  var st=tr.cons==='pleiades'?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:c.stars[tr.star];
+  var st=tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star];
   if(!st)return null;
   return function(){
     var fx=tr.cons==='pleiades'?(PLEIADES.x+st.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(st.x+c.ox),
@@ -4791,31 +4743,6 @@ function drawFloatingTelescope(now){
   }
 }
 
-function drawBg(now){
-  /* Twinkle half the field each frame (even/odd index by time) — cuts sin+fill
-     work ~50% with almost no visual difference on sparse background stars. */
-  var twPhase=(now/120|0)&1;
-  var R=BH.Rr,o2=(R*9.5)*(R*9.5);
-  for(var i=0;i<BG.length;i++){
-    var b=BG[i],x=b.x+mouse.x*b.d*14,y=b.y+mouse.y*b.d*10,k=0;
-    if(SW){var q=pull(x,y);x=q[0];y=q[1];k=q[2];}
-    else{
-      /* Cheap far skip before lens(): most BG stars never enter the well. */
-      var dx=x-BH.x,dy=y-BH.y;
-      if(dx*dx+dy*dy>=o2){
-        var twF=reduce?1:((i&1)===twPhase?(.6+.4*Math.sin(now*.001*b.s+b.p)):b._tw||.8);
-        b._tw=twF;
-        g.fillStyle='rgba('+b.c+','+(b.a*twF)+')';
-        g.beginPath();g.arc(x,y,b.r,0,6.283);g.fill();
-        continue;
-      }
-    }
-    var l=lens(x,y);if(!l)continue;
-    var tw=reduce?1:(.6+.4*Math.sin(now*.001*b.s+b.p));
-    g.fillStyle='rgba('+b.c+','+(b.a*tw*(1-.85*k))+')';
-    g.beginPath();g.arc(l[0],l[1],b.r*(1-.5*k),0,6.283);g.fill();
-  }
-}
 /* ---------- [FITUR 2] Synthesizer Chime untuk Bintang Biasa (Web Audio) ---------- */
 function playStarChime(s){
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
@@ -4974,7 +4901,7 @@ function drawTargetLock(now){
 
   var c = tr.cons === 'pleiades' ? PLEIADES : cons(tr.cons);
   var s = tr.cons === 'pleiades' 
-    ? PLEIADES.bright.filter(function(z){ return z.name === tr.star; })[0] 
+    ? plStarByName(tr.star) 
     : (c && c.stars && c.stars[tr.star]);
   if(!s) return;
 
@@ -5207,7 +5134,7 @@ function drawAsteroids(now){
 
 function drawTriggerVisuals(now){
   if(SECT.on)return;
-  Object.keys(TRIGGERS).forEach(function(key){
+  (OFX.keys||(OFX.keys=Object.keys(TRIGGERS))).forEach(function(key){
     var tr=TRIGGERS[key];
     if(tr.cons==='pleiades')return;
     if(!sectShow(tr.cons))return;
@@ -5504,7 +5431,7 @@ function drawStars(c,age,now){
   var k2=W<500?.95:1.2;
   var audioFocus=potatoAudioFocus();
   var focus=constellationFocus(c);
-  Object.keys(c.stars).forEach(function(k){
+  (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(k){
     var s=c.stars[k],a=clamp((age-s.t0)/.5);s._a=a;if(a<=0)return;
     var triggerKey=starKeyOf(k);
     var tr=triggerKey?TRIGGERS[triggerKey]:null;
@@ -5757,7 +5684,7 @@ function drawPulses(now,age){
     var p=PU[i],u=(now-p.t)/p.d;if(u>1){PU.splice(i,1);continue;}
     if(SECT.on||!sectShow(p.shock?TRIGGERS[p.snKey].cons:p.c.id))continue;
     if(p.shock){
-      var tr=TRIGGERS[p.snKey],sb=(tr&&tr.cons==='pleiades')?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:(p.c.stars&&p.c.stars[p.snKey]);
+      var tr=TRIGGERS[p.snKey],sb=(tr&&tr.cons==='pleiades')?plStarByName(tr.star):(p.c.stars&&p.c.stars[p.snKey]);
       if(!sb||!tr)continue;
       var bx=tr.cons==='pleiades'?(PLEIADES.x+sb.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(sb.x+p.c.ox),by=tr.cons==='pleiades'?(PLEIADES.y+sb.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(sb.y+p.c.oy);
       var base=gravityPos(bx,by);
@@ -5812,7 +5739,8 @@ function drawPortals(age,now){
        line tracks the moving star. Hit target still follows the star. */
     if(!SW){
       var fx=p.fx!=null?p.fx:p.lx,fy=p.fy!=null?p.fy:p.ly;
-      p.el.style.transform='translate('+fx.toFixed(1)+'px,'+fy.toFixed(1)+'px)'+STG.pt;
+      var ptf='translate('+fx.toFixed(1)+'px,'+fy.toFixed(1)+'px)'+STG.pt;
+      if(p._tf!==ptf){p._tf=ptf;p.el.style.transform=ptf;}
       var hs=c.stars[p.hit],hp=gSky(hs.x+ox,hs.y+oy);
       p.hitEl.style.transform='translate('+(hp[0]).toFixed(1)+'px,'+(hp[1]).toFixed(1)+'px)';
     }
@@ -6301,7 +6229,7 @@ function sumSet(on){
     SUM.on=true;SECT.cur.relay=true;SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;   /* belum di-drag = dilatasi audio pasif */
     try{focusRefresh();}catch(eFR){}
     try{var so=sfxSector();   /* kalau sumber suara di sektor lain, toast relay dari spatialHint yang tampil */
-      if(typeof showModeToast==='function'&&!(so&&so!==SECT.cur))showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET \u00b7 OVERVIEW SIGNAL STAYS CLEAR',null,3200);}catch(e){}
+      if(typeof showModeToast==='function'&&!(so&&so!==SECT.cur))showModeToast('GARGANTUA SUMMONED\nDRAG TO PARK ANYWHERE\nRELAY SET \u00b7 OVERVIEW BH MUST BE SUMMONED TOO',null,3200);}catch(e){}
   }else{
     SUM.on=false;if(SECT.cur){SECT.cur.relay=false;SECT.cur.sum=null;}
     try{focusRefresh();}catch(eFR){}
@@ -6343,8 +6271,8 @@ function homeSet(on){
   if(!on){drag.on=false;BH.x=BH.hx;BH.y=BH.hy;}
   try{
     var sfxOn=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);   /* lagi ada SFX: toast ikut status sinyal (jernih / teredam) */
-    if(sfxOn)AV._hint=on?'home':'muffled';                          /* cegah toast hint dobel */
-    if(typeof showModeToast==='function')showModeToast(on?(sfxOn?'GARGANTUA SUMMONED\nRELAY LINKED \u00b7 SIGNAL CLEAR':'GARGANTUA SUMMONED'):(sfxOn?'GARGANTUA RECALLED\nSIGNAL MUFFLED \u00b7 NO RELAY':'GARGANTUA RECALLED'),null,on?2000:2400);
+    /* Lagi ada SFX: status sinyal (linked / muffled) diumumkan spatialHint karena tergantung relay sektor sumber juga, jadi toast di sini dilewati. */
+    if(!sfxOn&&typeof showModeToast==='function')showModeToast(on?'GARGANTUA SUMMONED':'GARGANTUA RECALLED',null,on?2000:2400);
   }catch(e){}
   haptic(10);sumUI();
 }
@@ -6702,7 +6630,7 @@ function frame(now){
     }
     ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
     drawFloatingTelescope(now);
-    var msgEl=$('#secret-msg');
+    var msgEl=frame._m||(frame._m=$('#secret-msg'));
     if(msgEl&&msgEl.classList.contains('on')&&msgEl.dataset.type==='telescope')placeSecretMsg();
     teleGreetFollow();
     updateClockDilation(now);
@@ -7435,7 +7363,7 @@ function triggerSupernova(key){
   if(!isUnlocked(key)){lockedHint(key);return;}
   var tr=TRIGGERS[key],
       c=tr&&tr.cons==='pleiades'?PLEIADES:(tr&&cons(tr.cons)),
-      s=tr&&c&&(tr.cons==='pleiades'?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:c.stars[tr.star]);
+      s=tr&&c&&(tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star]);
   if(!tr||!s)return;
 
   /* Cooldown before any visual/audio so rapid double-taps don't stack. */
@@ -7531,7 +7459,7 @@ function drawSupernovaBursts(now){
     var b=SN_BURSTS[i],u=(now-b.t)/b.d;
     if(u>1){SN_BURSTS.splice(i,1);continue;}
     if(SECT.on||!sectShow(TRIGGERS[b.key].cons))continue;
-    var tr=TRIGGERS[b.key],c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons),s=tr.cons==='pleiades'?PLEIADES.bright.filter(function(z){return z.name===tr.star;})[0]:c.stars[tr.star],sx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),sy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy),q=gSky(sx,sy);
+    var tr=TRIGGERS[b.key],c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons),s=tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star],sx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),sy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy),q=gSky(sx,sy);
     if(!q||q[2]>=1)continue;
     var fade=1-.85*q[2],easeOut=1-Math.pow(1-u,3),sr=(s&&s.r)||1.9,base=sr*(2.5+9*easeOut);
     g.save();g.globalCompositeOperation='lighter';
@@ -7838,7 +7766,7 @@ function fxBase(d){
   var r=SKY.rasiBy[d.cons];
   if(r&&r.cluster){
     if(!PLEIADES.ready)return null;
-    var pl=PLEIADES.bright.filter(function(z){return z.interactive;})[0];
+    var pl=plInteractive();
     return pl?[PLEIADES.x+pl.x*PLEIADES.scale+mouse.x*1.4,PLEIADES.y+pl.y*PLEIADES.scale+mouse.y*1.0]:null;
   }
   var c=cons(d.cons),st=c&&c.stars&&c.stars[d.star];

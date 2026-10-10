@@ -28,7 +28,7 @@ const SHELL = [
   /* harus sama persis dengan <script src> di index.html */
   'sky-data.js?v=22',
   'texts.js?v=1',
-  'index.js?v=96',
+  'index.js?v=97',
   'dumul.css?v=1',
   'dumul.js?v=2',
   'dumul-app.js?v=1',
