@@ -736,10 +736,22 @@ body.tesseract-running { background:#0a1218 !important; }
   color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);
   box-shadow:0 0 12px rgba(110,229,255,.15);
 }
-#mode-cluster button .ico{
-  display:block;pointer-events:none;width:16px;height:16px;flex-shrink:0;
+#mode-cluster button .ico,
+#mode-silence .ico,
+#music-play .ico,
+#owl-source .ico,
+.owl-emoji .ico,
+.owl-q-emoji .ico,
+.mp-play-icon .ico{
+  display:block;pointer-events:none;flex-shrink:0;
 }
-#mode-cluster button .ico[hidden]{display:none!important}
+#mode-cluster button .ico[hidden],
+#mode-silence .ico[hidden],
+.mp-play-icon .ico[hidden]{display:none!important}
+#mode-silence .ico{width:14px;height:14px}
+#music-play .mp-play-icon{display:grid;place-items:center}
+#music-play .mp-play-icon .ico{width:12px;height:12px;color:#6ee5ff}
+.owl-emoji{display:grid;place-items:center}
 /* Zoom readout — sky-layer camera only, fixed UI chrome */
 #cam-zoom{
   position:fixed;left:50%;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:6;

@@ -602,7 +602,7 @@ function focusGeom(id){
 }
 function focusUI(){
   var b=document.getElementById('cf-name');if(!b||!FOCUS.list)return;
-  var f=FOCUS.list[FOCUS.i];b.textContent=f.id==='free'?'FOCUS · FREE':'◎ '+f.n.toUpperCase();
+  var f=FOCUS.list[FOCUS.i];b.textContent=f.id==='free'?'FOCUS · FREE':'● '+f.n.toUpperCase();
 }
 function focusCycle(d){
   if(!FOCUS.list)FOCUS.list=focusList();
@@ -1144,11 +1144,11 @@ function spatialHint(t){
   if(st===AV._hint)return;
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
-  if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON \uD83C\uDF00 INSIDE THE SOURCE SECTOR TO RELAY',null,4200);
-  else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL \uD83C\uDF00 IN THAT SECTOR TO MUFFLE AGAIN',null,3600);
-  else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nRELAY THE SOURCE SECTOR FIRST, THEN SUMMON \uD83C\uDF00 HERE',null,4600);
-  else if(st==='norelay')showModeToast('RELAY NOT LINKED \u00b7 SOURCE SECTOR HAS NO RELAY\nSUMMON \uD83C\uDF00 IN THE SOURCE SECTOR FIRST',null,4600);
-  else showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL \uD83C\uDF00 TO MUFFLE AGAIN',null,3600);
+  if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON BH INSIDE THE SOURCE SECTOR TO RELAY',null,4200);
+  else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL BH IN THAT SECTOR TO MUFFLE AGAIN',null,3600);
+  else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nRELAY THE SOURCE SECTOR FIRST, THEN SUMMON BH HERE',null,4600);
+  else if(st==='norelay')showModeToast('RELAY NOT LINKED \u00b7 SOURCE SECTOR HAS NO RELAY\nSUMMON BH IN THE SOURCE SECTOR FIRST',null,4600);
+  else showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL BH TO MUFFLE AGAIN',null,3600);
 }
 function spatialRelease(){
   AV.atten=0;AV._hint='';
@@ -2119,7 +2119,7 @@ function setRadioSilence(on){
   if(btn){
     btn.classList.toggle('on',RADIO_SILENCE);
     btn.setAttribute('aria-pressed',RADIO_SILENCE?'true':'false');
-    btn.textContent=RADIO_SILENCE?'🔈':'🔊';
+    (function(){var on=btn.querySelector('.ico-vol-on'),off=btn.querySelector('.ico-vol-off');if(on)on.hidden=!!RADIO_SILENCE;if(off)off.hidden=!RADIO_SILENCE;})();
     btn.title=RADIO_SILENCE?'Unmute — restore volume':'Mute — fade audio out';
     btn.setAttribute('aria-label',RADIO_SILENCE?'Unmute audio':'Mute audio');
   }
@@ -6114,7 +6114,7 @@ function drawSectorOverview(now,age){
     g.fillStyle=empty?'rgba(184,198,214,.4)':'rgba(214,236,248,.82)';
     /* Label: "01 · ✦4" (nomor sektor · jumlah rasi). Pas SFX Stellar Signals aktif di sektor ini -> "01 · <nama track>"; balik normal pas SFX stop/pause. */
     var sigN=empty?null:playingSignalName(),pidL=empty?null:playingConstellationId(),hotL=!!(sigN&&pidL&&s.ids.indexOf(pidL)>=0);
-    var lab=(i<9?'0':'')+(i+1)+' - '+(empty?'unmapped':(hotL?sigN:'\uD83D\uDCAB'+s.ids.length));
+    var lab=(i<9?'0':'')+(i+1)+' - '+(empty?'unmapped':(hotL?sigN:'*'+s.ids.length));
     if(hotL)g.fillStyle='rgba(110,229,255,.95)';
     g.fillText(lab,p[0],p[1]+r+7);
     if(s.relay&&!(s.flash&&now-s.flash<1500)){
@@ -6533,7 +6533,7 @@ var SN_COOLDOWN={};
        when closed it relocates into the music logo. */
     toggle.classList.toggle('playing-closed',playing&&!open);
     playBtn.setAttribute('aria-label',playing?'Pause music':'Play music');
-    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">'+(playing?'Ⅱ':'▶')+'</span>';
+    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true"><svg class="ico ico-play" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"'+(playing?' hidden':'')+'><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg><svg class="ico ico-pause" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"'+(playing?'':' hidden')+'><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>';
     if(playing)startSpec();else stopSpec();
     /* Title migrates to logo side when HUD closes while music plays;
        after 2s it slides into the logo. */
@@ -6578,7 +6578,7 @@ var SN_COOLDOWN={};
     toggle.classList.remove('playing-closed');
     rows.forEach(function(row){row.classList.remove('playing');});
     playBtn.setAttribute('aria-label','Play music');
-    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true">▶</span>';
+    playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true"><svg class="ico ico-play" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg><svg class="ico ico-pause" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>';
     clearNowPlaying();
     if(MS&&msKey){try{MS.playbackState='paused';}catch(e){}}
   };
