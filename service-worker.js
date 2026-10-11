@@ -28,10 +28,10 @@ const SHELL = [
   /* harus sama persis dengan <script src> di index.html */
   'dumul-js/obs/sky-data.js?v=22',
   'dumul-js/obs/texts.js?v=1',
-  'dumul-js/obs/js/01-core.js?v=98',
+  'dumul-js/obs/js/01-core.js?v=99',
   'dumul-js/obs/js/02-sky-logic.js?v=99',
-  'dumul-js/obs/js/03-gargantua.js?v=98',
-  'dumul-js/obs/js/04-render.js?v=99',
+  'dumul-js/obs/js/03-gargantua.js?v=99',
+  'dumul-js/obs/js/04-render.js?v=100',
   'dumul-js/obs/js/05-sector-ui.js?v=98',
   'dumul-js/obs/js/06-interaction.js?v=98',
   'dumul-js/obs/js/07-boot.js?v=98',
