@@ -857,7 +857,7 @@ function drawShooting(now){
   if(!idleMode&&(now-lastActivity)>IDLE_MS)idleMode=true;
   if(idleMode)return; /* Energy saver: no new shooting stars while idle */
   /* Shooting stars stay alive during star SFX and constellation alignment too
-     (they used to be gated by secondaryFxScale, which only heavier FX like asteroids should obey). */
+     (they used to be gated by secondaryFxScale). */
   if(now>nextSS&&!SW){
     /* BGM on: jarak acak tapi lebih sering; jumlah meteor aktif dibatasi (lebih ketat di HP kecil). */
     var ofxOn=OFX.p>.35,ofxCap=W<500?2:4;
@@ -963,9 +963,7 @@ function drawAsteroids(now){
   AST_K+=(astOrbitTarget()-AST_K)*.12;if(Math.abs(astOrbitTarget()-AST_K)<.001)AST_K=astOrbitTarget(); /* orbit melebar/menyempit halus */
   if(BHU.ast<.5)return;
   var bv=BHU_CTX?clamp(BHSC/.2):clamp((BHSC-.6)/.4);if(bv<=.02)return;
-  var fxDim=(typeof secondaryFxScale==='function')?secondaryFxScale():0;
-  if(fxDim>0.9)return;
-  var alphaMul=(fxDim>0.35?(1-fxDim*.85):1)*bv;
+  var alphaMul=bv; /* asteroid tetap tampil penuh saat SFX bintang aktif (nggak lagi memudar) */
   var sprites=ensureAsteroidSprites();
   var invR=1/AST_SPRITE_R;
   for(var i=0;i<AST.length;i++){

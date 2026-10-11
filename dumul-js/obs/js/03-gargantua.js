@@ -195,7 +195,7 @@ function bhBloomSprite(){
    Dibuat dalam frame cakram (sudah diputar BH.ang). Re-bake hanya kalau BH.R / DPR berubah. */
 var BH_FIB=null;
 function bhFiberSprite(){
-  var R=BH.R,d=DPR||1,key=Math.round(R*d*10);
+  var R=BH.R,d=DPR||1,key=Math.round(R*d*10)+'|'+BH_LENS_DY+'|'+BH_DISK_DY;
   if(BH_FIB&&BH_FIB.key===key)return BH_FIB;
   if(!(R>2))return BH_FIB;
   var w=R*13,h=R*8,c=document.createElement('canvas');
@@ -234,7 +234,7 @@ function bhFiberSprite(){
         var t0=s/segs,t1=(s+1)/segs,tm=(t0+t1)/2,env=Math.pow(Math.sin(Math.PI*tm),.8);
         x.strokeStyle='rgba('+cr+','+cg+','+cbl+','+(a*env)+')';
         x.beginPath();
-        x.ellipse(0,dir*R*cy,r,r*ry,0,dir*(ca+(cb-ca)*t0),dir*(ca+(cb-ca)*t1),dir<0);
+        x.ellipse(0,dir*R*cy+R*(BH_LENS_DY-BH_DISK_DY),r,r*ry,0,dir*(ca+(cb-ca)*t0),dir*(ca+(cb-ca)*t1),dir<0);
         x.stroke();
       }
     }
@@ -277,6 +277,12 @@ function drawHoleSafe(now,age){
     drawHoleFallback(now,age);
   }
 }
+/* Dua offset terpisah (satuan R, di frame cakram yang diputar, positif = turun):
+   BH_DISK_DY = pusat bidang cakram CSS relatif ke pusat horizon (diukur dari render: +0.157R). Dipakai SEMUA yang hidup di bidang cakram:
+     serat cakram, kilau plasma, highlight saat drag, dan partikel/riak cakram di 01-core.js. Jangan diubah kecuali band CSS-nya berubah.
+   BH_LENS_DY = posisi busur secondary lens (lengkung lensa atas+bawah) relatif ke posisi aslinya. Ini yang di-tuning (.22-.24).
+   Keduanya terpisah supaya menurunkan lensa nggak ikut menurunkan serat cakram. */
+var BH_DISK_DY=.20,BH_LENS_DY=0;
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
   BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*bhSizeMul();
@@ -311,7 +317,8 @@ function drawHole(now,age){
       var fa=Math.min(1,(.8+.2*BH.h+.4*e+.12*gk)*Math.min(1,.5+.5*BHU.bloom))*(1+.1*(reduce||IS_POTATO?0:Math.sin(now*.0007*BHU.speed+1.3)));
       var fw=fb.w*fk*(1+.012*fsh),fh=fb.h*fk;
       g.save();g.rotate(BH.ang);g.globalCompositeOperation='lighter';g.globalAlpha=Math.min(1,fa);
-      g.drawImage(fb.c,-fw/2,-fh/2,fw,fh);
+      /* Overlay serat (haze + serat horizontal) ikut pusat cakram CSS: BH_DISK_DY. Busur lensa di dalam sprite punya offset sendiri (BH_LENS_DY). */
+      g.drawImage(fb.c,-fw/2,-fh/2+R*BH_DISK_DY,fw,fh);
       g.restore();
     }
   }
@@ -361,7 +368,7 @@ function drawHole(now,age){
        drag wobble here, or they separate from the sprite disk. */
     var diskAng=BH.ang; /* bidang cakram sprite (-.48 visual lama, -23.5deg visual CSS) */
     var sp=.00024*(1+.55*BH.h+1.8*e);
-    g.save();g.rotate(diskAng);
+    g.save();g.rotate(diskAng);if(bhFull)g.translate(0,R*BH_DISK_DY);
     if(gk>.01){
       /* Collapsars: cakram akresi berdenyut pelan (hangat), lebih terang dari biasanya. */
       var gp=.5+.5*Math.sin(now*.0013*BHU.speed);
@@ -439,6 +446,7 @@ function drawHole(now,age){
     g.save();
     g.translate(bp[0],bp[1]);
     g.rotate(BH.ang+upAng()); /* landscape: ikut tegak bareng BH */
+    if(bhFull)g.translate(0,R*BH_DISK_DY); /* highlight drag nempel ke pusat cakram, bukan pusat horizon */
     g.strokeStyle='rgba(255,200,140,'+(.10+.08*wobS2)+')';
     g.lineWidth=Math.max(.7,R*.02);
     g.beginPath();g.ellipse(0,0,R*4.3*bhCS,R*.09,0,0,6.283);g.stroke();

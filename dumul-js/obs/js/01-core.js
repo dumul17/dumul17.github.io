@@ -1298,25 +1298,7 @@ function updateAudioViz(now){
     }
   }catch(e){AV.fallback=true;AV.ready=false;}
 }
-/* Dense, audio-reactive ripple rings around Gargantua, built for phones:
-   - the expensive part (reading the spectrum, walking the circle) runs ONCE
-     into a small shared point profile, reused by every ring that needs it.
-   - most of the "density" comes from cheap plain g.arc() rings (a single
-     native path op each) whose radius/alpha simply ride the smoothed level
-     and beat values already computed in updateAudioViz - no per-vertex work.
-   - the shared profile itself is only recomputed every other frame (synced
-     to AV.skip, the same cadence the analyser already samples at); audio
-     motion is far slower than 60fps so this is invisible but roughly halves
-     the per-vertex cost. */
-/* ---------- radial spectrum visualizer ----------
-   Lightweight circular bars inspired by the reference image.
-   Performance rules:
-   - one cached direction table (sin/cos only rebuilt when bar count changes)
-   - one shared spectrum profile sampled every analyser tick
-   - one Canvas stroke for ALL bars
-   - one fixed colour: less compositing/colour work and a calmer look
-   - adaptive bar count follows viewport size, with a lower cap on potato devices
-*/
+/* Visualizer Gargantua = asteroid + debu kosmik (lihat blok "Visualizer" di bawah). AVP dipertahankan cuma karena AV.skip/stamp masih dirujuk di atas. */
 var AVP={pts:null,N:0,stamp:-1,baseR:0,fullPts:null,fullN:0};
 /* Adaptive star colour: only one RGB string is used by the whole visualizer.
    The target is changed once when the active star changes; the tiny RGB
@@ -1350,208 +1332,329 @@ function updateAVColor(now){
   AV_COLOR=''+(AV_COLOR_RGB[0]|0)+','+(AV_COLOR_RGB[1]|0)+','+(AV_COLOR_RGB[2]|0);
 }
 
-var AV_RHINT=0;
-function avBarCount(){
-  if(AV_DOTS&&AV_RHINT>0){
-    /* Jarak antar kolom titik ~4.8px di tepi lubang hitam -> kerapatan sama di portrait, landscape, dan zoom cam. */
-    var nd=Math.round(6.28318*AV_RHINT*1.06/4.8/12)*12;
-    return Math.max(60,Math.min(IS_POTATO?72:132,nd));
-  }
-  var w=W||innerWidth||360;
-  var n=Math.round(w/9);
-  n=Math.max(48,Math.min(96,n));
-  if(IS_POTATO)n=Math.min(n,52);
-  return n;
-}
-
-function ensureAVProfile(){
-  var N=avBarCount();
-  if(AVP.N===N&&AVP.pts)return N;
-  AVP.N=N;
-  AVP.pts=new Float32Array(N*3);
-  AVP.raw=new Float32Array(N);AVP.sm=new Float32Array(N);
-  for(var j=0;j<N;j++){
-    var ang=(j/N)*6.28318530718-Math.PI*.5;
-    AVP.pts[j*3]=Math.cos(ang);
-    AVP.pts[j*3+1]=Math.sin(ang);
-  }
-  /* Fake bars: one extra bar interleaved between every pair of real bars
-     (same count as the real ones, so the ring is twice as dense). Each
-     fake bar borrows its length from the real bar right before it, so
-     it never needs its own spectrum sample. */
-  var FN=N*2;
-  AVP.fullPts=new Float32Array(FN*2);
-  for(var k=0;k<FN;k++){
-    var fang=(k/FN)*6.28318530718-Math.PI*.5;
-    AVP.fullPts[k*2]=Math.cos(fang);
-    AVP.fullPts[k*2+1]=Math.sin(fang);
-  }
-  AVP.fullN=FN;
-  AVP.stamp=-1;
-  return N;
-}
-
-function buildAVProfile(){
-  var N=ensureAVProfile(),pts=AVP.pts;
-  var data=AV.data,n=data?data.length:0;
-  var b=AV.bass,m=AV.mid,h=AV.high;
-  var lim=Math.min(120,n-1);
-  if(AV_DOTS){
-    if(!AVP.bmax)AVP.bmax=new Float32Array(130).fill(.3);
-    var nowT=performance.now(),dtp=Math.min(.1,(nowT-(AVP.t||nowT))/1000);AVP.t=nowT;
-    AVP.rot=((AVP.rot||0)+dtp*.022+AV.beat*dtp*.10)%1;
-    var lim2=Math.min(96,n-1),bm=AVP.bmax,bi2;
-    if(n&&lim2>1){
-      /* Whitening: tiap bin dinormalisasi ke puncaknya sendiri (turun pelan), jadi treble
-         juga bisa menjulang, bukan cuma bass di bawah. */
-      for(bi2=1;bi2<=lim2;bi2++){
-        var vv=data[bi2]/255,mm=bm[bi2]*.996;
-        if(vv>mm)mm=vv;if(mm<.22)mm=.22;bm[bi2]=mm;
-      }
-    }
-    for(var jd=0;jd<N;jd++){
-      var ud=(jd/N+AVP.rot)%1,qd=Math.abs(ud-.5)*2,fvd;
-      if(n&&lim2>1){
-        var bd=1+((Math.pow(qd,1.2)*(lim2-1))|0);
-        var vd=data[bd]/255;
-        fvd=vd/bm[bd]*.8+vd*.3;
-      }else fvd=.45*b+.35*m+.20*h;
-      AVP.raw[jd]=Math.max(.025,Math.min(1,fvd));
-    }
-  }
-  for(var j=0;AV_DOTS?false:j<N;j++){
-    /* Mirror the spectrum around the circle. Low frequencies sit near the
-       vertical axis and highs spread toward the sides, like a classic radial
-       spectrum while remaining cheap to sample. */
-    var u=j/(N-1),q=Math.abs(u-.5)*2;
-    var bi=1+Math.min(Math.max(1,lim),((q*q*Math.max(1,lim-1))|0));
-    var fv;
-    if(n&&lim>1)fv=data[bi]/255;
-    else fv=.45*b+.35*m+.20*h;
-
-    /* A tiny floor keeps quiet music visible without creating fake spikes. */
-    fv=Math.max(.025,Math.min(1,fv));
-    AVP.raw[j]=fv;
-  }
-  /* Calm the ring: 3-tap spatial blend (neighbouring FFT bins are noisy) then fast-attack /
-     slow-release per bar, so spikes ride the music instead of jittering all over the circle. */
-  var raw=AVP.raw,sm=AVP.sm;
-  for(var j2=0;j2<N;j2++){
-    var a0=raw[(j2+N-1)%N],a1=raw[j2],a2=raw[(j2+1)%N];
-    var tgt=AV_DOTS?(a0*.12+a1*.76+a2*.12):(a0*.25+a1*.5+a2*.25);
-    sm[j2]+=(tgt-sm[j2])*(tgt>sm[j2]?.6:.22);
-    pts[j2*3+2]=sm[j2];
-  }
-  AVP.stamp=AV.skip;
-}
-
-/* Bentuk visualizer: titik-titik radial (dotted) dengan bagian dalam lebih transparan.
-   Set localStorage.dumul_av_shape='bars' buat balik ke bar garis lama. */
-var AV_DOTS=(function(){var o=null;try{o=localStorage.getItem('dumul_av_shape');}catch(e){}return o!=='bars';})();
 /* Toggle spectrum Gargantua (panel music). Disimpan di localStorage.dumul_av_on ('0' = mati). */
 var AV_ON=(function(){var o=null;try{o=localStorage.getItem('dumul_av_on');}catch(e){}return o!=='0';})();
-function drawAudioVisualizer(now,R){
-  if(!AV_ON)return;
-  if(!AV_DOTS)return drawAudioVisualizerBars(now,R);
-  updateAVColor(now);
-  if(reduce||!activeSfx||activeSfx.paused||activeSfx.ended)return;
-  try{
-    if(!R||R<1)return;
-    AV_RHINT=R;
-    if(AVP.stamp!==AV.skip||!AVP.pts||AV.fallback||AVP.N!==avBarCount())buildAVProfile();
-    var pts=AVP.pts,N=AVP.N;
-    var lv=AV.level,beat=AV.beat;
-    var inner=R*1.06;
-    var ampBase=R*(.035+.04*lv)*.5;
-    var ampSpec=R*(.34+.46*lv+.30*beat)*.5;
-    var lw=Math.max(IS_POTATO?1.3:1.5,Math.min(2.6,R*.011));
-    var gap=lw*2.5;
-    var boost=Math.min(1,.78+.18*lv+.22*beat);
-    /* 3 lapis per bar: dalam (transparan), tengah, ujung (terang & lebih tipis).
-       Masing-masing satu path = satu stroke. */
-    var pA=new Path2D(),pB=new Path2D(),pC=new Path2D();
-    for(var j=0;j<N;j++){
-      var fv=pts[j*3+2];
-      fv=Math.min(1.3,Math.pow(fv,1.6)*1.15*(1+.45*beat));   /* kontras tinggi: puncak jadi duri, beat cuma nambah tinggi duri */
-      var rr=inner+ampBase+fv*ampSpec;
-      if(fv>.7)rr+=(fv-.7)*ampSpec*1.3;          /* duri tipis di puncak */
-      var cx=pts[j*3],cy=pts[j*3+1];
-      var len=rr-inner;
-      if(len<lw)continue;
-      var s1=inner+len*.34,s2=inner+len*.68;
-      pA.moveTo(cx*inner,cy*inner);pA.lineTo(cx*s1,cy*s1);
-      pB.moveTo(cx*s1,cy*s1);pB.lineTo(cx*s2,cy*s2);
-      pC.moveTo(cx*s2,cy*s2);pC.lineTo(cx*rr,cy*rr);
-    }
-    g.save();
-    g.globalCompositeOperation='lighter';
-    g.lineCap=IS_POTATO?'butt':'round';
-    if(!IS_POTATO)g.setLineDash([.01,gap]);else g.setLineDash([lw*1.2,gap*.8]);
-    g.lineWidth=lw;
-    g.strokeStyle='rgba('+AV_COLOR+','+(.26*boost)+')';g.stroke(pA);
-    g.strokeStyle='rgba('+AV_COLOR+','+(.62*boost)+')';g.stroke(pB);
-    g.lineWidth=lw*.85;
-    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.95,.98*boost)+')';g.stroke(pC);
-    g.restore();
-  }catch(err){}
+var AV_DOTS=true,AV_RHINT=0; /* sisa flag lama, dibiarkan supaya file lain yang masih nyebut nggak error */
+
+/* ---------- Visualizer: debu kosmik yang terlempar dari tepi lubang hitam ----------
+   Sinkron ke musik lewat ONSET per pita spektrum, bukan peluang acak:
+   - Spektrum dipecah jadi pita (AVB), dipetakan ke SUDUT lingkaran (cermin kiri-kanan, bass di atas/bawah,
+     treble ke samping, berputar pelan seperti visualizer lama).
+   - Tiap kali sebuah pita MELONJAK (onset: naik tajam + cukup keras), debu langsung ditembakkan dari sudut pita itu.
+     Kick, snare, hi-hat jadi semburan di sudut yang beda-beda, tepat di momen bunyinya.
+   - Beat (AV.lastBeatT) menambah semburan di sudut-sudut terkeras. SPIKE (beat sangat kuat) = lebih banyak + terbang lebih jauh.
+   - Debu "ngegas" lalu cepat melambat (drag kuat) dan hidupnya singkat, jadi gerakannya terbaca sebagai hentakan
+     yang pas dengan bunyi, bukan melayang telat di belakang musik.
+   Warna diseragamkan (AV_UNI), nggak ikut warna bintang SFX.
+   Ringan: pool typed array tetap (72 / 28 di potato), tanpa Path2D baru per frame, tanpa sprite/drawImage,
+   digambar batch: 3 tahap fade x (halo + inti) = maksimal 6 fill per frame. Nggak ada loop spawn acak tiap frame. */
+var AV_UNI='204,188,150'; /* abu-abu keemasan */
+/* Ambang SPIKE: nilai AV.beat saat beat terdeteksi (beat biasa ~.92, makin tajam transiennya makin naik sampai ~1.14).
+   Naikkan kalau terlalu sering, turunkan kalau jarang. Mode fallback (tanpa analyser) pakai ambang .85. */
+var SPIKE_T=1.0;
+var AVB={n:0,v:null,tg:null,d:null,cd:null,bm:null,stamp:-1,t:-1};
+function avbInit(){
+  var n=IS_POTATO?16:24;
+  if(AVB.n===n)return;
+  AVB.n=n;AVB.v=new Float32Array(n);AVB.tg=new Float32Array(n);AVB.d=new Float32Array(n);AVB.cd=new Float32Array(n);AVB.stamp=-1;
+  if(!AVB.bm)AVB.bm=new Float32Array(130).fill(.3);
 }
-function drawAudioVisualizerBars(now,R){
+/* Idempotent per frame. AVB.v = energi pita (0..1, attack cepat), AVB.d = kenaikan v di frame ini (buat deteksi onset). */
+function avbUpdate(now){
+  if(AVB.t===now)return;AVB.t=now;
+  avbInit();
+  var n=AVB.n,v=AVB.v,tg=AVB.tg,d=AVB.d,k,i;
+  var playing=!!(AV_ON&&!reduce&&activeSfx&&!activeSfx.paused&&!activeSfx.ended);
+  if(!playing){
+    for(k=0;k<n;k++)tg[k]=0;
+  }else if(AV.fallback||!AV.ready||!AV.data){
+    /* Tanpa analyser (potato / WebView): pita sintetis dari bass/mid/high + beat */
+    var tt=activeSfx.currentTime||0,bb=AV.bass,mm2=AV.mid,hh=AV.high;
+    for(k=0;k<n;k++){
+      var base=k<n/3?bb:(k<n*2/3?mm2:hh);
+      var sv=base*(.55+.7*(.5+.5*Math.sin(tt*(5+k*.37)+k*1.7)))+.25*AV.beat;
+      tg[k]=sv>1?1:(sv<0?0:sv);
+    }
+  }else if(AVB.stamp!==AV.skip){
+    AVB.stamp=AV.skip;
+    var data=AV.data,lim=Math.min(96,data.length-1),bm=AVB.bm;
+    /* Whitening: tiap bin dinormalisasi ke puncaknya sendiri (turun pelan), supaya treble juga menjulang. */
+    for(i=1;i<=lim;i++){var vv=data[i]/255,mx=bm[i]*.996;if(vv>mx)mx=vv;if(mx<.22)mx=.22;bm[i]=mx;}
+    for(k=0;k<n;k++){
+      var i0=1+((Math.pow(k/n,1.3)*(lim-1))|0),i1=1+((Math.pow((k+1)/n,1.3)*(lim-1))|0),pk=0;
+      if(i1<i0)i1=i0;
+      for(i=i0;i<=i1&&i<=lim;i++){var dv=data[i]/255,w=dv/bm[i]*.8+dv*.3;if(w>pk)pk=w;}
+      tg[k]=pk>1?1:pk;
+    }
+  }
+  /* Attack cepat, release lebih lambat: nempel ke musik tapi nggak kedip. */
+  for(k=0;k<n;k++){
+    var dd=tg[k]-v[k],nv=v[k]+dd*(dd>0?.6:.22);
+    if(nv<.004)nv=0;
+    d[k]=nv-v[k];v[k]=nv;
+  }
+}
+
+var VP={n:0,MAX:0,x:null,y:null,vx:null,vy:null,age:null,life:null,sz:null,kind:null,
+  bc:null,bh:null,cnt:null,prevBeat:0,lastSpawn:0,lastBT:0,t:0,rot0:0};
+function vpInit(){
+  var M=IS_POTATO?28:72;
+  if(VP.MAX===M)return;
+  VP.MAX=M;VP.n=0;
+  VP.x=new Float32Array(M);VP.y=new Float32Array(M);VP.vx=new Float32Array(M);VP.vy=new Float32Array(M);
+  VP.age=new Float32Array(M);VP.life=new Float32Array(M);VP.sz=new Float32Array(M);VP.kind=new Uint8Array(M);
+  /* Buffer per tahap fade (x,y,r): inti dan halo. Dipakai ulang tiap frame, nggak ada alokasi. */
+  VP.bc=[new Float32Array(M*3),new Float32Array(M*3),new Float32Array(M*3)];
+  VP.bh=[new Float32Array(M*3),new Float32Array(M*3),new Float32Array(M*3)];
+  VP.cnt=new Int32Array(6);
+}
+/* Pita spektrum di sudut th (radian). Pemetaan sama seperti visualizer lama: cermin + putar pelan. */
+function avAng(th){
+  var u=th/6.2831853+VP.rot0;u-=Math.floor(u);
+  var q=Math.abs(u-.5)*2,k=(Math.pow(q,1.2)*AVB.n)|0;
+  if(k>=AVB.n)k=AVB.n-1;
+  return AVB.v[k];
+}
+/* Kebalikan avAng: sudut tengah untuk pita k (s = -1 / +1 pilih sisi kiri atau kanan). */
+function avBandAng(k,s){
+  var q=Math.pow((k+.5)/AVB.n,1/1.2),u=.5+s*q*.5;
+  return (u-VP.rot0)*6.2831853;
+}
+/* R = radius tepi Gargantua (px), power 0..1+ = kekuatan, a = sudut, far>1 = lemparan spike. Posisi relatif ke pusat lubang hitam. */
+function vpSpawn(R,power,a,far){
+  if(VP.n>=VP.MAX)return;
+  far=far||1;
+  var i=VP.n++,ca=Math.cos(a),sa=Math.sin(a);
+  var us=Math.max(.7,Math.min(1.5,R/90));                 /* skala ukuran ikut ukuran lubang hitam */
+  /* Kecepatan awal tinggi + drag kuat (lihat dr di draw) = hentakan cepat lalu berhenti; jarak tempuh tetap ~R */
+  var sp=R*(1.0+Math.random()*1.9)*(.65+.7*power)*far;
+  VP.sz[i]=(.55+Math.random()*.9)*us;
+  VP.life[i]=(.5+Math.random()*.65)*(far>1?1.3:1);
+  VP.kind[i]=(!IS_POTATO&&Math.random()<.5)?1:0;         /* 1 = debu glow, 0 = debu polos */
+  var r0=R*(1.04+Math.random()*.05),tg=(Math.random()-.5)*.5*sp; /* sedikit komponen tangensial = kesan berputar */
+  VP.x[i]=ca*r0;VP.y[i]=sa*r0;
+  VP.vx[i]=ca*sp-sa*tg;VP.vy[i]=sa*sp+ca*tg;
+  VP.age[i]=0;
+}
+function vpKill(i){
+  var l=--VP.n;
+  if(i===l)return;
+  VP.x[i]=VP.x[l];VP.y[i]=VP.y[l];VP.vx[i]=VP.vx[l];VP.vy[i]=VP.vy[l];
+  VP.age[i]=VP.age[l];VP.life[i]=VP.life[l];VP.sz[i]=VP.sz[l];VP.kind[i]=VP.kind[l];
+}
+/* ---------- Cakram hidup (DK) ----------
+   Cakram akresi Gargantua yang bereaksi ke musik. Dua populasi partikel dalam frame cakram (diputar BH.ang):
+   - piringan: elips pipih (ey .115) r 1.28R..2.75R, orbit Keplerian (dalam = cepat)
+   - cincin lensa: hampir lingkaran (ey .86) r 1.25R..1.6R, "debu" yang melengkung di sekitar horizon
+   SINKRON (penting buat mathrock/polyrhythm): tiap partikel terikat ke SATU pita spektrum lewat posisi radialnya
+   (bass = dalam, treble = luar; cincin = treble), jadi pita yang beda ritme menyala sendiri-sendiri di radius yang beda.
+   Per pita ada flash onset (attack instan, decay cepat) + energi langsung AVB.v. Tidak ada peluang acak yang bisa telat.
+   Beat global / kick kuat = riak yang melebar sepanjang cakram; SPIKE = riak lebih terang + gema melingkar.
+   Ringan: pool typed array tetap, partikel di-batch per 4 tingkat kecerahan (4 fill), halo = 1 sprite glow di-bake sekali,
+   dibatasi 28 drawImage per frame. Tanpa shadowBlur / filter / gradient per frame. Hanya jalan saat SFX main; fade in/out. */
+var DK={N:0,nd:0,ph:null,rr:null,ey:null,w:null,bd:null,sz:null,tw:null,fa:null,
+  fl:null,cf:null,mn:null,bk:null,bn:null,hs:null,pr:0,mx:0,t:0,kick:0,lastRip:0,rip:[],sC:null,sD:null,HC:28};
+/* Mode idle: cakram + debu muter tetap nyala pelan (denyut halus, tanpa sinkron musik) saat nggak ada SFX. Matikan: DK_IDLE=false.
+   Otomatis mati di potato, saat idle saver 60 dtk aktif, dan saat swallow. DK_IDLE_PR = kecerahan idle (0..1). */
+var DK_IDLE=true,DK_IDLE_PR=.55;
+/* Riak saat idle: jeda antar riak (ms) dan kekuatannya (0..1). Naikin DK_IDLE_RIP_A kalau kurang kelihatan, naikin DK_IDLE_RIP_MS kalau kerapetan. */
+var DK_IDLE_RIP_MS=2600,DK_IDLE_RIP_A=.55;
+var DK_DC=['150,86,64','222,140,104','246,190,150','255,238,222'],DK_DA=[.50,.68,.85,1];
+function dkSprite(rgb){
+  var c=document.createElement('canvas');c.width=c.height=48;
+  var x=c.getContext('2d'),gr=x.createRadialGradient(24,24,0,24,24,24);
+  gr.addColorStop(0,'rgba('+rgb+',1)');gr.addColorStop(.18,'rgba('+rgb+',.55)');
+  gr.addColorStop(.5,'rgba('+rgb+',.14)');gr.addColorStop(1,'rgba('+rgb+',0)');
+  x.fillStyle=gr;x.fillRect(0,0,48,48);return c;
+}
+function dkInit(){
+  var nd=IS_POTATO?36:110,nr=IS_POTATO?0:40,N=nd+nr,nb=AVB.n,i;
+  if(DK.N===N&&DK.fl&&DK.fl.length===nb)return;
+  DK.N=N;DK.nd=nd;DK.HC=IS_POTATO?0:28;
+  DK.ph=new Float32Array(N);DK.rr=new Float32Array(N);DK.ey=new Float32Array(N);DK.w=new Float32Array(N);
+  DK.sz=new Float32Array(N);DK.tw=new Float32Array(N);DK.fa=new Float32Array(N);DK.bd=new Uint8Array(N);
+  DK.fl=new Float32Array(nb);DK.cf=new Float64Array(nb);DK.mn=new Float32Array(nb);
+  DK.bk=[new Float32Array(N*3),new Float32Array(N*3),new Float32Array(N*3),new Float32Array(N*3)];
+  DK.bn=new Int32Array(4);DK.hs=new Float32Array(Math.max(4,DK.HC*4));
+  for(i=0;i<N;i++){
+    var ring=i>=nd,u=Math.random(),rn;
+    if(ring){DK.rr[i]=1.25+u*.35;DK.ey[i]=.86;rn=.2;DK.bd[i]=Math.min(nb-1,(nb*.55+Math.random()*nb*.45)|0);}
+    else{rn=Math.pow(u,.8);DK.rr[i]=1.28+rn*1.47;DK.ey[i]=.115;DK.bd[i]=Math.min(nb-1,(rn*nb)|0);}
+    DK.ph[i]=Math.random()*6.2831853;
+    DK.w[i]=(ring?1.7:1.65)*Math.pow(1.3/DK.rr[i],1.5);   /* rad/s, Keplerian */
+    DK.sz[i]=.55+Math.random()*.95;DK.tw[i]=Math.random()*6.2831853;
+    DK.fa[i]=1-.4*rn;                                     /* tepi luar sedikit lebih redup */
+  }
+}
+/* Dipanggil tiap frame dari 03-gargantua dengan kanvas sudah di-translate ke pusat lubang hitam. */
+function drawAudioVisualizer(now,R){
+  if(reduce){VP.n=0;DK.pr=0;return;}   /* AV_ON (toggle panel musik) cuma mematikan REAKSI musik; cakram idle tetap jalan */
   updateAVColor(now);
-  if(reduce||!activeSfx||activeSfx.paused||activeSfx.ended)return;
+  if(!R||R<1)return;
   try{
-    if(!R||R<1)return;
-    if(AVP.stamp!==AV.skip||!AVP.pts||AV.fallback)buildAVProfile();
+    var playing=!!(AV_ON&&activeSfx&&!activeSfx.paused&&!activeSfx.ended);
+    var idleOn=DK_IDLE&&!IS_POTATO&&!(typeof idleMode!=='undefined'&&idleMode)&&!(typeof SW!=='undefined'&&SW);
+    if(!playing&&!idleOn&&!VP.n&&DK.pr<.012){DK.pr=0;DK.mx=0;VP.prevBeat=0;return;}   /* idle dimatikan: nol biaya */
+    vpInit();avbUpdate(now);dkInit();
+    var dt=VP.t?(now-VP.t)/1000:.016;VP.t=now;
+    if(dt<0||dt>.25){VP.n=0;DK.pr=0;DK.mx=0;DK.rip.length=0;dt=.016;}   /* jeda lama (tab hidden): buang sisa partikel */
+    if(dt>.05)dt=.05;
+    /* Panel tuning BH (slider Bloom & Speed -> BHU.bloom / BHU.speed): bloom = kuat glow halo/pemanasan/riak, speed = kecepatan putar + denyut idle.
+       Sinkron ke musik (flash onset, riak) sengaja TIDAK ikut speed supaya ketukan tetap pas. */
+    var bl=(typeof BHU!=='undefined'&&typeof BHU.bloom==='number')?BHU.bloom:1,spd=(typeof BHU!=='undefined'&&typeof BHU.speed==='number')?BHU.speed:1;
+    var beat=playing?AV.beat:0,lv=playing?AV.level:0,i,k,b;
+    var n=AVB.n,v=AVB.v,d=AVB.d,cd=AVB.cd,fl=DK.fl,cf=DK.cf,mn=DK.mn;
+    var onT=AV.fallback?.10:.14,cap=IS_POTATO?2:5,kickLow=false;
+    /* flash per pita meluruh: bass pelan (~200ms), treble cepat (~100ms) supaya hi-hat rapat tetap terbaca */
+    for(k=0;k<n;k++){fl[k]*=Math.exp(-dt*(5+5*k/n));if(fl[k]<.01)fl[k]=0;}
+    if(playing){
+      VP.rot0=(VP.rot0+dt*(.022+beat*.10))%1;
+      /* 1) Onset per pita (relatif ke rata-rata pitanya sendiri => tetap peka di bagian padat/keras):
+            flash cakram SEKETIKA, dan (kalau jatah ada) debu ditembakkan dari sudut pita itu */
+      for(k=0;k<n;k++){
+        if(!(d[k]>onT&&v[k]>.28&&v[k]>mn[k]+.06))continue;
+        if(now-cf[k]<(IS_POTATO?90:48))continue;
+        cf[k]=now;
+        var fv=v[k]+.35;if(fv>1.25)fv=1.25;if(fv>fl[k])fl[k]=fv;
+        if(k<n*.3&&v[k]>.7)kickLow=true;
+        if(cap>0&&now-cd[k]>(AV_FAST?85:110)){
+          cd[k]=now;cap--;
+          var side=Math.random()<.5?-1:1,jit=(Math.random()-.5)*6.2831853/n*1.6,pc=IS_POTATO?1:(v[k]>.7?3:2),j;
+          for(j=0;j<pc;j++)vpSpawn(R,v[k],avBandAng(k,side)+jit+(Math.random()-.5)*.18,1);
+        }
+      }
+      /* 2) Beat global (analyser: lastBeatT berubah; fallback: tepi naik). Semburan debu di sudut terkeras. SPIKE = lebih banyak + lebih jauh + riak terang. */
+      var nbt=AV.fallback?(beat>.62&&VP.prevBeat<=.62&&now-VP.lastSpawn>110):(AV.lastBeatT>0&&AV.lastBeatT!==VP.lastBT&&beat>.5);
+      VP.lastBT=AV.lastBeatT;
+      var spike=beat>=(AV.fallback?.85:SPIKE_T);
+      if(nbt){
+        VP.lastSpawn=now;
+        var far=spike?1.8:1;
+        var nbn=(IS_POTATO?2:3)+((beat*(IS_POTATO?2:4)+lv*2)|0)+(spike?(IS_POTATO?2:5):0);
+        for(i=0;i<nbn;i++){
+          var ba=Math.random()*6.2831853,be=avAng(ba),t2,a2,e2;
+          for(t2=0;t2<2;t2++){a2=Math.random()*6.2831853;e2=avAng(a2);if(e2>be){be=e2;ba=a2;}}
+          vpSpawn(R,Math.max(beat*.7,be),ba,far);
+        }
+      }
+      /* 3) Riak di cakram: beat global ATAU kick kuat di pita bass (cadangan kalau detektor global kelewat di ritme padat) */
+      if((nbt||kickLow)&&now-DK.lastRip>150){
+        DK.lastRip=now;DK.kick=Math.min(2.2,DK.kick+(nbt?.5:.3)+(spike?.9:0));
+        if(DK.rip.length>=(IS_POTATO?1:3))DK.rip.shift();
+        DK.rip.push({t:now,a:spike?1:(nbt?.6:.4),s:spike?1:0});
+      }
+    }
+    VP.prevBeat=beat;
+    for(k=0;k<n;k++)mn[k]+=(v[k]-mn[k])*Math.min(1,dt*3.2);   /* rata-rata lambat per pita, dipakai deteksi onset frame berikutnya */
 
-    var pts=AVP.pts,fullPts=AVP.fullPts,FN=AVP.fullN;
-    var lv=AV.level,beat=AV.beat;
-    var inner=R*1.045;
+    /* ---- cakram hidup ---- */
+    DK.pr+=((playing?1:(idleOn?DK_IDLE_PR:0))-DK.pr)*Math.min(1,dt*(playing?5:3));
+    /* Riak IDLE: tanpa musik, riak lembut melebar di cakram tiap ~DK_IDLE_RIP_MS (ikut slider Speed). Nggak ngaruh ke DK.kick. */
+    if(!playing&&idleOn&&DK.pr>.2&&spd>.05&&now-DK.lastRip>DK_IDLE_RIP_MS/spd){
+      DK.lastRip=now;
+      if(DK.rip.length>=2)DK.rip.shift();
+      DK.rip.push({t:now,a:DK_IDLE_RIP_A,s:0});
+    }
+    DK.mx+=((playing?1:0)-DK.mx)*Math.min(1,dt*4);var idl=1-DK.mx;   /* 1 = idle murni, 0 = musik penuh */
+    var pr=DK.pr;
+    if(pr<.012)pr=DK.pr=0;
+    if(pr>0){
+      DK.kick*=Math.exp(-dt*5.5);
+      var bs=playing?(AV.bass>1?1:AV.bass):0,bt=beat>1?1:beat,heat=bt+idl*.3*(.5+.5*Math.sin(DK.t*1.4-1));
+      DK.t+=dt*spd;
+      var spin=(1+1.1*lv+DK.kick)*spd,eyM=1+.65*bs+.5*bt;     /* bass menebalkan cakram, kick = hentakan putar sesaat */
+      var us=Math.max(.7,Math.min(1.5,R/90)),R2=R*R*1.04,ddy=(typeof BH_CSS!=='undefined'&&BH_CSS.spr&&BH.sprite===BH_CSS.spr&&typeof BH_DISK_DY==='number')?R*BH_DISK_DY:0,ta=DK.t,bn=DK.bn,bk=DK.bk,hs=DK.hs,hc=0,HC=DK.HC;
+      bn[0]=bn[1]=bn[2]=bn[3]=0;
+      for(i=0;i<DK.N;i++){
+        var ph=DK.ph[i]+DK.w[i]*spin*dt;if(ph>6.2831853)ph-=6.2831853;DK.ph[i]=ph;
+        var s=Math.sin(ph),rr=DK.rr[i]*R,ey=DK.ey[i];if(ey<.5)ey*=eyM;
+        var x=Math.cos(ph)*rr,y=s*rr*ey;
+        if(s<0&&x*x+(y+ddy)*(y+ddy)<R2)continue;                    /* sisi belakang cakram tertutup horizon */
+        b=DK.bd[i];
+        var I=(.16+.78*v[b]+.9*fl[b]+.09*Math.sin(ta*3+DK.tw[i])+idl*(.22+.26*(.5+.5*Math.sin(ta*1.4-b*.5))))*DK.fa[i]*(1+.2*s);   /* idl*(...) = denyut gelombang pelan ke luar saat idle */
+        if(I>1.4)I=1.4;
+        var q=I<.3?0:(I<.55?1:(I<.8?2:3)),r=DK.sz[i]*us*(1+.35*(I>1?1:I))*(1+.15*s),o=bn[q]*3;
+        bk[q][o]=x;bk[q][o+1]=y;bk[q][o+2]=r;bn[q]++;
+        if(I>.5+.2*DK.mx&&hc<HC&&bl>.05){o=hc*4;hs[o]=x;hs[o+1]=y;hs[o+2]=r*4.2;hs[o+3]=(I-.5)*.6>1?1:(I-.5)*.6;hc++;}
+      }
+      g.save();
+      g.rotate(BH.ang);g.translate(0,ddy);                  /* frame cakram (sama dengan sprite CSS), pusat = pusat cakram bukan horizon */
+      g.globalCompositeOperation='lighter';
+      if(heat>.04&&bl>.02){                                     /* pemanasan cakram: beat (musik) / denyut pelan (idle) */
+        g.fillStyle='rgba(255,208,168,'+(.10*heat*pr*(bl>1.6?1.6:bl))+')';
+        g.beginPath();g.ellipse(0,0,R*2.7,R*.26*eyM,0,0,6.2831853);g.fill();
+      }
+      var T=6.2831853,arr,m,j2,p3,rp,u3;
+      for(j2=DK.rip.length-1;j2>=0;j2--){               /* riak: ellipse yang melebar sepanjang cakram */
+        rp=DK.rip[j2];u3=(now-rp.t)/760;
+        if(u3>=1){DK.rip.splice(j2,1);continue;}
+        var ra=Math.pow(1-u3,1.6)*(.1+.5*rp.a)*pr*Math.min(1.4,.35+.65*bl),rx=R*(1.18+1.75*u3);
+        g.strokeStyle='rgba(255,226,196,'+ra+')';g.lineWidth=Math.max(1,R*.018*(1-.5*u3)+.6);
+        g.beginPath();g.ellipse(0,0,rx,rx*.115*eyM,0,0,T);g.stroke();
+        if(rp.s&&!IS_POTATO){
+          g.strokeStyle='rgba(255,240,226,'+(ra*.45)+')';g.lineWidth=Math.max(.8,R*.012);
+          g.beginPath();g.arc(0,0,R*(1.05+.55*u3),0,T);g.stroke();
+        }
+      }
+      if(hc){                                           /* halo glow: 1 sprite, maksimal 28 drawImage */
+        if(!DK.sC)DK.sC=dkSprite('255,226,196');
+        for(j2=0;j2<hc;j2++){
+          p3=j2*4;g.globalAlpha=Math.min(1,hs[p3+3]*pr*.9*(bl>1.6?1.6:bl));
+          var hr=hs[p3+2]*(.7+.3*(bl>1.6?1.6:bl));
+          g.drawImage(DK.sC,hs[p3]-hr,hs[p3+1]-hr,hr*2,hr*2);
+        }
+        g.globalAlpha=1;
+      }
+      for(b=0;b<4;b++){                                 /* inti partikel: 4 fill (gelap -> terang) */
+        m=bn[b];
+        if(m){
+          g.fillStyle='rgba('+DK_DC[b]+','+(DK_DA[b]*pr)+')';
+          g.beginPath();arr=bk[b];
+          for(j2=0;j2<m;j2++){p3=j2*3;g.moveTo(arr[p3]+arr[p3+2],arr[p3+1]);g.arc(arr[p3],arr[p3+1],arr[p3+2],0,T);}
+          g.fill();
+        }
+      }
+      g.restore();
+    }
 
-    /* Longer bars are deliberate: the old profile topped out too close to
-       the Gargantua edge, so the spectrum became hard to read from a distance.
-       Keep the renderer cheap, but give normal energy and especially transients
-       substantially more radial travel.
-       Trimmed to 50% of that length, then the ring is filled back out with
-       fake bars (same count as the real ones) interleaved between them; each
-       fake bar reuses its preceding real bar's length so it reads as one
-       continuous, denser ring instead of a sparser one. */
-    var ampBase=R*(.075+.13*lv+.22*beat)*.5;
-    var ampSpec=R*(.22+.34*lv+.42*beat)*.5;
-
-    /* One path = one Canvas stroke.  A single colour keeps compositing cheap. */
+    /* ---- debu glowing yang terlempar dari tepi ---- */
+    if(!VP.n)return;
+    var dr=Math.exp(-2.2*dt),pw=.55+.45*Math.min(1,lv+beat),glowOn=!IS_POTATO;
+    var cnt=VP.cnt,bc=VP.bc,bh=VP.bh;
+    cnt[0]=cnt[1]=cnt[2]=cnt[3]=cnt[4]=cnt[5]=0;
+    for(i=VP.n-1;i>=0;i--){
+      var age=VP.age[i]+dt,life=VP.life[i];
+      if(age>=life){vpKill(i);continue;}
+      VP.age[i]=age;
+      var vx=VP.vx[i]*dr,vy=VP.vy[i]*dr;VP.vx[i]=vx;VP.vy[i]=vy;
+      var x2=VP.x[i]+vx*dt,y2=VP.y[i]+vy*dt;VP.x[i]=x2;VP.y[i]=y2;
+      var fade=1-age/life,r2=VP.sz[i]*(.65+.35*fade),b2=fade>.6?0:(fade>.3?1:2),o2;
+      if(VP.kind[i]===1&&glowOn){o2=cnt[3+b2]*3;bh[b2][o2]=x2;bh[b2][o2+1]=y2;bh[b2][o2+2]=r2*3.4;cnt[3+b2]++;}
+      o2=cnt[b2]*3;bc[b2][o2]=x2;bc[b2][o2+1]=y2;bc[b2][o2+2]=r2;cnt[b2]++;
+    }
+    var AB=[1,.55,.22],T2=6.2831853,arr2,m2,j3,q3;
     g.save();
     g.globalCompositeOperation='lighter';
-    g.strokeStyle='rgba('+AV_COLOR+','+Math.min(.92,.56+.25*lv+.28*beat)+')';
-    g.lineWidth=Math.max(IS_POTATO?1.25:1.45,Math.min(2.8,R*.012));
-    g.lineCap='round';
-    g.beginPath();
-
-    for(var k=0;k<FN;k++){
-      var ri=k>>1;
-      var fv;
-      if(k&1){
-        /* Fake bar sits between real bar ri and the next one: take whichever
-           side is taller so a spike on either neighbour carries through. */
-        var riNext=(ri+1)%AVP.N;
-        var fvA=pts[ri*3+2],fvB=pts[riNext*3+2];
-        fv=fvA>fvB?fvA:fvB;
-      }else{
-        fv=pts[ri*3+2];
+    if(glowOn&&bl>.05&&(cnt[3]||cnt[4]||cnt[5])){
+      if(!DK.sD)DK.sD=dkSprite(AV_UNI);
+      for(b=0;b<3;b++){                                 /* halo: sprite glow (bukan lingkaran datar) */
+        m2=cnt[3+b];
+        if(m2){
+          g.globalAlpha=Math.min(1,.62*pw*AB[b]*(bl>1.6?1.6:bl));arr2=bh[b];
+          for(j3=0;j3<m2;j3++){q3=j3*3;g.drawImage(DK.sD,arr2[q3]-arr2[q3+2],arr2[q3+1]-arr2[q3+2],arr2[q3+2]*2,arr2[q3+2]*2);}
+        }
       }
-      /* Gamma lift makes quieter FFT bins visible without multiplying the
-         number of bars or doing another analyser pass. */
-      fv=Math.min(1.12,Math.pow(fv,.72)*1.08);
-      var rr=inner+ampBase+fv*ampSpec;
-      /* Beat transient is intentionally large and remains visible even when
-         the instantaneous FFT frame is a little soft. */
-      if(beat>.12)rr+=R*(.055+.12*beat)*.5;
-      var cx=fullPts[k*2],cy=fullPts[k*2+1];
-      var x=cx*inner;
-      var y=cy*inner;
-      var x2=cx*rr;
-      var y2=cy*rr;
-      g.moveTo(x,y);g.lineTo(x2,y2);
+      g.globalAlpha=1;
     }
-    g.stroke();
+    for(b=0;b<3;b++){
+      m2=cnt[b];
+      if(m2){
+        g.fillStyle='rgba('+AV_UNI+','+(.9*pw*AB[b])+')';
+        g.beginPath();arr2=bc[b];
+        for(j3=0;j3<m2;j3++){q3=j3*3;g.moveTo(arr2[q3]+arr2[q3+2],arr2[q3+1]);g.arc(arr2[q3],arr2[q3+1],arr2[q3+2],0,T2);}
+        g.fill();
+      }
+    }
     g.restore();
   }catch(err){}
 }
