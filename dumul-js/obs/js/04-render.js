@@ -1745,6 +1745,18 @@ function sectDrawSky(){
     if(!t||t.v<.01||!s.sky.dim)continue;
     g.save();g.globalAlpha=t.v*s.sky.dim;g.fillStyle='rgb('+(s.sky.dimRgb||'2,5,10')+')';g.fillRect(0,0,W,H);g.restore();
   }
+  if(NEB.base){                                       /* pass 1b: nebula gambar berwarna sektor (di atas plate yang sudah diredam, di bawah tint aditif) */
+    for(i=0;i<SECT.list.length;i++){
+      s=SECT.list[i];t=s.sky&&SKYT[s.k];
+      if(!t||t.v<.01)continue;
+      A=nebTint(s);if(!A)continue;
+      g.save();
+      if(A._m){g.globalAlpha=t.v*NEB.SDIM;g.fillStyle='rgb(2,5,10)';g.fillRect(0,0,W,H);}   /* nebula bertopeng: gelapkan plate (nebula overview) dulu biar nggak dobel + latar pekat */
+      g.globalAlpha=t.v*NEB.A_SEC;
+      plateBlit(A,plateM,W+2*plateM,H+2*plateM,1+(skyZoom-1)*NEB.ZF,skyPan.x*.14,skyPan.y*.14);
+      g.restore();
+    }
+  }
   for(i=0;i<SECT.list.length;i++){                    /* pass 2: tint + aksen */
     s=SECT.list[i];t=s.sky&&SKYT[s.k];
     if(!t||t.v<.01)continue;

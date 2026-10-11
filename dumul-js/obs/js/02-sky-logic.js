@@ -1138,6 +1138,85 @@ function telescopeHitRadius(){
   var base=(typeof touchMode!=='undefined'&&touchMode)?48:36;
   return Math.max(base,Math.min(64,(W||360)*0.09));
 }
+/* ---------- Nebula plate (gambar) ----------
+   Gambar nebula dipakai sebagai layer dasar plateDeep (overview) dan, lewat nebTint(), versi berwarna per sektor (dipakai sectDrawSky di 04-render.js).
+   Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
+   Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
+   Tuning: A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
+var NEB={on:!IS_POTATO,A_OV:.85,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:{p:'dumul-js/obs/img/nebula-portrait.webp?v=1',l:'dumul-js/obs/img/nebula-landscape.webp?v=1'},img:{},base:null,key:'',tint:{}};
+function nebBase(EW,EH,ds){
+  if(!NEB.on)return null;
+  var k=W<H*1.05?'p':'l',im=NEB.img[k];
+  if(!im){
+    im=NEB.img[k]=new Image();
+    im.onload=function(){im._ok=1;try{bakeAstroPlates();}catch(e){}};
+    im.onerror=function(){NEB.on=false;NEB.base=null;NEB.tint={};};
+    im.src=NEB.src[k];return null;
+  }
+  if(!im._ok){NEB.base=null;return null;}
+  var cw=Math.max(1,Math.round(EW*ds)),ch=Math.max(1,Math.round(EH*ds)),hy=Math.round(BH.hy||H*.45),key=k+'|'+cw+'x'+ch+'|'+hy;
+  if(NEB.base&&NEB.key===key)return NEB.base;
+  var c=document.createElement('canvas');c.width=cw;c.height=ch;
+  var x=c.getContext('2d'),sc=Math.max(cw/im.naturalWidth,ch/im.naturalHeight),dw=im.naturalWidth*sc,dh=im.naturalHeight*sc;
+  x.drawImage(im,(cw-dw)/2,(ch-dh)/2,dw,dh);   /* cover-fit, crop tengah */
+  /* redam bagian tengah supaya Gargantua + garis rasi tetap menonjol */
+  var R=Math.min(W,H)*.62*ds,gx=(plateM+(BH.hx||W*.5))*ds,gy=(plateM+hy)*ds,gr=x.createRadialGradient(gx,gy,0,gx,gy,R);
+  gr.addColorStop(0,'rgba(5,11,18,.62)');gr.addColorStop(.55,'rgba(5,11,18,.28)');gr.addColorStop(1,'rgba(5,11,18,0)');
+  x.fillStyle=gr;x.fillRect(0,0,cw,ch);
+  /* vignette tepi layar, ikut ter-bake ke nebula (overview + semua sektor, ikut parallax, 0 biaya per frame). Radius dari setengah diagonal supaya merata di portrait maupun landscape. */
+  var hh=Math.hypot(cw,ch)*.5,vg2=x.createRadialGradient(cw/2,ch/2,hh*.45,cw/2,ch/2,hh);
+  vg2.addColorStop(0,'rgba(0,0,0,0)');vg2.addColorStop(.7,'rgba(0,0,0,'+(.15*NEB.VIG)+')');vg2.addColorStop(1,'rgba(0,0,0,'+(.65*NEB.VIG)+')');
+  x.fillStyle=vg2;x.fillRect(0,0,cw,ch);
+  NEB.base=c;NEB.key=key;NEB.tint={};return c;
+}
+/* Versi nebula berwarna sektor (hue+saturasi dari SECTORS[].sky.rgb, terang tetap dari gambar). Di-bake lazy, sekali per sektor. */
+var NEBH=[0,0,0];
+function nebHsl(r,g,b){ /* rgb 0..255 -> NEBH=[h 0..360, s, l] */
+  r/=255;g/=255;b/=255;
+  var mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,d=mx-mn,h=0,sa=0;
+  if(d>1e-6){sa=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;}
+  NEBH[0]=h;NEBH[1]=sa;NEBH[2]=l;
+}
+function nebC(p,q,t){if(t<0)t+=1;if(t>1)t-=1;return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}
+function nebAng(a,b){return((a-b+540)%360)-180;}   /* selisih hue terpendek a-b, -180..180 */
+/* Versi nebula berwarna sektor. Hue SEMUA blob digeser ke hue tema sektor tapi variasi relatifnya dipertahankan (SPREAD): ungu/pink/teal asli jadi
+   biru/violet/cyan di autumn, oranye/merah/rose di summer, dst. Terang piksel tetap, bintang putih tetap putih (saturasi rendah tidak disentuh).
+   Warna aksen sektor (acc) menarik hue di sekitar posisinya. Latar gelap gambar -> transparan (MASK). Di-bake lazy, sekali per sektor. */
+function nebTint(s){
+  if(!NEB.base||!s||!s.sky)return null;
+  var c=NEB.tint[s.k];if(c)return c;
+  var w=NEB.base.width,h=NEB.base.height,A=s.sky.acc,k=w/(W+2*plateM),bd=null,x;
+  if(NEB.MASK){try{bd=NEB.base.getContext('2d').getImageData(0,0,w,h).data;}catch(e){bd=null;}}
+  c=document.createElement('canvas');c.width=w;c.height=h;
+  x=c.getContext('2d');
+  if(bd){
+    var id=x.createImageData(w,h),d=id.data,lo=NEB.MASK[0],hi=NEB.MASK[1],i,p,m,hb,hS,sS,hA=0,ax=0,ay=0,R=Math.max(w,h)*.9*.7,wg,dh,nh,ns,l,q,pp,rgb;
+    rgb=s.sky.rgb.split(',');nebHsl(+rgb[0],+rgb[1],+rgb[2]);hS=NEBH[0];sS=NEBH[1];
+    if(A){rgb=A.rgb.split(',');nebHsl(+rgb[0],+rgb[1],+rgb[2]);hA=NEBH[0];ax=(plateM+W*A.x)*k;ay=(plateM+H*A.y)*k;}
+    var sf=1+NEB.SATMIX*(sS/.6-1);   /* faktor saturasi: sektor jenuh (autumn) sedikit menaikkan, sektor pucat (spring) sedikit menurunkan */
+    for(i=0;i<d.length;i+=4){
+      m=(.3*bd[i]+.59*bd[i+1]+.11*bd[i+2]-lo)/(hi-lo);m=m<0?0:m>1?1:m;
+      if(m<=0)continue;   /* latar: transparan, lewati (~90% piksel) */
+      d[i+3]=(m*m*(3-2*m)*255)|0;
+      nebHsl(bd[i],bd[i+1],bd[i+2]);
+      hb=hS;
+      if(A){p=i>>2;wg=1-Math.sqrt(Math.pow(p%w-ax,2)+Math.pow(((p/w)|0)-ay,2))/R;if(wg>0)hb=hS+nebAng(hA,hS)*(wg>1?1:wg);}
+      nh=(hb+nebAng(NEBH[0],NEB.HC)*NEB.SPREAD+720)%360/360;
+      ns=NEBH[1]*sf;ns=ns>1?1:ns;l=NEBH[2];
+      q=l<.5?l*(1+ns):l+ns-l*ns;pp=2*l-q;
+      d[i]=nebC(pp,q,nh+1/3)*255;d[i+1]=nebC(pp,q,nh)*255;d[i+2]=nebC(pp,q,nh-1/3)*255;
+    }
+    x.putImageData(id,0,0);c._m=1;
+  }else{
+    /* fallback (getImageData ditolak): blend 'color' biasa, opaque */
+    x.drawImage(NEB.base,0,0);
+    x.globalCompositeOperation='color';
+    if(x.globalCompositeOperation!=='color')return null;
+    x.globalAlpha=NEB.TINT;x.fillStyle='rgb('+s.sky.rgb+')';x.fillRect(0,0,w,h);
+    x.globalAlpha=1;x.globalCompositeOperation='source-over';
+  }
+  NEB.tint[s.k]=c;return c;
+}
 /* ---------- Astrophotography Plate (long-exposure look) ----------
    Two offscreen layers are painted once (boot / resize / DPR change) and then only
    blitted per frame with parallax offsets -- no per-star work in the RAF loop.
@@ -1156,11 +1235,14 @@ function bakeAstroPlates(){
   var dc=plateDeep.getContext('2d',{alpha:false});
   dc.setTransform(ds,0,0,ds,M*ds,M*ds);
   dc.fillStyle='#050b12';dc.fillRect(-M,-M,EW,EH);
+  /* nebula gambar (kalau sudah dimuat); kabut/glow prosedural lama diredam (dk) biar nggak dobel */
+  var nb=nebBase(EW,EH,ds),dk=nb?.4:1;
+  if(nb){dc.save();dc.setTransform(1,0,0,1,0,0);dc.globalAlpha=NEB.A_OV;dc.drawImage(nb,0,0,plateDeep.width,plateDeep.height);dc.restore();}
   /* cosmological dust: wide, low-alpha tinted clouds */
   var dust=[[.20,.30,.55,'110,229,255',.050,.4],[.80,.22,.50,'255,122,217',.040,-.3],[.62,.72,.60,'110,160,255',.050,.2],[.14,.84,.45,'255,196,140',.034,-.5],[.50,.48,.70,'140,120,230',.030,.1]];
   for(var di=0;di<dust.length;di++){
     var dd=dust[di],dr=dd[2]*Math.max(W,H)*.5,dg;
-    dc.save();dc.translate(dd[0]*W,dd[1]*H);dc.rotate(dd[5]);dc.scale(1,.55);
+    dc.save();dc.globalAlpha=dk;dc.translate(dd[0]*W,dd[1]*H);dc.rotate(dd[5]);dc.scale(1,.55);
     dg=dc.createRadialGradient(0,0,0,0,0,dr);
     dg.addColorStop(0,'rgba('+dd[3]+','+dd[4]+')');dg.addColorStop(.55,'rgba('+dd[3]+','+(dd[4]*.45)+')');dg.addColorStop(1,'rgba('+dd[3]+',0)');
     dc.fillStyle=dg;dc.beginPath();dc.arc(0,0,dr,0,6.283);dc.fill();
@@ -1171,7 +1253,7 @@ function bakeAstroPlates(){
     var R=Math.max(W,H)*1.1,hx=BH.hx||W*.5,hy=BH.hy||H*.45,tg=dc.createRadialGradient(hx,hy,0,hx,hy,R);
     tg.addColorStop(0,'rgba(150,80,255,.156)');tg.addColorStop(.38,'rgba(112,34,150,.099)');
     tg.addColorStop(.72,'rgba(125,22,48,.052)');tg.addColorStop(1,'rgba(90,10,20,0)');
-    dc.save();dc.globalCompositeOperation='lighter';dc.fillStyle=tg;dc.fillRect(-M,-M,EW,EH);dc.restore();
+    dc.save();dc.globalCompositeOperation='lighter';dc.globalAlpha=dk;dc.fillStyle=tg;dc.fillRect(-M,-M,EW,EH);dc.restore();
   })();
   /* Milky-Way band: diagonal glow + mottled bright knots + dark dust lanes */
   dc.save();dc.translate(cx0,cy0);dc.rotate(BA);
