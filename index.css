@@ -2,7 +2,8 @@
 html,body{height:100%;margin:0}
 body{background:radial-gradient(120% 80% at 50% 28%,#10222f 0%,#08121b 55%,#04080d 100%);color:#dbe7f3;font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 #sky{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
-.scan{position:fixed;inset:0;pointer-events:none;z-index:2;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
+.scan{position:fixed;inset:0;pointer-events:none;z-index:2;background:none}
+/* scanline default dimatikan (bikin langit kusam). Mau balik: background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px). Versi pink body.konami .scan di bawah tetap jalan. */
 header{position:fixed;top:0;left:0;right:0;z-index:3;text-align:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px 0;pointer-events:none}
 h1{position:relative;margin:0;display:inline-block;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 h1::before{content:'';position:absolute;top:50%;left:50%;width:0%;height:2px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:width .3s ease,opacity .3s ease;z-index:-1}
