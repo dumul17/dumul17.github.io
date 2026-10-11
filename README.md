@@ -184,7 +184,7 @@ once its files (and, optionally, its music) have been cached.
     2.  In bulk, when the visitor taps **SAVE ALL** on the *Offline
         Archive* banner.
 -   **Offline Archive banner** (opt-in, styled like the Observatory HUD):
-    asks once whether to save all tracks (23 files, ~43 MB) for offline use,
+    asks once whether to save all tracks (23 files, ~70 MB) for offline use,
     shows `SYNCING n/23` progress, and can be closed while the download
     continues in the background.
     -   **NOT NOW** / close: asks again after 14 days. Per-track caching
