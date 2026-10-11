@@ -235,6 +235,8 @@ once its files (and, optionally, its music) have been cached.
 │   ├── icon-512.png
 │   └── icon-maskable-512.png
 ├── cache-status.html       # Optional diagnostic page for the audio cache
+├── licenses/
+│   └── gargantua-css-LICENSE.txt   # MIT license of the Gargantua CSS source (Josetxu)
 │
 ├── README.md
 │
@@ -453,6 +455,11 @@ The site is configured for the user site **`dumul17.github.io`**.
     HUD-styled opt-in banner
 -   Neural-network transition --- shared deterministic transition
     implementation between `index.html` and `dumul.html`
+-   Gargantua black hole visual --- *"Interstellar Blackhole Gargantua #2 -
+    Pure CSS"* by Josetxu
+    ([codepen.io/josetxu/pen/rNWgNeq](https://codepen.io/josetxu/pen/rNWgNeq)),
+    MIT License. Adapted into a canvas sprite. See
+    `licenses/gargantua-css-LICENSE.txt`.
 
 ------------------------------------------------------------------------
 
