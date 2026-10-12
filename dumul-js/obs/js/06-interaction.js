@@ -637,12 +637,12 @@ function konamiMeteors(){
 function triggerKonami(){
   document.body.classList.add('konami');
   haptic(18);
-  showSecret('SYSTEM OVERRIDE · DUMUL//OBSERVATORY',1800);
+  showSecret(T('toast.override'),1800);
   konamiMeteors();
   konamiComet();
   /* Cheat: buka semua gembok. markObserved sengaja TIDAK disentuh, biar Constellation Log tetap jujur. */
   unlockAll();
-  showModeToast('ALL SIGNALS UNLOCKED',null,2400);
+  showModeToast(T('toast.unlocked'),null,2400);
   clearTimeout(triggerKonami._t);
   triggerKonami._t=setTimeout(function(){document.body.classList.remove('konami');},(reduce||IS_POTATO||SW)?2100:5200);
 }
@@ -865,10 +865,10 @@ function termTap(){
     termTail();return;
   }
   if(TERM_NOCLOSE)return;
-  if(TERM_TAPS===1){termEmit('> INPUT RECEIVED',220);return;}
+  if(TERM_TAPS===1){termEmit(T('term.input'),220);return;}
   if(TERM_TAPS>=6&&!TERM_EXC){
     TERM_EXC=true;
-    termEmit('> INPUT RATE: EXCESSIVE',240,'term-warn');termEmit('> ...',650);termEmit('> YOU REALLY LIKE CLICKING THINGS.',420);
+    termEmit(T('term.excess'),240,'term-warn');termEmit('> ...',650);termEmit(T('term.click'),420);
   }
 }
 function termOpen(){
@@ -914,7 +914,7 @@ function termOpen(){
     TERM_ASK=q;
     TERM_NOIN=setTimeout(function(){
       if(!TERM_ASK||!TERM_RUN)return;
-      TERM_ASK=null;termEmit('> NO INPUT. ALSO A RESPONSE.',300);termTail();
+      TERM_ASK=null;termEmit(T('term.nolnput'),300);termTail();
     },wait+4500);
     return;
   }

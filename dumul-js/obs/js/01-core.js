@@ -557,8 +557,8 @@ function setCameraMode(on){
   if(btn){
     btn.classList.toggle('on',CAMERA_MODE);
     btn.setAttribute('aria-pressed',CAMERA_MODE?'true':'false');
-    btn.title=CAMERA_MODE?'Exit Constellation Camera':'Constellation Camera';
-    btn.setAttribute('aria-label',CAMERA_MODE?'Exit Constellation Camera':'Constellation Camera');
+    btn.title=CAMERA_MODE?T('mode.camera.exit'):T('mode.camera');
+    btn.setAttribute('aria-label',CAMERA_MODE?T('mode.camera.exit'):T('mode.camera'));
     btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   }
   if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;setSkyZoom(1,false);FOCUS.list=null;}
@@ -568,8 +568,8 @@ function setCameraMode(on){
   updateCamZoomUI();
   if(!CAMERA_MODE)flushConsPopups();
   if(typeof showModeToast==='function'){
-    if(CAMERA_MODE)showModeToast('CONSTELLATION CAMERA\nTAP ‹ › TO FOCUS · PINCH / WHEEL',null,2200);
-    else if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)showModeToast('CAMERA OFF',null,1400);
+    if(CAMERA_MODE)showModeToast(T('toast.camon'),null,2200);
+    else if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)showModeToast(T('toast.camoff'),null,1400);
   }
 }
 /* ---------- Constellation Camera: focus targets (tap to lock + auto-fit zoom) ---------- */
@@ -580,7 +580,7 @@ var FOCUS={i:0,anim:false,list:null};
 /* Urutan kamera fokus per sektor: dari `focus` + `focusName` di sky-data.js. Rasi off / di luar sektor otomatis terlewat (sectShow). */
 function focusList(){
   var order=SKY.focusOrder(SECT.cur?SECT.cur.k:null);
-  var L=[{id:'free',n:'Free'}];
+  var L=[{id:'free',n:T('cam.free')}];
   for(var i=0;i<order.length;i++){
     var id=order[i];
     if(sectShow(id,true))L.push({id:id,n:SKY.rasiBy[id].focusName||id});
@@ -639,7 +639,7 @@ function focusGeom(id){
 }
 function focusUI(){
   var b=document.getElementById('cf-name');if(!b||!FOCUS.list)return;
-  var f=FOCUS.list[FOCUS.i];b.textContent=f.id==='free'?'FOCUS · FREE':'● '+f.n.toUpperCase();
+  var f=FOCUS.list[FOCUS.i];b.textContent=f.id==='free'?T('cam.focus.free'):'● '+f.n.toUpperCase();
 }
 function focusCycle(d){
   if(!FOCUS.list)FOCUS.list=focusList();
@@ -668,7 +668,7 @@ function showWhisper(id){
   var h='<div class="ci-i ci-tag" style="--d:.15s">'+d.tag+'</div><div class="ci-i ci-name" style="--d:.3s">'+f.n+'</div><div class="ci-rows">';
   for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+rows[i][0]+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+rows[i][1]+'</span>';
   var t=.55+n*.14+.15;
-  h+='</div><div class="ci-i ci-fact" style="--d:'+t+'s"><em>FACT</em>'+d.fact+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+wh+'\u201d</div>';
+  h+='</div><div class="ci-i ci-fact" style="--d:'+t+'s"><em>'+T('cam.fact')+'</em>'+d.fact+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+wh+'\u201d</div>';
   w.style.setProperty('--cc','rgb('+(d.rgb||'110,229,255')+')');
   setTimeout(function(){if(FFX.id!==id)return;w.innerHTML=h;w.classList.add('on');},260);
 }
@@ -1184,13 +1184,13 @@ function spatialHint(t){
   if(st===AV._hint)return;
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
-  if(st==='muffled')showModeToast('SIGNAL MUFFLED \u00b7 NO RELAY\nSUMMON BH IN THE SOURCE SECTOR AND IN OVERVIEW',null,4400);
-  else if(st==='muffled-ov')showModeToast('SIGNAL MUFFLED \u00b7 OVERVIEW BH RECALLED\nSUMMON THE OVERVIEW BH TO LINK THE RELAY',null,4400);
-  else if(st==='muffled-sec')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE SECTOR HAS NO RELAY\nENTER IT AND SUMMON BH THERE',null,4400);
-  else if(st==='relay')showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL EITHER BH TO MUFFLE AGAIN',null,3600);
-  else if(st==='far')showModeToast('SIGNAL MUFFLED \u00b7 SOURCE IN ANOTHER SECTOR\nRELAY THE SOURCE SECTOR FIRST, THEN SUMMON BH HERE',null,4600);
-  else if(st==='norelay')showModeToast('RELAY NOT LINKED \u00b7 SOURCE SECTOR HAS NO RELAY\nSUMMON BH IN THE SOURCE SECTOR FIRST',null,4600);
-  else showModeToast('RELAY LINKED \u00b7 SIGNAL CLEAR\nRECALL BH TO MUFFLE AGAIN',null,3600);
+  if(st==='muffled')showModeToast(T('toast.muff.norelay'),null,4400);
+  else if(st==='muffled-ov')showModeToast(T('toast.muff.ov'),null,4400);
+  else if(st==='muffled-sec')showModeToast(T('toast.muff.sec'),null,4400);
+  else if(st==='relay')showModeToast(T('toast.relay'),null,3600);
+  else if(st==='far')showModeToast(T('toast.far'),null,4600);
+  else if(st==='norelay')showModeToast(T('toast.norelay2'),null,4600);
+  else showModeToast(T('toast.relayhere'),null,3600);
 }
 function spatialRelease(){
   AV.atten=0;AV._hint='';

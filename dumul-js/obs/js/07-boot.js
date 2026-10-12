@@ -19,13 +19,13 @@
   var quoteEl=document.getElementById('boot-quote');
   /* Fixed-width labels so the panel stays tidy while lines cycle. */
   var teleFrames=[
-    ['OBSERVER','DETECTED'],
-    ['AUDIO','BUFFERING'],
-    ['STAR MAP','ALIGNING'],
-    ['LENS','NOMINAL'],
-    ['AUDIO','READY'],
-    ['SIGNAL','STABLE'],
-    ['STAR MAP','LOCKED']
+    [T('boot.observer'),T('boot.detected')],
+    [T('boot.audio'),T('boot.buffering')],
+    [T('boot.starmap'),T('boot.aligning')],
+    [T('boot.lens'),T('boot.nominal')],
+    [T('boot.audio'),T('boot.ready')],
+    [T('boot.signal'),T('boot.stable')],
+    [T('boot.starmap'),T('boot.locked')]
   ];
   var teleIdx=0,teleLast=0;
   function padLabel(s,n){
@@ -41,7 +41,7 @@
     var rows=[];
     for(var r=0;r<4;r++){
       var f=teleFrames[(teleIdx+r)%teleFrames.length];
-      rows.push('[ '+padLabel(f[0],10)+']  <span class="ok">'+f[1]+'</span>');
+      rows.push('[ '+padLabel(f[0],12)+']  <span class="ok">'+f[1]+'</span>');
     }
     teleIdx++;
     statusEl.innerHTML=rows.join('\n');
@@ -219,10 +219,10 @@
     fill.style.width='100%';pct.textContent='100%';sig.classList.add('on');
     if(quoteEl)quoteEl.classList.add('on');
     if(statusEl)statusEl.innerHTML=
-      '[ '+padLabel('OBSERVER',10)+']  <span class="ok">ONLINE</span>\n'+
-      '[ '+padLabel('STAR MAP',10)+']  <span class="ok">LOCKED</span>\n'+
-      '[ '+padLabel('SIGNAL',10)+']  <span class="ok">OPEN</span>\n'+
-      '[ '+padLabel('BOOT',10)+']  <span class="ok">COMPLETE</span>';
+      '[ '+padLabel(T('boot.observer'),12)+']  <span class="ok">'+T('boot.online')+'</span>\n'+
+      '[ '+padLabel(T('boot.starmap'),12)+']  <span class="ok">'+T('boot.locked')+'</span>\n'+
+      '[ '+padLabel(T('boot.signal'),12)+']  <span class="ok">'+T('boot.open')+'</span>\n'+
+      '[ '+padLabel(T('boot.boot'),12)+']  <span class="ok">'+T('boot.complete')+'</span>';
     /* Capsule gate: wait for user choice instead of auto-entering. */
     if(choicesEl){
       choicesEl.classList.add('on');

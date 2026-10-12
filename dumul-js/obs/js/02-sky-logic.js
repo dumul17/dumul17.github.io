@@ -192,8 +192,8 @@ function lockedHint(key){
   _lockHintAt=n;
   haptic(6);
   if(typeof showModeToast==='function'){
-    if(key==='pleione')showModeToast('PLEIADES LOCKED\nIN CAMERA MODE: SIRIUS → ORION BELT → ALDEBARAN\nONE STRAIGHT LINE',null,4200);
-    else showModeToast('SIGNAL LOCKED\nALIGN THE CONSTELLATION IN CAMERA MODE',null,4000);
+    if(key==='pleione')showModeToast(T('toast.lock.ple'),null,4200);
+    else showModeToast(T('toast.lock'),null,4000);
   }
 }
 
@@ -229,8 +229,8 @@ function renderStellarRecord(){
     if(obs){
       if(lk){
         obs.innerHTML='<svg viewBox="0 0 10 12" aria-hidden="true"><rect x="1.2" y="5" width="7.6" height="6" rx="1.2"/><path d="M3 5V3.6a2 2 0 0 1 4 0V5"/></svg>';
-        obs.title='Locked';
-      }else{obs.textContent=on?'●':'○';obs.title=on?'Captured':'Unobserved';}
+        obs.title=T('mp.locked');
+      }else{obs.textContent=on?'●':'○';obs.title=on?T('mp.captured'):'Unobserved';}
     }
   }
   if(consEl){
@@ -240,7 +240,7 @@ function renderStellarRecord(){
       var cid=cids[j];
       var arch=consArchived(cid);
       var ready=!arch&&StellarMem.consComplete(cid);
-      var state=arch?'● ARCHIVED':(ready?'◇ READY':'○ SCANNING');
+      var state=arch?T('sr.archived'):(ready?T('sr.ready'):T('sr.scanning'));
       html2+='<div class="sr-cons-row'+(arch?' archived':'')+'" data-cons="'+cid+'">';
       html2+='<span class="sr-cons-name">'+CONS_LABELS[cid]+'</span>';
       html2+='<span class="sr-cons-state">'+state+'</span>';
@@ -265,8 +265,8 @@ function showSignalFragment(key){
   if(body)body.textContent=frag.body;
   if(meta){
     var bits=frag.meta.slice();
-    if(obs&&obs.at)bits.unshift('RECOVERED · '+obs.at);
-    else bits.unshift('SIGNAL ACQUIRED');
+    if(obs&&obs.at)bits.unshift(T('sf.recovered',{s:obs.at}));
+    else bits.unshift(T('sf.acquired'));
     meta.innerHTML=bits.map(function(m){return '<span>'+m+'</span>';}).join('');
   }
   el.classList.remove('on');
@@ -318,11 +318,11 @@ function showConsArchive(cid,mode){
   if(name)name.textContent=lab;
   if(mode==='unlock'){
     var ks=CONS_STARS[cid]||[],nm=ks.map(function(k){return (STELLAR_LABELS[k]||k).toUpperCase();});
-    if(line)line.textContent='ALIGNMENT COMPLETE';
-    if(sub)sub.textContent=nm.join(' · ')+' // UNLOCKED';
+    if(line)line.textContent=T('ca.align');
+    if(sub)sub.textContent=T('ca.unlocked',{s:nm.join(' · ')});
   }else{
-    if(line)line.textContent='PATTERN RECOGNIZED';
-    if(sub)sub.textContent=lab+' // ARCHIVED';
+    if(line)line.textContent=T('ca.pattern');
+    if(sub)sub.textContent=T('ca.archived',{s:lab});
   }
   el.classList.remove('on');
   void el.offsetWidth;
@@ -500,8 +500,8 @@ function setObserveMode(on){
     btn.classList.toggle('on',OBSERVE_MODE);
     btn.setAttribute('aria-pressed',OBSERVE_MODE?'true':'false');
     applyObserveIcon(btn);
-    btn.title=OBSERVE_MODE?'Exit Observation':'Observation Mode';
-    btn.setAttribute('aria-label',OBSERVE_MODE?'Exit Observation':'Observation Mode');
+    btn.title=OBSERVE_MODE?T('mode.observe.exit'):T('mode.observe');
+    btn.setAttribute('aria-label',OBSERVE_MODE?T('mode.observe.exit'):T('mode.observe'));
   }
   var camBtn=document.getElementById('mode-camera');
   if(camBtn){
@@ -512,8 +512,8 @@ function setObserveMode(on){
       FFX.id=null;hideWhisper();FOCUS.i=0;FOCUS.anim=false;FOCUS.list=null;
       camBtn.classList.remove('on');
       camBtn.setAttribute('aria-pressed','false');
-      camBtn.title='Constellation Camera';
-      camBtn.setAttribute('aria-label','Constellation Camera');
+      camBtn.title=T('mode.camera');
+      camBtn.setAttribute('aria-label',T('mode.camera'));
       setSkyZoom(1,false);
     }
   }
@@ -528,9 +528,9 @@ function setObserveMode(on){
       var mt=document.getElementById('music-toggle');
       if(mt)mt.setAttribute('aria-expanded','false');
     }
-    showModeToast('OBSERVATION MODE\nHUD OFF · LABELS OFF',null,2000);
+    showModeToast(T('toast.obs'),null,2000);
   }else{
-    showModeToast('HUD RESTORED',null,1600);
+    showModeToast(T('toast.hud'),null,1600);
   }
 }
 
@@ -571,7 +571,7 @@ function setRadioSilence(on){
       }
       try{if(typeof audioVizOff==='function')audioVizOff();}catch(e2){}
       try{if(typeof setAVColor==='function')setAVColor(null,false);}catch(e3){}
-      showModeToast('RADIO SILENCE\n─────────────\nAUDIO FADING OUT','silence',2200);
+      showModeToast(T('toast.silence.on'),'silence',2200);
     }else{
       /* Restore ONLY channels that were actually playing when muted.
          Never wake paused SFX / other BGM — that stacked every track. */
@@ -589,7 +589,7 @@ function setRadioSilence(on){
           a._silWas=0;
         }catch(e4){}
       }
-      showModeToast('SIGNAL RESTORED\nVOLUME FADING IN',null,1800);
+      showModeToast(T('toast.restored'),null,1800);
     }
   }catch(e){
     if(RADIO_SILENCE)showModeToast('RADIO SILENCE','silence',1800);
@@ -611,7 +611,7 @@ function setRadioSilence(on){
   if(cam){
     cam.hidden=true;
     cam.addEventListener('click',function(){
-      if(!OBSERVE_MODE){showModeToast('CAMERA REQUIRES\nOBSERVATION MODE',null,1800);return;}
+      if(!OBSERVE_MODE){showModeToast(T('toast.camreq'),null,1800);return;}
       if(typeof isLayoutEdit==='function'&&isLayoutEdit())return;setCameraMode(!CAMERA_MODE);haptic(10);
     });
   }
@@ -695,7 +695,7 @@ function beginAlignment(c){
   if(typeof showModeToast==='function'&&performance.now()-ALIGN.toastAt>900){
     ALIGN.toastAt=performance.now();
     var lab=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[c.id])?CONS_LABELS[c.id]:c.id;
-    showModeToast('ALIGNMENT · '+lab.toUpperCase()+'\nCONNECT THE STARS IN ORDER',null,2200);
+    showModeToast(T('toast.align',{s:lab.toUpperCase()}),null,2200);
   }
 }
 function beginPleChain(){
@@ -703,7 +703,7 @@ function beginPleChain(){
   document.body.classList.add('aligning'); /* portal DUMUL di sabuk Orion ngalah selama chain, sama kayak alignment Orion */
   if(typeof showModeToast==='function'&&performance.now()-ALIGN.toastAt>900){
     ALIGN.toastAt=performance.now();
-    showModeToast('ALIGNMENT · PLEIADES\nSIRIUS → ORION BELT → ALDEBARAN',null,2600);
+    showModeToast(T('toast.align.ple'),null,2600);
   }
 }
 function endAlignment(ok){
@@ -768,7 +768,7 @@ function alignTapStar(c,starKey){
 var _beltHintAt=0;
 function beltHint(){
   var n=performance.now();if(n-_beltHintAt<3000)return;_beltHintAt=n;
-  if(typeof showModeToast==='function')showModeToast('PLEIADES LOCKED\nSTART AT SIRIUS · DRAW THE LINE THROUGH THE BELT',null,2800);
+  if(typeof showModeToast==='function')showModeToast(T('toast.belt'),null,2800);
 }
 function pleChainTap(c,k){
   if(UNLOCK.set.pleiades)return false;
@@ -795,8 +795,8 @@ function pleChainTap(c,k){
     if(typeof tapFlash!=='undefined')tapFlash={until:performance.now()+520,cons:c.id};
     if(ALIGN.next>=S.length){alignDone('pleiades','pleione');return 'done';}
     if(typeof showModeToast==='function'){
-      if(ALIGN.next===1)showModeToast('SIRIUS LOCKED\nSHIFT FOCUS TO ORION · BELT: ALNITAK → MINTAKA',null,2600);
-      else if(ALIGN.next===S.length-1)showModeToast('BELT LOCKED\nSHIFT CAMERA FOCUS TO TAURUS',null,2200);
+      if(ALIGN.next===1)showModeToast(T('toast.sirius'),null,2600);
+      else if(ALIGN.next===S.length-1)showModeToast(T('toast.beltok'),null,2200);
     }
     /* Sirius/Aldebaran punya SFX sendiri: kalau rasinya sudah unlock, langkah tetap dihitung tapi SFX-nya boleh bunyi normal. */
     if(c.id!=='orion'&&UNLOCK.set[c.id])return false;
@@ -833,7 +833,7 @@ function updateAlignmentDim(now){
       endAlignment(false);                             /* keluar kamera / pindah fokus: batal diam-diam */
     }else if(performance.now()-ALIGN.last>(ALIGN.idle||ALIGN_IDLE_MS)){
       endAlignment(false);
-      if(typeof showModeToast==='function')showModeToast('ALIGNMENT TIMED OUT',null,1400);
+      if(typeof showModeToast==='function')showModeToast(T('toast.timeout'),null,1400);
     }else{ALIGN.dim=1;return;}
   }
   var floor=(typeof CF!=='undefined'&&CF.active)?.78:0;

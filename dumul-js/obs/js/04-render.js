@@ -291,7 +291,7 @@ function startSwallow(href){
    Home/overview : teleskop ngorbit IKON sektor yang SFX-nya lagi aktif.
    Dalam sektor sumber : ngorbit bintangnya (alur lama via triggerSupernova).
    Sektor lain (SFX aktif di sektor berbeda) : teleskop "sibuk", menghilang + bubble pamit. */
-var TELE_BUSY_MSG=["I'm busy tracking {s}. Can't come along.","Occupied. The signal in {s} still needs me.","Not now. I'm still listening to {s}.","Sorry. {s} has my lens for now."];
+var TELE_BUSY_MSG=[T('tele.busy.1'),T('tele.busy.2'),T('tele.busy.3'),T('tele.busy.4')];
 function teleStarFollow(key){
   var tr=TRIGGERS[key];if(!tr)return null;
   var c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons);if(!c)return null;
