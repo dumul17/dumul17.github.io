@@ -1429,7 +1429,7 @@ function layout(){
   /* Gargantua's home position/radius, needed up front so Boötes and the
      Pleiades can be nudged clear of it right after they're placed below. */
   BH.R=portrait?Math.min(30,W*.075):Math.min(30,ah*.11);
-  BH.hx=W*.5;BH.hy=portrait?top+ah*.48:top+ah*.44;
+  BH.hx=W*.5;BH.hy=STG.rot?H*.5:(portrait?top+ah*.48:top+ah*.44);
   /* Canis Major: small + high, far from Gargantua to avoid lens stretch.
      Size kept comparable to Orion / Virgo. */
   /* Taurus: mid-left lower (horns left, tail right) — Hyades LOCK coords scaled into box. */

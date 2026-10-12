@@ -343,10 +343,11 @@ function drawSectorOverview(now,age){
          Offset portrait (ox,oy) diubah ke ruang stage, dan diskala supaya muat di tinggi layar landscape. */
       /* Portal atas/bawah sudah tidak ada (sudut max 30° -> |sin|=.5), jadi tinggi layar cukup lega. Horizontal landscape lebih lebar:
          portal dijauhkan dari BH sampai sisi layar (dengan sisa margin). */
-      var lf=Math.min(1,Math.max(.3,(STG.ih*.5-rad-36)/Math.max(1,ry*.5)));
-      var bxs=STG.rot<0?BH.hy:(STG.iw-BH.hy),avail=Math.min(bxs,STG.iw-bxs)-rad-24;
-      var rxL=Math.max(rx*lf,Math.min(avail*.85,STG.ih*1.1));
-      ox=Math.cos(an)*rxL;oy*=lf;
+      var lf=Math.min(1,Math.max(.3,(STG.ih*.5-rad-62)/Math.max(1,ry*.5)));
+      var bxs=STG.rot<0?BH.hy:(STG.iw-BH.hy),mg=rad+28;
+      var rL=Math.max(rx*lf,Math.min((bxs-mg)*.85,STG.ih*1.1));
+      var rR=Math.max(rx*lf,Math.min((STG.iw-bxs-mg)*.85,STG.ih*1.1));
+      ox=Math.cos(an)*(Math.cos(an)<0?rL:rR);oy*=lf;
       if(STG.rot<0){dx=-oy;dy=ox;}else{dx=oy;dy=-ox;}
     }
     var bx=BH.hx+dx,by=BH.hy+dy;
