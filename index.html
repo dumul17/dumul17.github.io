@@ -36,23 +36,23 @@
   <div id="boot-scan" aria-hidden="true"></div>
   <div id="boot-core">
     <div id="boot-title">DUMUL//OBSERVATORY</div>
-    <div id="boot-status">[ OBSERVER ]        <span class="ok">DETECTED</span>
+    <div id="boot-status">[ OBSERVER ]        <span class="ok" data-i18n="boot.detected">DETECTED</span>
 [ AUDIO ]           CONNECTING
 [ STAR MAP ]        SYNC
 [ SIGNAL ]          STABLE</div>
     <div id="boot-bar"><div id="boot-fill"></div></div>
     <div id="boot-pct">0%</div>
     <div id="boot-signal">&gt; SIGNAL TRANSMITTED</div>
-    <div id="boot-quote">Keep creating, even without the applause.</div>
+    <div id="boot-quote" data-i18n="quote">Keep creating, even without the applause.</div>
     <div id="boot-choices" aria-hidden="true">
       <div class="boot-choice" id="boot-choice-red">
-        <button type="button" id="boot-cap-red" class="boot-cap red" aria-label="View Source Code" title="Source Code"></button>
-        <span class="boot-cap-label">Red</span>
+        <button type="button" id="boot-cap-red" class="boot-cap red" aria-label="View Source Code" title="Source Code" data-i18n-aria="boot.red.aria"></button>
+        <span class="boot-cap-label" data-i18n="boot.red">Red</span>
       </div>
-      <span class="boot-or" id="boot-or">or</span>
+      <span class="boot-or" id="boot-or" data-i18n="boot.or">or</span>
       <div class="boot-choice" id="boot-choice-blue">
-        <button type="button" id="boot-cap-blue" class="boot-cap blue" aria-label="Enter Observatory" title="Observatory"></button>
-        <span class="boot-cap-label">Blue</span>
+        <button type="button" id="boot-cap-blue" class="boot-cap blue" aria-label="Enter Observatory" title="Observatory" data-i18n-aria="boot.blue.aria"></button>
+        <span class="boot-cap-label" data-i18n="boot.blue">Blue</span>
       </div>
     </div>
   </div>
@@ -62,20 +62,20 @@
 <div class="scan" aria-hidden="true"></div>
 <header id="header" aria-hidden="true">
   <h1 id="title" tabindex="-1"><span class="kicker">Dumul's</span><span class="big">Observatory</span></h1>
-  <p class="sub">modder &amp; music composer</p>
+  <p class="sub" data-i18n="sub">modder &amp; music composer</p>
 </header>
 <!-- Caption #cap-<id> per rasi dibuat index.js dari sky-data.js (field `cap`). Hanya #cap-bh (Gargantua) yang ditulis manual. -->
-<span class="cap" id="cap-bh" aria-hidden="true">Gargantua</span>
+<span class="cap" id="cap-bh" aria-hidden="true" data-i18n="tune.bh">Gargantua</span>
 <a id="bh" href="dumul.html" aria-label="Masuk ke DUMUL (lubang hitam Gargantua)" title="Gargantua"></a>
 <span id="bh-clock" aria-hidden="true"></span>
-<button type="button" id="owl-source" aria-label="Open about panel" aria-expanded="false" aria-controls="owl-panel" title="About"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 3.5 L8.6 6.6 C10.2 6 13.8 6 15.4 6.6 L19.5 3.5 C20.3 6 20.6 8.5 20.5 11.5 C20.3 16.5 16.8 20.5 12 20.5 C7.2 20.5 3.7 16.5 3.5 11.5 C3.4 8.5 3.7 6 4.5 3.5 Z"/><circle cx="8.4" cy="11.6" r="2.8"/><circle cx="15.6" cy="11.6" r="2.8"/><circle cx="8.4" cy="11.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.6" cy="11.6" r="1.1" fill="currentColor" stroke="none"/><path d="M10.6 14.3 H13.4 L12 17.4 Z" fill="currentColor"/></svg></button>
+<button type="button" id="owl-source" aria-label="Open about panel" aria-expanded="false" aria-controls="owl-panel" title="About" data-i18n-aria="owl.open"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 3.5 L8.6 6.6 C10.2 6 13.8 6 15.4 6.6 L19.5 3.5 C20.3 6 20.6 8.5 20.5 11.5 C20.3 16.5 16.8 20.5 12 20.5 C7.2 20.5 3.7 16.5 3.5 11.5 C3.4 8.5 3.7 6 4.5 3.5 Z"/><circle cx="8.4" cy="11.6" r="2.8"/><circle cx="15.6" cy="11.6" r="2.8"/><circle cx="8.4" cy="11.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.6" cy="11.6" r="1.1" fill="currentColor" stroke="none"/><path d="M10.6 14.3 H13.4 L12 17.4 Z" fill="currentColor"/></svg></button>
 <div id="owl-backdrop" aria-hidden="true"></div>
 <div id="owl-panel" role="dialog" aria-modal="true" aria-labelledby="owl-panel-title" aria-hidden="true">
-  <button type="button" class="owl-close" id="owl-close" aria-label="Close">×</button>
+  <button type="button" class="owl-close" id="owl-close" aria-label="Close" data-i18n-aria="owl.close">×</button>
   <div class="owl-brand">
     <h2 id="owl-panel-title" tabindex="0"><span class="kicker">Dumul's</span><span class="big">Observatory</span></h2>
-    <p class="owl-sub">modder &amp; music composer</p>
-    <p class="owl-quote"><em>Keep creating, even without the applause.</em><span class="owl-q-emoji" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-left:.15em" aria-hidden="true"><path d="M4.5 3.5 L8.6 6.6 C10.2 6 13.8 6 15.4 6.6 L19.5 3.5 C20.3 6 20.6 8.5 20.5 11.5 C20.3 16.5 16.8 20.5 12 20.5 C7.2 20.5 3.7 16.5 3.5 11.5 C3.4 8.5 3.7 6 4.5 3.5 Z"/><circle cx="8.4" cy="11.6" r="2.8"/><circle cx="15.6" cy="11.6" r="2.8"/><circle cx="8.4" cy="11.6" r="1.0" fill="currentColor" stroke="none"/><circle cx="15.6" cy="11.6" r="1.0" fill="currentColor" stroke="none"/><path d="M10.6 14.3 H13.4 L12 17.4 Z" fill="currentColor"/></svg></span></p>
+    <p class="owl-sub" data-i18n="sub">modder &amp; music composer</p>
+    <p class="owl-quote"><em data-i18n="quote">Keep creating, even without the applause.</em><span class="owl-q-emoji" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-left:.15em" aria-hidden="true"><path d="M4.5 3.5 L8.6 6.6 C10.2 6 13.8 6 15.4 6.6 L19.5 3.5 C20.3 6 20.6 8.5 20.5 11.5 C20.3 16.5 16.8 20.5 12 20.5 C7.2 20.5 3.7 16.5 3.5 11.5 C3.4 8.5 3.7 6 4.5 3.5 Z"/><circle cx="8.4" cy="11.6" r="2.8"/><circle cx="15.6" cy="11.6" r="2.8"/><circle cx="8.4" cy="11.6" r="1.0" fill="currentColor" stroke="none"/><circle cx="15.6" cy="11.6" r="1.0" fill="currentColor" stroke="none"/><path d="M10.6 14.3 H13.4 L12 17.4 Z" fill="currentColor"/></svg></span></p>
   </div>
   <div class="owl-links">
     <a class="owl-link" href="https://www.youtube.com/@dumul17" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube">
@@ -88,7 +88,7 @@
     </a>
     <a class="owl-link owl-src" href="https://github.com/dumul17/dumul17.github.io" target="_blank" rel="noopener" aria-label="View source on GitHub" title="Source code">
       <span class="owl-emoji" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="13" rx="8" ry="3.2"/><path d="M8 13 C8 9.5 9.5 7 12 7 s4 2.5 4 6"/><circle cx="12" cy="10" r="1.2" fill="currentColor" stroke="none"/><path d="M7 16.5 L5.5 19 M12 17 v3 M17 16.5 L18.5 19"/></svg></span>
-      <span>Source</span>
+      <span data-i18n="owl.source">Source</span>
     </a>
   </div>
 </div>
@@ -97,14 +97,14 @@
 
 <!-- Stellar Fragments / Constellation Archive (overlays; record lives in music player) -->
 <div id="signal-fragment" aria-live="polite" aria-hidden="true">
-  <button type="button" class="sf-close" id="sf-close" aria-label="Dismiss">×</button>
+  <button type="button" class="sf-close" id="sf-close" aria-label="Dismiss" data-i18n-aria="sf.close">×</button>
   <div class="sf-tag" id="sf-tag">FRAGMENT // —</div>
   <div class="sf-title" id="sf-title"></div>
   <div class="sf-body" id="sf-body"></div>
   <div class="sf-meta" id="sf-meta"></div>
 </div>
 <div id="cons-archive" aria-live="polite" aria-hidden="true">
-  <div class="ca-line">PATTERN RECOGNIZED</div>
+  <div class="ca-line" data-i18n="ca.pattern">PATTERN RECOGNIZED</div>
   <div class="ca-name" id="ca-name">ORION</div>
   <div class="ca-rule"></div>
   <div class="ca-sub" id="ca-sub">ARCHIVED</div>
@@ -115,36 +115,36 @@
 <!-- Tombol #<key>-fx per bintang SFX dibuat index.js dari sky-data.js (SKY.sfx). -->
 <div id="veil" aria-hidden="true"></div>
 <section id="music-player" aria-label="Music player" aria-hidden="true">
-  <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker">Dumul's Observatory</span><div class="mp-title-row"><strong>Music Transmission</strong><div class="mp-vol-wrap" title="Volume"><button type="button" id="mode-silence" class="mp-silence mp-vol-btn" aria-pressed="false" aria-label="Volume" title="Volume"><svg class="ico ico-vol-on" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/><path d="M15.2 9.2 a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 7 a5.5 5.5 0 0 1 0 10"/></svg><svg class="ico ico-vol-off" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/><path d="M16 9 l5 6 M21 9 l-5 6"/></svg></button><input type="range" id="mp-vol" class="mp-vol" min="0" max="100" value="85" step="1" aria-label="Volume level"></div></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
+  <div class="mp-head"><div class="mp-head-left"><span class="mp-kicker" data-i18n="mp.kicker">Dumul's Observatory</span><div class="mp-title-row"><strong data-i18n="mp.title">Music Transmission</strong><div class="mp-vol-wrap" title="Volume"><button type="button" id="mode-silence" class="mp-silence mp-vol-btn" aria-pressed="false" aria-label="Volume" title="Volume" data-i18n-aria="mp.vol"><svg class="ico ico-vol-on" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/><path d="M15.2 9.2 a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 7 a5.5 5.5 0 0 1 0 10"/></svg><svg class="ico ico-vol-off" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M4 10 v4 h3.5 L12 18 V6 L7.5 10 H4 Z"/><path d="M16 9 l5 6 M21 9 l-5 6"/></svg></button><input type="range" id="mp-vol" class="mp-vol" min="0" max="100" value="85" step="1" aria-label="Volume level"></div></div></div><button id="music-close" type="button" aria-label="Tutup music player">×</button></div>
   <div class="mp-scroll">
   <button type="button" id="mp-av-toggle" class="mp-av" role="switch" aria-checked="true" aria-label="Gargantua spectrum visualizer">
     <span class="mp-av-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
-    <span class="mp-av-txt"><b>Gargantua Spectrum</b><i>Radial visualizer · signals</i></span>
+    <span class="mp-av-txt"><b data-i18n="mp.av.title">Gargantua Spectrum</b><i data-i18n="mp.av.sub">Radial visualizer · signals</i></span>
     <span class="mp-av-sw" aria-hidden="true"></span>
   </button>
   <div class="mp-section-title">Stellar Signals <span class="mp-rec-count" id="sr-count">// <em>00</em>/00</span></div>
   <!-- Baris track SFX (accordion per sektor) dibangun index.js dari sky-data.js. Jangan tulis manual. -->
   <div id="mp-sfx-groups"></div>
-  <div class="mp-section-title">Observatory BGM</div>
+  <div class="mp-section-title" data-i18n="mp.bgm">Observatory BGM</div>
   <div class="mp-tracks" id="mp-bgm-tracks"></div>
-  <div class="mp-section-title">Constellation Log</div>
+  <div class="mp-section-title" data-i18n="mp.conslog">Constellation Log</div>
   <div class="sr-list" id="sr-cons"></div>
   </div>
   <div class="mp-foot">
     <div class="mp-seek" id="mp-seek-wrap">
       <canvas id="mp-wave" width="280" height="32" aria-hidden="true"></canvas>
-      <input type="range" id="mp-seek" class="mp-seek-range" min="0" max="1000" value="0" step="1" aria-label="Seek">
+      <input type="range" id="mp-seek" class="mp-seek-range" min="0" max="1000" value="0" step="1" aria-label="Seek" data-i18n-aria="mp.seek">
       <div class="mp-time"><span id="mp-t0">0:00</span><span id="mp-t1">0:00</span></div>
     </div>
     <div class="mp-controls">
-      <button type="button" id="mp-shuffle" class="mp-ctrl" aria-pressed="false" aria-label="Shuffle" title="Shuffle">
+      <button type="button" id="mp-shuffle" class="mp-ctrl" aria-pressed="false" aria-label="Shuffle" title="Shuffle" data-i18n-aria="mp.shuffle">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
       </button>
-      <button type="button" id="mp-prev" class="mp-ctrl" aria-label="Previous" title="Previous">
+      <button type="button" id="mp-prev" class="mp-ctrl" aria-label="Previous" title="Previous" data-i18n-aria="mp.prev">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"/></svg>
       </button>
-      <button id="music-play" class="mp-play" type="button" aria-label="Play music"><span class="mp-play-icon" aria-hidden="true"><svg class="ico ico-play" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg><svg class="ico ico-pause" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span></button>
-      <button type="button" id="mp-next" class="mp-ctrl" aria-label="Next" title="Next">
+      <button id="music-play" class="mp-play" type="button" aria-label="Play music" data-i18n-aria="mp.play"><span class="mp-play-icon" aria-hidden="true"><svg class="ico ico-play" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg><svg class="ico ico-pause" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span></button>
+      <button type="button" id="mp-next" class="mp-ctrl" aria-label="Next" title="Next" data-i18n-aria="mp.next">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>
       </button>
       <button type="button" id="mp-repeat" class="mp-ctrl" aria-pressed="false" data-mode="0" aria-label="Repeat" title="Repeat off">
@@ -157,22 +157,22 @@
 
 <!-- Last Signal / Observe / Radio Silence -->
 <div id="last-signal" aria-live="polite" aria-hidden="true">
-  <div class="ls-tag">LAST SIGNAL DETECTED</div>
+  <div class="ls-tag" data-i18n="ls.tag">LAST SIGNAL DETECTED</div>
   <div class="ls-name" id="ls-name">—</div>
   <div class="ls-meta"><span id="ls-spec">—</span><span id="ls-dist">—</span></div>
 </div>
 <div id="mode-cluster">
-  <button type="button" id="mode-observe" aria-pressed="false" aria-label="Observation Mode" title="Observation Mode">
+  <button type="button" id="mode-observe" aria-pressed="false" aria-label="Observation Mode" title="Observation Mode" data-i18n-aria="mode.observe">
     <svg class="ico ico-obs-out" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 L12 5 L14 11 L19 13 Z"/><path d="M4 14 L8 18"/></svg>
     <svg class="ico ico-obs-in" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><circle cx="12" cy="12" r="3"/><path d="M6.5 6.5a7.8 7.8 0 0 1 11 0"/><path d="M4 4a11 11 0 0 1 16 0"/><path d="M12 15 v5"/></svg>
   </button>
-  <button type="button" id="mode-camera" aria-pressed="false" aria-label="Constellation Camera" title="Constellation Camera (Observation only)" hidden>
+  <button type="button" id="mode-camera" aria-pressed="false" aria-label="Constellation Camera" title="Constellation Camera (Observation only)" hidden data-i18n-aria="mode.camera">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="11" rx="2"/><circle cx="10" cy="12.5" r="3"/><path d="M17 10 l4 -2 v10 l-4 -2 Z"/></svg>
   </button>
-  <button type="button" id="mode-bh" aria-pressed="false" aria-label="Summon Gargantua" title="Summon Gargantua">
+  <button type="button" id="mode-bh" aria-pressed="false" aria-label="Summon Gargantua" title="Summon Gargantua" data-i18n-aria="mode.bh.summon">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5 a8.5 8.5 0 0 1 0 17"/><path d="M12 6 a6 6 0 0 1 0 12" opacity=".7"/><path d="M12 8.5 a3.5 3.5 0 0 1 0 7" opacity=".45"/></svg>
   </button>
-  <button type="button" id="mode-bhset" aria-label="Tuning" title="Tuning" aria-expanded="false" aria-controls="bh-panel">
+  <button type="button" id="mode-bhset" aria-label="Tuning" title="Tuning" aria-expanded="false" aria-controls="bh-panel" data-i18n-aria="mode.tune">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.2"/><circle cx="9.5" cy="17" r="2.2"/></svg>
   </button>
   <button type="button" id="mode-sectors" aria-label="Back to sector overview" title="Back to overview">
@@ -181,42 +181,42 @@
 </div>
 <div id="cam-zoom" aria-live="polite" aria-hidden="true">
   <span class="cz-label">CAM </span><span class="cz-val" id="cam-zoom-val">1×</span>
-  <span class="cz-hint">TAP ‹ › TO FOCUS · PINCH / WHEEL · 1×–3×</span>
-  <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous focus target">‹</button><button type="button" id="cf-name" aria-label="Next focus target">FOCUS · FREE</button><button type="button" id="cf-next" aria-label="Next focus target">›</button></div>
+  <span class="cz-hint" data-i18n="cam.hint">TAP ‹ › TO FOCUS · PINCH / WHEEL · 1×–3×</span>
+  <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous focus target">‹</button><button type="button" id="cf-name" aria-label="Next focus target" data-i18n="cam.focus.free">FOCUS · FREE</button><button type="button" id="cf-next" aria-label="Next focus target">›</button></div>
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
-<div id="bh-panel" role="dialog" aria-label="Tuning" aria-hidden="true">
+<div id="bh-panel" role="dialog" aria-label="Tuning" aria-hidden="true" data-i18n-aria="mode.tune">
   <div class="bp-head">
-    <div class="bp-tabs" role="tablist" aria-label="Tuning">
-      <button type="button" class="bp-tab on" role="tab" data-tab="bh" aria-selected="true">Gargantua</button>
-      <button type="button" class="bp-tab" role="tab" data-tab="sky" aria-selected="false">Sky</button>
+    <div class="bp-tabs" role="tablist" aria-label="Tuning" data-i18n-aria="mode.tune">
+      <button type="button" class="bp-tab on" role="tab" data-tab="bh" aria-selected="true" data-i18n="tune.bh">Gargantua</button>
+      <button type="button" class="bp-tab" role="tab" data-tab="sky" aria-selected="false" data-i18n="tune.sky">Sky</button>
     </div>
-    <button type="button" id="bp-close" aria-label="Close">×</button>
+    <button type="button" id="bp-close" aria-label="Close" data-i18n-aria="owl.close">×</button>
   </div>
-  <div class="bp-sub" id="bp-sub">Gargantua // Tune</div>
+  <div class="bp-sub" id="bp-sub" data-i18n="tune.sub.bh">Gargantua // Tune</div>
   <div class="bp-page" data-page="bh">
-    <div class="bp-sec">Shape</div>
-    <label class="bp-row"><span class="bp-k">Size<i>scale</i></span><input type="range" class="bp-range" id="bp-size" min="50" max="180" step="1" value="100"><output id="bp-size-v">1.00×</output></label>
-    <label class="bp-row"><span class="bp-k">Strength<i>lensing</i></span><input type="range" class="bp-range" id="bp-str" min="0" max="250" step="1" value="100"><output id="bp-str-v">1.00×</output></label>
-    <div class="bp-sec">Light</div>
-    <label class="bp-row"><span class="bp-k">Bloom<i>warm glow</i></span><input type="range" class="bp-range" id="bp-bloom" min="0" max="200" step="1" value="100"><output id="bp-bloom-v">1.00×</output></label>
-    <label class="bp-row"><span class="bp-k">Speed<i>animation</i></span><input type="range" class="bp-range" id="bp-speed" min="0" max="300" step="1" value="100"><output id="bp-speed-v">1.00×</output></label>
-    <div class="bp-sec">Surroundings</div>
-    <div class="bp-row bp-tog"><span class="bp-k">Asteroids<i>orbiting rocks</i></span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true">Show</button></div>
+    <div class="bp-sec" data-i18n="tune.shape">Shape</div>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.size">Size</span><i data-i18n="tune.size.s">scale</i></span><input type="range" class="bp-range" id="bp-size" min="50" max="180" step="1" value="100"><output id="bp-size-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.str">Strength</span><i data-i18n="tune.str.s">lensing</i></span><input type="range" class="bp-range" id="bp-str" min="0" max="250" step="1" value="100"><output id="bp-str-v">1.00×</output></label>
+    <div class="bp-sec" data-i18n="tune.light">Light</div>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.bloom">Bloom</span><i data-i18n="tune.bloom.s">warm glow</i></span><input type="range" class="bp-range" id="bp-bloom" min="0" max="200" step="1" value="100"><output id="bp-bloom-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.speed">Speed</span><i data-i18n="tune.speed.s">animation</i></span><input type="range" class="bp-range" id="bp-speed" min="0" max="300" step="1" value="100"><output id="bp-speed-v">1.00×</output></label>
+    <div class="bp-sec" data-i18n="tune.surr">Surroundings</div>
+    <div class="bp-row bp-tog"><span class="bp-k"><span data-i18n="tune.ast">Asteroids</span><i data-i18n="tune.ast.s">orbiting rocks</i></span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true" data-i18n="tune.show">Show</button></div>
   </div>
   <div class="bp-page" data-page="sky" hidden>
-    <div class="bp-sec">Atmosphere</div>
-    <label class="bp-row"><span class="bp-k">Haze<i>dust clouds + glow</i></span><input type="range" class="bp-range" id="sp-HAZE" min="0" max="100" step="1" value="0"><output id="sp-HAZE-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k">Band<i>milky way</i></span><input type="range" class="bp-range" id="sp-BAND" min="0" max="100" step="1" value="0"><output id="sp-BAND-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k">Drift<i>floating dust</i></span><input type="range" class="bp-range" id="sp-DRIFT" min="0" max="100" step="1" value="0"><output id="sp-DRIFT-v">0%</output></label>
-    <div class="bp-sec">Nebula</div>
-    <label class="bp-row"><span class="bp-k">Nebula<i>image strength</i></span><input type="range" class="bp-range" id="sp-A_OV" min="0" max="100" step="1" value="100"><output id="sp-A_OV-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k">Blob halo<i>edge thickness</i></span><input type="range" class="bp-range" id="sp-THICK" min="0" max="100" step="1" value="50"><output id="sp-THICK-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k">Vignette<i>edge darkness</i></span><input type="range" class="bp-range" id="sp-VIG" min="0" max="200" step="1" value="100"><output id="sp-VIG-v">0%</output></label>
-    <div class="bp-sec">Portals</div>
-    <label class="bp-row"><span class="bp-k">Portal halo<i>dark behind ring</i></span><input type="range" class="bp-range" id="sp-HALO" min="0" max="100" step="1" value="55"><output id="sp-HALO-v">0%</output></label>
+    <div class="bp-sec" data-i18n="tune.atm">Atmosphere</div>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.haze">Haze</span><i data-i18n="tune.haze.s">dust clouds + glow</i></span><input type="range" class="bp-range" id="sp-HAZE" min="0" max="100" step="1" value="0"><output id="sp-HAZE-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.band">Band</span><i data-i18n="tune.band.s">milky way</i></span><input type="range" class="bp-range" id="sp-BAND" min="0" max="100" step="1" value="0"><output id="sp-BAND-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.drift">Drift</span><i data-i18n="tune.drift.s">floating dust</i></span><input type="range" class="bp-range" id="sp-DRIFT" min="0" max="100" step="1" value="0"><output id="sp-DRIFT-v">0%</output></label>
+    <div class="bp-sec" data-i18n="tune.neb">Nebula</div>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.neb">Nebula</span><i data-i18n="tune.neb.s">image strength</i></span><input type="range" class="bp-range" id="sp-A_OV" min="0" max="100" step="1" value="100"><output id="sp-A_OV-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.halo2">Blob halo</span><i data-i18n="tune.halo2.s">edge thickness</i></span><input type="range" class="bp-range" id="sp-THICK" min="0" max="100" step="1" value="50"><output id="sp-THICK-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.vig">Vignette</span><i data-i18n="tune.vig.s">edge darkness</i></span><input type="range" class="bp-range" id="sp-VIG" min="0" max="200" step="1" value="100"><output id="sp-VIG-v">0%</output></label>
+    <div class="bp-sec" data-i18n="tune.portals">Portals</div>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.phalo">Portal halo</span><i data-i18n="tune.phalo.s">dark behind ring</i></span><input type="range" class="bp-range" id="sp-HALO" min="0" max="100" step="1" value="55"><output id="sp-HALO-v">0%</output></label>
   </div>
-  <div class="bp-act"><button type="button" id="bp-save">Save</button><button type="button" id="bp-reset">Reset</button></div>
+  <div class="bp-act"><button type="button" id="bp-save" data-i18n="tune.save">Save</button><button type="button" id="bp-reset" data-i18n="tune.reset">Reset</button></div>
 </div>
 <div id="sector-scan" aria-hidden="true">
   <div class="ss-head"><span>MAP</span><span class="ss-sec" id="ss-sec">—</span></div>
@@ -239,18 +239,22 @@
   <nav aria-label="Links" hidden>
     <div class="footer-left"></div>
   </nav>
-  <p class="quote">I create what I love, even without applause.</p>
+  <p class="quote" data-i18n="footer.quote">I create what I love, even without applause.</p>
 </footer>
 <!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (7 file, urutan JANGAN diubah) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
+<script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=22"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=99"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=101"></script>
+<script defer src="dumul-js/obs/i18n.js?v=2"></script>
+<script defer src="dumul-js/obs/i18n-sky.js?v=1"></script>
+<script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=100"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=102"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=99"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=100"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=100"></script>
-<script defer src="dumul-js/obs/js/06-interaction.js?v=98"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=98"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=101"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=101"></script>
+<script defer src="dumul-js/obs/js/06-interaction.js?v=99"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=99"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
@@ -318,7 +322,7 @@ if ('serviceWorker' in navigator) {
   var SIZE_MB = 43;          /* perkiraan total ukuran semua lagu */
   var ASK_AGAIN_DAYS = 14;   /* "NOT NOW" -> tanya lagi setelah sekian hari */
   var KEY = 'ofl_choice';
-  var TXT = {
+  var TXT_EN = {
     title: '> OFFLINE ARCHIVE',
     ask: 'Save all {n} tracks (~{mb} MB) so the observatory keeps playing without signal?',
     yes: 'SAVE ALL', no: 'NOT NOW',
@@ -326,6 +330,11 @@ if ('serviceWorker' in navigator) {
     done: '> ARCHIVE SECURED', doneNote: 'Offline mode ready.',
     part: '> SYNC INTERRUPTED', partNote: '{d}/{t} saved. Resumes on your next visit.'
   };
+  /* teks dibaca lazy: T() baru ada setelah i18n.js (defer) jalan; fallback ke Inggris */
+  var TXT = {};
+  Object.keys(TXT_EN).forEach(function (k) {
+    Object.defineProperty(TXT, k, { get: function () { return window.T ? T('ofl.' + k) : TXT_EN[k]; } });
+  });
   var total = 0, cachedNow = 0, card = null, mode = '', watchdog = 0, hideT = 0, styled = false;
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
@@ -376,7 +385,7 @@ if ('serviceWorker' in navigator) {
     card.setAttribute('aria-live', 'polite');
     card.setAttribute('aria-label', 'Offline archive');
     card.innerHTML =
-      '<button type="button" class="ofl-x" aria-label="Close">&times;</button>' +
+      '<button type="button" class="ofl-x" aria-label="' + (window.T ? T('owl.close') : 'Close') + '">&times;</button>' +
       '<div class="ofl-t"></div><div class="ofl-p"></div>' +
       '<div class="ofl-bar"><i></i></div>' +
       '<div class="ofl-row"><button type="button" class="ofl-b ofl-y"></button><button type="button" class="ofl-b ofl-n"></button></div>';
