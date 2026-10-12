@@ -25,7 +25,7 @@ jsFiles.forEach(function(f){
   if(m&&shell.indexOf("'"+m[1]+"'")<0)P.push('SHELL service-worker belum memuat \''+m[1]+'\' (harus sama persis dengan index.html)');
   if(!/^\s*(?:\/\*[\s\S]*?\*\/\s*)*'use strict';/.test(rd(n)))P.push(n+": tidak diawali 'use strict'");
 });
-['index.css',OBS+'sky-data.js',OBS+'texts.js'].forEach(function(n){
+['index.css',OBS+'sky-data.js',OBS+'texts.js',OBS+'i18n.js',OBS+'i18n-sky.js',OBS+'i18n-texts.js'].forEach(function(n){
   var m=html.match(new RegExp('(?:src|href)="('+n.replace(/[.\/]/g,'\\$&')+'\\?v=\\d+)"'));
   if(!m){P.push(n+': tag di index.html tidak ketemu / tanpa ?v=');return;}
   if(shell.indexOf("'"+m[1]+"'")<0)P.push('SHELL service-worker belum memuat \''+m[1]+'\' (harus sama persis dengan index.html)');
