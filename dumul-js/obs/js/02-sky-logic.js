@@ -1062,6 +1062,17 @@ function fitTitle(){
     big.style.fontSize=estimated+'px';
   }
 }
+/* satu batu: radius dasar dari ukuran layar (dikali AST_CFG.w saat digambar), ukuran dikali AST_CFG.sz saat digambar */
+function astMake(j){
+  var rb=Math.min(W,H)*.5+Math.max(W,H)*.12,k=.26+Math.random()*.74;
+  return {a:Math.random()*Math.PI*2,r:rb*k,rb:rb,k:k,e:.32+Math.random()*.16,spd:(.000045+Math.random()*.000075)*(Math.random()<.5?1:-1),sz:1.5+Math.random()*4.4,rot:Math.random()*6.28,rs:(Math.random()-.5)*.0018,al:.96+Math.random()*.04,seed:Math.random()*6.28,sprite:j%8,ox:0,oy:0,vx:0,vy:0,kick:0,kickUntil:0,_lastNow:performance.now()};
+}
+/* sesuaikan jumlah batu ke target (slider / otomatis) tanpa mengacak ulang batu yang sudah ada */
+function astResize(){
+  var t=AST_CFG.n<0?AST_AUTO:AST_CFG.n;
+  while(AST.length<t)AST.push(astMake(AST.length));
+  if(AST.length>t)AST.length=t;
+}
 /* ---------- layout ---------- */
 var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
 /* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
@@ -1702,11 +1713,9 @@ function layout(){
   }
   /* sabuk asteroid lokal di sekitar Gargantua: ringan, tidak memenuhi layar */
   AST=[];
-  var ac=IS_POTATO?14:Math.max(22,Math.min(42,Math.round(W*H/15000)));
-  for(var j=0;j<ac;j++){
-    var ang=Math.random()*Math.PI*2,rad=Math.min(W,H)*(.12+Math.random()*.22);
-    AST.push({a:ang,r:rad,e:.72+Math.random()*.28,spd:(.000045+Math.random()*.000075)*(Math.random()<.5?1:-1),sz:2.0+Math.random()*5.8,rot:Math.random()*6.28,rs:(Math.random()-.5)*.0018,al:.96+Math.random()*.04,seed:Math.random()*6.28,sprite:j%8,ox:0,oy:0,vx:0,vy:0,kick:0,kickUntil:0,_lastNow:performance.now()});
-  }  if(!GAL.length){
+  AST_AUTO=IS_POTATO?30:Math.max(56,Math.min(96,Math.round(W*H/8000)));
+  astResize();
+  if(!GAL.length){
     var spots=[[.08,.18,.72,.18,1.0],[.84,.13,.42,.72,.8],[.18,.42,.58,.38,1.1],[.76,.47,.66,.32,.9],[.10,.72,.48,.22,.75],[.88,.78,.55,.55,1.15],[.48,.24,.34,.44,.65],[.54,.82,.72,.26,.9]];
     var galCols=[
       {core:'255,225,185',outer:'205,225,255',halo:'135,175,230'},

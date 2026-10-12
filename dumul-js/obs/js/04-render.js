@@ -880,15 +880,31 @@ function drawShooting(now){
     g.strokeStyle=gr;g.lineWidth=s.lw||1.4;g.beginPath();g.moveTo(x,y);g.lineTo(x-s.vx*tl,y-s.vy*tl);g.stroke();
   }
 }
-function astSzK(){return BHU_CTX?Math.max(.5,Math.min(1,Math.sqrt(BHSC))):1;}
+/* Pusat orbit = anchor home BH (BH.hx/hy), diproyeksikan lewat skyXF (pan/rotate/zoom). BHK ikut seperti camBH() supaya mode kamera
+   tetap sinkron; di luar mode kamera BHK=0 jadi anchor diam di tengah langit, nggak ikut BH mini yang di-drag / di-summon. */
+function astAnchor(){
+  var px=BH.hx+skyPan.x*BHK,py=BH.hy+skyPan.y*BHK;
+  if(skyZoom===1)return [px,py];
+  var cx=W*.5,cy=H*.5;
+  return [cx+(px-cx)*skyZoom,cy+(py-cy)*skyZoom];
+} /* sama persis dengan camBH() (tanpa rotasi: BH digambar tegak), tapi pakai home BH.hx/hy */
+/* Skala kedalaman mulus dari sin(t): jauh (-1) kecil, dekat (+1) besar -> kesan perspektif. */
+function astDepth(s){return .52+.62*(s+1)/2;}
+/* Posisi layar 1 batu: elips (rr, rr*e) diputar BH.ang = bidang yang sama dengan cakram. out.s = sin(t): <0 = separuh belakang. */
+function astPlace(a,now,c,out){
+  var T=AST_CFG.t,rk=a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*T):a.r,ee=Math.max(.12,Math.min(.75,.40+(a.e-.40)*T)); /* T = ketebalan cincin: sebaran radius + sebaran kemiringan elips */
+  var t=AST_T*a.spd+a.seed,rr=rk*AST_K*AST_CFG.w*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom;
+  var ex=Math.cos(t)*rr,ey=Math.sin(t)*rr*ee,ca=Math.cos(BH.ang),sa=Math.sin(BH.ang);
+  out.x=c[0]+ex*ca-ey*sa;out.y=c[1]+ex*sa+ey*ca;out.s=Math.sin(t);
+  return out;
+}
+var _astP={x:0,y:0,s:0};
 function asteroidScreenAt(x,y){
-  if(!AST.length||BHSC<(BHU_CTX?.05:.6)||BHU.ast<.5)return -1;
-  var best=-1,bd=Infinity,now=performance.now();
-  var bp=camBH();
+  if(!AST.length||!AST_CFG.on)return -1;
+  var best=-1,bd=Infinity,now=performance.now(),c=astAnchor(),p=_astP;
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed))*BHZ;
-    var ax=bp[0]+Math.cos(t)*rr,ay=bp[1]+Math.sin(t)*rr*a.e;
-    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*skyZoom*astSzK();
+    var a=AST[i];astPlace(a,now,c,p);
+    var ax=p.x,ay=p.y,z=astDepth(p.s),sz=a.sz*z*skyZoom*AST_CFG.sz;
     if(SW){var q=pull(ax,ay);ax=q[0];ay=q[1];sz*=1-.45*q[2];}
     ax+=a.ox;ay+=a.oy;
     var d=Math.hypot(x-ax,y-ay);
@@ -898,9 +914,8 @@ function asteroidScreenAt(x,y){
 }
 function scatterAsteroid(i,x,y){
   if(i<0||!AST[i]||SW)return false;
-  var a=AST[i],now=performance.now(),t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed));
-  var ax=BH.x+Math.cos(t)*rr,ay=BH.y+Math.sin(t)*rr*a.e;
-  var dx=ax-BH.x,dy=ay-BH.y,dl=Math.hypot(dx,dy)||1;
+  var a=AST[i],now=performance.now(),c=astAnchor(),p=astPlace(a,now,c,_astP);
+  var dx=p.x-c[0],dy=p.y-c[1],dl=Math.hypot(dx,dy)||1;
   var nx=dx/dl,ny=dy/dl;
   /* One short impulse, then a damped spring brings the rock home.
      Velocities are pixels/second (not per-frame), so the kick cannot accumulate forever. */
@@ -919,59 +934,73 @@ function scatterAsteroid(i,x,y){
    matches the previous live polygon+gradient path. */
 function ensureAsteroidSprites(){
   if(AST_SPRITES&&AST_SPRITES.length)return AST_SPRITES;
-  var R=AST_SPRITE_R,pad=Math.ceil(R*1.55+6),size=pad*2,n=8,list=[];
+  var n=8,list=[],back=[];
   for(var si=0;si<n;si++){
-    var sides=6+(si%5),seed=si*1.618+0.37,sc=document.createElement('canvas');
+    var sides=6+(si%5),seed=si*1.618+0.37;
+    /* ---- DEPAN: besar, tajam, detail penuh (facet, kawah, rim light hangat dari sisi BH) ---- */
+    var R=AST_SPRITE_R,pad=Math.ceil(R*1.55+6),size=pad*2,sc=document.createElement('canvas');
     sc.width=sc.height=size;
     var sg=sc.getContext('2d');
     sg.translate(pad,pad);
-    /* Soft contact shadow baked into the sprite (was live shadowBlur). */
     sg.shadowColor='rgba(0,0,0,.95)';
     sg.shadowBlur=Math.max(1.5,R*1.15);
     var rock=sg.createLinearGradient(-R,-R,R,R);
-    rock.addColorStop(0,'rgba(78,82,82,1)');
-    rock.addColorStop(.28,'rgba(38,40,40,1)');
+    rock.addColorStop(0,'rgba(92,96,95,1)');
+    rock.addColorStop(.28,'rgba(42,44,44,1)');
     rock.addColorStop(.68,'rgba(15,16,17,1)');
     rock.addColorStop(1,'rgba(4,5,6,1)');
     sg.fillStyle=rock;
     sg.strokeStyle='rgba(3,4,5,1)';
     sg.lineWidth=Math.max(.7,R*.10);
+    var pts=[];
     sg.beginPath();
     for(var k=0;k<sides;k++){
       var aa=k*Math.PI*2/sides;
       var rr2=R*(.70+.38*Math.sin(k*9.71+seed)+.10*Math.cos(k*4.17+seed*1.7));
-      var px=Math.cos(aa)*rr2,py=Math.sin(aa)*rr2*.72;
+      var px=Math.cos(aa)*rr2,py=Math.sin(aa)*rr2*.72;pts.push([px,py]);
       if(k===0)sg.moveTo(px,py);else sg.lineTo(px,py);
     }
     sg.closePath();sg.fill();sg.stroke();
     sg.shadowBlur=0;
-    /* Mineral facet + craters (same relative geometry as the old live path). */
-    sg.fillStyle='rgba(150,154,151,.18)';
+    /* rim light hangat di sisi kiri-atas (menghadap cakram) */
+    sg.strokeStyle='rgba(255,196,128,.34)';sg.lineWidth=Math.max(.5,R*.07);
+    sg.beginPath();for(k=0;k<=Math.ceil(sides/2);k++){var q=pts[(k+sides-Math.floor(sides/4))%sides];if(k===0)sg.moveTo(q[0],q[1]);else sg.lineTo(q[0],q[1]);}sg.stroke();
+    sg.fillStyle='rgba(150,154,151,.20)';
     sg.beginPath();sg.moveTo(-R*.58,-R*.08);sg.lineTo(-R*.12,-R*.55);sg.lineTo(R*.18,-R*.26);sg.lineTo(-R*.08,R*.02);sg.closePath();sg.fill();
     sg.fillStyle='rgba(0,0,0,.88)';
-    sg.beginPath();sg.arc(R*.18,-R*.12,Math.max(.35,R*.15),0,6.283);sg.fill();
+    sg.beginPath();sg.arc(R*.18+Math.sin(seed)*R*.1,-R*.12,Math.max(.35,R*.15),0,6.283);sg.fill();
     sg.beginPath();sg.arc(-R*.27,R*.18,Math.max(.28,R*.10),0,6.283);sg.fill();
-    sg.strokeStyle='rgba(180,185,182,.24)';sg.lineWidth=Math.max(.3,R*.045);
-    sg.beginPath();sg.moveTo(-R*.35,-R*.34);sg.lineTo(R*.22,-R*.48);sg.stroke();
+    sg.beginPath();sg.arc(R*.38,R*.2,Math.max(.25,R*.07),0,6.283);sg.fill();
+    sg.strokeStyle='rgba(180,185,182,.26)';sg.lineWidth=Math.max(.3,R*.045);
+    sg.beginPath();sg.moveTo(-R*.35,-R*.34);sg.lineTo(R*.22,-R*.48);sg.moveTo(-R*.2,R*.32);sg.lineTo(R*.12,R*.12);sg.stroke();
     list.push({c:sc,pad:pad,R:R});
+    /* ---- BELAKANG: resolusi rendah (jadi lembut), siluet polos, tanpa kawah/facet, agak kebiruan seperti kabut jauh ---- */
+    var Rb=9,padb=Math.ceil(Rb*1.5+3),bc=document.createElement('canvas');
+    bc.width=bc.height=padb*2;
+    var bg2=bc.getContext('2d');
+    bg2.translate(padb,padb);
+    var bgr=bg2.createRadialGradient(-Rb*.3,-Rb*.3,0,0,0,Rb*1.1);
+    bgr.addColorStop(0,'rgba(58,66,76,1)');bgr.addColorStop(.6,'rgba(26,30,36,1)');bgr.addColorStop(1,'rgba(10,12,15,1)');
+    bg2.fillStyle=bgr;
+    bg2.beginPath();
+    for(k=0;k<sides-1;k++){
+      var ab=k*Math.PI*2/(sides-1),rb=Rb*(.78+.2*Math.sin(k*7.3+seed));
+      var bx=Math.cos(ab)*rb,by=Math.sin(ab)*rb*.76;
+      if(k===0)bg2.moveTo(bx,by);else bg2.lineTo(bx,by);
+    }
+    bg2.closePath();bg2.fill();
+    back.push({c:bc,pad:padb,R:Rb});
   }
-  AST_SPRITES=list;
+  AST_SPRITES=list;AST_SPRITES.back=back;
   return list;
 }
-function drawAsteroids(now){
-  if(!AST.length)return;
-  AST_K+=(astOrbitTarget()-AST_K)*.12;if(Math.abs(astOrbitTarget()-AST_K)<.001)AST_K=astOrbitTarget(); /* orbit melebar/menyempit halus */
-  if(BHU.ast<.5)return;
-  var bv=BHU_CTX?clamp(BHSC/.2):clamp((BHSC-.6)/.4);if(bv<=.02)return;
-  var alphaMul=bv; /* asteroid tetap tampil penuh saat SFX bintang aktif (nggak lagi memudar) */
-  var sprites=ensureAsteroidSprites();
-  var invR=1/AST_SPRITE_R;
+/* Satu langkah per frame: posisi + spring semua batu dihitung sekali (di pass belakang / pass tunggal), pass depan tinggal pakai hasilnya. */
+function astStep(now){
+  var dtc=AST_TL?Math.min(100,Math.max(0,now-AST_TL)):0;AST_TL=now;AST_T+=dtc*AST_CFG.spd; /* jam orbit sendiri: ganti kecepatan nggak bikin batu loncat */
+  var c=astAnchor(),p=_astP;
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],t=now*a.spd+a.seed,rr=a.r*AST_K*(1+.035*Math.sin(now*.0007+a.seed));
-    var bp=camBH();
-    var x=bp[0]+Math.cos(t)*rr*BHZ;
-    var y=bp[1]+Math.sin(t)*rr*a.e*BHZ;
-    var z=.70+.30*(Math.sin(t)+1)/2,sz=a.sz*z*astSzK();
+    var a=AST[i];astPlace(a,now,c,p);
+    var x=p.x,y=p.y,z=astDepth(p.s),sz=a.sz*z*skyZoom*AST_CFG.sz;
     if(SW){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
     /* Damped spring: the rock gets one impulse, flies a little, then settles back. */
     var last=a._lastNow||now,dt=Math.min(.032,Math.max(.001,(now-last)/1000));
@@ -982,16 +1011,28 @@ function drawAsteroids(now){
     a.ox+=a.vx*dt;a.oy+=a.vy*dt;
     if(a.kick&&now>a.kickUntil)a.kick=0;
     if(Math.abs(a.ox)+Math.abs(a.oy)<.12&&Math.abs(a.vx)+Math.abs(a.vy)<1.2){a.ox=a.oy=a.vx=a.vy=0;a.kick=0;}
-    x+=a.ox;y+=a.oy;
-    var sp=sprites[(a.sprite|0)%sprites.length];
-    var scale=sz*invR;
-    var half=sp.pad*scale;
-    var rot=a.rot+now*a.rs;
+    a._x=x+a.ox;a._y=y+a.oy;a._sz=sz;a._back=p.s<0;a._s=p.s;
+  }
+  AST._stamp=now;
+}
+/* half: -1 = separuh belakang (gambar SEBELUM Rasi/BH, lebih redup), 1 = separuh depan (SESUDAH BH), 0/undefined = semua sekaligus. */
+function drawAsteroids(now,half){
+  if(!AST.length||!AST_CFG.on)return;
+  half=half|0;
+  if(half<=0||AST._stamp!==now)astStep(now);
+  var sprites=ensureAsteroidSprites(),bsp=sprites.back;
+  for(var i=0;i<AST.length;i++){
+    var a=AST[i];
+    if(half<0&&!a._back)continue;
+    if(half>0&&a._back)continue;
+    var si2=(a.sprite|0)%sprites.length,sp=a._back?bsp[si2]:sprites[si2];
+    var scale=a._sz/sp.R,hf=sp.pad*scale;
     g.save();
-    if(typeof alphaMul==='number'&&alphaMul<1)g.globalAlpha*=alphaMul;
-    g.translate(x,y);
-    g.rotate(rot);
-    g.drawImage(sp.c,-half,-half,half*2,half*2);
+    /* belakang: makin jauh (sin t -> -1) makin redup + kecil; depan: sedikit lebih terang saat paling dekat */
+    if(a._back)g.globalAlpha*=.86+.36*a._s; else g.globalAlpha*=Math.min(1,.9+.1*a._s);
+    g.translate(a._x,a._y);
+    g.rotate(a.rot+now*a.rs);
+    g.drawImage(sp.c,-hf,-hf,hf*2,hf*2);
     g.restore();
   }
 }

@@ -439,19 +439,24 @@ var HOME_BH_DEFAULT=true;
 var HBH={on:HOME_BH_DEFAULT};
 try{var _hb=localStorage.getItem('dumul_bh_home');if(_hb==='0')HBH.on=false;else if(_hb==='1')HBH.on=true;}catch(e){}
 /* Tune Gargantua (panel 🎚️): size = ukuran, str = kekuatan lensing, bloom = glow hangat, speed = kecepatan animasi. Disimpan di localStorage.dumul_bh_cfg. */
-var BHU_DEF={size:1,str:1,bloom:1,speed:1,ast:1};
-var BHU={size:1,str:1,bloom:1,speed:1,ast:1};
-var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3],ast:[0,1]};
-/* Orbit asteroid ikut slider Strength (fisika): 1.0x = jarak asli, makin kuat tarikannya makin merapat (min 0.4x), makin lemah makin jauh (max 1.45x). Dihaluskan lewat AST_K. */
+var BHU_DEF={size:1,str:1,bloom:1,speed:1};
+var BHU={size:1,str:1,bloom:1,speed:1};
+var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3]};
+/* Asteroid: sabuk orbit BERDIRI SENDIRI (nggak ikut BH mini / slider Gargantua). Pusat = anchor home BH (BH.hx/hy lewat skyXF),
+   jari-jari tetap (AST_K, pengali global), bidang miring ikut BH.ang. Toggle ada di panel tab Langit, disimpan di localStorage.dumul_ast_cfg. */
 var AST_K=1;
-/* Orbit asteroid (fisika): makin kuat tarikan makin rapat. Di sector ikut ukuran BH (BHSC = size/1.8). */
-function astOrbitTarget(){return Math.max(.4,1.45-.45*BHU.str)*(BHU_CTX?BHSC:1);}
+/* AST_CFG: on = tampil, n = jumlah batu (-1 = otomatis dari ukuran layar), sz/w/spd = pengali ukuran / lebar orbit / kecepatan orbit, t = ketebalan cincin (sebaran radius + kemiringan elips; kecil = cincin tipis rapat). Disimpan di localStorage.dumul_ast_cfg */
+var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_RNG={n:[0,200],sz:[.4,2.5],w:[.3,4],spd:[0,3],t:[.1,3]},AST_CFG={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_AUTO=40,AST_T=0,AST_TL=0;
+function astClamp(k,v){v=+v;if(!isFinite(v))return AST_DEF[k];var r=AST_RNG[k];return Math.max(r[0],Math.min(r[1],k==='n'?Math.round(v):v));}
+function astNorm(o){var r={on:AST_DEF.on,n:AST_DEF.n,sz:AST_DEF.sz,w:AST_DEF.w,spd:AST_DEF.spd,t:AST_DEF.t};if(o&&typeof o==='object'){if(typeof o.on==='number')r.on=o.on>=.5?1:0;
+  if(typeof o.n==='number'&&o.n>=0)r.n=astClamp('n',o.n);['sz','w','spd','t'].forEach(function(k){if(typeof o[k]==='number')r[k]=astClamp(k,o[k]);});}return r;}
+try{AST_CFG=astNorm(JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null'));}catch(e){}
 function bhuClamp(k,v){var r=BHU_RNG[k];v=+v;if(!(v===v))v=BHU_DEF[k];return Math.max(r[0],Math.min(r[1],v));}
 try{var _bc=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');if(_bc)for(var _bk in BHU_DEF)if(typeof _bc[_bk]==='number')BHU[_bk]=bhuClamp(_bk,_bc[_bk]);}catch(e){}
 /* ===== Tune terpisah: overview vs BH yang di-summon di dalam sector =====
    Sector: ukuran 1.80x = ukuran BH overview 1.00x (jadi 0.50x jauh lebih kecil dari overview), strength/bloom/speed 1.00x = sama dgn overview,
-   asteroid default Show. BH sector TIDAK lagi membesar/mengecil karena dekat/jauh dari rasi (ukuran murni dari slider). */
-var BHU_SDEF={size:1,str:1,bloom:1,speed:1,ast:1},BH_SECT_MAXSIZE=1.8;
+   BH sector TIDAK lagi membesar/mengecil karena dekat/jauh dari rasi (ukuran murni dari slider). */
+var BHU_SDEF={size:1,str:1,bloom:1,speed:1},BH_SECT_MAXSIZE=1.8;
 var BHU_O={},BHU_S={},BHU_CTX=0,bhuRepaint=null;
 (function(){for(var k in BHU_DEF){BHU_O[k]=BHU[k];BHU_S[k]=BHU_SDEF[k];}
   try{var c=JSON.parse(localStorage.getItem('dumul_bh_cfg_s')||'null');if(c)for(var k2 in BHU_SDEF)if(typeof c[k2]==='number')BHU_S[k2]=bhuClamp(k2,c[k2]);}catch(e){}})();

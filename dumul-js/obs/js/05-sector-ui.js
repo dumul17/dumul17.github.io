@@ -404,13 +404,15 @@ function drawSectorOverview(now,age){
     g.fillText('build 2026-10-06a \u00b7 PLE '+(PLEIADES.scale||0).toFixed(1),8,top+4);g.restore();}}catch(eD){}
 }
 /* ---------- panel tuning: 1 tombol (#mode-bhset), 2 jendela/tab ----------
-   GARGANTUA = size / strength / bloom / speed / asteroid (logika lama), LANGIT = kabut, nebula, vignette, halo portal (hanya di overview). Save/Reset berlaku untuk tab yang aktif. */
+   GARGANTUA = size / strength / bloom / speed, LANGIT = toggle asteroid (overview + di dalam sektor) + kabut, nebula, vignette, halo portal (baris ini hanya di overview). Save/Reset berlaku untuk tab yang aktif. */
 (function bhTune(){
   var panel=document.getElementById('bh-panel'),btn=document.getElementById('mode-bhset');
   if(!panel||!btn)return;
-  var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys.concat(['ast']),astBtn=document.getElementById('bp-ast'),inp={},out={},
+  var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),AK=['n','sz','w','t','spd'],ain={},aout={},inp={},out={},
       bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),bClose=document.getElementById('bp-close'),sub=document.getElementById('bp-sub'),
       tabs=[].slice.call(panel.querySelectorAll('.bp-tab')),pages={},cur='bh',SKYK=['HAZE','BAND','DRIFT','A_OV','THICK','VIG','HALO'],sin={},sout={},bakeT=0;
+  AK.forEach(function(k){ain[k]=document.getElementById('ap-'+k);aout[k]=document.getElementById('ap-'+k+'-v');});
+  function tx(k,f){try{var v=T(k);return(v&&v!==k)?v:f;}catch(e){return f;}}
   [].slice.call(panel.querySelectorAll('.bp-page')).forEach(function(p){pages[p.getAttribute('data-page')]=p;});
   keys.forEach(function(k){inp[k]=document.getElementById('bp-'+k);out[k]=document.getElementById('bp-'+k+'-v');});
   SKYK.forEach(function(k){sin[k]=document.getElementById('sp-'+k);sout[k]=document.getElementById('sp-'+k+'-v');
@@ -421,10 +423,21 @@ function drawSectorOverview(now,age){
   function stored(){var o=null;try{o=JSON.parse(localStorage.getItem(bhuKey())||'null');}catch(e){}var r={},df=bhuDef();allKeys.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?bhuClamp(k,o[k]):df[k];});return r;}
   function paintBH(){
     keys.forEach(function(k){if(inp[k]){inp[k].value=String(Math.round(BHU[k]*100));fill(inp[k]);}if(out[k])out[k].textContent=BHU[k].toFixed(2)+'\u00d7';});
-    if(astBtn){var ao=BHU.ast>=.5;astBtn.setAttribute('aria-pressed',ao?'true':'false');astBtn.textContent=ao?T('tune.show'):T('tune.hide');astBtn.classList.toggle('off',!ao);}
   }
   /* ---- tab Langit ---- */
   function skyStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg')||'null');}catch(e){}var r={};SKYK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEB_TUNE[k].def;});return r;}
+  function skyOv(){var c=body.classList;return c.contains('sect-ov')&&NEB.on;}   /* baris kabut/nebula/dll cuma relevan di overview */
+  function astStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null');}catch(e){}return astNorm(o);}
+  function astFmt(k,v){return k==='n'?String(v):v.toFixed(2)+'\u00d7';}
+  function paintAst(){
+    if(astBtn){var ao=!!AST_CFG.on;astBtn.setAttribute('aria-pressed',ao?'true':'false');astBtn.textContent=ao?T('tune.show'):T('tune.hide');astBtn.classList.toggle('off',!ao);}
+    AK.forEach(function(k){
+      var v=k==='n'?(AST_CFG.n<0?AST_AUTO:AST_CFG.n):AST_CFG[k],el=ain[k];
+      if(el){el.value=String(k==='n'?v:Math.round(v*100));fill(el);}
+      if(aout[k])aout[k].textContent=astFmt(k,v);
+    });
+  }
+  function astDirty(){var st=astStored(),d=false;if(st.on!==AST_CFG.on)d=true;AK.forEach(function(k){if(k==='n'?st.n!==AST_CFG.n:Math.abs(st[k]-AST_CFG[k])>.004)d=true;});return d;}
   function paintSky(){SKYK.forEach(function(k){var v=NEB[k];if(sin[k]){sin[k].value=String(Math.round(v*100));fill(sin[k]);}if(sout[k])sout[k].textContent=skyFmt(k,v);});}
   function skyBake(){clearTimeout(bakeT);bakeT=setTimeout(function(){try{bakeAstroPlates();}catch(e){}},110);}   /* debounce: bake plate tidak tiap geseran */
   function skyChanged(k){
@@ -434,25 +447,27 @@ function drawSectorOverview(now,age){
   }
   /* ---- umum ---- */
   function paint(){
-    if(sub)sub.textContent=cur==='sky'?T('tune.sub.sky'):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
-    paintBH();paintSky();
+    if(sub)sub.textContent=cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?T('tune.sub.sky'):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
+    paintBH();paintSky();paintAst();
     var d=false,st;
     if(cur==='bh'){st=stored();allKeys.forEach(function(k){if(Math.abs(st[k]-BHU[k])>.004)d=true;});}
-    else{st=skyStored();SKYK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
+    else if(cur==='ast')d=astDirty();
+    else if(skyOv()){st=skyStored();SKYK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     if(bSave)bSave.classList.toggle('dirty',d);
   }
-  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:c.contains('sect-ov')&&NEB.on};}
+  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:c.contains('sect-ov'),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview + di dalam sektor (di sektor isinya cuma toggle asteroid) */
   function refresh(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
-    if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':cur);
+    if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':(a.ast?'ast':cur));
     tabs.forEach(function(tb){var on=tb.getAttribute('data-tab')===cur;tb.classList.toggle('on',on);tb.setAttribute('aria-selected',on?'true':'false');});
     Object.keys(pages).forEach(function(id){pages[id].hidden=(id!==cur);});
-    if(!a.bh&&!a.sky&&panel.classList.contains('on'))open(false);
+    var ov=skyOv();[].slice.call(panel.querySelectorAll('[data-ov]')).forEach(function(el){el.hidden=!ov;});
+    if(!a.bh&&!a.sky&&!a.ast&&panel.classList.contains('on'))open(false);
     paint();
   }
   function open(on){
-    var a=avail();on=!!on&&(a.bh||a.sky);
+    var a=avail();on=!!on&&(a.bh||a.sky||a.ast);
     panel.classList.toggle('on',on);panel.setAttribute('aria-hidden',on?'false':'true');
     btn.classList.toggle('on',on);btn.setAttribute('aria-expanded',on?'true':'false');
     if(on)refresh();
@@ -471,23 +486,38 @@ function drawSectorOverview(now,age){
     if(!sin[k])return;
     sin[k].addEventListener('input',function(){nebTuneApply(k,sin[k].value/100);skyChanged(k);paint();});
   });
-  if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();BHU.ast=BHU.ast>=.5?0:1;paint();haptic(6);});
+  if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();AST_CFG.on=AST_CFG.on?0:1;paint();haptic(6);});
+  AK.forEach(function(k){
+    if(!ain[k])return;
+    ain[k].addEventListener('input',function(){
+      AST_CFG[k]=astClamp(k,k==='n'?ain[k].value:ain[k].value/100);
+      if(k==='n')astResize();
+      paint();
+    });
+  });
   if(bSave)bSave.addEventListener('click',function(e){
     e.stopPropagation();
-    if(cur==='sky'){
-      var o={};SKYK.forEach(function(k){o[k]=NEB[k];});
-      try{localStorage.setItem('dumul_sky_cfg',JSON.stringify(o));}catch(er){}
+    if(cur==='ast'){
+      try{localStorage.setItem('dumul_ast_cfg',JSON.stringify(AST_CFG));}catch(er){}
+    }else if(cur==='sky'){
+      if(skyOv()){var o={};SKYK.forEach(function(k){o[k]=NEB[k];});
+        try{localStorage.setItem('dumul_sky_cfg',JSON.stringify(o));}catch(er){}}
     }else{try{localStorage.setItem(bhuKey(),JSON.stringify(BHU));}catch(er){}}
     paint();haptic(10);
-    try{if(typeof showModeToast==='function')showModeToast(cur==='sky'?T('tune.saved.sky'):T('tune.saved.bh'),null,1500);}catch(er){}
+    try{if(typeof showModeToast==='function')showModeToast(cur==='ast'?tx('tune.saved.ast','Asteroid saved'):cur==='sky'?T('tune.saved.sky'):T('tune.saved.bh'),null,1500);}catch(er){}
   });
   if(bReset)bReset.addEventListener('click',function(e){
     e.stopPropagation();
-    if(cur==='sky'){
-      SKYK.forEach(function(k){nebTuneApply(k,NEB_TUNE[k].def);nebTuneChanged(k);});
-      SECT_HALO[0]=SECT_HALO[1]=null;SECT_HALO_A[0]=NEB.HALO;SECT_HALO_A[1]=NEB.HALO*.64;
-      try{localStorage.removeItem('dumul_sky_cfg');}catch(er){}
-      skyBake();
+    if(cur==='ast'){
+      AST_CFG=astNorm(null);astResize();
+      try{localStorage.removeItem('dumul_ast_cfg');}catch(er){}
+    }else if(cur==='sky'){
+      if(skyOv()){
+        SKYK.forEach(function(k){nebTuneApply(k,NEB_TUNE[k].def);nebTuneChanged(k);});
+        SECT_HALO[0]=SECT_HALO[1]=null;SECT_HALO_A[0]=NEB.HALO;SECT_HALO_A[1]=NEB.HALO*.64;
+        try{localStorage.removeItem('dumul_sky_cfg');}catch(er){}
+        skyBake();
+      }
     }else{
       allKeys.forEach(function(k){BHU[k]=bhuDef()[k];});
       try{localStorage.removeItem(bhuKey());}catch(er){}
@@ -701,6 +731,7 @@ function frame(now){
     teleGreetFollow();
     updateClockDilation(now);
     drawShooting(now);
+    try{drawAsteroids(now,-1);}catch(err){window.__hub.renderError='drawAsteroidsBack: '+(err&&err.message||err);} /* separuh belakang: di belakang Rasi & BH */
     cullBegin();
     sectStep(now);
     if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);}
@@ -723,9 +754,9 @@ function frame(now){
 
     /* Isolate late-stage canvas effects so one mobile/WebView compatibility
        issue cannot abort the frame before Gargantua is rendered. */
-    try{drawAsteroids(now);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);}
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     drawHoleSafe(now,age);
+    try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: melintas di depan BH */
     try{drawSectorGate(now);}catch(err){window.__hub.renderError='sectorGate: '+(err&&err.message||err);}
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}
