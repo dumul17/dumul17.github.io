@@ -932,7 +932,26 @@ var SN_COOLDOWN={};
     var hit=false;groups.forEach(function(g){var o=g.getAttribute('data-sector')===k;if(o)hit=true;grpOpen(g,o);});
     if(!hit&&groups[0])grpOpen(groups[0],true);
   }
-  groups.forEach(function(g){g.querySelector('.mp-grp-head').addEventListener('click',function(){var on=!g.classList.contains('open');groups.forEach(function(o){grpOpen(o,false);});grpOpen(g,on);});}); /* satu sektor terbuka sekali waktu */
+  /* satu sektor terbuka sekali waktu. Karena grup lain di atasnya ikut menutup, isi di atas header yang diklik ikut menyusut dan daftar jadi "meleset":
+     jadi header yang diklik dijangkar (tetap di posisi layar yang sama), lalu kalau daftar barunya kepotong di bawah, digeser pelan sampai kelihatan
+     (header tidak boleh lewat batas atas). Scroll-snap dimatikan sebentar supaya tidak saling tarik dengan penyesuaian ini. */
+  var mpScroll=panel.querySelector('.mp-scroll'),mpSnapT=0;
+  groups.forEach(function(g){var head=g.querySelector('.mp-grp-head');head.addEventListener('click',function(){
+    var on=!g.classList.contains('open'),y0=head.getBoundingClientRect().top;
+    if(mpScroll){clearTimeout(mpSnapT);mpScroll.style.scrollSnapType='none';}
+    groups.forEach(function(o){grpOpen(o,false);});grpOpen(g,on);
+    if(!mpScroll)return;
+    mpScroll.scrollTop+=head.getBoundingClientRect().top-y0;   /* jangkar: header tetap di tempat */
+    if(on){
+      var cr=mpScroll.getBoundingClientRect(),hr=head.getBoundingClientRect(),gr=g.getBoundingClientRect(),
+          need=gr.bottom-(cr.bottom-4),room=hr.top-(cr.top+2),d=Math.min(need,room);
+      if(d>1){
+        var rm=false;try{rm=window.matchMedia('(prefers-reduced-motion:reduce)').matches;}catch(e){}
+        mpScroll.scrollTo({top:mpScroll.scrollTop+d,behavior:rm?'auto':'smooth'});
+      }
+    }
+    mpSnapT=setTimeout(function(){mpScroll.style.scrollSnapType='';},420);
+  });});
   toggle.addEventListener('click',function(){
     if(panel.classList.contains('open'))return;
     grpFocus(!SECT.on&&SECT.cur?SECT.cur.k:(SECT.cur&&SECT.cur.k)||null);

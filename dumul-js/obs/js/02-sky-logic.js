@@ -1115,13 +1115,16 @@ function drawHud(){
 }
 /* Astrophotography plate: deep layer (dust/band/galaxies) + mid layer (stars/HUD/grid), both baked offscreen. */
 var plateDeep=null,plateM=28,plateDPR=0;
+/* Skala bake plate relatif px CSS (dibatasi DPR). DPR 2 + nilai 2 = tajam penuh (tanpa upscale, grain halus gradient tak membesar); makin kecil makin ringan/lembut.
+   deep = plate utama (haze, band, nebula; nebTint per sektor ikut membesar), dust = 2 layer DRIFT. Dulu .75 dan .5. */
+var PLATE_DS_DEEP=1.5,PLATE_DS_DUST=2;
 /* Dust depth layers: 2 transparent plates baked ONCE at low res, drifting on sine paths with
    their own parallax speed. Per-frame cost = 2 drawImage; nothing is re-rendered. */
 var plateDust=[];
 function bakeDustLayers(M,EW,EH,hk){
   plateDust=[];
   if(IS_POTATO||hk===0)return; /* low-end devices (atau DRIFT=0): keep the single deep plate, no extra layers */
-  var ds=Math.min(DPR,.5);
+  var ds=Math.min(DPR,PLATE_DS_DUST);
   /* far = cool/slow/wide, near = warm/faster/tighter. Parallax stays below the star layer (.35)
      so depth ordering matches speed ordering. */
   var defs=[
@@ -1266,7 +1269,7 @@ function bakeAstroPlates(){
   var EW=W+2*M,EH=H+2*M,rnd=plateRng(0x5EED17),cx0=W*.5,cy0=H*.5,BA=-.5,bt=Math.min(W,H)*.32;
   plateDPR=DPR;
   /* ===== L0 deep plate (opaque, reduced resolution: it is soft by design) ===== */
-  var ds=Math.min(DPR,IS_POTATO?.5:.75);
+  var ds=Math.min(DPR,IS_POTATO?.5:PLATE_DS_DEEP);
   plateDeep=document.createElement('canvas');
   plateDeep.width=Math.max(1,Math.round(EW*ds));plateDeep.height=Math.max(1,Math.round(EH*ds));
   var dc=plateDeep.getContext('2d',{alpha:false});
