@@ -1107,9 +1107,9 @@ var plateDeep=null,plateM=28,plateDPR=0;
 /* Dust depth layers: 2 transparent plates baked ONCE at low res, drifting on sine paths with
    their own parallax speed. Per-frame cost = 2 drawImage; nothing is re-rendered. */
 var plateDust=[];
-function bakeDustLayers(M,EW,EH){
+function bakeDustLayers(M,EW,EH,hk){
   plateDust=[];
-  if(IS_POTATO)return; /* low-end devices: keep the single deep plate, no extra layers */
+  if(IS_POTATO||hk===0)return; /* low-end devices (atau DRIFT=0): keep the single deep plate, no extra layers */
   var ds=Math.min(DPR,.5);
   /* far = cool/slow/wide, near = warm/faster/tighter. Parallax stays below the star layer (.35)
      so depth ordering matches speed ordering. */
@@ -1123,7 +1123,7 @@ function bakeDustLayers(M,EW,EH){
     var c=cvs.getContext('2d');c.setTransform(ds,0,0,ds,M*ds,M*ds);
     for(var i=0;i<d.n;i++){
       var x=(.12+rnd()*.76)*W,y=(.10+rnd()*.80)*H,r=(d.rmin+rnd()*(d.rmax-d.rmin))*Math.max(W,H)*.5;
-      var col=d.cols[(rnd()*d.cols.length)|0],al=d.a[0]+rnd()*(d.a[1]-d.a[0]);
+      var col=d.cols[(rnd()*d.cols.length)|0],al=(d.a[0]+rnd()*(d.a[1]-d.a[0]))*(hk===undefined?1:hk);
       c.save();c.translate(x,y);c.rotate((rnd()-.5)*1.6);c.scale(1,.35+rnd()*.3);
       var gr=c.createRadialGradient(0,0,0,0,0,r);
       gr.addColorStop(0,'rgba('+col+','+al+')');gr.addColorStop(.5,'rgba('+col+','+(al*.42)+')');gr.addColorStop(1,'rgba('+col+',0)');
@@ -1142,8 +1142,8 @@ function telescopeHitRadius(){
    Gambar nebula dipakai sebagai layer dasar plateDeep (overview) dan, lewat nebTint(), versi berwarna per sektor (dipakai sectDrawSky di 04-render.js).
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
-   Tuning: A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:.85,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:{p:'dumul-js/obs/img/nebula-portrait.webp?v=1',l:'dumul-js/obs/img/nebula-landscape.webp?v=1'},img:{},base:null,key:'',tint:{}};
+   Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],HALO:.55,THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:{p:'dumul-js/obs/img/nebula-portrait.webp?v=1',l:'dumul-js/obs/img/nebula-landscape.webp?v=1'},img:{},base:null,key:'',tint:{}};
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
   var k=W<H*1.05?'p':'l',im=NEB.img[k];
@@ -1167,9 +1167,35 @@ function nebBase(EW,EH,ds){
   var hh=Math.hypot(cw,ch)*.5,vg2=x.createRadialGradient(cw/2,ch/2,hh*.45,cw/2,ch/2,hh);
   vg2.addColorStop(0,'rgba(0,0,0,0)');vg2.addColorStop(.7,'rgba(0,0,0,'+(.15*NEB.VIG)+')');vg2.addColorStop(1,'rgba(0,0,0,'+(.65*NEB.VIG)+')');
   x.fillStyle=vg2;x.fillRect(0,0,cw,ch);
-  NEB.base=c;NEB.key=key;NEB.tint={};return c;
+  NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;return c;
 }
 /* Versi nebula berwarna sektor (hue+saturasi dari SECTORS[].sky.rgb, terang tetap dari gambar). Di-bake lazy, sekali per sektor. */
+/* Versi overview: warna asli gambar, tapi latar gelap -> transparan (topeng yang sama dgn sektor), supaya latar overview pekat/bening seperti di sektor.
+   getImageData ditolak -> null (pakai gambar opaque). */
+function nebOv(){
+  var b=NEB.base;if(!b||!NEB.MASK)return null;
+  if(NEB.ovc)return NEB.ovc;
+  var w=b.width,h=b.height,id,d,i,m,lo=NEB.MASK[0],hi=NEB.MASK[1],c,x;
+  try{id=b.getContext('2d').getImageData(0,0,w,h);}catch(e){return null;}
+  d=id.data;
+  for(i=0;i<d.length;i+=4){m=(.3*d[i]+.59*d[i+1]+.11*d[i+2]-lo)/(hi-lo);m=m<0?0:m>1?1:m;d[i+3]=(m*m*(3-2*m)*255)|0;}
+  c=document.createElement('canvas');c.width=w;c.height=h;x=c.getContext('2d');x.putImageData(id,0,0);
+  return NEB.ovc=c;
+}
+/* ---- Tuning langit (panel tab "Langit", tombol 🎚️): nilai disimpan di localStorage.dumul_sky_cfg ----
+   HAZE/BAND/DRIFT = kabut lama (lihat atas), A_OV = kuat nebula, THICK = tebal halo blob (0..1 -> NEB.MASK[0] 18..2; default .5 = 10),
+   VIG = vignette tepi, HALO = gelap halo portal sektor (dipakai 05-sector-ui.js). */
+var NEB_TUNE={HAZE:{min:0,max:1,def:0},BAND:{min:0,max:1,def:0},DRIFT:{min:0,max:1,def:0},A_OV:{min:0,max:1,def:1},THICK:{min:0,max:1,def:.5},VIG:{min:0,max:2,def:1},HALO:{min:0,max:1,def:.55}};
+function nebTuneApply(k,v){
+  var t=NEB_TUNE[k];v=+v;if(!(v===v))v=t.def;v=Math.max(t.min,Math.min(t.max,v));
+  NEB[k]=v;if(k==='THICK')NEB.MASK=[18-16*v,80];
+  return v;
+}
+function nebTuneChanged(k){   /* invalidasi cache yang bergantung pada nilai ini; bake ulang plate dipicu pemanggil */
+  if(k==='VIG')NEB.key='';                       /* paksa nebula dasar dibangun ulang (vignette ter-bake di dalamnya) */
+  if(k==='THICK'){NEB.ovc=null;NEB.tint={};}     /* topeng berubah -> versi overview & sektor di-bake ulang */
+}
+(function(){try{var c=JSON.parse(localStorage.getItem('dumul_sky_cfg')||'null');for(var k in NEB_TUNE)nebTuneApply(k,(c&&typeof c[k]==='number')?c[k]:NEB_TUNE[k].def);}catch(e){}})();
 var NEBH=[0,0,0];
 function nebHsl(r,g,b){ /* rgb 0..255 -> NEBH=[h 0..360, s, l] */
   r/=255;g/=255;b/=255;
@@ -1236,11 +1262,11 @@ function bakeAstroPlates(){
   dc.setTransform(ds,0,0,ds,M*ds,M*ds);
   dc.fillStyle='#050b12';dc.fillRect(-M,-M,EW,EH);
   /* nebula gambar (kalau sudah dimuat); kabut/glow prosedural lama diredam (dk) biar nggak dobel */
-  var nb=nebBase(EW,EH,ds),dk=nb?.4:1;
-  if(nb){dc.save();dc.setTransform(1,0,0,1,0,0);dc.globalAlpha=NEB.A_OV;dc.drawImage(nb,0,0,plateDeep.width,plateDeep.height);dc.restore();}
+  var nb=nebBase(EW,EH,ds),dk=nb?NEB.HAZE:1,bk=nb?NEB.BAND:1;
+  if(nb){dc.save();dc.setTransform(1,0,0,1,0,0);dc.globalAlpha=NEB.A_OV;dc.drawImage(nebOv()||nb,0,0,plateDeep.width,plateDeep.height);dc.restore();}
   /* cosmological dust: wide, low-alpha tinted clouds */
   var dust=[[.20,.30,.55,'110,229,255',.050,.4],[.80,.22,.50,'255,122,217',.040,-.3],[.62,.72,.60,'110,160,255',.050,.2],[.14,.84,.45,'255,196,140',.034,-.5],[.50,.48,.70,'140,120,230',.030,.1]];
-  for(var di=0;di<dust.length;di++){
+  for(var di=0;di<(dk>0?dust.length:0);di++){
     var dd=dust[di],dr=dd[2]*Math.max(W,H)*.5,dg;
     dc.save();dc.globalAlpha=dk;dc.translate(dd[0]*W,dd[1]*H);dc.rotate(dd[5]);dc.scale(1,.55);
     dg=dc.createRadialGradient(0,0,0,0,0,dr);
@@ -1256,7 +1282,7 @@ function bakeAstroPlates(){
     dc.save();dc.globalCompositeOperation='lighter';dc.globalAlpha=dk;dc.fillStyle=tg;dc.fillRect(-M,-M,EW,EH);dc.restore();
   })();
   /* Milky-Way band: diagonal glow + mottled bright knots + dark dust lanes */
-  dc.save();dc.translate(cx0,cy0);dc.rotate(BA);
+  dc.save();dc.globalAlpha=bk;dc.translate(cx0,cy0);dc.rotate(BA);
   var bw=Math.max(W,H)*1.1,bgr=dc.createLinearGradient(0,-bt,0,bt);
   bgr.addColorStop(0,'rgba(170,200,255,0)');bgr.addColorStop(.5,'rgba(185,205,255,.075)');bgr.addColorStop(1,'rgba(170,200,255,0)');
   dc.fillStyle=bgr;dc.fillRect(-bw,-bt,bw*2,bt*2);
@@ -1293,11 +1319,13 @@ function bakeAstroPlates(){
       dc.restore();
     }
     /* vignette: lens falloff of a long-exposure plate */
-  var vg=dc.createRadialGradient(cx0,cy0,Math.min(W,H)*.35,cx0,cy0,Math.hypot(W,H)*.62);
-  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.38)');
-  dc.fillStyle=vg;dc.fillRect(-M,-M,EW,EH);
+  if(!nb){   /* nebula gambar sudah punya vignette sendiri */
+    var vg=dc.createRadialGradient(cx0,cy0,Math.min(W,H)*.35,cx0,cy0,Math.hypot(W,H)*.62);
+    vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.38)');
+    dc.fillStyle=vg;dc.fillRect(-M,-M,EW,EH);
+  }
   /* film grain: one tiny noise tile, drawn in device pixels (skipped on potato) */
-  if(!IS_POTATO){
+  if(!IS_POTATO&&!nb){   /* grain di-skip kalau nebula gambar aktif: di-upscale dari plate resolusi rendah jadi tampak kasar/beda piksel dgn sektor */
     var gt=document.createElement('canvas');gt.width=gt.height=96;
     var gx=gt.getContext('2d'),gi=gx.createImageData(96,96),gd=gi.data,gv;
     for(var pi=0;pi<gd.length;pi+=4){gv=(rnd()*255)|0;gd[pi]=gd[pi+1]=gd[pi+2]=gv;gd[pi+3]=255;}
@@ -1381,7 +1409,7 @@ function bakeAstroPlates(){
       bgCtx.restore();
     })();
 
-  bakeDustLayers(M,EW,EH);
+  bakeDustLayers(M,EW,EH,nb?NEB.DRIFT:1);
 }
 /* One layer blit: zoom about screen centre (deep layer zooms less => parallax depth) + offset. */
 function plateBlit(c,m,pw,ph,z,ox,oy){
