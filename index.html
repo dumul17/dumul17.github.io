@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=40">
+<link rel="stylesheet" href="index.css?v=41">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -190,6 +190,7 @@
     <div class="bp-tabs" role="tablist" aria-label="Tuning" data-i18n-aria="mode.tune">
       <button type="button" class="bp-tab on" role="tab" data-tab="bh" aria-selected="true" data-i18n="tune.bh">Gargantua</button>
       <button type="button" class="bp-tab" role="tab" data-tab="sky" aria-selected="false" data-i18n="tune.sky">Sky</button>
+      <button type="button" class="bp-tab" role="tab" data-tab="ast" aria-selected="false">Asteroid</button>
     </div>
     <button type="button" id="bp-close" aria-label="Close" data-i18n-aria="owl.close">×</button>
   </div>
@@ -201,20 +202,27 @@
     <div class="bp-sec" data-i18n="tune.light">Light</div>
     <label class="bp-row"><span class="bp-k"><span data-i18n="tune.bloom">Bloom</span><i data-i18n="tune.bloom.s">warm glow</i></span><input type="range" class="bp-range" id="bp-bloom" min="0" max="200" step="1" value="100"><output id="bp-bloom-v">1.00×</output></label>
     <label class="bp-row"><span class="bp-k"><span data-i18n="tune.speed">Speed</span><i data-i18n="tune.speed.s">animation</i></span><input type="range" class="bp-range" id="bp-speed" min="0" max="300" step="1" value="100"><output id="bp-speed-v">1.00×</output></label>
-    <div class="bp-sec" data-i18n="tune.surr">Surroundings</div>
-    <div class="bp-row bp-tog"><span class="bp-k"><span data-i18n="tune.ast">Asteroids</span><i data-i18n="tune.ast.s">orbiting rocks</i></span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true" data-i18n="tune.show">Show</button></div>
   </div>
   <div class="bp-page" data-page="sky" hidden>
-    <div class="bp-sec" data-i18n="tune.atm">Atmosphere</div>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.haze">Haze</span><i data-i18n="tune.haze.s">dust clouds + glow</i></span><input type="range" class="bp-range" id="sp-HAZE" min="0" max="100" step="1" value="0"><output id="sp-HAZE-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.band">Band</span><i data-i18n="tune.band.s">milky way</i></span><input type="range" class="bp-range" id="sp-BAND" min="0" max="100" step="1" value="0"><output id="sp-BAND-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.drift">Drift</span><i data-i18n="tune.drift.s">floating dust</i></span><input type="range" class="bp-range" id="sp-DRIFT" min="0" max="100" step="1" value="0"><output id="sp-DRIFT-v">0%</output></label>
-    <div class="bp-sec" data-i18n="tune.neb">Nebula</div>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.neb">Nebula</span><i data-i18n="tune.neb.s">image strength</i></span><input type="range" class="bp-range" id="sp-A_OV" min="0" max="100" step="1" value="100"><output id="sp-A_OV-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.halo2">Blob halo</span><i data-i18n="tune.halo2.s">edge thickness</i></span><input type="range" class="bp-range" id="sp-THICK" min="0" max="100" step="1" value="50"><output id="sp-THICK-v">0%</output></label>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.vig">Vignette</span><i data-i18n="tune.vig.s">edge darkness</i></span><input type="range" class="bp-range" id="sp-VIG" min="0" max="200" step="1" value="100"><output id="sp-VIG-v">0%</output></label>
-    <div class="bp-sec" data-i18n="tune.portals">Portals</div>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.phalo">Portal halo</span><i data-i18n="tune.phalo.s">dark behind ring</i></span><input type="range" class="bp-range" id="sp-HALO" min="0" max="100" step="1" value="55"><output id="sp-HALO-v">0%</output></label>
+    <div class="bp-sec" data-i18n="tune.surr">Surroundings</div>
+    <div class="bp-sec" data-ov data-i18n="tune.atm">Atmosphere</div>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.haze">Haze</span><i data-i18n="tune.haze.s">dust clouds + glow</i></span><input type="range" class="bp-range" id="sp-HAZE" min="0" max="100" step="1" value="0"><output id="sp-HAZE-v">0%</output></label>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.band">Band</span><i data-i18n="tune.band.s">milky way</i></span><input type="range" class="bp-range" id="sp-BAND" min="0" max="100" step="1" value="0"><output id="sp-BAND-v">0%</output></label>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.drift">Drift</span><i data-i18n="tune.drift.s">floating dust</i></span><input type="range" class="bp-range" id="sp-DRIFT" min="0" max="100" step="1" value="0"><output id="sp-DRIFT-v">0%</output></label>
+    <div class="bp-sec" data-ov data-i18n="tune.neb">Nebula</div>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.neb">Nebula</span><i data-i18n="tune.neb.s">image strength</i></span><input type="range" class="bp-range" id="sp-A_OV" min="0" max="100" step="1" value="100"><output id="sp-A_OV-v">0%</output></label>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.halo2">Blob halo</span><i data-i18n="tune.halo2.s">edge thickness</i></span><input type="range" class="bp-range" id="sp-THICK" min="0" max="100" step="1" value="50"><output id="sp-THICK-v">0%</output></label>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.vig">Vignette</span><i data-i18n="tune.vig.s">edge darkness</i></span><input type="range" class="bp-range" id="sp-VIG" min="0" max="200" step="1" value="100"><output id="sp-VIG-v">0%</output></label>
+    <div class="bp-sec" data-ov data-i18n="tune.portals">Portals</div>
+    <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.phalo">Portal halo</span><i data-i18n="tune.phalo.s">dark behind ring</i></span><input type="range" class="bp-range" id="sp-HALO" min="0" max="100" step="1" value="55"><output id="sp-HALO-v">0%</output></label>
+  </div>
+  <div class="bp-page" data-page="ast" hidden>
+    <div class="bp-row bp-tog"><span class="bp-k"><span>Asteroids</span><i>orbiting rocks</i></span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true" data-i18n="tune.show">Show</button></div>
+    <label class="bp-row"><span class="bp-k"><span>Count</span><i>rocks</i></span><input type="range" class="bp-range" id="ap-n" min="0" max="200" step="1" value="60"><output id="ap-n-v">60</output></label>
+    <label class="bp-row"><span class="bp-k"><span>Size</span><i>rock scale</i></span><input type="range" class="bp-range" id="ap-sz" min="40" max="250" step="1" value="100"><output id="ap-sz-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k"><span>Orbit</span><i>width</i></span><input type="range" class="bp-range" id="ap-w" min="30" max="400" step="1" value="100"><output id="ap-w-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k"><span>Thickness</span><i>ring density</i></span><input type="range" class="bp-range" id="ap-t" min="10" max="300" step="1" value="100"><output id="ap-t-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k"><span>Speed</span><i>orbit</i></span><input type="range" class="bp-range" id="ap-spd" min="0" max="300" step="1" value="100"><output id="ap-spd-v">1.00×</output></label>
   </div>
   <div class="bp-act"><button type="button" id="bp-save" data-i18n="tune.save">Save</button><button type="button" id="bp-reset" data-i18n="tune.reset">Reset</button></div>
 </div>
@@ -248,11 +256,11 @@
 <script defer src="dumul-js/obs/i18n.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=1"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=100"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=103"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=101></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=104"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=99"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=101"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=102"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=102"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=103"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=99"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=99"></script>
 
