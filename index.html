@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=38">
+<link rel="stylesheet" href="index.css?v=39">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -172,7 +172,7 @@
   <button type="button" id="mode-bh" aria-pressed="false" aria-label="Summon Gargantua" title="Summon Gargantua">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5 a8.5 8.5 0 0 1 0 17"/><path d="M12 6 a6 6 0 0 1 0 12" opacity=".7"/><path d="M12 8.5 a3.5 3.5 0 0 1 0 7" opacity=".45"/></svg>
   </button>
-  <button type="button" id="mode-bhset" aria-label="Gargantua settings" title="Gargantua settings" aria-expanded="false" aria-controls="bh-panel">
+  <button type="button" id="mode-bhset" aria-label="Tuning" title="Tuning" aria-expanded="false" aria-controls="bh-panel">
     <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.2"/><circle cx="9.5" cy="17" r="2.2"/></svg>
   </button>
   <button type="button" id="mode-sectors" aria-label="Back to sector overview" title="Back to overview">
@@ -185,13 +185,37 @@
   <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous focus target">‹</button><button type="button" id="cf-name" aria-label="Next focus target">FOCUS · FREE</button><button type="button" id="cf-next" aria-label="Next focus target">›</button></div>
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
-<div id="bh-panel" role="dialog" aria-label="Gargantua settings" aria-hidden="true">
-  <div class="bp-head"><span class="bp-tag">Gargantua // Tune</span><button type="button" id="bp-close" aria-label="Close">×</button></div>
-  <label class="bp-row"><span class="bp-k">Size</span><input type="range" class="bp-range" id="bp-size" min="50" max="180" step="1" value="100"><output id="bp-size-v">1.00×</output></label>
-  <label class="bp-row"><span class="bp-k">Strength</span><input type="range" class="bp-range" id="bp-str" min="0" max="250" step="1" value="100"><output id="bp-str-v">1.00×</output></label>
-  <label class="bp-row"><span class="bp-k">Bloom</span><input type="range" class="bp-range" id="bp-bloom" min="0" max="200" step="1" value="100"><output id="bp-bloom-v">1.00×</output></label>
-  <label class="bp-row"><span class="bp-k">Speed</span><input type="range" class="bp-range" id="bp-speed" min="0" max="300" step="1" value="100"><output id="bp-speed-v">1.00×</output></label>
-  <div class="bp-row bp-tog"><span class="bp-k">Asteroids</span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true">Show</button></div>
+<div id="bh-panel" role="dialog" aria-label="Tuning" aria-hidden="true">
+  <div class="bp-head">
+    <div class="bp-tabs" role="tablist" aria-label="Tuning">
+      <button type="button" class="bp-tab on" role="tab" data-tab="bh" aria-selected="true">Gargantua</button>
+      <button type="button" class="bp-tab" role="tab" data-tab="sky" aria-selected="false">Sky</button>
+    </div>
+    <button type="button" id="bp-close" aria-label="Close">×</button>
+  </div>
+  <div class="bp-sub" id="bp-sub">Gargantua // Tune</div>
+  <div class="bp-page" data-page="bh">
+    <div class="bp-sec">Shape</div>
+    <label class="bp-row"><span class="bp-k">Size<i>scale</i></span><input type="range" class="bp-range" id="bp-size" min="50" max="180" step="1" value="100"><output id="bp-size-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k">Strength<i>lensing</i></span><input type="range" class="bp-range" id="bp-str" min="0" max="250" step="1" value="100"><output id="bp-str-v">1.00×</output></label>
+    <div class="bp-sec">Light</div>
+    <label class="bp-row"><span class="bp-k">Bloom<i>warm glow</i></span><input type="range" class="bp-range" id="bp-bloom" min="0" max="200" step="1" value="100"><output id="bp-bloom-v">1.00×</output></label>
+    <label class="bp-row"><span class="bp-k">Speed<i>animation</i></span><input type="range" class="bp-range" id="bp-speed" min="0" max="300" step="1" value="100"><output id="bp-speed-v">1.00×</output></label>
+    <div class="bp-sec">Surroundings</div>
+    <div class="bp-row bp-tog"><span class="bp-k">Asteroids<i>orbiting rocks</i></span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true">Show</button></div>
+  </div>
+  <div class="bp-page" data-page="sky" hidden>
+    <div class="bp-sec">Atmosphere</div>
+    <label class="bp-row"><span class="bp-k">Haze<i>dust clouds + glow</i></span><input type="range" class="bp-range" id="sp-HAZE" min="0" max="100" step="1" value="0"><output id="sp-HAZE-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k">Band<i>milky way</i></span><input type="range" class="bp-range" id="sp-BAND" min="0" max="100" step="1" value="0"><output id="sp-BAND-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k">Drift<i>floating dust</i></span><input type="range" class="bp-range" id="sp-DRIFT" min="0" max="100" step="1" value="0"><output id="sp-DRIFT-v">0%</output></label>
+    <div class="bp-sec">Nebula</div>
+    <label class="bp-row"><span class="bp-k">Nebula<i>image strength</i></span><input type="range" class="bp-range" id="sp-A_OV" min="0" max="100" step="1" value="100"><output id="sp-A_OV-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k">Blob halo<i>edge thickness</i></span><input type="range" class="bp-range" id="sp-THICK" min="0" max="100" step="1" value="50"><output id="sp-THICK-v">0%</output></label>
+    <label class="bp-row"><span class="bp-k">Vignette<i>edge darkness</i></span><input type="range" class="bp-range" id="sp-VIG" min="0" max="200" step="1" value="100"><output id="sp-VIG-v">0%</output></label>
+    <div class="bp-sec">Portals</div>
+    <label class="bp-row"><span class="bp-k">Portal halo<i>dark behind ring</i></span><input type="range" class="bp-range" id="sp-HALO" min="0" max="100" step="1" value="55"><output id="sp-HALO-v">0%</output></label>
+  </div>
   <div class="bp-act"><button type="button" id="bp-save">Save</button><button type="button" id="bp-reset">Reset</button></div>
 </div>
 <div id="sector-scan" aria-hidden="true">
@@ -221,10 +245,10 @@
 <script defer src="dumul-js/obs/sky-data.js?v=22"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=99"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=99"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=101"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=99"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=100"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=98"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=100"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=98"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=98"></script>
 
