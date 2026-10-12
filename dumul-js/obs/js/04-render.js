@@ -890,11 +890,11 @@ function astAnchor(){
 } /* sama persis dengan camBH() (tanpa rotasi: BH digambar tegak), tapi pakai home BH.hx/hy */
 /* Skala kedalaman mulus dari sin(t): jauh (-1) kecil, dekat (+1) besar -> kesan perspektif. */
 function astDepth(s){return .52+.62*(s+1)/2;}
-/* Posisi layar 1 batu: elips (rr, rr*e) diputar BH.ang = bidang yang sama dengan cakram. out.s = sin(t): <0 = separuh belakang. */
+/* Posisi layar 1 batu: elips (rr, rr*e) diputar BH.ang(+upAng di landscape) = bidang yang sama dengan cakram. out.s = sin(t): <0 = separuh belakang. */
 function astPlace(a,now,c,out){
   var T=AST_CFG.t,rk=a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*T):a.r,ee=Math.max(.12,Math.min(.75,.40+(a.e-.40)*T)); /* T = ketebalan cincin: sebaran radius + sebaran kemiringan elips */
   var t=AST_T*a.spd+a.seed,rr=rk*AST_K*AST_CFG.w*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom;
-  var ex=Math.cos(t)*rr,ey=Math.sin(t)*rr*ee,ca=Math.cos(BH.ang),sa=Math.sin(BH.ang);
+  var ex=Math.cos(t)*rr,ey=Math.sin(t)*rr*ee,ba=BH.ang+upAng(),ca=Math.cos(ba),sa=Math.sin(ba); /* + upAng(): landscape (stage diputar 90deg) bidang sabuk ikut tegak bareng cakram BH (sama dgn 03-gargantua: BH.ang+upAng()); portrait/desktop upAng()=0 */
   out.x=c[0]+ex*ca-ey*sa;out.y=c[1]+ex*sa+ey*ca;out.s=Math.sin(t);
   return out;
 }
