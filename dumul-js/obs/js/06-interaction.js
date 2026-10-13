@@ -214,6 +214,29 @@ function constellationTargetAt(x,y,skipTelescope){
   if(!skipTelescope&&telescopeHitAt(x,y))found=true;
   return found;
 }
+/* Jarak ke bintang rasi/Pleiades yang KENA tap (Infinity kalau tidak ada). Dipakai buat adu "siapa lebih dekat" antara bintang vs teleskop di area padat. */
+function constellationHitDist(x,y){
+  var best=Infinity,d;
+  if(PLEIADES.ready){
+    var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y,hitR=Math.max(22,PLEIADES.scale*.11);
+    for(var i=0;i<PLEIADES.bright.length;i++){
+      var st=PLEIADES.bright[i];if(!st.interactive)continue;
+      var q=gSky(PLEIADES.x+st.x*PLEIADES.scale+ox,PLEIADES.y+st.y*PLEIADES.scale+oy);
+      if(!q||q[2]>=1)continue;
+      d=Math.hypot(x-q[0],y-q[1]);if(d<hitR&&d<best)best=d;
+    }
+  }
+  CONS.forEach(function(c){
+    if(CONS_OFF[c.id])return;
+    Object.keys(c.stars).forEach(function(k){
+      var s=c.stars[k],q=gSky(s.x+c.ox,s.y+c.oy);
+      if(!q)return;
+      d=Math.hypot(x-q[0],y-q[1]);
+      if(d<Math.max(14,s.r*4.5)&&d<best)best=d;
+    });
+  });
+  return best;
+}
 function beginBHDrag(e){
   if(reduce||SW||drag.on||BHSC<.05)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
@@ -271,9 +294,12 @@ document.addEventListener('pointercancel',endBHDrag,{passive:false});
 
 /* ---------- mobile constellation pan + 2-finger rotate (±180°) ---------- */
 function skyPanLimits(){
-  var z=skyZoom||1;
-  if(CAMERA_MODE)return {x:Math.max(W*.62,Math.max(80,W*.38)*z),y:Math.max(H*.62,Math.max(70,H*.32)*z)};
-  return {x:Math.max(80,W*.38)*z,y:Math.max(70,H*.32)*z};
+  var z=skyZoom||1,lx,ly;
+  if(CAMERA_MODE){lx=Math.max(W*.62,Math.max(80,W*.38)*z);ly=Math.max(H*.62,Math.max(70,H*.32)*z);}
+  else{lx=Math.max(80,W*.38)*z;ly=Math.max(70,H*.32)*z;}
+  /* Landscape ROT: pan hidup di ruang sky (sebelum skyRot), jadi saat sky diputar ~90deg (kamera fokus rasi) sumbu x/y batasnya ikut tertukar */
+  if(STG.rot){var sn=Math.sin(skyRot),k=sn*sn;return {x:lx*(1-k)+ly*k,y:ly*(1-k)+lx*k};}
+  return {x:lx,y:ly};
 }
 function skyHitXY(x,y){
   /* Base star pos + pan, then through gSky - same rotation AND gravity-lens
@@ -410,6 +436,9 @@ function moveSkyPan(e){
   if(Math.hypot(dx,dy)>8)skyDrag.moved=true;
   if(!skyDrag.moved)return;
   var lim=skyPanLimits();
+  /* Landscape ROT: pan ada di ruang sky yang sudah diputar skyRot (kamera fokus rasi => ~90deg), sedangkan jari terbaca di ruang stage.
+     Putar balik delta jari dgn -skyRot (rumus sama dgn focusStep) supaya geser kiri/kanan di layar = sky gerak kiri/kanan. */
+  if(STG.rot&&skyRot*skyRot>=1e-8){var rc=Math.cos(skyRot),rs=Math.sin(skyRot),qx=dx*rc+dy*rs;dy=-dx*rs+dy*rc;dx=qx;}
   skyPan.x=Math.max(-lim.x,Math.min(lim.x,skyDrag.px+dx));
   skyPan.y=Math.max(-lim.y,Math.min(lim.y,skyDrag.py+dy));
   syncSkyPanHits();
@@ -1130,7 +1159,11 @@ document.addEventListener('pointerdown',function(e){
        (tidak muncul bubble, tidak makan tap). Tap di bintang yang lagi ketimpa teleskop
        tetap diproses sebagai tap bintang. */
     if(typeof ALIGN!=='undefined'&&ALIGN.cid)return;
-    if(constellationTargetAt(e.clientX,e.clientY,true))return;
+    /* Area padat (teleskop lagi ngorbit di dekat bintang): dulu SEMUA bintang dalam radius tap langsung menang, jadi teleskop hampir nggak bisa di-tap.
+       Sekarang yang lebih DEKAT ke titik tap yang menang; tap di badan teleskop (radius visual) selalu milik teleskop. */
+    var _tp=telescopeScreenPos(),_dT=Math.hypot(e.clientX-_tp[0],e.clientY-_tp[1]),_dS=constellationHitDist(e.clientX,e.clientY);
+    if(_dS<Infinity&&_dT>_dS&&_dT>Math.max(22,W*.04))return;
+    skyGestureAt=performance.now(); /* tombol .hit bintang di bawah teleskop jangan ikut ke-klik (pakai peredam klik yang sama dgn gesture 2 jari) */
     e.stopPropagation();
     /* Cancel any sky-pan that capture-phase may have started on a near miss. */
     if(skyDrag.on&&skyDrag.pid===e.pointerId){

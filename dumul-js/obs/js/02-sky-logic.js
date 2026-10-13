@@ -1114,7 +1114,7 @@ function drawHud(){
   g.restore();
 }
 /* Astrophotography plate: deep layer (dust/band/galaxies) + mid layer (stars/HUD/grid), both baked offscreen. */
-var plateDeep=null,plateM=28,plateDPR=0;
+var plateDeep=null,plateM=28,plateDPR=0,plateRot=0; /* plateRot = STG.rot saat plate di-bake: arah putar stage berubah (kiri<->kanan) => bake ulang */
 /* Skala bake plate relatif px CSS (dibatasi DPR). DPR 2 + nilai 2 = tajam penuh (tanpa upscale, grain halus gradient tak membesar); makin kecil makin ringan/lembut.
    deep = plate utama (haze, band, nebula; nebTint per sektor ikut membesar), dust = 2 layer DRIFT. Dulu .75 dan .5. */
 var PLATE_DS_DEEP=1.5,PLATE_DS_DUST=2;
@@ -1138,7 +1138,7 @@ function bakeDustLayers(M,EW,EH,hk){
     for(var i=0;i<d.n;i++){
       var x=(.12+rnd()*.76)*W,y=(.10+rnd()*.80)*H,r=(d.rmin+rnd()*(d.rmax-d.rmin))*Math.max(W,H)*.5;
       var col=d.cols[(rnd()*d.cols.length)|0],al=(d.a[0]+rnd()*(d.a[1]-d.a[0]))*(hk===undefined?1:hk);
-      c.save();c.translate(x,y);c.rotate((rnd()-.5)*1.6);c.scale(1,.35+rnd()*.3);
+      c.save();c.translate(x,y);c.rotate((rnd()-.5)*1.6+upAng());c.scale(1,.35+rnd()*.3); /* + upAng(): landscape ROT => blob debu tegak di layar, bukan ikut miring bareng stage */
       var gr=c.createRadialGradient(0,0,0,0,0,r);
       gr.addColorStop(0,'rgba('+col+','+al+')');gr.addColorStop(.5,'rgba('+col+','+(al*.42)+')');gr.addColorStop(1,'rgba('+col+',0)');
       c.fillStyle=gr;c.beginPath();c.arc(0,0,r,0,6.283);c.fill();c.restore();
@@ -1266,8 +1266,8 @@ function nebTint(s){
 function plateRng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function bakeAstroPlates(){
   var M=plateM=Math.round(Math.max(24,Math.min(48,Math.min(W,H)*.07)));
-  var EW=W+2*M,EH=H+2*M,rnd=plateRng(0x5EED17),cx0=W*.5,cy0=H*.5,BA=-.5,bt=Math.min(W,H)*.32;
-  plateDPR=DPR;
+  var EW=W+2*M,EH=H+2*M,rnd=plateRng(0x5EED17),cx0=W*.5,cy0=H*.5,BA=-.5+upAng(),bt=Math.min(W,H)*.32; /* + upAng(): sabuk Milky Way tegak di layar landscape (ROT), sama seperti di portrait; portrait/desktop upAng()=0 */
+  plateDPR=DPR;plateRot=STG.rot;
   /* ===== L0 deep plate (opaque, reduced resolution: it is soft by design) ===== */
   var ds=Math.min(DPR,IS_POTATO?.5:PLATE_DS_DEEP);
   plateDeep=document.createElement('canvas');
@@ -1282,7 +1282,7 @@ function bakeAstroPlates(){
   var dust=[[.20,.30,.55,'110,229,255',.050,.4],[.80,.22,.50,'255,122,217',.040,-.3],[.62,.72,.60,'110,160,255',.050,.2],[.14,.84,.45,'255,196,140',.034,-.5],[.50,.48,.70,'140,120,230',.030,.1]];
   for(var di=0;di<(dk>0?dust.length:0);di++){
     var dd=dust[di],dr=dd[2]*Math.max(W,H)*.5,dg;
-    dc.save();dc.globalAlpha=dk;dc.translate(dd[0]*W,dd[1]*H);dc.rotate(dd[5]);dc.scale(1,.55);
+    dc.save();dc.globalAlpha=dk;dc.translate(dd[0]*W,dd[1]*H);dc.rotate(dd[5]+upAng());dc.scale(1,.55);
     dg=dc.createRadialGradient(0,0,0,0,0,dr);
     dg.addColorStop(0,'rgba('+dd[3]+','+dd[4]+')');dg.addColorStop(.55,'rgba('+dd[3]+','+(dd[4]*.45)+')');dg.addColorStop(1,'rgba('+dd[3]+',0)');
     dc.fillStyle=dg;dc.beginPath();dc.arc(0,0,dr,0,6.283);dc.fill();
@@ -1319,7 +1319,7 @@ function bakeAstroPlates(){
     var gCount=IS_POTATO?4:GAL.length;
     for(var gi=0;gi<gCount;gi++){
       var gd=GAL[gi],px=gd.x*W,py=gd.y*H,w=(6+5*gd.scale),h=(2.6+2.4*gd.scale);
-      dc.save();dc.translate(px,py);dc.rotate(gd.rot);
+      dc.save();dc.translate(px,py);dc.rotate(gd.rot+upAng()); /* landscape ROT: galaksi tegak di layar */
       var gc=gd.col||{core:'255,225,185',outer:'205,225,255',halo:'135,175,230'};
       var gh=dc.createRadialGradient(0,0,0,0,0,w*1.9);
       gh.addColorStop(0,'rgba('+gc.core+',.20)');gh.addColorStop(.30,'rgba('+gc.outer+',.09)');gh.addColorStop(.68,'rgba('+gc.halo+',.045)');gh.addColorStop(1,'rgba('+gc.halo+',0)');
@@ -1404,19 +1404,22 @@ function bakeAstroPlates(){
       bgCtx.strokeStyle='rgba(110,229,255,.035)';
       bgCtx.lineWidth=.7;
       bgCtx.setLineDash([4,8]);
+      /* Landscape ROT: grid digambar di ruang LAYAR (gw x gh, sumbu ditukar) lalu diputar balik, jadi garis deklinasi tetap horizontal di layar */
+      var gw=W,gh=H;
+      if(STG.rot){gw=H;gh=W;bgCtx.translate(W*.5,H*.5);bgCtx.rotate(upAng());bgCtx.translate(-gw*.5,-gh*.5);}
 
       /* Declination lines. */
       for(var dec=.2;dec<1;dec+=.2){
         bgCtx.beginPath();
-        bgCtx.moveTo(0,H*dec);
-        bgCtx.lineTo(W,H*dec);
+        bgCtx.moveTo(0,gh*dec);
+        bgCtx.lineTo(gw,gh*dec);
         bgCtx.stroke();
       }
 
       /* Right Ascension meridians: restrained ellipses give the sky-map feel. */
       for(var ra=-.2;ra<=1.2;ra+=.35){
         bgCtx.beginPath();
-        bgCtx.ellipse(W*ra,H*.5,W*.25,H*.8,.2,0,6.283);
+        bgCtx.ellipse(gw*ra,gh*.5,gw*.25,gh*.8,.2,0,6.283);
         bgCtx.stroke();
       }
       bgCtx.setLineDash([]);
@@ -1732,7 +1735,7 @@ function layout(){
     ];
     GAL=spots.map(function(q,i){var cc=galCols[i%galCols.length];return{x:q[0],y:q[1],rx:q[2],ry:q[3],rot:(i*.83)%3.14,scale:q[4],p:i*.91,tw:.7+i*.06,col:cc};});
   }
-  if(bgDirty||!bgCanvas||plateDPR!==DPR){
+  if(bgDirty||!bgCanvas||plateDPR!==DPR||plateRot!==STG.rot){
     bakeAstroPlates();
     bgDirty=false;
   }

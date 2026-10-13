@@ -718,6 +718,7 @@ function frame(now){
         var dl=plateDust[dli],dt2=reduce?0:now*.001,
             ddx=reduce?0:Math.sin(dt2*6.2832/dl.per+dl.ph)*dl.amp,
             ddy=reduce?0:Math.cos(dt2*6.2832/(dl.per*1.37)+dl.ph)*dl.amp*.6;
+        if(STG.rot){var ua=upAng(),uc=Math.cos(ua),us=Math.sin(ua),tx=ddx*uc-ddy*us;ddy=ddx*us+ddy*uc;ddx=tx;}   /* landscape ROT: lintasan melayang searah layar, bukan searah stage yang diputar */
         plateBlit(dl.c,pM,pW,pH,1+(skyZoom-1)*dl.zf,skyPan.x*dl.par+ddx,skyPan.y*dl.par+ddy);
       }
       sectDrawSky();   /* warna langit per sektor (data: SECTORS[].sky di sky-data.js) */
