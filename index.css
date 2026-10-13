@@ -1142,3 +1142,25 @@ body.camera-mode .hit,body.camera-mode #bh,body.sect-in .hit,body.sect-in #bh{to
 /* perf tier 0: blur dimatikan di atas, jadi panel dibuat lebih pekat (sama dgn aturan panel music) */
 .perf-tier-0 #owl-panel,.perf-tier-0 #terminal,.perf-tier-0 #signal-fragment,.perf-tier-0 #last-signal,.perf-tier-0 #bh-panel{background:rgba(2,7,12,.93)!important}
 .perf-tier-0 #cons-archive{background:rgba(6,3,11,.93)!important}
+
+/* ===== Lost-in-Space: overlay fade/glitch/grain, indikator, kartu ajak/tinggal teleskop ===== */
+#lis-fx{position:fixed;inset:0;z-index:14;pointer-events:none;opacity:0;transition:opacity .6s ease;overflow:hidden;background:radial-gradient(ellipse at 50% 50%,rgba(2,5,10,0) 30%,rgba(2,5,10,.7) 100%)}
+#lis-fx::before{content:'';position:absolute;inset:-12%;opacity:.55;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .8 -.15'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");animation:lisGrain .45s steps(4) infinite;mix-blend-mode:screen}
+#lis-fx::after{content:'';position:absolute;left:0;right:0;top:18%;height:12%;background:linear-gradient(90deg,rgba(255,60,90,0) 0,rgba(255,60,90,.18) 30%,rgba(90,220,255,.2) 70%,rgba(90,220,255,0) 100%);animation:lisGlitch 1.4s steps(9) infinite}
+body.lis-gone #lis-fx{opacity:.5}
+body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,rgba(2,5,10,.25) 20%,rgba(2,5,10,.8) 100%)}
+@keyframes lisGrain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(3%,3%)}}
+@keyframes lisGlitch{0%{top:8%;opacity:0}12%{top:22%;opacity:1}30%{top:61%;opacity:.4}48%{top:38%;opacity:1}66%{top:84%;opacity:0}84%{top:50%;opacity:.8}100%{top:14%;opacity:0}}
+#lis-hud{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:16;padding:5px 10px;border:1px solid rgba(110,229,255,.3);border-radius:4px;background:rgba(2,7,12,.88);font:600 9px/1.4 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s}
+#lis-hud.on{opacity:1;visibility:visible}
+#lis-hud.red{border-color:rgba(255,80,80,.6);color:#ff9a9a}
+#lis-hud.red::before{content:'';display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#ff4848;box-shadow:0 0 6px #ff4848;animation:lisBlink .5s steps(2) infinite;vertical-align:1px}
+@keyframes lisBlink{50%{opacity:.2}}
+#lis-ask{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;padding:12px 14px;border:1px solid rgba(110,229,255,.35);border-radius:6px;background:rgba(2,7,12,.94);font:600 10px/1.5 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#bff4ff;text-align:center}
+#lis-ask[hidden]{display:none}
+#lis-ask .la-q{margin-bottom:9px}
+#lis-ask .la-b{display:flex;gap:8px;justify-content:center}
+#lis-ask button{padding:7px 14px;border:1px solid rgba(110,229,255,.4);border-radius:4px;background:rgba(110,229,255,.08);color:#8eeeff;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer}
+#lis-ask button:hover,#lis-ask button:focus-visible{background:rgba(110,229,255,.2);outline:none}
+#lis-ask button[data-a=leave]{border-color:rgba(255,154,217,.4);color:#ffb3e0;background:rgba(255,122,217,.07)}
+@media (prefers-reduced-motion:reduce){#lis-fx::before,#lis-fx::after,#lis-hud.red::before{animation:none}}
