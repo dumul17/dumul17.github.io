@@ -15,8 +15,8 @@
   /* ---------- kamus UI: kunci -> {en, id}. {n} {s} dst = variabel ---------- */
   var UI={
     'sub':{en:'modder & music composer',id:'modder & komposer musik'},
-    'quote':{en:'Keep creating, even without the applause.',id:'Terus berkarya, meski tanpa tepuk tangan.'},
-    'footer.quote':{en:'I create what I love, even without applause.',id:'Aku berkarya apa yang kucintai, meski tanpa tepuk tangan.'},
+    'quote':{en:'Keep creating, even without the applause.',id:'Tetap berkreasi, meski tanpa apresiasi.'},
+    'footer.quote':{en:'Keep creating, even without the applause.',id:'Tetap berkreasi, meski tanpa apresiasi.'},
     'owl.open':{en:'Open about panel',id:'Buka panel tentang'},
     'owl.close':{en:'Close',id:'Tutup'},
     'owl.source':{en:'Source',id:'Kode'},
@@ -69,6 +69,11 @@
     'tune.save':{en:'Save',id:'Simpan'},'tune.reset':{en:'Reset',id:'Atur ulang'},
     'tune.sub.sky':{en:'Sky // Overview',id:'Langit // Ringkasan'},'tune.sub.sect':{en:'Gargantua // Sector Tune',id:'Gargantua // Setelan Sektor'},'tune.sub.bh':{en:'Gargantua // Tune',id:'Gargantua // Setelan'},
     'tune.saved.sky':{en:'SKY SETTINGS SAVED',id:'SETELAN LANGIT TERSIMPAN'},'tune.saved.bh':{en:'GARGANTUA SETTINGS SAVED',id:'SETELAN GARGANTUA TERSIMPAN'},
+    /* tuning panel: tab Asteroid */
+    'tune.ast.tab':{en:'Asteroid',id:'Asteroid'},'tune.sub.ast':{en:'Asteroid // Tune',id:'Asteroid // Setelan'},'tune.saved.ast':{en:'ASTEROID SETTINGS SAVED',id:'SETELAN ASTEROID TERSIMPAN'},
+    'tune.ast.count':{en:'Count',id:'Jumlah'},'tune.ast.count.s':{en:'rocks',id:'batu'},'tune.ast.size.s':{en:'rock scale',id:'skala batu'},
+    'tune.ast.orbit':{en:'Orbit',id:'Orbit'},'tune.ast.orbit.s':{en:'width',id:'lebar'},'tune.ast.thick':{en:'Thickness',id:'Ketebalan'},'tune.ast.thick.s':{en:'ring density',id:'kerapatan cincin'},
+    'tune.ast.spd.s':{en:'orbit',id:'orbit'},
 
     /* kamera / HUD */
     'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.hint':{en:'TAP ‹ › TO FOCUS · PINCH / WHEEL · 1×–3×',id:'KETUK ‹ › UNTUK FOKUS · CUBIT / RODA · 1×–3×'},
