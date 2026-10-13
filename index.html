@@ -213,6 +213,11 @@
     <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.neb">Nebula</span><i data-i18n="tune.neb.s">image strength</i></span><input type="range" class="bp-range" id="sp-A_OV" min="0" max="100" step="1" value="100"><output id="sp-A_OV-v">0%</output></label>
     <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.halo2">Blob halo</span><i data-i18n="tune.halo2.s">edge thickness</i></span><input type="range" class="bp-range" id="sp-THICK" min="0" max="100" step="1" value="50"><output id="sp-THICK-v">0%</output></label>
     <label class="bp-row" data-ov><span class="bp-k"><span data-i18n="tune.vig">Vignette</span><i data-i18n="tune.vig.s">edge darkness</i></span><input type="range" class="bp-range" id="sp-VIG" min="0" max="200" step="1" value="100"><output id="sp-VIG-v">0%</output></label>
+    <div class="bp-sec" data-sc data-i18n="tune.sneb">Sector sky</div>
+    <label class="bp-row" data-sc><span class="bp-k"><span data-i18n="tune.sneb">Sector nebula</span><i data-i18n="tune.sneb.s">tinted image strength</i></span><input type="range" class="bp-range" id="sp-A_SEC" min="0" max="100" step="1" value="90"><output id="sp-A_SEC-v">0%</output></label>
+    <label class="bp-row" data-sc><span class="bp-k"><span data-i18n="tune.sdim">Depth</span><i data-i18n="tune.sdim.s">darken base sky</i></span><input type="range" class="bp-range" id="sp-SDIM" min="0" max="100" step="1" value="70"><output id="sp-SDIM-v">0%</output></label>
+    <label class="bp-row" data-sc><span class="bp-k"><span data-i18n="tune.sprd">Hue variety</span><i data-i18n="tune.sprd.s">stays in sector theme</i></span><input type="range" class="bp-range" id="sp-SPREAD" min="0" max="100" step="1" value="45"><output id="sp-SPREAD-v">0%</output></label>
+    <label class="bp-row" data-sc><span class="bp-k"><span data-i18n="tune.szf">Zoom follow</span><i data-i18n="tune.szf.s">nebula zooms with sector</i></span><input type="range" class="bp-range" id="sp-ZF" min="0" max="55" step="1" value="25"><output id="sp-ZF-v">0%</output></label>
     <div class="bp-sec" data-ovo data-i18n="tune.portals">Portals</div>
     <label class="bp-row" data-ovo><span class="bp-k"><span data-i18n="tune.phalo">Portal halo</span><i data-i18n="tune.phalo.s">dark behind ring</i></span><input type="range" class="bp-range" id="sp-HALO" min="0" max="100" step="1" value="55"><output id="sp-HALO-v">0%</output></label>
   </div>
@@ -253,14 +258,14 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=22"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=3"></script>
+<script defer src="dumul-js/obs/i18n.js?v=4"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=1"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=101"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=107"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=108"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=99"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=103"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=106"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=107"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=100"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=99"></script>
 
