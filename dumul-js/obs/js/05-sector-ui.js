@@ -426,7 +426,8 @@ function drawSectorOverview(now,age){
   }
   /* ---- tab Langit ---- */
   function skyStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg')||'null');}catch(e){}var r={};SKYK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEB_TUNE[k].def;});return r;}
-  function skyOv(){var c=body.classList;return c.contains('sect-ov')&&NEB.on;}   /* baris kabut/nebula/dll cuma relevan di overview */
+  function skyOv(){var c=body.classList;return(c.contains('sect-ov')||c.contains('sect-in'))&&NEB.on;}   /* baris kabut/nebula/vinyet: overview + di dalam sektor (plate/nebula tetap terlihat di bawah langit sektor) */
+  function skyPortals(){return body.classList.contains('sect-ov')&&NEB.on;}   /* halo portal: portal cuma ada di overview */
   function astStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null');}catch(e){}return astNorm(o);}
   function astFmt(k,v){return k==='n'?String(v):v.toFixed(2)+'\u00d7';}
   function paintAst(){
@@ -455,14 +456,15 @@ function drawSectorOverview(now,age){
     else if(skyOv()){st=skyStored();SKYK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     if(bSave)bSave.classList.toggle('dirty',d);
   }
-  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:c.contains('sect-ov'),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview + di dalam sektor (di sektor isinya cuma toggle asteroid) */
+  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:c.contains('sect-ov')||c.contains('sect-in'),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview + di dalam sektor (di sektor isinya cuma toggle asteroid) */
   function refresh(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
     if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':(a.ast?'ast':cur));
     tabs.forEach(function(tb){var on=tb.getAttribute('data-tab')===cur;tb.classList.toggle('on',on);tb.setAttribute('aria-selected',on?'true':'false');});
     Object.keys(pages).forEach(function(id){pages[id].hidden=(id!==cur);});
-    var ov=skyOv();[].slice.call(panel.querySelectorAll('[data-ov]')).forEach(function(el){el.hidden=!ov;});
+    var ov=skyOv(),ovp=skyPortals();[].slice.call(panel.querySelectorAll('[data-ov]')).forEach(function(el){el.hidden=!ov;});
+    [].slice.call(panel.querySelectorAll('[data-ovo]')).forEach(function(el){el.hidden=!ovp;});   /* baris khusus overview (halo portal) */
     if(!a.bh&&!a.sky&&!a.ast&&panel.classList.contains('on'))open(false);
     paint();
   }
@@ -953,8 +955,28 @@ var SN_COOLDOWN={};
     }
     mpSnapT=setTimeout(function(){mpScroll.style.scrollSnapType='';},420);
   });});
+  /* SFX yang lagi bunyi: accordion sektornya otomatis jadi yang terbuka pas panel dibuka (dan barisnya digulir ke tengah kalau kepotong).
+     Nggak ada SFX aktif -> perilaku lama (ikut sektor yang lagi dibuka di peta). */
+  function focusPlayingGroup(){
+    var pi=getPlayingTrackIndex(),t=tracks[pi];
+    if(pi<0||!t||t.type!=='sfx')return false;
+    var row=rows[pi],g=row&&row.closest&&row.closest('.mp-grp');
+    if(!g)return false;
+    grpFocus(g.getAttribute('data-sector'));
+    requestAnimationFrame(function(){
+      if(!mpScroll)return;
+      var cr=mpScroll.getBoundingClientRect(),rr=row.getBoundingClientRect();
+      if(rr.top<cr.top+2||rr.bottom>cr.bottom-2){
+        clearTimeout(mpSnapT);mpScroll.style.scrollSnapType='none';
+        mpScroll.scrollTop+=rr.top-cr.top-Math.max(0,(cr.height-rr.height)/2);
+        mpSnapT=setTimeout(function(){mpScroll.style.scrollSnapType='';},420);
+      }
+    });
+    return true;
+  }
   toggle.addEventListener('click',function(){
     if(panel.classList.contains('open'))return;
+    if(focusPlayingGroup())return;
     grpFocus(!SECT.on&&SECT.cur?SECT.cur.k:(SECT.cur&&SECT.cur.k)||null);
   },true);
   grpFocus(null);
