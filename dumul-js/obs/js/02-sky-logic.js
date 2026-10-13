@@ -1210,6 +1210,16 @@ function nebTuneChanged(k){   /* invalidasi cache yang bergantung pada nilai ini
   if(k==='THICK'){NEB.ovc=null;NEB.tint={};}     /* topeng berubah -> versi overview & sektor di-bake ulang */
 }
 (function(){try{var c=JSON.parse(localStorage.getItem('dumul_sky_cfg')||'null');for(var k in NEB_TUNE)nebTuneApply(k,(c&&typeof c[k]==='number')?c[k]:NEB_TUNE[k].def);}catch(e){}})();
+/* Tuning langit DI DALAM SEKTOR (tab Langit saat masuk sektor), disimpan terpisah di localStorage.dumul_sky_cfg_s.
+   Cuma parameter yang memang dipakai render sektor (sectDrawSky / nebTint): A_SEC = kuat nebula bertint sektor, SDIM = gelapkan plate dasar di bawahnya,
+   SPREAD = lebar variasi hue (hue tetap berpusat di warna tema sektor, jadi tema nggak keluar), ZF = seberapa ikut zoom. Overview nggak memakai nilai ini. */
+var NEBS_TUNE={A_SEC:{min:0,max:1,def:.9},SDIM:{min:0,max:1,def:.7},SPREAD:{min:0,max:1,def:.45},ZF:{min:0,max:.55,def:.25}};
+function nebSTuneApply(k,v){
+  var t=NEBS_TUNE[k];v=+v;if(!(v===v))v=t.def;v=Math.max(t.min,Math.min(t.max,v));
+  NEB[k]=v;return v;
+}
+function nebSTuneChanged(k){if(k==='SPREAD')NEB.tint={};}   /* hue di-bake ke kanvas per sektor -> bake ulang lazy */
+(function(){try{var c=JSON.parse(localStorage.getItem('dumul_sky_cfg_s')||'null');for(var k in NEBS_TUNE)nebSTuneApply(k,(c&&typeof c[k]==='number')?c[k]:NEBS_TUNE[k].def);}catch(e){}})();
 var NEBH=[0,0,0];
 function nebHsl(r,g,b){ /* rgb 0..255 -> NEBH=[h 0..360, s, l] */
   r/=255;g/=255;b/=255;
