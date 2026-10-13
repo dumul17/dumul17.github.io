@@ -128,7 +128,7 @@ function sectZoomOut(){
 }
 function sectToggle(){
   if(SECT.busy)return;
-  if(SECT.phase==='sec')sectZoomOut();
+  if(SECT.phase==='sec')lisAsk(sectZoomOut,false);   /* ada teleskop di sini? tanya ajak / tinggal dulu */
 }
 /* ---- Gargantua = sektor 0. Di dalam sektor dia disembunyikan; tombol 🕳️ memanggilnya kecil (seukuran pulse) & bebas di-parkir ---- */
 /* Soft proximity of summoned mini-BH to rasi/cluster mass. Continuous field, no hard edge. */
@@ -306,6 +306,7 @@ function sectStep(now){
       sectSet(false);
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
       try{syncSkyPanHits();}catch(e){}
+      try{lisArrive(s.k);}catch(eL){}
     }
   }else if(SECT.phase==='out'){
     sectApply(s,1-sectEase(u));
@@ -314,6 +315,7 @@ function sectStep(now){
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;}catch(eF){}
       try{syncSkyPanHits();}catch(e){}
       if(SGATE.pend){var pj=SGATE.pend;SGATE.pend=null;try{sectZoomIn(pj);}catch(eJ){}} /* lanjut masuk sector tujuan (Sector Gate) */
+      else{try{lisArrive('ov');}catch(eL2){}}
     }
   }
 }
@@ -585,9 +587,128 @@ function drawSectorOverview(now,age){
       if(s.sx==null)continue;
       var dd=Math.hypot(e.clientX-s.sx,e.clientY-s.sy);if(dd<bd){bd=dd;best=s;}}
     if(!best)return;
-    if(best.ids.length){sectZoomIn(best);}else{best.flash=now;try{navigator.vibrate&&navigator.vibrate(12);}catch(er){}}
+    if(best.ids.length){lisAsk(function(){sectZoomIn(best);},false);}else{best.flash=now;try{navigator.vibrate&&navigator.vibrate(12);}catch(er){}}
   },true);
 })();
+
+/* ===== Lost-in-Space (LIS) =====
+   Teleskop = "observer". Tiap pindah (portal masuk, tombol balik overview, shortcut BH / Sector Gate) kalau teleskop ada di tempat asal,
+   muncul pilihan AJAK / TINGGAL. LIS.at = lokasi teleskop ('ov' atau SECT.k); LIS.last = lokasi pengamat saat terakhir mendarat.
+   - Diajak, pindah biasa (portal / balik overview)  -> normal.
+   - Diajak lewat Sector Gate + SFX bintang aktif     -> SFX putus, bubble teleskop, LED merah 5 dtk, kamera + Stellar Signal terkunci, layar glitch/grain.
+   - Diajak lewat Sector Gate tanpa SFX               -> kamera terkunci 3 dtk (LED merah + indikator).
+   - Ditinggal                                        -> tanpa teleskop: kamera + Stellar Signal terkunci, grain/glitch menetap, sampai balik ke tempat teleskop.
+   BGM nggak disentuh. Status ini nggak disimpan (reload = teleskop ikut pengamat lagi). */
+var LIS={at:'ov',last:'ov',cd:0,kind:'',pend:null,tm:0,iv:0,deny:0,ui:null,hud:null,fx:null,cb:null,wasGone:false};
+function lisLoc(){return SECT.busy?null:(SECT.cur?SECT.cur.k:'ov');}
+function lisGone(){var l=lisLoc();return l!==null&&LIS.at!==l;}
+function lisBlock(kind){
+  if(lisGone())return true;
+  if(performance.now()<LIS.cd)return kind==='cam'||LIS.kind==='full';
+  return false;
+}
+function lisRed(now){return now<LIS.cd;}
+function lisWhere(k){
+  if(k==='ov')return T('lis.where.ov');
+  for(var i=0;i<SECT.list.length;i++)if(SECT.list[i].k===k)return T('lis.where.sec',{n:sgNum(SECT.list[i])});
+  return String(k);
+}
+function lisToast(key,ms,vars){try{showModeToast(T(key,vars),null,ms||2600);}catch(e){}}
+function lisDenied(kind){
+  var n=performance.now();if(n-LIS.deny<900)return;LIS.deny=n;
+  lisToast(lisGone()?(kind==='cam'?'lis.deny.cam.gone':'lis.deny.sig.gone'):'lis.deny.cd',2400);
+  try{haptic(8);}catch(e){}
+}
+function lisEls(){
+  if(LIS.ui)return;
+  var d=document,b=d.body;
+  LIS.fx=d.createElement('div');LIS.fx.id='lis-fx';LIS.fx.setAttribute('aria-hidden','true');b.appendChild(LIS.fx);
+  LIS.hud=d.createElement('div');LIS.hud.id='lis-hud';LIS.hud.setAttribute('aria-live','polite');b.appendChild(LIS.hud);
+  var a=LIS.ui=d.createElement('div');a.id='lis-ask';a.setAttribute('role','dialog');a.hidden=true;
+  a.innerHTML='<div class="la-q"></div><div class="la-b"><button type="button" data-a="bring"></button><button type="button" data-a="leave"></button></div>';
+  b.appendChild(a);
+  ['pointerdown','pointerup','click','touchstart'].forEach(function(t){a.addEventListener(t,function(e){e.stopPropagation();},{passive:true});});
+  a.addEventListener('click',function(e){
+    var t=e.target.closest&&e.target.closest('button[data-a]');if(!t)return;
+    lisChoose(t.getAttribute('data-a')==='bring');
+  });
+  d.addEventListener('pointerdown',function(e){if(!a.hidden&&!a.contains(e.target))lisCancel();},true);
+  d.addEventListener('keydown',function(e){if(e.key==='Escape'&&!a.hidden)lisCancel();});
+}
+function lisCancel(){if(LIS.ui)LIS.ui.hidden=true;LIS.cb=null;}
+function lisAsk(cb,gate){
+  var sfxOn=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);
+  if(!LIS.ui)lisEls();
+  if(lisGone()){LIS.pend={carry:false,gate:!!gate,sfx:sfxOn,t:performance.now()};cb();return;}   /* teleskop memang nggak di sini: nggak ada yang ditanya */
+  var a=LIS.ui;
+  a.querySelector('.la-q').textContent=T('lis.ask.q');
+  a.querySelector('[data-a=bring]').textContent=T('lis.ask.bring');
+  a.querySelector('[data-a=leave]').textContent=T('lis.ask.leave');
+  LIS.cb={fn:cb,gate:!!gate,sfx:sfxOn};a.hidden=false;
+}
+function lisChoose(carry){
+  var c=LIS.cb;LIS.cb=null;if(LIS.ui)LIS.ui.hidden=true;if(!c)return;
+  LIS.pend={carry:!!carry,gate:c.gate,sfx:c.sfx,t:performance.now()};
+  try{haptic(8);}catch(e){}
+  c.fn();
+}
+function lisStopSfx(){   /* SFX bintang memudar lalu mati (BGM tidak disentuh) */
+  var a=activeSfx;if(!a)return;
+  a.onended=null;var v0=a.volume||.85,n=0,iv=setInterval(function(){
+    n++;try{a.volume=Math.max(0,v0*(1-n/8));}catch(e){}
+    if(n>=8){clearInterval(iv);try{safeReset(a);a.volume=a._bv||.85;}catch(e2){}}
+  },110);
+  if(activeSfx===a){activeSfx=null;try{setAVColor(null,false);audioVizOff();tdRelease();}catch(e3){}}
+}
+function lisHud(){
+  var h=LIS.hud;if(!h)return;var now=performance.now(),cls=document.body.classList;
+  if(now<LIS.cd){
+    h.textContent=T(LIS.kind==='full'?'lis.hud.full':'lis.hud.cam')+' · '+Math.max(0,(LIS.cd-now)/1000).toFixed(1)+'s';
+    h.className='on red';
+  }else if(lisGone()||(SECT.busy&&LIS.at!==LIS.last)){
+    h.textContent=T('lis.hud.gone',{w:lisWhere(LIS.at)});h.className='on';
+  }else h.className='';
+}
+function lisEnd(){
+  clearTimeout(LIS.tm);clearInterval(LIS.iv);LIS.iv=0;
+  var full=LIS.kind==='full';LIS.cd=0;LIS.kind='';
+  document.body.classList.remove('lis-burst');
+  lisHud();
+  if(lisGone())return;
+  lisToast('lis.toast.done',2600);
+  if(full){try{TG.anchor=null;tgShow(T('lis.bub.done'));}catch(e){}}
+}
+function lisStart(full){
+  var ms=full?5000:3000;
+  clearTimeout(LIS.tm);clearInterval(LIS.iv);
+  LIS.cd=performance.now()+ms;LIS.kind=full?'full':'cam';
+  try{if(CAMERA_MODE)setCameraMode(false);}catch(e){}
+  if(full){
+    lisStopSfx();document.body.classList.add('lis-burst');
+    lisToast('lis.toast.full',3200);
+    try{TG.anchor=null;tgShow(T('lis.bub.start'));}catch(e2){}
+  }else lisToast('lis.toast.cam',2600);
+  LIS.tm=setTimeout(lisEnd,ms+30);LIS.iv=setInterval(lisHud,100);lisHud();
+}
+function lisArrive(dest){   /* dipanggil sekali per pendaratan akhir (bukan overview perantara Sector Gate) */
+  lisEls();
+  var p=LIS.pend;LIS.pend=null;if(p&&performance.now()-p.t>9000)p=null;
+  var from=LIS.last;LIS.last=dest;
+  var had=(LIS.at===from);
+  if(had&&(!p||p.carry))LIS.at=dest;
+  var here=(LIS.at===dest),body=document.body.classList;
+  if(!here){
+    body.add('lis-gone');
+    try{if(CAMERA_MODE)setCameraMode(false);}catch(e){}
+    lisStopSfx();
+    lisToast(had?'lis.toast.left':'lis.toast.noobs',3600,{w:lisWhere(LIS.at)});
+    LIS.wasGone=true;lisHud();return;
+  }
+  body.remove('lis-gone');
+  if(LIS.wasGone){LIS.wasGone=false;lisToast('lis.toast.back',2800);lisHud();return;}
+  if(p&&p.gate&&p.carry&&had)lisStart(!!p.sfx);   /* lompat antar sector bawa teleskop: star tracker kehilangan orientasi */
+  else lisHud();
+}
 
 /* ===== Sector Gate =====
    Di dalam sector, tap Gargantua mini (yang sedang di-summon = relay) membuka portal tujuan: ikon portal overview versi kecil,
@@ -605,10 +726,13 @@ function sgToggle(){
 }
 function sgJump(s){
   if(!SGATE.open||SECT.busy||!SECT.cur||s===SECT.cur||!s.relay)return;
-  SGATE.pend=s;sgClose();
-  try{showModeToast(T('toast.jump',{s:sgNum(s)}),null,1500);}catch(e){}
-  haptic(12);sectZoomOut();
-  if(!SECT.busy)SGATE.pend=null;
+  lisAsk(function(){   /* tanya ajak / tinggal teleskop dulu; gate=true -> kalau diajak, kena skenario Lost-in-Space */
+    if(SECT.busy||!SECT.cur||s===SECT.cur||!s.relay)return;
+    SGATE.pend=s;sgClose();
+    try{showModeToast(T('toast.jump',{s:sgNum(s)}),null,1500);}catch(e){}
+    haptic(12);sectZoomOut();
+    if(!SECT.busy)SGATE.pend=null;
+  },true);
 }
 function sgHit(x,y){
   for(var i=0;i<SGATE.items.length;i++){var it=SGATE.items[i];if(Math.hypot(x-it.x,y-it.y)<=Math.max(it.r*1.35,22))return it;}
@@ -661,6 +785,7 @@ function drawSectorGate(now){
 }
 window.addEventListener('pointerdown',function(e){
   if(!SGATE.open)return;
+  if(e.target&&e.target.closest&&e.target.closest('#lis-ask'))return;   /* kartu pilihan teleskop: jangan nutup gate */
   var h=sgHit(e.clientX,e.clientY);
   if(h){e.preventDefault();e.stopPropagation();SGATE.down={s:h.s,x:e.clientX,y:e.clientY,t:performance.now(),id:e.pointerId};SGATE.sup=performance.now()+700;return;}
   var bp=camBH();
@@ -1515,6 +1640,7 @@ var SN_COOLDOWN={};
 function triggerSupernova(key){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(SW)return;
+  if(typeof lisBlock==='function'&&lisBlock('sig')){lisDenied('sig');return;}   /* Lost-in-Space */
   if(!isUnlocked(key)){lockedHint(key);return;}
   var tr=TRIGGERS[key],
       c=tr&&tr.cons==='pleiades'?PLEIADES:(tr&&cons(tr.cons)),

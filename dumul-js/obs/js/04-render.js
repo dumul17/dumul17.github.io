@@ -331,7 +331,7 @@ function teleSectorLogic(dt){
   if(!T.follow)T.followKind=null;
   /* sibuk: fade out + bubble sekali per masuk sektor */
   T.away=away;
-  T.al+=((away?0:1)-T.al)*Math.min(1,dt*6);
+  T.al+=(((away||(typeof lisGone==='function'&&lisGone()))?0:1)-T.al)*Math.min(1,dt*6);   /* teleskop ditinggal di tempat lain: nggak tampil di sini */
   if(T.al>.985)T.al=1;
   if(away&&SECT.cur&&!T.busyShown){
     T.busyShown=true;
@@ -597,9 +597,11 @@ function drawFloatingTelescope(now){
     g.strokeStyle='rgb(146,162,171)';g.lineWidth=.8;
     g.beginPath();g.moveTo(-25,0);g.lineTo(-33,0);g.stroke();
     /* Beacon LED status light on rear antenna tip (observatory satellite feel) */
-    var beacon=Math.sin(now*0.006)>0.6?1:0.15;
-    g.fillStyle='rgba(110,229,255,'+beacon+')';
-    g.beginPath();g.arc(-34,0,1.8,0,6.283);g.fill();
+    var lisR=(typeof lisRed==='function')&&lisRed(now);   /* Lost-in-Space: LED merah selama star tracker belum pulih */
+    var beacon=lisR?(Math.sin(now*0.02)>-0.2?1:0.3):(Math.sin(now*0.006)>0.6?1:0.15);
+    if(lisR){g.fillStyle='rgba(255,60,60,'+(beacon*.35)+')';g.beginPath();g.arc(-34,0,6,0,6.283);g.fill();}
+    g.fillStyle=lisR?'rgba(255,72,72,'+beacon+')':'rgba(110,229,255,'+beacon+')';
+    g.beginPath();g.arc(-34,0,lisR?2.8:1.8,0,6.283);g.fill();
 
     /* Small service-box details: opaque and restrained. */
     g.fillStyle='rgb(91,105,114)';g.fillRect(-4,-15,9,3);g.fillRect(-3,12,8,3);

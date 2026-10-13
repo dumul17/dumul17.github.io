@@ -555,6 +555,7 @@ function openCamOnCons(cid){
 function setCameraMode(on){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(on&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE))return;
+  if(on&&typeof lisBlock==='function'&&lisBlock('cam')){lisDenied('cam');return;}   /* Lost-in-Space */
   CAMERA_MODE=!!on;
   if(CAMERA_MODE&&typeof bhTuneClose==='function')bhTuneClose(); /* panel tune BH ketutup otomatis di mode kamera */
   document.body.classList.toggle('camera-mode',CAMERA_MODE);
@@ -1680,6 +1681,7 @@ function playSfx(a){
   /* Gembok: semua jalur (canvas, tombol #xxx-fx, panel musik) berakhir di sini. */
   var lk=keyFromAudio(a);if(lk&&!isUnlocked(lk))return;
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
+  if(typeof lisBlock==='function'&&lisBlock('sig')){lisDenied('sig');return;}   /* Lost-in-Space: teleskop nggak ada / star tracker belum pulih */
   if(a.preload!=='auto'){a.preload='auto';}
   /* Replay-safe: SFX yang sudah habis dianggap mulai baru (bukan toggle pause), volume balik ke dasar. */
   if(a.ended){safeReset(a);if(activeSfx===a){a.onended=null;activeSfx=null;}}
