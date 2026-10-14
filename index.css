@@ -1218,3 +1218,7 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 }
 @media (prefers-reduced-motion:reduce){#exit-panel.talk .tl-m,#exit-panel.talk .tl-glow,#exit-panel.talk .ex-owl,#exit-panel.talk .ow-beak,#exit-panel .ex-next.on{animation:none}#exit-panel,#exit-backdrop{transition-duration:.01s!important}}
 .perf-tier-0 #exit-backdrop{background:rgba(2,6,12,.82)}
+/* Mode "selalu ajak teleskop": centang di panel ajak/tinggal + baris di panel Tuning */
+#lis-ask .la-c{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:10px;cursor:pointer;opacity:.85;font-size:.92em}
+#lis-ask .la-c input,.bp-chk input{margin:0;width:14px;height:14px;accent-color:#6ee5ff;cursor:pointer}
+.bp-row.bp-chk{grid-template-columns:minmax(0,1fr) auto;margin-top:6px}
