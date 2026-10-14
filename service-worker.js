@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v107'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v108'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -37,7 +37,7 @@ const SHELL = [
   'dumul-js/obs/js/04-render.js?v=104',
   'dumul-js/obs/js/05-sector-ui.js?v=111',
   'dumul-js/obs/js/06-interaction.js?v=101',
-  'dumul-js/obs/js/07-boot.js?v=100',
+  'dumul-js/obs/js/07-boot.js?v=101',
   'dumul-js/obs/img/nebula-portrait.webp?v=2',
   'dumul-js/obs/img/nebula-landscape.webp?v=1',
   'dumul.css?v=1',
