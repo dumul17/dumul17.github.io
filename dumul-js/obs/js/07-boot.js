@@ -698,40 +698,50 @@ function boot(){
 if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTimeout(function(){if(!W)boot();},1500);}else{boot();}
 
 /* ===== Tombol Back (tombol back HP / gesture back / Alt+←) =====
-   Satu "guard" entry di history dipasang selama ADA yang bisa ditutup; back = tutup lapisan paling atas:
-   kartu ajak/tinggal → Sector Gate → panel About → panel Tune → music player → Observation Mode (+kamera) → keluar sektor ke overview.
-   Selama transisi sektor berjalan back ditelan (nggak ke mana-mana). Di overview tanpa lapisan terbuka, back berperilaku normal (keluar halaman).
-   Guard dipasang/dilepas otomatis (polling ringan) jadi jalur lain (long-press BH mini, tombol X, dll) nggak meninggalkan entry yatim. */
+   Tiap lapisan yang bisa ditutup punya satu "guard" entry di history; back = tutup lapisan paling atas, urutannya:
+   kartu ajak/tinggal → Sector Gate → panel About → panel Tune → music player → kamera rasi → Observation Mode → keluar sektor ke overview.
+   Selama transisi sektor back ditelan. Di overview tanpa lapisan terbuka, back berperilaku normal (keluar halaman).
+   PENTING: guard cuma di-push saat lapisan dibuka (poll 150 ms setelah sentuhan user), TIDAK PERNAH di dalam handler popstate:
+   push tanpa sentuhan user membuat Chrome menandai entry sebelumnya "skippable", lalu back berikutnya melompatinya dan keluar site.
+   Guard yang baru di-pop dipakai ulang lewat history.go(1). Guard berlebih (lapisan ditutup lewat jalur lain: long-press BH, tombol X, tap luar) dibuang otomatis. */
 (function backNav(){
   if(!window.history||!history.pushState)return;
-  var guard=false,skip=0;
+  var g=0,fwd=0,skip=0;   /* g = jumlah guard di history sekarang; fwd = guard yang baru di-pop back dan masih ada di "forward"; skip = history.go() buatan kita yang belum selesai */
   function el(id){return document.getElementById(id);}
   function has(id,c){var e=el(id);return !!(e&&e.classList.contains(c));}
-  function top(){   /* penutup lapisan paling atas, atau null kalau nggak ada */
+  function layers(){   /* semua lapisan aktif, paling atas dulu: {f:penutup, w:jumlah guard yang dimiliki} */
+    var L=[];
+    if(typeof isLayoutEdit==='function'&&isLayoutEdit())return L;   /* layout editor (dev): jangan ikut campur */
     try{
-      if(LIS&&LIS.ui&&!LIS.ui.hidden)return lisCancel;
-      if(SGATE&&SGATE.open)return sgClose;
-      if(has('owl-panel','on'))return function(){var b=el('owl-backdrop');if(b)b.click();};
-      if(has('bh-panel','on'))return function(){if(typeof bhTuneClose==='function')bhTuneClose();};
-      if(has('music-player','open'))return function(){var c=el('music-close');if(c)c.click();};
-      if(OBSERVE_MODE)return function(){setObserveMode(false);};
-      if(SECT.busy)return function(){};            /* transisi sektor: telan back */
-      if(SECT.cur)return sectToggle;               /* sektor → overview (lewat kartu ajak/tinggal kalau teleskop ada) */
+      if(LIS&&LIS.ui&&!LIS.ui.hidden)L.push({f:lisCancel,w:(SECT.cur||SECT.busy)?0:1});   /* kartu ajak/tinggal: di dalam sektor muncul DARI back (sektor→overview) jadi nggak punya guard sendiri (guard sektor dipakai ulang); di overview (tap portal) dia lapisan sendiri */
+      if(SGATE&&SGATE.open)L.push({f:sgClose,w:1});
+      if(has('owl-panel','on'))L.push({f:function(){var b=el('owl-backdrop');if(b)b.click();},w:1});
+      if(has('bh-panel','on'))L.push({f:function(){if(typeof bhTuneClose==='function')bhTuneClose();},w:1});
+      if(has('music-player','open'))L.push({f:function(){var c=el('music-close');if(c)c.click();},w:1});
+      if(CAMERA_MODE)L.push({f:function(){setCameraMode(false);},w:1});   /* kamera rasi = sub-mode Observation: back pertama matikan kamera saja */
+      if(OBSERVE_MODE)L.push({f:function(){setObserveMode(false);},w:1});
+      if(SECT.busy)L.push({f:function(){},w:1});                  /* transisi sektor: telan back */
+      else if(SECT.cur)L.push({f:sectToggle,w:1});               /* sektor → overview (lewat kartu ajak/tinggal kalau teleskop ada) */
     }catch(e){}
-    return null;
+    return L;
   }
-  function sync(){
-    if(document.hidden)return;
-    var need=!!top();
-    if(need&&!guard){try{history.pushState({dumulBack:1},'');guard=true;}catch(e){}}
-    else if(!need&&guard){guard=false;skip++;try{history.back();}catch(e){skip--;}}   /* lapisan sudah tertutup lewat jalur lain: buang guard */
+  function need(L){var n=0,i;for(i=0;i<L.length;i++)n+=L[i].w;return n;}
+  function sync(fromPop){
+    if(document.hidden||skip>0)return;
+    var n=need(layers()),d;
+    if(g<n){
+      d=n-g;
+      if(fromPop&&fwd>=d){skip++;fwd-=d;g+=d;try{history.go(d);}catch(e){skip--;}}   /* guard yang baru di-pop masih ada di forward: maju lagi, BUKAN push (push di dalam handler back = tanpa sentuhan user, Chrome menandai entry sebelumnya "skippable" lalu back berikutnya melompati dan keluar site) */
+      else{while(d-->0){try{history.pushState({dumulBack:g+1},'');g++;fwd=0;}catch(e){break;}}}
+    }else if(g>n){d=g-n;skip++;g-=d;fwd+=d;try{history.go(-d);}catch(e){skip--;}}   /* lapisan sudah tertutup lewat jalur lain: buang guard berlebih */
   }
   window.addEventListener('popstate',function(e){
-    if(skip>0){skip--;return;}                      /* popstate dari history.back() buatan kita sendiri */
-    if(!guard){if(e.state&&e.state.dumulBack)guard=true;sync();return;}   /* mis. tombol forward desktop masuk lagi ke guard */
-    guard=false;                                    /* guard terpakai oleh back ini */
-    var t=top();if(t){try{t();}catch(er){}}
-    sync();                                         /* masih ada lapisan lain? pasang guard baru */
+    if(skip>0){skip--;return;}                       /* popstate dari history.go() buatan kita sendiri */
+    var dep=(e.state&&e.state.dumulBack)||0,L;
+    if(dep>g){fwd=Math.max(0,fwd-(dep-g));g=dep;sync(false);return;}   /* mis. tombol forward desktop masuk lagi ke guard */
+    fwd+=g-dep;g=dep;                                 /* guard terpakai oleh back ini (kalau Chrome melompati beberapa, dep sudah menghitungnya) */
+    L=layers();if(L.length){try{L[0].f();}catch(er){}}
+    sync(true);                                       /* butuh guard lagi? (mis. kartu ajak/tinggal muncul) pakai guard forward, bukan push */
   });
-  setInterval(sync,150);
+  setInterval(function(){sync(false);},150);
 })();
