@@ -1191,7 +1191,12 @@ var SN_COOLDOWN={};
   function isPlaying(){return getPlayingTrackIndex()!==-1;}
   function panelOpen(){return panel.classList.contains('open');}
   function stopAllExcept(keepAudio){
-    tracks.forEach(function(t){if(t.audio&&t.audio!==keepAudio)safePause(t.audio);});
+    tracks.forEach(function(t){
+      if(t.audio&&t.audio!==keepAudio){
+        safePause(t.audio);
+        if(t.type==='sfx')t.audio.loop=false; /* repeat-one jangan nempel di track yang sudah ditinggal */
+      }
+    });
   }
   function clearNowPlaying(){
     if(nowTimer){clearTimeout(nowTimer);nowTimer=0;}
@@ -1535,9 +1540,18 @@ var SN_COOLDOWN={};
     else if(repeatMode===2)a.loop=false;
     else a.loop=!!isBgm;
   }
+  window.__mpSyncLoop=syncLoopFlag;
   function onTrackEnded(t){
-    if(!t||!t.audio)return;
+    if(!t||!t.audio)return;   
+    /* 'ended' basi: track sudah di-reset (currentTime=0) atau bukan track aktif -> abaikan*/
+    if(!t.audio.ended)retun;
+    if(t.type==='sfx'&&activeSfx&&activeSfx!==t.audio)return;    
+    /* 'ended' basi (track sudah diganti lewat supernova/panel): jangan restart/advance, itu yang bikin numpuk. */
+    if(getPlayingTrackIndex()!==-1)return;
     if(repeatMode===1){
+      /* SFX: lewat playSfx supaya activeSfx/onended/viz tetap koheren (restart langsung via safePlay bikin
+         activeSfx kosong -> supernova berikutnya nggak mematikan lagu ini -> numpuk). */
+      if(t.type==='sfx'&&typeof playSfx==='function'){playSfx(t.audio);return;}
       try{t.audio.currentTime=0;}catch(e){}
       safePlay(t.audio);return;
     }
@@ -1667,7 +1681,19 @@ var SN_COOLDOWN={};
 
   tracks.forEach(function(t){
     if(!t.audio)return;
-    t.audio.addEventListener('play',sync);
+    t.audio.addEventListener('play',function(){
+      /* retry async dari track lama yang sudah ditinggalkan: matikan lagi */
+      if(!t.audio._want){safePause(t.audio);if(t.type==='sfx')t.audio.loop=false;sync();return;}
+      /* ada track baru mulai: pastikan semua track lain berhenti (single voice) */
+      tracks.forEach(function(o){
+        if(o.audio&&o.audio!==t.audio&&!o.audio.paused&&!o.audio.ended){
+          if(o.audio===activeSfx&&t.type==='sfx'){o.audio.onended=null;}
+          safePause(o.audio);
+          if(o.type==='sfx')o.audio.loop=false;
+        }
+      });
+      sync();
+    });
     t.audio.addEventListener('pause',sync);
     t.audio.addEventListener('ended',function(){onTrackEnded(t);sync();});
     t.audio.addEventListener('timeupdate',function(){if(!seekDrag&&panelOpen())updateSeekUI();});
@@ -1712,9 +1738,9 @@ function triggerSupernova(key){
   /* Bintang lain masih bunyi? Matikan SEKARANG (jangan nunggu teleskop mendarat), supaya fokus rasi,
      spektrum, time-dilation, dan visual burst nggak nunjuk ke dua bintang berbeda sekaligus. */
   var prevSfx=activeSfx;
-  if(prevSfx&&prevSfx!==SFX[key]){
-    prevSfx.onended=null;safeReset(prevSfx);
-    activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
+  if(prevSfx&&prevSfx!==SFX[key]){    
+prevSfx.onended=null;prevSfx.loop=false;safeReset(prevSfx); 
+activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
   }
   /* Sisa efek dari klik sebelumnya dibersihin dulu. */
   SN_BURSTS.length=0;

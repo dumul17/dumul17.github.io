@@ -821,6 +821,7 @@ SKY.sfx.forEach(function(d){SFX[d.key]=mkAudio(d.audio,.85,false,'metadata');});
 function mkAudio(name,vol,loop,preloadMode){var a=new Audio('audio/'+encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;a._bv=vol;return a;}
 function safePlay(a){
   if(!a)return false;
+  a._want=true; /* niat play terakhir; safePause/safeReset menurunkannya, jadi retry async nggak "menghidupkan" track yang sudah ditinggal */
   try{
     /* Wake Web Audio if a prior star-chime/spectrum path left the context suspended.
        MediaElementSource nodes are silent while the context is suspended. */
@@ -845,6 +846,7 @@ function safePlay(a){
         a._retrying=false;
         a.removeEventListener('canplay',retry);
         a.removeEventListener('canplaythrough',retry);
+        if(!a._want)return; /* sudah di-pause/ganti track selagi loading */
         if(typeof unlockAudioGraph==='function')unlockAudioGraph();
         if(a.paused||a.ended){
           var p2=a.play();if(p2&&p2.catch)p2.catch(function(){});
@@ -856,6 +858,7 @@ function safePlay(a){
     var p=a.play();
     if(p&&p.catch)p.catch(function(){
       setTimeout(function(){
+        if(!a._want)return; /* pause()/ganti track bikin play() reject (AbortError) -> jangan di-retry */
         if(!a.paused&&!a.ended)return;
         if(typeof unlockAudioGraph==='function')unlockAudioGraph();
         try{var p3=a.play();if(p3&&p3.catch)p3.catch(function(){});}catch(e2){}
@@ -864,7 +867,7 @@ function safePlay(a){
     return true;
   }catch(e){return false;}
 }
-function safePause(a){if(!a)return;try{a.pause();}catch(e){}}
+function safePause(a){if(!a)return;a._want=false;try{a.pause();}catch(e){}}
 function safeReset(a){if(!a)return;safePause(a);try{a.currentTime=0;}catch(e){}}
 function haptic(ms){
   if(navigator.vibrate)try{navigator.vibrate(ms||10);}catch(e){}
@@ -1739,9 +1742,22 @@ function playSfx(a){
   pauseMusicForSfx();
   if(activeSfx&&activeSfx!==a){
     activeSfx.onended=null;
+    
+    activeSfx.loop=false;
+    /* repeat-one jangan nempel di track yang ditinggalkan */
     safeReset(activeSfx);
     try{activeSfx.volume=activeSfx._bv||.85;}catch(eOv){}
   }
+  /* Satu suara saja: SFX lain yang masih hidup (panel musik / retry loading / sisa loop) dimatikan juga,
+     bukan cuma activeSfx. Loop-nya dilepas biar nggak ke-bawa saat diputar lagi lewat jalur lain. */
+  try{
+    for(var _sk in SFX){
+      var _o=SFX[_sk];
+      if(_o===a)continue;
+      if(!_o.paused||_o._want){_o.onended=null;safeReset(_o);try{_o.volume=_o._bv||.85;}catch(eO2){}}
+      _o.loop=false;
+    }
+  }catch(eKill){}
   activeSfx=a;
   /* Docking tetap: ganti bintang SFX → update key TX di sektor sumber (line ikut pindah nanti) */
   try{
@@ -1766,6 +1782,8 @@ function playSfx(a){
     }
   };
   safePlay(a);
+  /* Loop mengikuti mode repeat panel musik walau diputar dari kanvas / supernova (panel tertutup). */
+  try{if(typeof window.__mpSyncLoop==='function')window.__mpSyncLoop(a);}catch(eLp){}
   requestAnimationFrame(function(){if(activeSfx===a)audioVizInit(a);});
 }
 
