@@ -1152,6 +1152,113 @@ function telescopeHitRadius(){
   var base=(typeof touchMode!=='undefined'&&touchMode)?48:36;
   return Math.max(base,Math.min(64,(W||360)*0.09));
 }
+/* ===== Transmitter (Fase 3–4+) =====
+   TEMP visual: dashed lines only — nanti diganti drone yang ngorbit dekat sumber sinyal.
+   Dock (sumber): long-press teleskop di sektor sumber setelah SFX.
+   Receiver (sektor lain): long-press teleskop → sambung ke BH mini lokal.
+   Short-tap teleskop = bubble pesan (tidak ganggu TX). */
+var TX={by:{},recv:{}};
+function txOf(s){return s&&s.k?TX.by[s.k]:null;}
+function txOn(s){var t=txOf(s);return !!(t&&t.on);}
+function txRecvOn(s){return !!(s&&s.k&&TX.recv[s.k]);}
+function txSyncRelay(s){if(s)s.relay=txOn(s);}
+function txDeploy(s,key){
+  if(!s||!s.k||!key)return false;
+  TX.by[s.k]={on:1,key:key,t:performance.now()};
+  s.relay=true;
+  return true;
+}
+function txRecall(s){
+  if(!s||!s.k)return false;
+  if(!TX.by[s.k])return false;
+  delete TX.by[s.k];
+  s.relay=false;
+  return true;
+}
+function txRecvSet(s,on){
+  if(!s||!s.k)return false;
+  if(on){
+    TX.recv[s.k]=1;
+    /* Mark overview slot: line/relay label butuh entry di TX.by juga (bukan cuma sumber SFX) */
+    if(!TX.by[s.k]||!TX.by[s.k].on){
+      var key=null;
+      if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
+      TX.by[s.k]={on:1,key:key||'recv',recv:1,t:performance.now()};
+    }else{
+      TX.by[s.k].recv=1;
+    }
+    s.relay=true;
+  }else{
+    delete TX.recv[s.k];
+    if(TX.by[s.k]&&TX.by[s.k].recv){
+      delete TX.by[s.k];
+      s.relay=false;
+    }
+  }
+  return true;
+}
+/* Sektor tampil line/relay di overview? TX dock ATAU receiver link. */
+function txMarked(s){
+  if(!s||!s.k)return false;
+  return !!(TX.by[s.k]&&TX.by[s.k].on);
+}
+function txStarPos(key){
+  if(!key||typeof TRIGGERS==='undefined')return null;
+  var tr=TRIGGERS[key];if(!tr)return null;
+  var c=tr.cons==='pleiades'?(typeof PLEIADES!=='undefined'?PLEIADES:null):cons(tr.cons);if(!c)return null;
+  var st=tr.cons==='pleiades'?(typeof plStarByName==='function'?plStarByName(tr.star):null):c.stars[tr.star];
+  if(!st)return null;
+  var fx=tr.cons==='pleiades'?(PLEIADES.x+st.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(st.x+c.ox);
+  var fy=tr.cons==='pleiades'?(PLEIADES.y+st.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(st.y+c.oy);
+  return skyXF(fx,fy);
+}
+/* Long-press teleskop: pasang/lepas TX.
+   - Sektor sumber (+SFX atau TX sudah ada): toggle dock ke bintang.
+   - Sektor lain: toggle receiver ke BH mini lokal.
+   - Overview: no-op (toast). */
+function txLongPressTele(){
+  if(typeof lisBlock==='function'&&lisBlock('sig')){if(typeof lisDenied==='function')lisDenied('sig');return true;}
+  if(SW||SECT.busy)return false;
+  if(!SECT.cur){
+    try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.ov'),null,2800);}catch(e){}
+    return true;
+  }
+  var src=typeof sfxSector==='function'?sfxSector():null;
+  var key=null;
+  if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')
+    key=keyFromAudio(activeSfx);
+  /* Di sektor sumber (SFX lokal / TX lokal) */
+  if(src&&src===SECT.cur){
+    if(txOn(src)&&(!key||TX.by[src.k].key===key)){
+      txRecall(src);
+      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.recall',{s:src.name||src.k}),null,2800);}catch(e){}
+      haptic(12);return true;
+    }
+    if(!key){
+      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.needplay'),null,3000);}catch(e){}
+      return true;
+    }
+    txDeploy(src,key);
+    try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.linked',{s:src.name||src.k}),null,3200);}catch(e){}
+    haptic(14);return true;
+  }
+  /* Sektor lain: receiver link ke BH mini */
+  if(SUM.on&&BHSC>.05){
+    if(txRecvOn(SECT.cur)){
+      txRecvSet(SECT.cur,false);
+      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.recvoff',{s:SECT.cur.name||SECT.cur.k}),null,2800);}catch(e){}
+      haptic(10);return true;
+    }
+    txRecvSet(SECT.cur,true);
+    try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.linked',{s:SECT.cur.name||SECT.cur.k}),null,3200);}catch(e){}
+    haptic(14);return true;
+  }
+  try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.needbh'),null,3200);}catch(e){}
+  return true;
+}
+function txRecallFromTele(){return txLongPressTele();}
+function txToggleFromTele(){return false;}
+
 /* ---------- Nebula plate (gambar) ----------
    Gambar nebula dipakai sebagai layer dasar plateDeep (overview) dan, lewat nebTint(), versi berwarna per sektor (dipakai sectDrawSky di 04-render.js).
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.

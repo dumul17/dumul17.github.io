@@ -236,36 +236,54 @@ function sumSpot(){
   }
   return best||[W*.5,H*.5];
 }
+/* Summon/recall BH mini di sektor (tombol #mode-bh). Toast summon/recall dimatikan. */
 function sumSet(on){
   if(on&&(!SECT.cur||SECT.busy||SW))return;
   if(SECT.busy||SW)return;
   if(on){
     var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
     BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
-    SUM.on=true;SECT.cur.relay=true;SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;   /* belum di-drag = dilatasi audio pasif */
+    SUM.on=true;SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;
+    if(SECT.cur)SECT.cur.summed=1;
     try{focusRefresh();}catch(eFR){}
-    try{var so=sfxSector();   /* kalau sumber suara di sektor lain, toast relay dari spatialHint yang tampil */
-      if(typeof showModeToast==='function'&&!(so&&so!==SECT.cur))showModeToast(T('toast.bhsum2'),null,3200);}catch(e){}
+    try{if(typeof showModeToast==='function')showModeToast(T('toast.bhsumtip'),null,4200);}catch(eT){}
   }else{
-    SUM.on=false;if(SECT.cur){SECT.cur.relay=false;SECT.cur.sum=null;}
+    /* Recall di sektor selain sumber SFX → reset TX/receiver, sinyal muffled lagi */
+    var _src=typeof sfxSector==='function'?sfxSector():null;
+    var _nonSrc=!(!SECT.cur||(_src&&_src===SECT.cur));
+    if(_nonSrc&&SECT.cur){
+      try{
+        if(typeof txOn==='function'&&txOn(SECT.cur)&&typeof txRecall==='function')txRecall(SECT.cur);
+        if(typeof txRecvOn==='function'&&txRecvOn(SECT.cur)&&typeof txRecvSet==='function')txRecvSet(SECT.cur,false);
+        if(typeof showModeToast==='function')showModeToast(T('toast.tx.redock'),null,3600);
+      }catch(eR){}
+    }
+    SUM.on=false;if(SECT.cur){SECT.cur.sum=null;/* summed tetap 1 biar shortcut ke sini masih valid setelah pernah summon */}
     try{focusRefresh();}catch(eFR){}
-    try{if(typeof showModeToast==='function')showModeToast(T('toast.bhrec'),null,1800);}catch(e){}
   }
   haptic(10);sumUI();
 }
 function sumReset(){SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();}
-/* Keluar sektor: Gargantua mini DISIMPAN di sektornya (posisi + relay tetap), bukan di-reset. */
+/* Keluar sektor: posisi BH mini di-stash. */
 function sumStash(){
   var c=SECT.cur;
-  if(c)c.sum=SUM.on?{x:BH.x,y:BH.y,x0:SUM.x0,y0:SUM.y0,moved:!!SUM.moved}:null;
+  if(c){
+    if(SUM.on){c.summed=1;c.sum={x:BH.x,y:BH.y,x0:SUM.x0,y0:SUM.y0,moved:!!SUM.moved};}
+    else{c.sum=null;}
+  }
   SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();
 }
-/* Masuk sektor: kalau tadi sudah di-summon di sini, munculkan lagi di posisi parkir terakhir. */
+/* Masuk sektor: JANGAN auto-summon. Restore hanya kalau BH pernah di-summon & di-stash. */
 function sumRestore(s){
-  if(!s||!s.sum)return;
+  if(!s)return;
+  if(!s.sum){
+    SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();
+    return;
+  }
   var mg=Math.max(6,SUM_R*1.15);
   BH.x=Math.max(mg,Math.min(W-mg,s.sum.x));BH.y=Math.max(mg,Math.min(H-mg,s.sum.y));
-  SUM.on=true;s.relay=true;SUM.x0=s.sum.x0==null?s.sum.x:s.sum.x0;SUM.y0=s.sum.y0==null?s.sum.y:s.sum.y0;SUM.moved=!!s.sum.moved;sumUI();
+  SUM.x0=s.sum.x0==null?s.sum.x:s.sum.x0;SUM.y0=s.sum.y0==null?s.sum.y:s.sum.y0;SUM.moved=!!s.sum.moved;
+  SUM.on=true;s.summed=1;sumUI();
 }
 function sumUI(){
   var b=document.getElementById('mode-bh');
@@ -278,18 +296,15 @@ function sumUI(){
   }
   if(typeof bhTuneSync==='function')bhTuneSync();
 }
-/* Summon / recall Gargantua di OVERVIEW (kembaran sumSet yang dipakai di dalam sektor). */
+/* Summon / recall Gargantua di OVERVIEW. Toast dimatikan (sama seperti sektor). */
 function homeSet(on){
+  /* Overview BH: recall → sinyal muffled; summon → jernih lagi.
+     TIDAK mereset TX docking/relay (beda dari BH mini di sektor). */
   if(SECT.cur||SECT.busy||SW)return;
   on=!!on;if(on===HBH.on)return;
   HBH.on=on;
   try{localStorage.setItem('dumul_bh_home',on?'1':'0');}catch(e){}
   if(!on){drag.on=false;BH.x=BH.hx;BH.y=BH.hy;}
-  try{
-    var sfxOn=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);   /* lagi ada SFX: toast ikut status sinyal (jernih / teredam) */
-    /* Lagi ada SFX: status sinyal (linked / muffled) diumumkan spatialHint karena tergantung relay sektor sumber juga, jadi toast di sini dilewati. */
-    if(!sfxOn&&typeof showModeToast==='function')showModeToast(on?T('toast.bhsum'):T('toast.bhrec'),null,on?2000:2400);
-  }catch(e){}
   haptic(10);sumUI();
 }
 function sectStep(now){
@@ -307,6 +322,13 @@ function sectStep(now){
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
       try{syncSkyPanHits();}catch(e){}
       try{lisArrive(s.k);}catch(eL){}
+      /* Tutorial sekali: summon BH (shortcut) + long-press balik overview. BH tidak auto-summon. */
+      try{
+        if(!localStorage.getItem('dumul_bh_lp_tip')&&typeof showModeToast==='function'){
+          localStorage.setItem('dumul_bh_lp_tip','1');
+          showModeToast(T('toast.sectip'),null,5200);
+        }
+      }catch(eTip){}
     }
   }else if(SECT.phase==='out'){
     sectApply(s,1-sectEase(u));
@@ -393,7 +415,12 @@ function drawSectorOverview(now,age){
     }
     /* label '01 - *4' di bawah portal dibuang (dikosongkan dulu); sisa: penanda relay / 'no signal yet' */
     g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
-    if(s.relay&&!(s.flash&&now-s.flash<1500)){
+    /* Label relay: TX sumber docked, ATAU receiver+summoned */
+    var _rel=false;
+    if(typeof TX!=='undefined'&&TX.by&&TX.by[s.k]&&TX.by[s.k].on){
+      _rel=TX.by[s.k].recv?!!s.summed:true;
+    }
+    if(_rel&&!(s.flash&&now-s.flash<1500)){
       g.fillStyle='rgba(110,229,255,.7)';g.fillText(T('sect.relay'),p[0],p[1]+lo);
     }
     if(s.flash&&now-s.flash<1500){
@@ -562,8 +589,7 @@ function drawSectorOverview(now,age){
 })();
 
 (function sectInit(){
-  var b=document.getElementById('mode-sectors');
-  if(b)b.addEventListener('click',sectToggle);
+  /* Fase 2: #mode-sectors diganti long-press BH mini — tombol disembunyikan CSS, handler tidak dipasang. */
   var bb=document.getElementById('mode-bh');
   if(bb)bb.addEventListener('click',function(){if(SECT.cur)sumSet(!SUM.on);else homeSet(!HBH.on);});
   try{sumUI();}catch(eU0){}
@@ -627,12 +653,20 @@ function lisEls(){
   var a=LIS.ui=d.createElement('div');a.id='lis-ask';a.setAttribute('role','dialog');a.hidden=true;
   a.innerHTML='<div class="la-q"></div><div class="la-b"><button type="button" data-a="bring"></button><button type="button" data-a="leave"></button></div>';
   b.appendChild(a);
-  ['pointerdown','pointerup','click','touchstart'].forEach(function(t){a.addEventListener(t,function(e){e.stopPropagation();},{passive:true});});
-  a.addEventListener('click',function(e){
-    var t=e.target.closest&&e.target.closest('button[data-a]');if(!t)return;
-    lisChoose(t.getAttribute('data-a')==='bring');
+  /* Isolasi penuh: panel ajak/tinggal tidak tembus ke sky/BH/gate/tele */
+  ['pointerdown','pointerup','pointermove','click','touchstart','touchmove','touchend','wheel','contextmenu'].forEach(function(tp){
+    a.addEventListener(tp,function(e){e.stopPropagation();},{passive:false,capture:true});
   });
-  d.addEventListener('pointerdown',function(e){if(!a.hidden&&!a.contains(e.target))lisCancel();},true);
+  a.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    var btn=e.target.closest&&e.target.closest('button[data-a]');if(!btn)return;
+    lisChoose(btn.getAttribute('data-a')==='bring');
+  },true);
+  d.addEventListener('pointerdown',function(e){
+    if(a.hidden)return;
+    if(a.contains(e.target)){e.stopPropagation();return;}
+    lisCancel();
+  },true);
   d.addEventListener('keydown',function(e){if(e.key==='Escape'&&!a.hidden)lisCancel();});
 }
 function lisCancel(){if(LIS.ui)LIS.ui.hidden=true;LIS.cb=null;}
@@ -684,9 +718,13 @@ function lisStart(full){
   LIS.cd=performance.now()+ms;LIS.kind=full?'full':'cam';
   try{if(CAMERA_MODE)setCameraMode(false);}catch(e){}
   if(full){
-    lisStopSfx();document.body.classList.add('lis-burst');
+    /* Star tracker: JANGAN putus SFX total — muffle selama LIS.cd; user long-press tele → receiver. */
+    document.body.classList.add('lis-burst');
     lisToast('lis.toast.full',3200);
     try{TG.anchor=null;tgShow(T('lis.bub.start'));}catch(e2){}
+    setTimeout(function(){
+      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.tiprecv'),null,4200);}catch(e3){}
+    },900);
   }else lisToast('lis.toast.cam',2600);
   LIS.tm=setTimeout(lisEnd,ms+30);LIS.iv=setInterval(lisHud,100);lisHud();
 }
@@ -714,21 +752,28 @@ function lisArrive(dest){   /* dipanggil sekali per pendaratan akhir (bukan over
    Di dalam sector, tap Gargantua mini (yang sedang di-summon = relay) membuka portal tujuan: ikon portal overview versi kecil,
    satu per sector LAIN yang statusnya relay. Tap portal = lompat (keluar ke overview lalu masuk sector tujuan). BH tetap parkir
    (jadi relay), fungsinya cuma shortcut. Portal ke dumul.html tetap cuma lewat BH overview. */
-var SGATE={open:false,t:0,items:[],down:null,pend:null,sup:0};
-function sgDests(){var r=[],i,s;for(i=0;i<SECT.list.length;i++){s=SECT.list[i];if(s!==SECT.cur&&s.relay&&s.ids&&s.ids.length)r.push(s);}return r;}
+var SGATE={open:false,t:0,items:[],down:null,pend:null,sup:0,tunnelUntil:0};
+function sgDests(){var r=[],i,s;for(i=0;i<SECT.list.length;i++){s=SECT.list[i];if(s!==SECT.cur&&s.ids&&s.ids.length)r.push(s);}return r;}
 function sgNum(s){var i=SECT.list.indexOf(s)+1;return (i<10?'0':'')+i;}
 function sgClose(){SGATE.open=false;SGATE.items.length=0;SGATE.down=null;}
 function sgToggle(){
   if(SGATE.open){sgClose();return;}
   if(!SECT.cur||!SUM.on||SECT.busy)return;
-  if(!sgDests().length){try{showModeToast(T('toast.norelay'),null,2800);}catch(e){}return;}
+  if(!sgDests().length){try{showModeToast(T('toast.nosum'),null,2800);}catch(e){}return;}
   SGATE.open=true;SGATE.t=performance.now();SGATE.down=null;haptic(8);
 }
 function sgJump(s){
-  if(!SGATE.open||SECT.busy||!SECT.cur||s===SECT.cur||!s.relay)return;
-  lisAsk(function(){   /* tanya ajak / tinggal teleskop dulu; gate=true -> kalau diajak, kena skenario Lost-in-Space */
-    if(SECT.busy||!SECT.cur||s===SECT.cur||!s.relay)return;
+  if(!SGATE.open||SECT.busy||!SECT.cur||s===SECT.cur)return;
+  /* Tujuan harus pernah summon BH mini; kalau belum → toast, portal tetap tampil */
+  if(!s.summed){
+    try{if(typeof showModeToast==='function')showModeToast(T('toast.nosum'),null,3200);}catch(e){}
+    return;
+  }
+  lisAsk(function(){
+    if(SECT.busy||!SECT.cur||s===SECT.cur||!s.summed)return;
     SGATE.pend=s;sgClose();
+    /* Tunnel side-effect: selalu muffle 2 dtk; lanjut muffle jika tujuan belum dock/summon siap */
+    SGATE.tunnelUntil=performance.now()+2000;
     try{showModeToast(T('toast.jump',{s:sgNum(s)}),null,1500);}catch(e){}
     haptic(12);sectZoomOut();
     if(!SECT.busy)SGATE.pend=null;
@@ -878,12 +923,13 @@ function frame(now){
     try{drawAsteroids(now,-1);}catch(err){window.__hub.renderError='drawAsteroidsBack: '+(err&&err.message||err);} /* separuh belakang: di belakang Rasi & BH */
     cullBegin();
     sectStep(now);
-    if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);}
+    if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);try{if(typeof drawTxLines==='function')drawTxLines(now);}catch(eTx){}}
     else{
     CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
     drawPulses(now,age);
     CONS.forEach(function(c){if(sectShow(c.id))drawStars(c,age,now);});
     if(sectShow('pleiades'))drawPleiades(age,now);
+    try{if(typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
     }
     drawTriggerVisuals(now);
     ofxSafe(ofxDrawAvail,now);
@@ -1700,21 +1746,20 @@ function triggerSupernova(key){
   // Trigger efek kilatan garis hyperspace ke arah bintang target
   triggerHyperspaceWarp(sx, sy);
 
-  /* 2. Warp telescope to the star; SFX + haptic fire on arrival. */
-  TELESCOPE.mode='warp';
-  /* Track the star in sky space: camera pan/zoom/focus moves it on screen, so re-project every frame. */
-  TELESCOPE.follow=function(){
-    var fx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),
-        fy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy);
-    return skyXF(fx,fy); /* pre-gravity: the telescope draw applies lens() itself */
-  };
-  var ft=TELESCOPE.follow();TELESCOPE.targetX=ft[0];TELESCOPE.targetY=ft[1];
-  TELESCOPE.followKind='star';TELESCOPE.followSect=null;TELESCOPE.orbitR=38;
-  TELESCOPE.onWarpComplete=function(){sfxArrive(key);};
+  /* Fase 4: teleskop tidak lagi auto-warp/orbit ke SFX. SFX langsung play. */
+  sfxArrive(key);
 }
 function sfxArrive(key){
     playSfx(SFX[key]);
     haptic(key==='betel'?20:18);
+    /* Tutorial: sambungkan drone TX (long-press teleskop). Tidak auto-dock. */
+    try{
+      var _src=typeof sfxSector==='function'?sfxSector():null;
+      var _docked=_src&&typeof txOn==='function'&&txOn(_src);
+      if(!_docked&&typeof showModeToast==='function'){
+        showModeToast(T('toast.tx.tip'),null,4200);
+      }
+    }catch(eTx){}
     /* Stellar Memory: click/observe on interaction (fragment waits for SFX end). */
     if(typeof StellarMem!=='undefined'&&STELLAR_KEYS.indexOf(key)>=0){
       var firstObs=StellarMem.markObserved(key);

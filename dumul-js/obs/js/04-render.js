@@ -312,39 +312,29 @@ function teleIconFollow(sc){
 function teleSectorLogic(dt){
   var T=TELESCOPE;
   if(SW)return;
-  var on=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);
-  var key=on?keyFromAudio(activeSfx):null,src=on?sfxSector():null,away=false;
-  if(src){
-    if(SECT.cur&&src!==SECT.cur)away=true;
-    else if(SECT.busy&&SECT.phase==='in'&&SECT.target&&SECT.target!==src)away=true;
-    if(SECT.on||SECT.busy||away){                                   /* berbasis ikon sektor */
-      if(T.followKind!=='icon'||T.followSect!==src){
-        T.follow=teleIconFollow(src);T.followKind='icon';T.followSect=src;
-        T.orbitR=Math.max(40,Math.max(20,Math.min(30,W*.07))+18);
-        if(T.mode==='drift')T.mode='warp';
-      }
-    }else if(SECT.cur===src&&T.followKind==='icon'){                /* masuk sektor sumber: pindah ke bintangnya */
-      var sf=key?teleStarFollow(key):null;
-      if(sf){T.follow=sf;T.followKind='star';T.followSect=null;T.orbitR=38;T.mode='warp';T.onWarpComplete=null;}
+  /* Fase 4+: tidak auto-warp/orbit ke SFX. Tidak "sibuk stay" di sektor sumber.
+     Visibilitas hanya ikut LIS (lisGone): teleskop ikut pengamat kalau di-ajak. */
+  if(T.mode==='warp'||T.mode==='orbit'){
+    if(T.followKind==='star'||T.followKind==='icon'){
+      T.mode='drift';T.follow=null;T.followKind=null;T.followSect=null;T.onWarpComplete=null;
+      T.vx=(Math.random()<.5?-1:1)*(1.2+Math.random()*1.8);
+      T.vy=(Math.random()<.5?-1:1)*(.9+Math.random()*1.4);
+      T.tx=T.vx;T.ty=T.vy;
     }
   }
   if(!T.follow)T.followKind=null;
-  /* sibuk: fade out + bubble sekali per masuk sektor */
-  T.away=away;
-  T.al+=(((away||(typeof lisGone==='function'&&lisGone()))?0:1)-T.al)*Math.min(1,dt*6);   /* teleskop ditinggal di tempat lain: nggak tampil di sini */
+  T.away=false;T.busyShown=false;
+  var gone=(typeof lisGone==='function'&&lisGone());
+  T.al+=((gone?0:1)-T.al)*Math.min(1,dt*6);
   if(T.al>.985)T.al=1;
-  if(away&&SECT.cur&&!T.busyShown){
-    T.busyShown=true;
-    try{
-      if(TG&&TG.el&&typeof tgShow==='function'){
-        var nm=src.name||'another sector',m=TELE_BUSY_MSG[(Math.random()*TELE_BUSY_MSG.length)|0].replace('{s}',nm);
-        TG.anchor=[(W||innerWidth)*.5,(H||innerHeight)*.34];
-        tgShow(m);
-      }
-    }catch(eB){}
-  }
-  if(!away)T.busyShown=false;
 }
+/* TX lines — TEMPORARY (nanti diganti drone orbit). Dipanggil SETELAH drawSectorOverview supaya sx/sy portal sudah ada. */
+function drawTxLines(now){
+  /* TEMP retired: visual line TX di overview & di dalam sektor dimatikan.
+     Sisakan label ◉ relay di portal overview saja. Drone orbit nanti. */
+  return;
+}
+
 function drawFloatingTelescope(now){
   /* Free-floating telescope: drift / warp / orbit state machine.
      Warp + orbit triggered by star supernova; otherwise inertial drift. */
@@ -481,6 +471,7 @@ function drawFloatingTelescope(now){
     TELESCOPE.sx=TELESCOPE.x;TELESCOPE.sy=TELESCOPE.y;
   }
   TELESCOPE.hitR=telescopeHitRadius();
+  /* TX lines digambar di drawTxLines() setelah portal sx/sy di-set */
 
   for(var ci=0;TELESCOPE.al>.02&&ci<copies.length;ci++){
     var tqx=TELESCOPE.x+copies[ci][0],tqy=TELESCOPE.y+copies[ci][1];

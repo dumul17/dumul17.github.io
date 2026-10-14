@@ -35,7 +35,7 @@ var mouse={x:0,y:0,tx:0,ty:0,px:null,py:null},glitchUntil=0,hot=null;
    the pointer actually moved, throttled ~30Hz — never every render frame. */
 var hoverDirty=false,lastHoverAt=0,HOVER_MIN_MS=33;
 var touchMode=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-var drag={on:false,moved:false,pid:null,x0:0,y0:0,bx:0,by:0};
+var drag={on:false,moved:false,pid:null,x0:0,y0:0,bx:0,by:0,tapEligible:false,lpTimer:null,lpFired:false};
 /* Mobile sky-pan + rotate: swipe to slide, 2-finger twist ±180°, both spring back. */
 var skyPan={x:0,y:0};
 /* ---- Landscape stage ----
@@ -453,10 +453,11 @@ function astNorm(o){var r={on:AST_DEF.on,n:AST_DEF.n,sz:AST_DEF.sz,w:AST_DEF.w,s
 try{AST_CFG=astNorm(JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null'));}catch(e){}
 function bhuClamp(k,v){var r=BHU_RNG[k];v=+v;if(!(v===v))v=BHU_DEF[k];return Math.max(r[0],Math.min(r[1],v));}
 try{var _bc=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');if(_bc)for(var _bk in BHU_DEF)if(typeof _bc[_bk]==='number')BHU[_bk]=bhuClamp(_bk,_bc[_bk]);}catch(e){}
-/* ===== Tune terpisah: overview vs BH yang di-summon di dalam sector =====
-   Sector: ukuran 1.80x = ukuran BH overview 1.00x (jadi 0.50x jauh lebih kecil dari overview), strength/bloom/speed 1.00x = sama dgn overview,
-   BH sector TIDAK lagi membesar/mengecil karena dekat/jauh dari rasi (ukuran murni dari slider). */
-var BHU_SDEF={size:1,str:1,bloom:1,speed:1},BH_SECT_MAXSIZE=1.8;
+/* ===== Tune terpisah: overview vs BH mini di dalam sector =====
+   Sector: BHSC = BHU.size / BH_SECT_MAXSIZE. size 1.80 = seukuran BH overview (1.00×).
+   Default sector 0.90 → BHSC 0.50× (auto-summon saat masuk; bisa recall/summon lagi via tombol).
+   BH sector TIDAK membesar/mengecil karena dekat/jauh dari rasi (ukuran murni dari slider). */
+var BHU_SDEF={size:0.9,str:1,bloom:1,speed:1},BH_SECT_MAXSIZE=1.8;
 var BHU_O={},BHU_S={},BHU_CTX=0,bhuRepaint=null;
 (function(){for(var k in BHU_DEF){BHU_O[k]=BHU[k];BHU_S[k]=BHU_SDEF[k];}
   try{var c=JSON.parse(localStorage.getItem('dumul_bh_cfg_s')||'null');if(c)for(var k2 in BHU_SDEF)if(typeof c[k2]==='number')BHU_S[k2]=bhuClamp(k2,c[k2]);}catch(e){}})();
@@ -1146,12 +1147,11 @@ function activeStarScreenPos(){
     return gSky(s.x+(c.ox||0),s.y+(c.oy||0));
   }catch(e){return null;}
 }
-/* ---- Spatial muffle (lowpass "tenggelam" saat sumber suara jauh) ----
-   Aktif di: (1) dalam sektor + Constellation Camera (jarak bintang ke tengah layar),
-             (2) transisi pindah sektor (jarak ikon sektor sumber ke tengah layar),
-             (3) home/overview (selalu teredam; ikon sektor jauh dari Gargantua).
-   Di overview, muffle dimatikan kalau sektor sumber punya "relay" = Gargantua mini
-   pernah di-summon di sektor itu (recall manual 🕳️ menghapus relay). */
+/* ---- Spatial muffle (Fase 3–4 refined) ----
+   - Sektor sumber: selalu jernih (tanpa TX).
+   - Overview / sektor lain: jernih hanya jika TX di-dock di sektor SUMBER + teleskop dibawa (bukan lisGone).
+   - Teleskop ditinggal → LIS (disconnect); teleskop ada tapi tanpa TX sumber → muffled.
+   - Overview TIDAK perlu dock TX di overview. */
 function sfxSector(){
   if(!activeSfx||typeof TRIGGERS==='undefined'||typeof keyFromAudio!=='function')return null;
   var key=keyFromAudio(activeSfx),tr=key&&TRIGGERS[key];if(!tr)return null;
@@ -1160,43 +1160,78 @@ function sfxSector(){
 }
 function spatialTarget(){
   var cx=W*.5,cy=H*.5,maxD=Math.max(120,Math.hypot(W,H)*.48),t,p,s;
-  if(SECT.on||SECT.busy){                       /* home/overview + transisi antar sektor */
-    s=sfxSector();
-    /* Jernih HANYA kalau dua-duanya aktif: BH overview di-summon DAN BH di sektor sumber di-summon (relay). Salah satu saja = teredam. */
-    if(HBH.on&&s&&s.relay&&SECT.on&&SECT.phase!=='in')return 0;
+  var gone=(typeof lisGone==='function'&&lisGone());
+  s=sfxSector();
+  /* Sumber lokal (di dalam sektor sumber): selalu jernih */
+  if(SECT.cur&&s&&s===SECT.cur){
+    if(!CAMERA_MODE)return 0;
+    p=activeStarScreenPos();
+    if(!p||p[2]>=1)return .55;
+    t=Math.min(1,Math.max(0,Math.hypot(p[0]-cx,p[1]-cy)/maxD));
+    return Math.max(0,(t-.12)/.88);
+  }
+  /* Teleskop ditinggal: disconnect penuh (LIS) */
+  if(gone)return 1;
+  /* Star tracker / tunnel shortcut: muffled */
+  if(typeof LIS!=='undefined'&&LIS.cd&&performance.now()<LIS.cd&&LIS.kind==='full')return .88;
+  if(typeof SGATE!=='undefined'&&SGATE.tunnelUntil&&performance.now()<SGATE.tunnelUntil)return .88;
+  /* Overview: jernih = TX sumber + BH overview aktif (HBH.on).
+     Recall BH overview → muffled; summon lagi → jernih. TIDAK reset docking/TX. */
+  if(SECT.on||SECT.busy){
+    var _hbOk=!!(typeof HBH!=='undefined'&&HBH.on);
+    if(s&&typeof txOn==='function'&&txOn(s)&&_hbOk&&SECT.on&&SECT.phase!=='in')return 0;
     if(s&&s.sx!=null){t=Math.min(1,Math.hypot(s.sx-cx,s.sy-cy)/maxD);t=Math.max(0,(t-.12)/.88);}
     else t=.7;
-    if(!SECT.busy)t=Math.max(.7,t);             /* diam di overview: selalu jelas teredam */
+    if(!SECT.busy)t=Math.max(.7,t);
+    if(!_hbOk)t=Math.max(.85,t); /* BH overview di-recall → muffled */
     return t;
   }
-  s=sfxSector();
-  if(SECT.cur&&s&&s!==SECT.cur)                 /* sumber di sektor LAIN: teredam, kecuali Gargantua mini di-summon di sektor INI (relay baru) */
-    return (SUM.on&&s.relay)?0:.8;   /* relay harus berantai: sektor sumber WAJIB sudah di-relay (BH di-summon) dulu */
-  if(!CAMERA_MODE)return 0;                     /* dalam sektor tanpa kamera: normal */
+  /* Sektor lain: jernih = TX sumber + receiver link (long-press tele→BH). Star tracker muffle di atas. */
+  if(SECT.cur&&s&&s!==SECT.cur){
+    var _txOk=(typeof txOn==='function'&&txOn(s));
+    var _recv=(typeof txRecvOn==='function'&&txRecvOn(SECT.cur));
+    var _bhOk=!!(SUM.on&&BHSC>.05);
+    /* Jernih hanya jika TX sumber + receiver + BH mini di tujuan. Tunnel 2s sudah di atas. */
+    if(_txOk&&_recv&&_bhOk)return 0;
+    return .88; /* belum docking/summon di tujuan → muffled terus */
+  }
+  if(!CAMERA_MODE)return 0;
   p=activeStarScreenPos();
   if(!p||p[2]>=1)return .55;
   t=Math.min(1,Math.max(0,Math.hypot(p[0]-cx,p[1]-cy)/maxD));
   return Math.max(0,(t-.12)/.88);
 }
 function spatialHint(t){
-  var st='',s=sfxSector();
+  var st='',s=sfxSector(),rel=!!(s&&typeof txOn==='function'&&txOn(s));
+  var gone=(typeof lisGone==='function'&&lisGone());
+  if(gone){ /* LIS handle toast sendiri; jangan spam spatial */
+    if(AV._hint)AV._hint='';
+    return;
+  }
+  if(typeof LIS!=='undefined'&&LIS.cd&&performance.now()<LIS.cd&&LIS.kind==='full'){
+    if(AV._hint!=='tracker'){AV._hint='tracker';}
+    return; /* toast star tracker sudah dari lisStart */
+  }
   if(SECT.on&&!SECT.busy){
-    var rel=!!(s&&s.relay);
-    if(HBH.on&&rel)st='relay';                       /* dua sisi terhubung */
-    else if(t>.5)st=HBH.on?'muffled-sec':(rel?'muffled-ov':'muffled');
+    var _hbOk=!!(typeof HBH!=='undefined'&&HBH.on);
+    if(rel&&_hbOk)st='relay';
+    else if(!_hbOk&&rel)st='needbh'; /* TX ada, BH overview di-recall */
+    else if(t>.5)st='muffled';
   }else if(SECT.cur&&!SECT.busy&&s&&s!==SECT.cur){
-    st=SUM.on?(s.relay?'relay-here':'norelay'):'far';   /* lagi di sektor lain dari sumber suara */
+    var _recv=(typeof txRecvOn==='function'&&txRecvOn(SECT.cur));
+    if(rel&&_recv)st='relay-here';
+    else if(rel&&!_recv)st='needrecv'; /* TX sumber ada, belum long-press tele di sini */
+    else st='far';
   }
   if(st===AV._hint)return;
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
-  if(st==='muffled')showModeToast(T('toast.muff.norelay'),null,4400);
-  else if(st==='muffled-ov')showModeToast(T('toast.muff.ov'),null,4400);
-  else if(st==='muffled-sec')showModeToast(T('toast.muff.sec'),null,4400);
-  else if(st==='relay')showModeToast(T('toast.relay'),null,3600);
-  else if(st==='far')showModeToast(T('toast.far'),null,4600);
-  else if(st==='norelay')showModeToast(T('toast.norelay2'),null,4600);
-  else showModeToast(T('toast.relayhere'),null,3600);
+  if(st==='muffled')showModeToast(T('toast.tx.muff'),null,4400);
+  else if(st==='relay')showModeToast(T('toast.tx.linked'),null,3600);
+  else if(st==='far')showModeToast(T('toast.tx.far'),null,4600);
+  else if(st==='needbh')showModeToast(T('toast.tx.needbh'),null,4200);
+  else if(st==='needrecv')showModeToast(T('toast.tx.tiprecv'),null,4200);
+  else showModeToast(T('toast.tx.linked'),null,3600);
 }
 function spatialRelease(){
   AV.atten=0;AV._hint='';
@@ -1708,6 +1743,16 @@ function playSfx(a){
     try{activeSfx.volume=activeSfx._bv||.85;}catch(eOv){}
   }
   activeSfx=a;
+  /* Docking tetap: ganti bintang SFX → update key TX di sektor sumber (line ikut pindah nanti) */
+  try{
+    if(typeof TX!=='undefined'&&TX.by&&typeof keyFromAudio==='function'){
+      var _pk=keyFromAudio(a),_ps=typeof sfxSector==='function'?sfxSector():null;
+      if(_ps&&_pk&&TX.by[_ps.k]&&TX.by[_ps.k].on&&!TX.by[_ps.k].recv){
+        TX.by[_ps.k].key=_pk;
+      }
+    }
+  }catch(eTxK){}
+
   setAVColor(a,false);
   a.onended=null;
   a.onended=function(){

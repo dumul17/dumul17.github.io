@@ -237,6 +237,9 @@ function constellationHitDist(x,y){
   });
   return best;
 }
+function clearBHlp(){
+  if(drag.lpTimer){try{clearTimeout(drag.lpTimer);}catch(e){}drag.lpTimer=null;}
+}
 function beginBHDrag(e){
   if(reduce||SW||drag.on||BHSC<.05)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
@@ -251,7 +254,20 @@ function beginBHDrag(e){
   var bp=camBH();
   var d=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]);
   if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
-  drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;drag.tapEligible=(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
+  drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;
+  drag.tapEligible=(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
+  drag.lpFired=false;clearBHlp();
+  /* Fase 2: long-press BH mini di sektor → kembali ke overview (ganti tombol #mode-sectors). */
+  if(SECT.cur&&SUM.on&&drag.tapEligible){
+    drag.lpTimer=setTimeout(function(){
+      drag.lpTimer=null;
+      if(!drag.on||drag.moved||!SECT.cur||!SUM.on||SECT.busy)return;
+      drag.lpFired=true;drag.on=false;
+      try{cv.releasePointerCapture(drag.pid);}catch(err){}
+      haptic(18);
+      try{if(typeof sectToggle==='function')sectToggle();}catch(e){}
+    },580);
+  }
   try{cv.setPointerCapture(e.pointerId);}catch(err){}
   haptic(15);e.preventDefault();e.stopPropagation();
   return true;
@@ -259,7 +275,7 @@ function beginBHDrag(e){
 function moveBHDrag(e){
   if(!drag.on||e.pointerId!==drag.pid)return;
   var dx=e.clientX-drag.x0,dy=e.clientY-drag.y0;
-  if(Math.hypot(dx,dy)>7)drag.moved=true;
+  if(Math.hypot(dx,dy)>7){drag.moved=true;clearBHlp();}
   if(drag.moved){
     var dz=(SECT.cur&&SUM.on)?Math.max(1,skyZoom):1;dx/=dz;dy/=dz;
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);
@@ -274,15 +290,17 @@ function moveBHDrag(e){
 }
 function endBHDrag(e){
   if(!drag.on||e.pointerId!==drag.pid)return;
-  var was=drag.moved;drag.on=false;
+  var was=drag.moved,lp=drag.lpFired;
+  clearBHlp();drag.on=false;drag.lpFired=false;
   try{cv.releasePointerCapture(e.pointerId);}catch(err){}
+  if(lp)return; /* long-press sudah memicu sectToggle */
   if(was){
     haptic(8);
-    var bpSw=camBH();createBHShockwave(bpSw[0], bpSw[1]); // Buat gelombang kejut gravitasi saat Gargantua dilepas
+    var bpSw=camBH();createBHShockwave(bpSw[0], bpSw[1]);
   }else if(drag.tapEligible){
     e.preventDefault();
-    if(SECT.cur&&SUM.on)sgToggle();   /* BH sector = gerbang antar sector (butuh relay) */
-    else startSwallow(bhA.getAttribute('href'));   /* portal ke dumul.html: cuma BH overview */
+    if(SECT.cur&&SUM.on)sgToggle();   /* short tap: shortcut gate antar sektor */
+    else startSwallow(bhA.getAttribute('href'));   /* overview: portal ke dumul.html */
   }
 }
 document.addEventListener('pointerdown',function(e){
@@ -1151,29 +1169,55 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
   haptic(8);
   if(utcClicks>=5){utcClicks=0;termOpen();}
 },{passive:true});
-document.addEventListener('pointerdown',function(e){
-  if(SW)return;
-  if(e.target&&e.target.closest&&e.target.closest('#bh-panel'))return; /* panel tune: jangan tembus ke teleskop */
-  if(telescopeHitAt(e.clientX,e.clientY)){
-    /* Priority: bintang menang dari teleskop. Saat alignment aktif, teleskop pasif total
-       (tidak muncul bubble, tidak makan tap). Tap di bintang yang lagi ketimpa teleskop
-       tetap diproses sebagai tap bintang. */
-    if(typeof ALIGN!=='undefined'&&ALIGN.cid)return;
-    /* Area padat (teleskop lagi ngorbit di dekat bintang): dulu SEMUA bintang dalam radius tap langsung menang, jadi teleskop hampir nggak bisa di-tap.
-       Sekarang yang lebih DEKAT ke titik tap yang menang; tap di badan teleskop (radius visual) selalu milik teleskop. */
-    var _tp=telescopeScreenPos(),_dT=Math.hypot(e.clientX-_tp[0],e.clientY-_tp[1]),_dS=constellationHitDist(e.clientX,e.clientY);
-    if(_dS<Infinity&&_dT>_dS&&_dT>Math.max(22,W*.04))return;
-    skyGestureAt=performance.now(); /* tombol .hit bintang di bawah teleskop jangan ikut ke-klik (pakai peredam klik yang sama dgn gesture 2 jari) */
+/* Teleskop: short-tap (pointerup) = bubble; long-press = undock TX. Dock = auto di supernova. */
+(function(){
+  var lpT=null,lpPid=null,lpX=0,lpY=0,lpMoved=false,lpFired=false;
+  function clearTimer(){if(lpT){clearTimeout(lpT);lpT=null;}}
+  function reset(){clearTimer();lpPid=null;lpMoved=false;lpFired=false;}
+  function teleHitOk(e){
+    if(SW||SECT.busy)return false;
+    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster'))return false;
+    if(typeof telescopeHitAt!=='function'||!telescopeHitAt(e.clientX,e.clientY))return false;
+    if(typeof ALIGN!=='undefined'&&ALIGN.cid)return false;
+    var _tp=typeof telescopeScreenPos==='function'?telescopeScreenPos():[0,0];
+    var _dT=Math.hypot(e.clientX-_tp[0],e.clientY-_tp[1]);
+    var _dS=typeof constellationHitDist==='function'?constellationHitDist(e.clientX,e.clientY):Infinity;
+    if(_dS<Infinity&&_dT>_dS&&_dT>Math.max(22,W*.04))return false;
+    return true;
+  }
+  document.addEventListener('pointerdown',function(e){
+    if(!teleHitOk(e))return;
+    skyGestureAt=performance.now();
     e.stopPropagation();
-    /* Cancel any sky-pan that capture-phase may have started on a near miss. */
     if(skyDrag.on&&skyDrag.pid===e.pointerId){
       skyDrag.on=false;
       try{cv.releasePointerCapture(e.pointerId);}catch(err){}
     }
-    haptic(8);showSecretSequence();
-    placeSecretMsg();
+    reset();lpPid=e.pointerId;lpX=e.clientX;lpY=e.clientY;
+    lpT=setTimeout(function(){
+      lpT=null;
+      if(lpMoved||lpPid==null)return;
+      lpFired=true;
+      var ok=false;
+      try{if(typeof txLongPressTele==='function')ok=!!txLongPressTele();else if(typeof txRecallFromTele==='function')ok=!!txRecallFromTele();}catch(er){}
+      if(ok)haptic(16);else lpFired=false;
+    },580);
+  },true);
+  document.addEventListener('pointermove',function(e){
+    if(lpPid==null||e.pointerId!==lpPid)return;
+    if(Math.hypot(e.clientX-lpX,e.clientY-lpY)>10){lpMoved=true;clearTimer();}
+  },true);
+  function end(e){
+    if(lpPid==null||e.pointerId!==lpPid)return;
+    var fireBubble=!lpFired&&!lpMoved;
+    var wasLp=lpFired;
+    reset();
+    if(wasLp||!fireBubble)return;
+    haptic(8);showSecretSequence();placeSecretMsg();
   }
-},{passive:true});
+  document.addEventListener('pointerup',end,true);
+  document.addEventListener('pointercancel',function(e){if(e.pointerId===lpPid)reset();},true);
+})();
 
 /* BFCache restore (back from dumul.html): force a fresh boot so the
    Matrix warm-up and deferred render staging run again instead of returning
