@@ -168,6 +168,7 @@
     'exit.l6':{en:"Come back whenever you like. The sky will be right here. So will we.",id:"Balik lagi kapan aja, ya. Langitnya tetap di sini. Kami juga."},
     'exit.stay':{en:"Stay a little longer",id:"Tinggal sebentar lagi"},'exit.leave':{en:"Sorry, I need to get going",id:"Maaf, aku harus pergi"},
     'exit.bye':{en:"Safe travels, okay? Look up sometimes. We'll be looking back.",id:"Hati-hati di jalan, ya. Sesekali lihat ke atas. Kami juga lagi lihat ke arahmu."},
+    'exit.native':{en:"Press back once more to leave",id:"Tekan back sekali lagi untuk keluar"},
     'exit.stay.bub':{en:"You stayed... Thank you. The stars burn brighter with company.",id:"Kamu tetap di sini... Makasih ya. Bintang-bintang lebih terang kalau ada yang nemenin."},
     'tele.busy.4':{en:'Sorry. {s} has my lens for now.',id:'Maaf. Lensaku sedang untuk {s}.'},
 
