@@ -831,6 +831,7 @@ body.observe-mode #cam-zoom{bottom:calc(52px + env(safe-area-inset-bottom,0px))}
   opacity:0;pointer-events:none;visibility:hidden;
   transition:opacity .35s ease,transform .4s ease,visibility 0s linear .4s;
   white-space:pre-line;
+  width:max-content;max-width:min(calc(100vw - 24px),340px);box-sizing:border-box;overflow-wrap:anywhere;
 }
 body.camera-mode #mode-toast{bottom:calc(148px + env(safe-area-inset-bottom,0px))}
 #mode-toast.on{
@@ -838,6 +839,8 @@ body.camera-mode #mode-toast{bottom:calc(148px + env(safe-area-inset-bottom,0px)
   transition:opacity .35s ease,transform .4s ease,visibility 0s;
 }
 #mode-toast.silence{border-color:rgba(255,122,217,.35);color:#ffb3e0}
+#mode-toast.tip{border-color:rgba(110,229,255,.16);background:rgba(2,7,12,.82);color:#9fd6e3}   /* tutorial / petunjuk: lebih redup dari toast status */
+body.lis-asking #mode-toast{bottom:calc(160px + env(safe-area-inset-bottom,0px))}   /* fallback; posisi pasnya dihitung JS di atas kartu ajak/tinggal */
 
 @media (max-width:520px){
   #mode-cluster{right:calc(10px + 31px + 6px);bottom:calc(12px + env(safe-area-inset-bottom,0px))}
@@ -1039,7 +1042,7 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 body.sect-ov #mode-bh{display:grid}
 #mode-bhset{width:32px;height:32px;padding:0;display:none;place-items:center;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
 body.bh-live #mode-bhset,body.sect-ov #mode-bhset,body.sect-in #mode-bhset{display:grid}
-.bp-sec[data-ov][hidden],.bp-row[data-ov][hidden]{display:none}
+.bp-sec[data-ov][hidden],.bp-row[data-ov][hidden],.bp-sec[data-sc][hidden],.bp-row[data-sc][hidden],.bp-sec[data-ovo][hidden],.bp-row[data-ovo][hidden]{display:none}   /* .bp-row{display:grid} menimpa [hidden]: tanpa ini baris khusus-sektor (Zoom follow dkk) bocor di overview & Portal halo bocor di sektor */
 #mode-bhset:hover,#mode-bhset:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
 #mode-bhset.on{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);box-shadow:0 0 12px rgba(110,229,255,.15)}
 @media (max-width:520px){#mode-bhset{width:31px;height:31px}}
@@ -1158,7 +1161,7 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 #lis-hud.red{border-color:rgba(255,80,80,.6);color:#ff9a9a}
 #lis-hud.red::before{content:'';display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#ff4848;box-shadow:0 0 6px #ff4848;animation:lisBlink .5s steps(2) infinite;vertical-align:1px}
 @keyframes lisBlink{50%{opacity:.2}}
-#lis-ask{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:120;pointer-events:auto;padding:12px 14px;border:1px solid rgba(110,229,255,.35);border-radius:6px;background:rgba(2,7,12,.94);font:600 10px/1.5 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#bff4ff;text-align:center}
+#lis-ask{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:120;pointer-events:auto;width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box;padding:12px 14px;border:1px solid rgba(110,229,255,.35);border-radius:6px;background:rgba(2,7,12,.94);font:600 10px/1.5 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#bff4ff;text-align:center}
 #lis-ask[hidden]{display:none}
 #lis-ask .la-q{margin-bottom:9px}
 #lis-ask .la-b{display:flex;gap:8px;justify-content:center}
