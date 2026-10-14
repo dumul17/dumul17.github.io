@@ -154,8 +154,21 @@
     'lis.deny.cd':{en:'STAR TRACKER RECOVERING\nTRY AGAIN IN A MOMENT',id:'STAR TRACKER BELUM PULIH\nCOBA LAGI SEBENTAR LAGI'},
     'lis.hud.full':{en:'STAR TRACKER · REACQUIRING',id:'STAR TRACKER · MENCARI POSISI'},'lis.hud.cam':{en:'CAMERA · CALIBRATING',id:'KAMERA · KALIBRASI'},
     'lis.hud.gone':{en:'NO OBSERVER · SCOPE @ {w}',id:'TANPA OBSERVER · TELESKOP @ {w}'},
-    'lis.bub.start':{en:'Lost-in-Space scenario. Star signal lost, my star tracker has no idea which way I am facing. Recalculating position...',id:'Skenario Lost-in-Space. Sinyal bintang terputus, star tracker saya kehilangan arah. Menghitung ulang posisi...'},
-    'lis.bub.done':{en:'Reference stars locked. Position matches the chart. Back on watch.',id:'Bintang referensi terkunci. Posisi cocok dengan peta. Saya kembali berjaga.'},
+    /* teleskop kehilangan arah → dikenali lagi: ditunjukkan lewat tingkah teleskop, bukan diumumkan */
+    'lis.bub.start':{en:"Static... only static. Turning slowly. One familiar light. Just one. Where are you?",id:"Statis... cuma statis. Aku berputar pelan. Satu cahaya yang kukenal. Satu aja. Di mana kamu?"},
+    'lis.bub.done':{en:"There. Three bright points in a row. I know that line. ...Hello again. I'm home.",id:"Itu dia. Tiga titik terang berjajar. Aku kenal garis itu. ...Halo lagi. Aku sudah di rumah."},
+    /* panel pamitan (back terakhir) — dialog teleskop; Dumb Owl cuma bisa "..." */
+    'exit.aria':{en:"Goodbye message",id:"Pesan perpisahan"},
+    'exit.name.t':{en:"Telescope",id:"Teleskop"},'exit.name.o':{en:"Dumb Owl",id:"Dumb Owl"},
+    'exit.l1':{en:"Oh... you're leaving already? Wait, just a moment. Someone asked me to pass something on to you.",id:"Eh... udah mau pergi? Tunggu sebentar. Ada titipan buat kamu."},
+    'exit.l2':{en:"The Dumb Owl wanted you to know... thank you for visiting. Truly.",id:"Dumb Owl bilang... terima kasih sudah mampir. Beneran."},
+    'exit.l3':{en:"...",id:"..."},
+    'exit.l4':{en:"Yeah, that's all the owl can say. But I've known that owl a long time. When it goes quiet like that, it means a lot.",id:"Iya, cuma itu yang bisa dia bilang. Tapi aku kenal dia lama. Kalau dia sampai diam begitu, artinya dia senang banget."},
+    'exit.l5':{en:"Every night the owl leaves the observatory lights on, just in case someone wanders in. Tonight, someone did. It was you.",id:"Tiap malam dia biarin lampu observatorium ini tetap nyala, siapa tahu ada yang mampir. Malam ini ada. Kamu."},
+    'exit.l6':{en:"Come back whenever you like. The sky will be right here. So will we.",id:"Balik lagi kapan aja, ya. Langitnya tetap di sini. Kami juga."},
+    'exit.stay':{en:"Stay a little longer",id:"Tinggal sebentar lagi"},'exit.leave':{en:"Sorry, I need to get going",id:"Maaf, aku harus pergi"},
+    'exit.bye':{en:"Safe travels, okay? Look up sometimes. We'll be looking back.",id:"Hati-hati di jalan, ya. Sesekali lihat ke atas. Kami juga lagi lihat ke arahmu."},
+    'exit.stay.bub':{en:"You stayed... Thank you. The stars burn brighter with company.",id:"Kamu tetap di sini... Makasih ya. Bintang-bintang lebih terang kalau ada yang nemenin."},
     'tele.busy.4':{en:'Sorry. {s} has my lens for now.',id:'Maaf. Lensaku sedang untuk {s}.'},
 
     /* offline banner */
