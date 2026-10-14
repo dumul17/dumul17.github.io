@@ -850,7 +850,7 @@ var EXITP=(function(){
    Guard yang baru di-pop dipakai ulang lewat history.go(1). Guard berlebih (lapisan ditutup lewat jalur lain: long-press BH, tombol X, tap luar) dibuang otomatis. */
 (function backNav(){
   if(!window.history||!history.pushState)return;
-  var g=0,fwd=0,skip=0,leaving=false,touched=false;
+  var g=0,fwd=0,skip=0,leaving=false,touched=false,noRoot=false;
   try{var s0=history.state;if(s0&&s0.dumulBack>0)g=s0.dumulBack|0;}catch(e0){}   /* balik dari halaman lain lewat back: kita lagi duduk di guard lama, anggap itu guard root */
   ['pointerdown','touchstart','mousedown','keydown'].forEach(function(ev){window.addEventListener(ev,function(){touched=true;},{capture:true,passive:true});});   /* g = jumlah guard di history sekarang; fwd = guard yang baru di-pop back dan masih ada di "forward"; skip = history.go() buatan kita yang belum selesai */
   function el(id){return document.getElementById(id);}
@@ -869,7 +869,7 @@ var EXITP=(function(){
       if(OBSERVE_MODE)L.push({f:function(){setObserveMode(false);},w:1});
       if(SECT.busy)L.push({f:function(){},w:1});                  /* transisi sektor: telan back */
       else if(SECT.cur)L.push({f:sectToggle,w:1});               /* sektor → overview (lewat kartu ajak/tinggal kalau teleskop ada) */
-      if(bootDone&&(touched||g>0))L.push({f:EXITP.open,w:1});     /* layer dasar: back terakhir → panel pamitan (bukan langsung keluar site) */
+      if(bootDone&&!noRoot&&(touched||g>0))L.push({f:EXITP.open,w:1});     /* layer dasar: back terakhir → panel pamitan (bukan langsung keluar site) */
     }catch(e){}
     return L;
   }
@@ -894,17 +894,23 @@ var EXITP=(function(){
   });
   setInterval(function(){sync(false);},150);
   /* Tombol "Maaf, aku harus pergi": mundur melewati semua guard + entry asli = keluar ke halaman sebelum situs ini.
-     Kalau tidak ada halaman sebelumnya (tab baru / dibuka langsung) history.go tidak melakukan apa-apa → coba tutup tab, terakhir ke about:blank. */
+     Kalau tidak ada halaman sebelumnya (tab baru / PWA) history.go tidak keluar → coba window.close(); kalau tetap di sini,
+     JANGAN navigasi ke about:blank (di PWA malah looping). Cukup matikan root guard (noRoot): guard sudah habis, jadi back
+     berikutnya dari sistem (tombol/gesture back HP) keluar secara native. Panel ditutup + toast petunjuk. */
   EXITP.setLeave(function(){
     leaving=true;skip=0;
     try{history.go(-(g+1));}catch(e){}
     setTimeout(function(){
       try{window.close();}catch(e1){}
-      setTimeout(function(){if(!document.hidden){try{location.replace('about:blank');}catch(e2){}}},350);
+      setTimeout(function(){
+        if(document.hidden)return;
+        noRoot=true;leaving=false;g=0;fwd=0;skip=0;EXITP.reset();
+        try{if(typeof showModeToast==='function')showModeToast(T('exit.native'),null,3200);}catch(e2){}
+      },450);
     },700);
   });
   window.addEventListener('pageshow',function(e){   /* kembali dari bfcache setelah keluar: panel jangan nyangkut di state "pamit" */
     if(!e.persisted)return;
-    leaving=false;skip=0;fwd=0;g=(history.state&&history.state.dumulBack)|0;EXITP.reset();
+    leaving=false;noRoot=false;skip=0;fwd=0;g=(history.state&&history.state.dumulBack)|0;EXITP.reset();
   });
 })();

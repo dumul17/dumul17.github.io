@@ -245,7 +245,7 @@ function beginBHDrag(e){
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cam-whisper,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -385,7 +385,7 @@ function beginSkyPan(e){
   /* FIX pinch zoom di cam fokus (dalam sektor): dulu SETIAP jari dicek ke hit-test bintang/asteroid/BH, dan di dalam sektor
      hampir seluruh layar = target bintang -> jari ke-2 ditolak -> pinch nggak pernah mulai. Sekarang semua kontak sentuh dicatat,
      dan jari ke-2 cuma ditolak kalau jatuh di UI (panel/tombol), bukan di bintang. */
-  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cam-whisper,#title,#footer,#owl-source,#bh-clock,#music-toggle';
+  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cam-whisper,#lis-ask,#title,#footer,#owl-source,#bh-clock,#music-toggle';
   if(e.target.closest&&e.target.closest(UI_T))return false;
   var multi=false;
   if(e.pointerType!=='mouse'){
@@ -400,7 +400,7 @@ function beginSkyPan(e){
       if(!skyPtrs[ids2[qi]])skyPtrs[ids2[qi]]={x:skyAll[ids2[qi]].x,y:skyAll[ids2[qi]].y};
     }
   }else{
-  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -725,7 +725,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
@@ -1173,10 +1173,10 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
 (function(){
   var lpT=null,lpPid=null,lpX=0,lpY=0,lpMoved=false,lpFired=false;
   function clearTimer(){if(lpT){clearTimeout(lpT);lpT=null;}}
-  function reset(){clearTimer();lpPid=null;lpMoved=false;lpFired=false;}
+  function reset(){clearTimer();lpPid=null;lpMoved=false;lpFired=false;try{if(window.TXFX)TXFX.holdEnd();}catch(eH){}}
   function teleHitOk(e){
     if(SW||SECT.busy)return false;
-    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-whisper'))return false;
+    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-whisper,#lis-ask'))return false;
     if(typeof telescopeHitAt!=='function'||!telescopeHitAt(e.clientX,e.clientY))return false;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid)return false;
     var _tp=typeof telescopeScreenPos==='function'?telescopeScreenPos():[0,0];
@@ -1194,6 +1194,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
       try{cv.releasePointerCapture(e.pointerId);}catch(err){}
     }
     reset();lpPid=e.pointerId;lpX=e.clientX;lpY=e.clientY;
+    try{if(window.TXFX)TXFX.holdStart();}catch(eH){}   /* ring progres tahan di teleskop (08-tx-drone.js) */
     lpT=setTimeout(function(){
       lpT=null;
       if(lpMoved||lpPid==null)return;
