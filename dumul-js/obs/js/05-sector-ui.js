@@ -214,10 +214,69 @@ function bhScaleStep(){
     if(bhEl&&bhEl._hid!==hid){bhEl._hid=hid;bhEl.style.visibility=hid?'hidden':'';if(CAPS&&CAPS.bh)CAPS.bh.style.visibility=hid?'hidden':'';}
   }catch(e){}
 }
+/* ---- Penghalang HUD (koordinat layar): dipakai posisi summon BH mini DAN layout portal shortcut, supaya keduanya nggak numpuk tombol HUD / teleskop ---- */
+function hudRects(){
+  var out=[],ids=['owl-source','mode-cluster','mp-now-playing','last-signal','cam-zoom','footer'],i,el,cs,r;
+  for(i=0;i<ids.length;i++){
+    el=document.getElementById(ids[i]);if(!el)continue;
+    try{
+      cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||+cs.opacity<.05)continue;
+      r=vrect(el);
+    }catch(e){continue;}
+    if(!r||!(r.right-r.left>2)||!(r.bottom-r.top>2))continue;
+    out.push([r.left,r.top,r.right,r.bottom]);
+  }
+  try{var tp=telescopeScreenPos();if(tp)out.push([tp[0]-30,tp[1]-30,tp[0]+30,tp[1]+30]);}catch(eT){}
+  return out;
+}
+function hudHit(x,y,R,rects){
+  for(var i=0;i<rects.length;i++){
+    var q=rects[i],dx=Math.max(q[0]-x,0,x-q[2]),dy=Math.max(q[1]-y,0,y-q[3]);
+    if(dx*dx+dy*dy<R*R)return true;
+  }
+  return false;
+}
+/* Posisi portal shortcut mengelilingi BH di (bx,by). Dipakai drawSectorGate (gambar) dan sumSpot (milih titik summon) → geometrinya selalu sama.
+   Portal yang kena HUD / teleskop / BH digeser memutar mengelilingi BH; bad = jumlah portal yang tetap nggak dapat tempat bebas (0 = semua gampang di-tap). */
+function sgPoints(bx,by,Rv,dests,rad,rects){
+  var n=dests.length,ring=Math.max(Rv*2.2,40)+rad*1.6,m=rad+10,pts=[],bad=0,i,j,k,sg,rr,a,dx,dy,len,s,p,q,ok,
+      hitR=Math.max(rad*1.35,22)+4,lab=rad+14,keep=Rv*1.4+rad;
+  function clampP(p){return [Math.max(m,Math.min(W-m,p[0])),Math.max(m,Math.min(H-m,p[1]))];}
+  function blocked(p){return hudHit(p[0],p[1],hitR,rects)||hudHit(p[0],p[1]+lab,10,rects)||Math.hypot(p[0]-bx,p[1]-by)<keep;}
+  function free(p,self){for(var t=0;t<pts.length;t++)if(t!==self&&Math.hypot(p[0]-pts[t][0],p[1]-pts[t][1])<rad*2.6)return false;return true;}
+  for(i=0;i<n;i++){
+    s=dests[i];
+    dx=(s.bx!=null)?s.bx-BH.hx:(i-(n-1)/2)*60;dy=(s.by!=null)?s.by-BH.hy:0;
+    len=Math.hypot(dx,dy)||1;
+    pts.push([bx+dx/len*ring,by+dy/len*ring]);
+  }
+  for(var it=0;it<4;it++){
+    for(i=0;i<n;i++)for(j=i+1;j<n;j++){
+      dx=pts[j][0]-pts[i][0];dy=pts[j][1]-pts[i][1];len=Math.hypot(dx,dy)||.01;
+      if(len<rad*2.6){k=(rad*2.6-len)/2;dx/=len;dy/=len;pts[i][0]-=dx*k;pts[i][1]-=dy*k;pts[j][0]+=dx*k;pts[j][1]+=dy*k;}
+    }
+  }
+  for(i=0;i<n;i++){
+    p=clampP(pts[i]);
+    if(Math.hypot(p[0]-pts[i][0],p[1]-pts[i][1])>ring*.35)bad+=.5;   /* kepotong tepi layar jauh: portal numpuk dekat BH */
+    if(blocked(p)||!free(p,i)){
+      ok=false;a=Math.atan2(p[1]-by,p[0]-bx);
+      for(k=1;k<=10&&!ok;k++)for(sg=1;sg>=-1&&!ok;sg-=2)for(j=0;j<2&&!ok;j++){
+        rr=j?ring*1.3:ring;q=clampP([bx+Math.cos(a+sg*k*.3)*rr,by+Math.sin(a+sg*k*.3)*rr]);
+        if(!blocked(q)&&free(q,i)){p=q;ok=true;}
+      }
+      if(!ok)bad+=1;
+    }
+    pts[i]=p;
+  }
+  return {pts:pts,bad:bad};
+}
+/* Titik parkir BH mini waktu di-summon: (1) titik terjauh dari bintang/rasi di sektor (lingkaran kosong terbesar), (2) BH + semua portal shortcut-nya
+   bebas dari tombol HUD & teleskop. Dipakai summon manual maupun summon otomatis (txAutoBH). */
 function sumSpot(){
   var hb=0,ft=H;
   try{hb=vrect($('#header')).bottom;ft=vrect($('#footer')).top;}catch(e){}
-  var x0=Math.max(40,W*.08),x1=W-x0,y0=Math.max(hb+30,H*.14),y1=Math.min(ft-30,H*.88),pts=[],k,c,s2,q,i,j;
+  var x0=Math.max(30,W*.06),x1=W-x0,y0=Math.max(hb+24,H*.12),y1=Math.min(ft-24,H*.9),pts=[],k,s2,q,i,j;
   CONS.forEach(function(cc){
     if(!sectShow(cc.id))return;
     for(k in cc.stars){s2=cc.stars[k];q=skyXF(s2.x+cc.ox,s2.y+cc.oy);pts.push(q[0],q[1]);}
@@ -225,43 +284,54 @@ function sumSpot(){
   if(sectShow('pleiades')&&PLEIADES.ready){
     PLEIADES.bright.forEach(function(z){q=skyXF(PLEIADES.x+z.x*PLEIADES.scale,PLEIADES.y+z.y*PLEIADES.scale);pts.push(q[0],q[1]);});
   }
-  var best=null,bs=1e9,nx=18,ny=13,zz=skyZoom||1,ccx=W*.5,ccy=H*.5;
+  var rects=hudRects(),dests=sgDests(),rad=Math.max(15,Math.min(22,W*.05)),tgt=Math.max(.05,Math.min(1,BHU.size/BH_SECT_MAXSIZE)),Rv=Math.max(10,BH.R*tgt*2),
+      best=null,bs=-1e9,nx=22,ny=16;
   for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
-    var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/Math.max(1,ny),md=1e9;
-    for(k=0;k<pts.length;k+=2){var d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
-    /* screen -> ruang BH (rumus sama dengan sumSet), lalu nilai pakai bhNearAt: makin kecil = makin kecil pula BH mini pas parkir */
-    var bxx=ccx+(cx-ccx)/zz-skyPan.x*BHK,byy=ccy+(cy-ccy)/zz-skyPan.y*BHK;
-    var sc=bhNearAt(bxx,byy)-Math.min(md,200)/2000;   /* tie-break: yang lebih jauh dari bintang menang */
-    if(sc<bs){bs=sc;best=[cx,cy];}
+    var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/ny,md=320,d,lay,sc;
+    for(k=0;k<pts.length;k+=2){d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
+    lay=sgPoints(cx,cy,Rv,dests,rad,rects);
+    sc=md-lay.bad*400-(hudHit(cx,cy,Rv+14,rects)?2000:0)-Math.hypot(cx-W*.5,cy-H*.5)*.02;   /* terjauh dari bintang; HUD/portal bebas; seri → condong ke tengah */
+    if(sc>bs){bs=sc;best=[cx,cy];}
   }
   return best||[W*.5,H*.5];
+}
+/* Taruh BH mini di titik parkir (sumSpot), dikonversi ke ruang BH. */
+function sumPlace(){
+  var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
+  BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
+  SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;
 }
 /* Summon/recall BH mini di sektor (tombol #mode-bh). Toast summon/recall dimatikan. */
 function sumSet(on){
   if(on&&(!SECT.cur||SECT.busy||SW))return;
   if(SECT.busy||SW)return;
   if(on){
-    var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
-    BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
-    SUM.on=true;SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;
+    sumPlace();SUM.on=true;
     if(SECT.cur)SECT.cur.summed=1;
     try{focusRefresh();}catch(eFR){}
     try{if(typeof showModeToast==='function')showModeToast(T('toast.bhsumtip'),'tip',4200);}catch(eT){}
   }else{
-    /* Recall di sektor selain sumber SFX → reset TX/receiver, sinyal muffled lagi */
-    var _src=typeof sfxSector==='function'?sfxSector():null;
-    var _nonSrc=!(!SECT.cur||(_src&&_src===SECT.cur));
-    if(_nonSrc&&SECT.cur){
-      try{
-        if(typeof txOn==='function'&&txOn(SECT.cur)&&typeof txRecall==='function')txRecall(SECT.cur);
-        if(typeof txRecvOn==='function'&&txRecvOn(SECT.cur)&&typeof txRecvSet==='function')txRecvSet(SECT.cur,false);
-        if(typeof showModeToast==='function')showModeToast(T('toast.tx.redock'),null,3600);
-      }catch(eR){}
-    }
+    /* Recall BH mini cuma melepas komponen kuning sektor ini. TX/receiver TIDAK di-reset: ◉ pink tetap menyala, level turun, sinyal muffled sampai BH mini dipanggil lagi.
+       (Dulu di sini TX direset berdasarkan sfxSector(), yang null begitu SFX berhenti -> sektor sumber ikut dikira 'sektor lain' dan dock-nya hilang.) */
     SUM.on=false;if(SECT.cur){SECT.cur.sum=null;/* summed tetap 1 biar shortcut ke sini masih valid setelah pernah summon */}
     try{focusRefresh();}catch(eFR){}
   }
   haptic(10);sumUI();
+}
+/* Sektor yang otomatis jadi receiver (sumber SFX pindah ke sektor lain) harus punya BH mini, kalau tidak relay-nya cuma label tanpa drone RX dan sinyal tetap teredam.
+   Sektor aktif: summon diam-diam (tanpa toast tip). Sektor lain: BH mini di-stash di titik parkir, muncul begitu sektornya dimasuki (sumRestore). */
+function txAutoBH(s){
+  if(!s)return;
+  if(s===SECT.cur){
+    if(SUM.on)return;
+    if(!SECT.busy&&!SW){
+      sumPlace();SUM.on=true;s.summed=1;
+      try{focusRefresh();}catch(eFR){}
+      try{sumUI();}catch(eU){}
+      return;
+    }
+  }
+  if(!s.sum){s.summed=1;s.sum={x:BH.hx,y:BH.hy,x0:BH.hx,y0:BH.hy,moved:false,auto:1};}   /* auto: titik pastinya dihitung (sumPlace) begitu sektor sudah selesai di-zoom */
 }
 function sumReset(){SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();}
 /* Keluar sektor: posisi BH mini di-stash. */
@@ -271,7 +341,7 @@ function sumStash(){
     if(SUM.on){c.summed=1;c.sum={x:BH.x,y:BH.y,x0:SUM.x0,y0:SUM.y0,moved:!!SUM.moved};}
     else{c.sum=null;}
   }
-  SUM.on=false;BH.x=BH.hx;BH.y=BH.hy;sumUI();
+  SUM.on=false;SUM.pend=0;BH.x=BH.hx;BH.y=BH.hy;sumUI();
 }
 /* Masuk sektor: JANGAN auto-summon. Restore hanya kalau BH pernah di-summon & di-stash. */
 function sumRestore(s){
@@ -283,7 +353,9 @@ function sumRestore(s){
   var mg=Math.max(6,SUM_R*1.15);
   BH.x=Math.max(mg,Math.min(W-mg,s.sum.x));BH.y=Math.max(mg,Math.min(H-mg,s.sum.y));
   SUM.x0=s.sum.x0==null?s.sum.x:s.sum.x0;SUM.y0=s.sum.y0==null?s.sum.y:s.sum.y0;SUM.moved=!!s.sum.moved;
-  SUM.on=true;s.summed=1;sumUI();
+  SUM.on=true;s.summed=1;
+  if(s.sum.auto)SUM.pend=1;   /* belum punya posisi: ditaruh di sectStep setelah zoom/pan di-reset */
+  sumUI();
 }
 function sumUI(){
   var b=document.getElementById('mode-bh');
@@ -318,6 +390,7 @@ function sectStep(now){
       try{sumRestore(s);}catch(eSR){}
       try{sumUI();}catch(eU2){}
       skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
+      if(SUM.pend){SUM.pend=0;try{if(SUM.on)sumPlace();}catch(ePl){}}
       sectSet(false);
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
       try{syncSkyPanHits();}catch(e){}
@@ -413,15 +486,10 @@ function drawSectorOverview(now,age){
       if(s.gprev!=null)drawGlyphSprite(s.gprev,p[0],p[1],r*1.45,1-gp);
       drawGlyphSprite(s.gid,p[0],p[1],r*1.45,gp);
     }
-    /* label '01 - *4' di bawah portal dibuang (dikosongkan dulu); sisa: penanda relay / 'no signal yet' */
+    /* di bawah portal: interlocking status ◉◉◉ (txInterlock) / 'no signal yet' */
     g.font='500 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';
-    /* Label relay: TX sumber docked, ATAU receiver+summoned */
-    var _rel=false;
-    if(typeof TX!=='undefined'&&TX.by&&TX.by[s.k]&&TX.by[s.k].on){
-      _rel=TX.by[s.k].recv?!!s.summed:true;
-    }
-    if(_rel&&!(s.flash&&now-s.flash<1500)){
-      g.fillStyle='rgba(110,229,255,.7)';g.fillText(T('sect.relay'),p[0],p[1]+lo);
+    if(!empty&&!(s.flash&&now-s.flash<1500)&&typeof txInterlock==='function'){
+      drawInterlock(p[0],p[1]+lo+5,txInterlock(s));
     }
     if(s.flash&&now-s.flash<1500){
       g.fillStyle='rgba(255,154,217,'+(.85*(1-(now-s.flash)/1500))+')';
@@ -431,6 +499,23 @@ function drawSectorOverview(now,age){
   }
   try{if(/[?&]dbg\b/.test(location.search)){g.save();g.fillStyle='rgba(255,255,255,.5)';g.font='9px monospace';g.textAlign='left';g.textBaseline='top';
     g.fillText('build 2026-10-06a \u00b7 PLE '+(PLEIADES.scale||0).toFixed(1),8,top+4);g.restore();}}catch(eD){}
+}
+/* Interlocking status per sektor: tiga ◉ (ring + titik tengah), masing-masing punya warna sendiri dan menyala sendiri-sendiri:
+   kiri ◉ kuning = BH mini di-summon di sektor itu · tengah ◉ pink = drone TX terpasang · kanan ◉ cyan = BH overview di-summon.
+   Yang belum aktif = netral (idle), tanpa teks. Level sektor (txComp, 02-sky-logic.js): 1 cuma BH mini · 2 TX terpasang · 3 ketiganya. */
+var IL_COL=[null,'255,214,102','255,154,217','110,229,255'];   /* warna per LEVEL: dipakai garis/drone/cincin di 08-tx-drone.js */
+var IL_DOT=['255,214,102','255,154,217','110,229,255'];        /* warna per KOMPONEN ◉: mini BH, TX, BH overview */
+function drawInterlock(x,y,il){
+  var i,cx,lit,col;
+  g.save();g.lineWidth=1;
+  for(i=0;i<3;i++){
+    cx=x+(i-1)*10;lit=!!(i===0?il.y:(i===1?il.p:il.c));col=IL_DOT[i];
+    g.strokeStyle=lit?'rgba('+col+',.9)':'rgba(200,214,226,.2)';
+    g.beginPath();g.arc(cx,y,3.3,0,6.283);g.stroke();
+    g.fillStyle=lit?'rgba('+col+',1)':'rgba(200,214,226,.2)';
+    g.beginPath();g.arc(cx,y,1.4,0,6.283);g.fill();
+  }
+  g.restore();
 }
 /* ---------- panel tuning: 1 tombol (#mode-bhset), 2 jendela/tab ----------
    GARGANTUA = size / strength / bloom / speed, LANGIT = toggle asteroid (overview + di dalam sektor) + kabut, nebula, vignette, halo portal (baris ini hanya di overview). Save/Reset berlaku untuk tab yang aktif. */
@@ -625,7 +710,12 @@ function drawSectorOverview(now,age){
    - Diajak lewat Sector Gate tanpa SFX               -> kamera terkunci 3 dtk (LED merah + indikator).
    - Ditinggal                                        -> tanpa teleskop: kamera + Stellar Signal terkunci, grain/glitch menetap, sampai balik ke tempat teleskop.
    BGM nggak disentuh. Status ini nggak disimpan (reload = teleskop ikut pengamat lagi). */
-var LIS={at:'ov',last:'ov',cd:0,kind:'',pend:null,tm:0,iv:0,deny:0,ui:null,hud:null,fx:null,cb:null,wasGone:false};
+var LIS={at:'ov',last:'ov',cd:0,kind:'',pend:null,tm:0,iv:0,deny:0,ui:null,hud:null,fx:null,cb:null,wasGone:false,auto:false};
+/* Mode "selalu ajak teleskop": panel ajak/tinggal dilewati, selalu dianggap AJAK. Disimpan; centang di panel ajak (pertama kali) dan di panel Tuning (untuk mematikan). */
+try{LIS.auto=localStorage.getItem('dumul_lis_auto')==='1';}catch(eLA){}
+function lisAutoSync(){var el=document.getElementById('bp-tele-auto');if(el)el.checked=!!LIS.auto;}
+function lisAutoSet(on){LIS.auto=!!on;try{localStorage.setItem('dumul_lis_auto',LIS.auto?'1':'0');}catch(e){}lisAutoSync();}
+(function(){var el=document.getElementById('bp-tele-auto');if(!el)return;el.checked=!!LIS.auto;el.addEventListener('change',function(){lisAutoSet(el.checked);});})();
 function lisLoc(){return SECT.busy?null:(SECT.cur?SECT.cur.k:'ov');}
 function lisGone(){var l=lisLoc();return l!==null&&LIS.at!==l;}
 function lisBlock(kind){
@@ -651,15 +741,16 @@ function lisEls(){
   LIS.fx=d.createElement('div');LIS.fx.id='lis-fx';LIS.fx.setAttribute('aria-hidden','true');b.appendChild(LIS.fx);
   LIS.hud=d.createElement('div');LIS.hud.id='lis-hud';LIS.hud.setAttribute('aria-live','polite');b.appendChild(LIS.hud);
   var a=LIS.ui=d.createElement('div');a.id='lis-ask';a.setAttribute('role','dialog');a.hidden=true;
-  a.innerHTML='<div class="la-q"></div><div class="la-b"><button type="button" data-a="bring"></button><button type="button" data-a="leave"></button></div>';
+  a.innerHTML='<div class="la-q"></div><div class="la-b"><button type="button" data-a="bring"></button><button type="button" data-a="leave"></button></div><label class="la-c"><input type="checkbox" data-c="auto"><span class="la-ct"></span></label>';
   b.appendChild(a);
   /* Isolasi penuh: panel ajak/tinggal tidak tembus ke sky/BH/gate/tele */
   ['pointerdown','pointerup','pointermove','click','touchstart','touchmove','touchend','wheel','contextmenu'].forEach(function(tp){
     a.addEventListener(tp,function(e){e.stopPropagation();},{passive:false,capture:true});
   });
   a.addEventListener('click',function(e){
+    var btn=e.target.closest&&e.target.closest('button[data-a]');
+    if(!btn)return;   /* centang "selalu ajak" (label/checkbox): biarkan default toggle jalan */
     e.preventDefault();e.stopPropagation();
-    var btn=e.target.closest&&e.target.closest('button[data-a]');if(!btn)return;
     lisChoose(btn.getAttribute('data-a')==='bring');
   },true);
   d.addEventListener('pointerdown',function(e){
@@ -674,7 +765,10 @@ function lisAsk(cb,gate){
   var sfxOn=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);
   if(!LIS.ui)lisEls();
   if(lisGone()){LIS.pend={carry:false,gate:!!gate,sfx:sfxOn,t:performance.now()};cb();return;}   /* teleskop memang nggak di sini: nggak ada yang ditanya */
+  if(LIS.auto){LIS.pend={carry:true,gate:!!gate,sfx:sfxOn,t:performance.now()};cb();return;}   /* selalu ajak: tanpa panel */
   var a=LIS.ui;
+  a.querySelector('.la-ct').textContent=T('lis.auto');
+  a.querySelector('input[data-c=auto]').checked=false;
   a.querySelector('.la-q').textContent=T('lis.ask.q');
   a.querySelector('[data-a=bring]').textContent=T('lis.ask.bring');
   a.querySelector('[data-a=leave]').textContent=T('lis.ask.leave');
@@ -684,6 +778,7 @@ function lisChoose(carry){
   var c=LIS.cb;LIS.cb=null;if(LIS.ui)LIS.ui.hidden=true;document.body.classList.remove('lis-asking');if(!c)return;
   LIS.pend={carry:!!carry,gate:c.gate,sfx:c.sfx,t:performance.now()};
   try{haptic(8);}catch(e){}
+  try{var ck=LIS.ui&&LIS.ui.querySelector('input[data-c=auto]');if(carry&&ck&&ck.checked){lisAutoSet(true);lisToast('lis.auto.on',3200);}}catch(eC){}   /* centang cuma berlaku untuk AJAK */
   c.fn();
 }
 function lisStopSfx(){   /* SFX bintang memudar lalu mati (BGM tidak disentuh) */
@@ -752,9 +847,9 @@ function lisArrive(dest){   /* dipanggil sekali per pendaratan akhir (bukan over
    Di dalam sector, tap Gargantua mini (yang sedang di-summon = relay) membuka portal tujuan: ikon portal overview versi kecil,
    satu per sector LAIN yang statusnya relay. Tap portal = lompat (keluar ke overview lalu masuk sector tujuan). BH tetap parkir
    (jadi relay), fungsinya cuma shortcut. Portal ke dumul.html tetap cuma lewat BH overview. */
-var SGATE={open:false,t:0,items:[],down:null,pend:null,sup:0,tunnelUntil:0};
+var SGATE={open:false,t:0,items:[],down:null,pend:null,sup:0,tunnelUntil:0,rc:null,rct:0};
 function sgDests(){var r=[],i,s;for(i=0;i<SECT.list.length;i++){s=SECT.list[i];if(s!==SECT.cur&&s.ids&&s.ids.length)r.push(s);}return r;}
-function sgNum(s){var i=SECT.list.indexOf(s)+1;return (i<10?'0':'')+i;}
+function sgNum(s){return String((s&&(s.name||s.k))||'').toUpperCase();}   /* label shortcut + toast lompat: nama sektor (WINTER/SPRING/SUMMER/AUTUMN), bukan nomor */
 function sgClose(){SGATE.open=false;SGATE.items.length=0;SGATE.down=null;}
 function sgToggle(){
   if(SGATE.open){sgClose();return;}
@@ -789,19 +884,9 @@ function drawSectorGate(now){
   var dests=sgDests(),n=dests.length;if(!n){sgClose();return;}
   var bp=camBH(),Rv=Math.max(8,BH.Rr*(BHZ||1)),rad=Math.max(15,Math.min(22,W*.05)),ring=Math.max(Rv*2.2,40)+rad*1.6,
       u=clamp((now-SGATE.t)/(reduce?1:260)),e=1-Math.pow(1-u,3),pts=[],i,j,s,dx,dy,len,x,y,m=rad+10;
-  /* arah portal = arah ikon sektor itu di overview terhadap Gargantua (susunan sama dengan overview) */
-  for(i=0;i<n;i++){
-    s=dests[i];
-    dx=(s.bx!=null)?s.bx-BH.hx:(i-(n-1)/2)*60;dy=(s.by!=null)?s.by-BH.hy:0;
-    len=Math.hypot(dx,dy)||1;
-    pts.push([bp[0]+dx/len*ring,bp[1]+dy/len*ring]);
-  }
-  for(var it=0;it<4;it++){ /* longgarkan kalau dua portal bertabrakan */
-    for(i=0;i<n;i++)for(j=i+1;j<n;j++){
-      dx=pts[j][0]-pts[i][0];dy=pts[j][1]-pts[i][1];len=Math.hypot(dx,dy)||.01;
-      if(len<rad*2.6){var k=(rad*2.6-len)/2;dx/=len;dy/=len;pts[i][0]-=dx*k;pts[i][1]-=dy*k;pts[j][0]+=dx*k;pts[j][1]+=dy*k;}
-    }
-  }
+  /* arah portal = arah ikon sektor itu di overview terhadap Gargantua; digeser kalau kena HUD/teleskop (sgPoints). Rect HUD di-cache sebentar biar murah. */
+  if(!SGATE.rc||now-SGATE.rct>250){SGATE.rc=hudRects();SGATE.rct=now;}
+  pts=sgPoints(bp[0],bp[1],Rv,dests,rad,SGATE.rc).pts;
   SGATE.items.length=0;
   g.save();g.textAlign='center';
   for(i=0;i<n;i++){
@@ -820,7 +905,7 @@ function drawSectorGate(now){
     if(fr){var fh=r*(100/75);g.drawImage(fr,px-fh,py-fh,fh*2,fh*2);lo=r*1.28+3;}
     else{g.lineWidth=1;g.strokeStyle='rgba(110,229,255,.5)';g.beginPath();g.arc(px,py,r,0,6.283);g.stroke();}
     drawGlyphSprite(s.ids[0],px,py,r*1.45,1);
-    g.font='600 9px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';g.fillStyle='rgba(110,229,255,.85)';
+    g.font='600 8.5px "Space Grotesk",system-ui,sans-serif';g.textBaseline='top';g.fillStyle='rgba(110,229,255,.85)';
     g.fillText(sgNum(s),px,py+lo);
     if(up)g.restore();
     g.restore();
@@ -1497,8 +1582,9 @@ var SN_COOLDOWN={};
     for(var i=0;i<tracks.length;i++)if(isPlayable(i))L.push(i);
     return L;
   }
-  function pickNext(from,dir){
+  function pickNext(from,dir,scope){   /* scope = 'sfx'|'bgm': hanya cari di daftar itu (repeat all otomatis nggak nyebrang Stellar Signals ↔ BGM) */
     var L=playableList();
+    if(scope)L=L.filter(function(i){return tracks[i].type===scope;});
     if(!L.length)return -1;
     if(shuffleOn){
       if(L.length===1)return L[0];
@@ -1536,15 +1622,18 @@ var SN_COOLDOWN={};
   function syncLoopFlag(a){
     if(!a)return;
     var isBgm=(a===AMB||a===MUSIC_COLLAP);
+    /* Repeat one: track yang diputar selalu loop (SFX maupun BGM).
+       BGM auto-loop HANYA kalau repeat off DAN shuffle off. Repeat all / shuffle: loop mati supaya 'ended' jalan dan lanjut ke track berikutnya
+       (dulu BGM tetap loop waktu shuffle on, jadi shuffle nggak pernah pindah dari BGM). SFX di luar repeat one nggak pernah loop. */
     if(repeatMode===1)a.loop=true;
-    else if(repeatMode===2)a.loop=false;
+    else if(repeatMode===2||shuffleOn)a.loop=false;
     else a.loop=!!isBgm;
   }
   window.__mpSyncLoop=syncLoopFlag;
   function onTrackEnded(t){
     if(!t||!t.audio)return;   
     /* 'ended' basi: track sudah di-reset (currentTime=0) atau bukan track aktif -> abaikan*/
-    if(!t.audio.ended)retun;
+    if(!t.audio.ended)return;
     if(t.type==='sfx'&&activeSfx&&activeSfx!==t.audio)return;    
     /* 'ended' basi (track sudah diganti lewat supernova/panel): jangan restart/advance, itu yang bikin numpuk. */
     if(getPlayingTrackIndex()!==-1)return;
@@ -1557,9 +1646,19 @@ var SN_COOLDOWN={};
     }
     if(repeatMode===2||shuffleOn){
       var cur=tracks.indexOf(t);
-      var n=pickNext(cur,1);
-      if(n>=0&&n!==cur)selectAndPlay(n);
-      else if(n===cur){try{t.audio.currentTime=0;}catch(e2){}safePlay(t.audio);}
+      /* Repeat all = muter di daftar yang sama (Stellar Signals sendiri, BGM sendiri). Shuffle tetap acak di semua track. */
+      var n=pickNext(cur,1,(repeatMode===2&&!shuffleOn)?t.type:null);
+      if(n>=0&&n!==cur){
+        selectAndPlay(n);
+        /* selectAndPlay -> triggerSupernova bisa batal diam-diam (bintang tujuan di luar layar sektor / cooldown) dan rantai auto-lanjut mati.
+           Auto-lanjut audionya tetap harus jalan, visual supernova opsional. */
+        var nt=tracks[n];
+        if(getPlayingTrackIndex()===-1&&nt&&nt.type==='sfx'&&typeof playSfx==='function')playSfx(nt.audio);
+      }else if(n===cur){
+        /* satu-satunya track di daftarnya: mulai lagi. SFX lewat playSfx (activeSfx/onended tetap koheren). */
+        if(t.type==='sfx'&&typeof playSfx==='function')playSfx(t.audio);
+        else{try{t.audio.currentTime=0;}catch(e2){}safePlay(t.audio);}
+      }
       return;
     }
     sync();
@@ -1638,6 +1737,11 @@ var SN_COOLDOWN={};
       btnRepeat.title=repeatMode===1?T('mp.rep.one'):(repeatMode===2?T('mp.rep.all'):T('mp.rep.off'));
       btnRepeat.setAttribute('aria-label',btnRepeat.title);
     }
+    /* Indikator loop BGM (↻): baris BGM di panel + tombol panel. Auto-loop (repeat off & shuffle off) = semua baris BGM; repeat one = hanya BGM yang lagi diputar / terpilih. */
+    var pi2=getPlayingTrackIndex(),autoLoop=(repeatMode===0&&!shuffleOn),oneLoop=(repeatMode===1),ci=pi2>=0?pi2:activeIdx,i2;
+    for(i2=SFX_N;i2<tracks.length;i2++){if(rows[i2])rows[i2].classList.toggle('looping',autoLoop||(oneLoop&&i2===ci));}
+    toggle.classList.toggle('bgm-loop',pi2>=SFX_N&&(autoLoop||oneLoop));
+    if(pi2>=0)syncLoopFlag(tracks[pi2].audio);   /* tiap play/pause/ended: loop track yang main selalu sesuai mode (BGM nyala dari jalur mana pun, panel tertutup sekalipun) */
     var pi=getPlayingTrackIndex();
     if(pi>=0&&panelOpen()){waveSeed=(pi+1)*97;startSeekTick();}
     else stopSeekTick();
@@ -1648,6 +1752,8 @@ var SN_COOLDOWN={};
   if(btnShuffle)btnShuffle.addEventListener('click',function(){
     shuffleOn=!shuffleOn;
     try{localStorage.setItem('mp_shuffle',shuffleOn?'1':'0');}catch(e){}
+    var pi0=getPlayingTrackIndex();
+    if(pi0>=0)syncLoopFlag(tracks[pi0].audio);   /* BGM yang lagi main: loop-nya ikut aturan baru sekarang juga */
     sync();haptic(6);
   });
   if(btnRepeat)btnRepeat.addEventListener('click',function(){
@@ -1782,7 +1888,7 @@ function sfxArrive(key){
     try{
       var _src=typeof sfxSector==='function'?sfxSector():null;
       var _docked=_src&&typeof txOn==='function'&&txOn(_src);
-      if(!_docked&&typeof showModeToast==='function'){
+      if(!_docked&&SECT.cur&&_src===SECT.cur&&typeof showModeToast==='function'){
         showModeToast(T('toast.tx.tip'),'tip',4200);
       }
     }catch(eTx){}

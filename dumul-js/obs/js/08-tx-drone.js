@@ -3,15 +3,16 @@
    Sebelumnya mekanik ini nggak punya visual sama sekali (cuma toast + label "relay" di portal). Sekarang:
    1. Ring tahan di teleskop: waktu long-press, cincin progres ngisi (580 ms) = petunjuk "tahan terus".
    2. Di dalam sektor: drone terbang dari teleskop ke target, orbit di sana, tether putus-putus + paket sinyal ngalir ke teleskop.
-        - SRC (cyan)  : sektor sumber SFX → target = bintang pemancar. Kalau Gargantua mini lagi dipanggil, paket lanjut teleskop → Gargantua (masuk tunnel).
-        - RCV (pink)  : sektor lain → target = Gargantua mini (mulut tunnel). Paket ngalir dari Gargantua ke teleskop.
+        - SRC         : sektor sumber SFX → target = bintang pemancar. Kalau Gargantua mini lagi dipanggil, paket lanjut teleskop → Gargantua (masuk tunnel).
+        - RCV         : sektor lain → target = Gargantua mini (mulut tunnel). Paket ngalir dari Gargantua ke teleskop.
       Lepas (long-press lagi / recall) = drone balik ke teleskop. Pindah sektor = tanpa animasi (langsung posisi akhir).
    3. Di overview sektor: Gargantua = tunnel. Garis sumber → Gargantua → sektor penerima, paket cahaya ngalir searah sinyal.
+   Warna jalur/drone/ring mengikuti indikator interlocking sektornya (kuning/pink/cyan), bukan lagi cyan=TX pink=RX.
    Dipanggil dari frame() lewat drawTxLines(now) (sudah ada di 04-render/05-sector-ui, tinggal didefinisikan).
    Hook long-press ada di 06-interaction.js (TXFX.holdStart / holdEnd). State dibaca dari TX / SUM / SECT; modul ini TIDAK mengubah state apa pun. */
 var TXFX=(function(){
   var SRC='110,229,255',RCV='255,154,217',NEU='200,214,226',HOLD_MS=580,HOLD_SHOW=160;
-  var D={},hold=null,pings=[],lastCur=null;
+  var D={},OV={},ovT=0,hold=null,pings=[],lastCur=null;
   function c01(v){return v<0?0:v>1?1:v;}
   function ease(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
   function hsh(k){var h=0,i;for(i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))|0;return (h&1)?1:-1;}
@@ -22,6 +23,19 @@ var TXFX=(function(){
     return [i*i*a[0]+2*i*e*cx+e*e*b[0],i*i*a[1]+2*i*e*cy+e*e*b[1]];
   }
   function tele(){var p=telescopeScreenPos();return p?[p[0],p[1]]:null;}
+  /* Warna jalur/drone = warna indikator interlocking sektornya (txInterlock + IL_COL di 05-sector-ui.js):
+     1 kuning, 2 pink, 3 cyan. Lvl 0 (nggak ada TX) = netral. Peran TX/RX tetap dibedakan lewat label & arah paket. */
+  function ilLvl(s){return(s&&typeof txInterlock==='function')?txInterlock(s).lvl:0;}
+  function lvlCol(l){return(typeof IL_COL!=='undefined'&&IL_COL[l])||NEU;}
+  function ilCol(s){return lvlCol(ilLvl(s));}
+  /* Fade warna: tiap jalur punya warna berjalan sendiri (key), dilerp ke target. Lama nggak digambar (>400 ms) = snap, bukan fade basi. */
+  var CF={};
+  function fcol(key,tgt,now){
+    var t=tgt.split(','),c=CF[key],i,k,dt;
+    if(!c||now-c.t>400){CF[key]={v:[+t[0],+t[1],+t[2]],t:now};return tgt;}
+    if(c.t!==now){dt=Math.min(100,now-c.t);k=reduce?1:1-Math.exp(-dt/220);for(i=0;i<3;i++)c.v[i]+=(+t[i]-c.v[i])*k;c.t=now;}
+    return Math.round(c.v[0])+','+Math.round(c.v[1])+','+Math.round(c.v[2]);
+  }
 
   /* ---------- state yang diinginkan di sektor sekarang ---------- */
   function want(s){
@@ -106,7 +120,7 @@ var TXFX=(function(){
     var el=now-hold.t0;if(el<HOLD_SHOW)return;
     var t=tele();if(!t)return;
     var col=NEU;
-    if(SECT.cur&&!SECT.on){col=(typeof sfxSector==='function'&&sfxSector()===SECT.cur)?SRC:RCV;}
+    if(SECT.cur&&!SECT.on)col=fcol('hold',ilCol(SECT.cur),now);
     var f=c01(el/HOLD_MS),R=26,fade=c01((el-HOLD_SHOW)/120),full=f>=1,pulse=full&&!reduce?.6+.4*Math.sin(now*.02):1;
     g.save();g.lineCap='round';
     g.strokeStyle='rgba('+col+','+(.18*fade)+')';g.lineWidth=2;g.beginPath();g.arc(t[0],t[1],R,0,6.283);g.stroke();
@@ -118,24 +132,31 @@ var TXFX=(function(){
   /* ---------- di dalam sektor ---------- */
   function drawSector(now,s){
     if(typeof lisGone==='function'&&lisGone()){lastCur=null;return;}   /* teleskop ditinggal di sektor lain: nggak ada yang digambar */
-    var mode=want(s),d=D[s.k]||(D[s.k]={ph:'idle',mode:null,trail:[],sg:hsh(s.k),t0:0,from:null,pos:null});
-    if(lastCur!==s){lastCur=s;d.trail.length=0;d.ph=mode?'dock':'idle';d.mode=mode;d.from=null;d.pos=null;}   /* masuk sektor: snap, tanpa animasi */
+    var mode=want(s),d=D[s.k]||(D[s.k]={ph:'idle',mode:null,trail:[],sg:hsh(s.k),t0:0,from:null,pos:null,key:null,hop:false}),
+        curKey=(mode==='src'&&TX.by[s.k])?TX.by[s.k].key:null;   /* bintang pemancar sekarang (berubah kalau SFX ganti) */
+    if(lastCur!==s){lastCur=s;d.trail.length=0;d.ph=mode?'dock':'idle';d.mode=mode;d.from=null;d.pos=null;d.key=curKey;d.hop=false;}   /* masuk sektor: snap, tanpa animasi */
     var tp=tele();if(!tp)return;
-    var col=(d.mode||mode)==='rcv'?RCV:SRC;
+    var col=fcol('sec:'+s.k,ilCol(s),now);
     /* transisi state */
     if(mode&&(d.ph==='idle'||d.ph==='back'||d.mode!==mode)){
-      d.from=(d.ph==='back'&&d.pos)?d.pos.slice():null;
-      d.ph='out';d.t0=now;d.mode=mode;col=mode==='rcv'?RCV:SRC;ping(tp[0],tp[1],col,now,false);
+      var live=!!(d.pos&&(d.ph==='back'||d.ph==='dock'||d.ph==='out'));
+      d.from=live?d.pos.slice():null;
+      d.hop=!!(live&&d.ph!=='back');   /* ganti peran (TX↔RX) saat drone masih di luar: terbang langsung dari posisi sekarang, tanpa fade dari teleskop */
+      d.ph='out';d.t0=now;d.mode=mode;d.key=curKey;col=fcol('sec:'+s.k,ilCol(s),now);
+      if(!d.hop)ping(tp[0],tp[1],col,now,false);else ping(d.pos[0],d.pos[1],col,now,false);
+    }else if(mode==='src'&&d.key!==curKey){   /* SFX ganti bintang di sektor yang sama: drone pindah orbit ke bintang baru */
+      if(d.ph==='dock'&&d.pos){d.from=d.pos.slice();d.ph='out';d.t0=now;d.hop=true;ping(d.pos[0],d.pos[1],col,now,false);}
+      d.key=curKey;   /* kalau masih 'out': targetOf() dihitung ulang tiap frame, jalur otomatis membelok ke bintang baru */
     }else if(!mode&&(d.ph==='out'||d.ph==='dock')){
-      d.from=d.pos?d.pos.slice():tp;d.ph='back';d.t0=now;
+      d.from=d.pos?d.pos.slice():tp;d.ph='back';d.t0=now;d.hop=false;
     }
     if(d.ph==='idle')return;
     var T=d.mode?targetOf(s,d.mode):null,pos,al=1,u,e;
     if(d.ph==='out'){
       if(!T){d.ph='idle';return;}
-      u=reduce?1:c01((now-d.t0)/1150);e=ease(u);al=e;
+      u=reduce?1:c01((now-d.t0)/1150);e=ease(u);al=d.hop?1:e;
       pos=bez(d.from||tp,orbit(T,now,d.sg),e,d.sg*.28);
-      if(u>=1){d.ph='dock';ping(T.x,T.y,col,now,true);}
+      if(u>=1){d.ph='dock';d.hop=false;ping(T.x,T.y,col,now,true);}
     }else if(d.ph==='dock'){
       if(!T){d.ph='idle';return;}
       pos=orbit(T,now,d.sg);
@@ -184,22 +205,32 @@ var TXFX=(function(){
   function drawOverview(now){
     lastCur=null;
     if(SECT.busy||SECT.vis<.05)return;
-    var bp=camBH(),Rv=Math.max(8,BH.Rr*(BHZ||1)),rad=Math.max(20,Math.min(30,W*.07)),i,s,t,srcs=[],rcvs=[];
+    var bp=camBH(),Rv=Math.max(8,BH.Rr*(BHZ||1)),rad=Math.max(20,Math.min(30,W*.07)),i,s,t,o,role,srcs=[],rcvs=[],mx=0;
     if(!bp)return;
+    /* Tiap sektor punya alpha jalur sendiri (src & rcv): sumber pindah / sektor ganti peran = jalur lama memudar, jalur baru muncul. State dibaca ulang tiap frame, jadi nggak butuh reset. */
+    var dt=ovT?Math.min(100,now-ovT):16,k=reduce?1:1-Math.exp(-dt/150);ovT=now;
     for(i=0;i<SECT.list.length;i++){
       s=SECT.list[i];if(s.sx==null||!s.ids||!s.ids.length)continue;
-      t=TX.by[s.k];if(!t||!t.on)continue;
-      if(t.recv){if(s.summed)rcvs.push(s);}else srcs.push(s);
+      t=TX.by[s.k];role=null;
+      if(t&&t.on){if(!t.recv)role='src';else if(txRelayShown(s))role='rcv';}
+      o=OV[s.k]||(OV[s.k]={s:0,r:0});
+      o.s+=((role==='src'?1:0)-o.s)*k;o.r+=((role==='rcv'?1:0)-o.r)*k;
+      if(o.s<.015&&role!=='src')o.s=0;if(o.r<.015&&role!=='rcv')o.r=0;
+      if(o.s>0){srcs.push([s,o.s]);if(o.s>mx)mx=o.s;}
+      if(o.r>0){rcvs.push([s,o.r]);if(o.r>mx)mx=o.r;}
     }
     if(!srcs.length&&!rcvs.length)return;
-    g.save();g.globalAlpha=SECT.vis;
-    var bpp=[bp[0],bp[1]],flowIn=srcs.length>0;
-    for(i=0;i<srcs.length;i++)link([srcs[i].sx,srcs[i].sy],bpp,rad*1.35,Rv*1.35,SRC,true,now,hsh(srcs[i].k));
-    for(i=0;i<rcvs.length;i++)link(bpp,[rcvs[i].sx,rcvs[i].sy],Rv*1.35,rad*1.35,RCV,flowIn,now,hsh(rcvs[i].k));
+    g.save();
+    var bpp=[bp[0],bp[1]],flowIn=srcs.length>0,hasR=false;
+    for(i=0;i<srcs.length;i++){s=srcs[i][0];g.globalAlpha=SECT.vis*srcs[i][1];link([s.sx,s.sy],bpp,rad*1.35,Rv*1.35,fcol('ovs:'+s.k,ilCol(s),now),true,now,hsh(s.k));}
+    for(i=0;i<rcvs.length;i++){s=rcvs[i][0];if(rcvs[i][1]>.5)hasR=true;g.globalAlpha=SECT.vis*rcvs[i][1];link(bpp,[s.sx,s.sy],Rv*1.35,rad*1.35,fcol('ovr:'+s.k,ilCol(s),now),flowIn,now,hsh(s.k));}
     /* cincin tunnel di Gargantua: ngembang pelan selama ada sinyal lewat */
     if(!reduce&&!lite()){
-      var f=(now%2600)/2600,a=(flowIn&&rcvs.length)?1:.55;
-      g.strokeStyle='rgba('+(rcvs.length?RCV:SRC)+','+(.34*(1-f)*a)+')';g.lineWidth=1.3;
+      var f=(now%2600)/2600,a=(flowIn&&hasR)?1:.55,ml=0,ql;
+      for(i=0;i<srcs.length;i++){ql=ilLvl(srcs[i][0]);if(ql>ml)ml=ql;}
+      for(i=0;i<rcvs.length;i++){ql=ilLvl(rcvs[i][0]);if(ql>ml)ml=ql;}
+      g.globalAlpha=SECT.vis*Math.min(1,mx);
+      g.strokeStyle='rgba('+fcol('ovring',lvlCol(ml),now)+','+(.34*(1-f)*a)+')';g.lineWidth=1.3;
       g.beginPath();g.arc(bpp[0],bpp[1],Rv*1.4+f*Rv*1.6,0,6.283);g.stroke();
     }
     g.restore();
@@ -219,7 +250,12 @@ var TXFX=(function(){
     draw:draw,
     holdStart:function(){hold={t0:performance.now()};},
     holdEnd:function(){hold=null;},
-    reset:function(){D={};hold=null;pings.length=0;lastCur=null;}
+    role:function(){   /* 'src' = TX docked di sektor ini, 'rcv' = RX terhubung ke BH mini, null = idle; dipakai LED teleskop */
+      if(!SECT.cur||SECT.on||SECT.busy)return null;
+      if(typeof lisGone==='function'&&lisGone())return null;
+      return want(SECT.cur);
+    },
+    reset:function(){D={};OV={};CF={};ovT=0;hold=null;pings.length=0;lastCur=null;}
   };
 })();
 function drawTxLines(now){TXFX.draw(now);}

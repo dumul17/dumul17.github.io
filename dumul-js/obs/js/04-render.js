@@ -331,10 +331,21 @@ function teleSectorLogic(dt){
 /* TX lines — TEMPORARY (nanti diganti drone orbit). Dipanggil SETELAH drawSectorOverview supaya sx/sy portal sudah ada. */
 function drawTxLines(now){
   /* TEMP retired: visual line TX di overview & di dalam sektor dimatikan.
-     Sisakan label ◉ relay di portal overview saja. Drone orbit nanti. */
+     Sisakan indikator interlocking ◉◉◉ di portal overview saja. Drone orbit nanti. */
   return;
 }
 
+/* LED beacon teleskop: idle hijau neon, TX (sektor sumber, drone docked) cyan, RX (sektor lain, link ke BH mini) pink.
+   Warna dilerp halus (TELED) supaya perpindahan peran tidak loncat. Peran dari TXFX.role() (08-tx-drone.js). */
+var TELED={c:[57,255,20],t:0};
+var TELED_IDLE=[57,255,20],TELED_TX=[110,229,255],TELED_RX=[255,154,217];
+function teLedStep(now,role){
+  var tg=role==='src'?TELED_TX:role==='rcv'?TELED_RX:TELED_IDLE,dt=TELED.t?Math.min(100,now-TELED.t):100,k=reduce?1:1-Math.exp(-dt/200),i;
+  if(now-TELED.t>400)k=1;
+  TELED.t=now;
+  for(i=0;i<3;i++)TELED.c[i]+=(tg[i]-TELED.c[i])*k;
+  return Math.round(TELED.c[0])+','+Math.round(TELED.c[1])+','+Math.round(TELED.c[2]);
+}
 function drawFloatingTelescope(now){
   /* Free-floating telescope: drift / warp / orbit state machine.
      Warp + orbit triggered by star supernova; otherwise inertial drift. */
@@ -589,10 +600,13 @@ function drawFloatingTelescope(now){
     g.beginPath();g.moveTo(-25,0);g.lineTo(-33,0);g.stroke();
     /* Beacon LED status light on rear antenna tip (observatory satellite feel) */
     var lisR=(typeof lisRed==='function')&&lisRed(now);   /* Lost-in-Space: LED merah selama star tracker belum pulih */
-    var beacon=lisR?(Math.sin(now*0.02)>-0.2?1:0.3):(Math.sin(now*0.006)>0.6?1:0.15);
+    var _role=(typeof TXFX!=='undefined'&&TXFX.role)?TXFX.role():null,_lc=teLedStep(now,_role);
+    /* idle: kedip pendek seperti sebelumnya; TX/RX: menyala stabil dengan denyut halus + glow lebih kuat */
+    var beacon=lisR?(Math.sin(now*0.02)>-0.2?1:0.3):(_role?(.78+.22*Math.sin(now*0.008)):(Math.sin(now*0.006)>0.6?1:0.15));
     if(lisR){g.fillStyle='rgba(255,60,60,'+(beacon*.35)+')';g.beginPath();g.arc(-34,0,6,0,6.283);g.fill();}
-    g.fillStyle=lisR?'rgba(255,72,72,'+beacon+')':'rgba(110,229,255,'+beacon+')';
-    g.beginPath();g.arc(-34,0,lisR?2.8:1.8,0,6.283);g.fill();
+    else{g.fillStyle='rgba('+_lc+','+(beacon*(_role?.42:.24))+')';g.beginPath();g.arc(-34,0,_role?7:5,0,6.283);g.fill();}
+    g.fillStyle=lisR?'rgba(255,72,72,'+beacon+')':'rgba('+_lc+','+beacon+')';
+    g.beginPath();g.arc(-34,0,lisR?2.8:(_role?2.2:1.8),0,6.283);g.fill();
 
     /* Small service-box details: opaque and restrained. */
     g.fillStyle='rgb(91,105,114)';g.fillRect(-4,-15,9,3);g.fillRect(-3,12,8,3);

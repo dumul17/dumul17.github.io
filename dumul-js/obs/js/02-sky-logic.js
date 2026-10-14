@@ -1199,39 +1199,89 @@ function txOf(s){return s&&s.k?TX.by[s.k]:null;}
 function txOn(s){var t=txOf(s);return !!(t&&t.on);}
 function txRecvOn(s){return !!(s&&s.k&&TX.recv[s.k]);}
 function txSyncRelay(s){if(s)s.relay=txOn(s);}
-function txDeploy(s,key){
-  if(!s||!s.k||!key)return false;
-  TX.by[s.k]={on:1,key:key,t:performance.now()};
+/* Semua perubahan TX lewat txSet/txClear: TX.by, TX.recv dan s.relay SELALU searah.
+   (Dulu txDeploy tidak membersihkan TX.recv dan txRecvSet bisa membalik sumber jadi receiver -> state saling bertentangan -> "dock ke-reset" / muffled terus.)
+   Peran: 'src' = drone dock di bintang sumber, 'rcv' = receiver di BH mini sektor lain. Satu sektor = satu TX (peran bisa berubah, lewat txFollowSfx). */
+function txSet(s,role,key,auto){
+  if(!s||!s.k)return false;
+  var o=TX.by[s.k],now=performance.now();
+  if(role==='src'){TX.by[s.k]={on:1,key:key,t:(o&&o.t)||now};delete TX.recv[s.k];}
+  else{TX.by[s.k]={on:1,key:key||'recv',recv:1,auto:auto?1:0,t:(o&&o.t)||now};TX.recv[s.k]=1;}
   s.relay=true;
   return true;
 }
-function txRecall(s){
+function txClear(s){
   if(!s||!s.k)return false;
-  if(!TX.by[s.k])return false;
-  delete TX.by[s.k];
-  s.relay=false;
-  return true;
+  var had=!!TX.by[s.k];
+  delete TX.by[s.k];delete TX.recv[s.k];s.relay=false;
+  return had;
 }
+function txDeploy(s,key){return !!key&&txSet(s,'src',key);}
+function txRecall(s){return txClear(s);}
 function txRecvSet(s,on){
   if(!s||!s.k)return false;
-  if(on){
-    TX.recv[s.k]=1;
-    /* Mark overview slot: line/relay label butuh entry di TX.by juga (bukan cuma sumber SFX) */
-    if(!TX.by[s.k]||!TX.by[s.k].on){
-      var key=null;
-      if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
-      TX.by[s.k]={on:1,key:key||'recv',recv:1,t:performance.now()};
-    }else{
-      TX.by[s.k].recv=1;
-    }
-    s.relay=true;
-  }else{
-    delete TX.recv[s.k];
-    if(TX.by[s.k]&&TX.by[s.k].recv){
-      delete TX.by[s.k];
-      s.relay=false;
-    }
+  if(!on)return txClear(s);
+  var key=null;
+  if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
+  return txSet(s,'rcv',key);
+}
+/* Relay tampil (label + garis) di overview? Sumber: selalu. Receiver: BH mini pernah di-summon (receiver hasil pindah sumber otomatis di-summon lewat txAutoBH). */
+function txRelayShown(s){
+  var t=s&&s.k?TX.by[s.k]:null;
+  if(!t||!t.on)return false;
+  return t.recv?!!(s.summed||t.auto):true;
+}
+/* ===== Interlocking per SEKTOR (satu-satunya sumber kebenaran: label portal ◉◉◉, warna garis/drone, DAN muffle audio semuanya baca dari sini) =====
+   Tiga komponen, masing-masing punya warna sendiri:
+     y = BH mini di-summon di sektor itu            (◉ kuning)
+     p = drone TX terpasang di sektor itu (dock sumber atau receiver)   (◉ pink)
+     c = BH overview di-summon (global) — baru dihitung di sektor yang punya y atau p, supaya portal kosong nggak ikut menyala   (◉ cyan)
+   Level sektor:  1 = cuma BH mini · 2 = TX terpasang (tanpa BH mini lengkap) · 3 = ketiganya menyala.
+   BH overview di-recall → c mati → sektor level 3 turun (cyan jadi idle) → sinyal muffled. TX/docking TIDAK ikut di-reset. */
+function txComp(s){
+  var t=s&&s.k?TX.by[s.k]:null,
+      p=!!(t&&t.on),
+      y=!!(s&&(s.sum||(typeof SECT!=='undefined'&&SECT.cur===s&&typeof SUM!=='undefined'&&SUM.on))),
+      c=!!(typeof HBH!=='undefined'&&HBH.on)&&(y||p);
+  return {y:y,p:p,c:c,lvl:(y&&p&&c)?3:(p?2:(y?1:0))};
+}
+function txInterlock(s){var o=txComp(s);return {lvl:o.lvl,y:o.y,p:o.p,c:o.c};}
+/* Kenapa sinyal dari sektor `src` belum jernih di `here` (null = overview)? '' = jernih.
+   Urutannya = urutan yang harus dipasang user, dipakai bareng oleh muffle (spatialTarget) dan toast petunjuk (spatialHint):
+     di sektor sumber           → selalu jernih
+     di overview                → sumber harus level 3
+     di sektor lain             → sumber level 3 DAN sektor ini juga level 3 (beda level = muffled) */
+function txWhy(src,here){
+  if(!src)return 'none';
+  if(here===src)return '';
+  var a=txComp(src);
+  if(!a.p)return 'far';                       /* TX sumber belum di-dock */
+  if(!a.c)return 'needov';                    /* BH overview di-recall */
+  if(!a.y)return 'needbh';                    /* BH mini sektor sumber belum/dilepas */
+  if(!here)return '';
+  var h=txComp(here);
+  if(!h.y)return 'needbh';                    /* panggil BH mini di sini */
+  if(!h.p)return 'needrecv';                  /* receiver di sini belum terpasang */
+  if(!h.c)return 'needov';
+  return '';
+}
+function sigLinked(src,here){return !!src&&txWhy(src,here)==='';}
+/* SFX ganti sumber (dipanggil playSfx). Semua jalur (supernova, panel musik, repeat) lewat sini.
+   1. Sektor yang sama dengan TX dock: cukup ganti key (drone terbang ke bintang baru).
+   2. Sektor lain yang SUDAH punya TX sebagai receiver: jadi sumber baru; sumber lama otomatis jadi receiver (tetap terpasang, tanpa reset/long-press ulang).
+   3. Sektor yang belum punya TX: TX sektor lain TIDAK disentuh (dock lama tetap, nggak ada yang di-reset). */
+function txFollowSfx(key,ns){
+  if(!key||!ns||!ns.k)return false;
+  var cur=TX.by[ns.k],i,s,o;
+  if(!(cur&&cur.on))return false;
+  if(!cur.recv){cur.key=key;return true;}
+  for(i=0;i<SECT.list.length;i++){
+    s=SECT.list[i];o=TX.by[s.k];
+    if(s===ns||!o||!o.on||o.recv)continue;
+    txSet(s,'rcv','recv',true);
+    if(typeof txAutoBH==='function')txAutoBH(s);   /* receiver butuh BH mini */
   }
+  txSet(ns,'src',key);
   return true;
 }
 /* Sektor tampil line/relay di overview? TX dock ATAU receiver link. */
@@ -1249,48 +1299,38 @@ function txStarPos(key){
   var fy=tr.cons==='pleiades'?(PLEIADES.y+st.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(st.y+c.oy);
   return skyXF(fx,fy);
 }
-/* Long-press teleskop: pasang/lepas TX.
-   - Sektor sumber (+SFX atau TX sudah ada): toggle dock ke bintang.
-   - Sektor lain: toggle receiver ke BH mini lokal.
-   - Overview: no-op (toast). */
+/* Long-press teleskop di dalam sektor: pasang / lepas TX di SEKTOR INI. Keputusan cuma dari state sektor ini + SFX yang lagi bunyi, bukan dari
+   "SFX yang barusan jalan" yang bisa null (SFX habis / teleskop ditinggal) — itu dulu yang bikin sumber salah dikira sektor lain, dibalik jadi receiver lalu terhapus.
+   1. Sektor ini sudah punya TX/RX (peran apa pun) → dilepas.
+   2. Sektor sumber SFX (+SFX bunyi) → dock drone ke bintang.
+   3. Sektor lain (BH mini di-summon) → receiver.
+   Overview: no-op (toast). */
 function txLongPressTele(){
   if(typeof lisBlock==='function'&&lisBlock('sig')){if(typeof lisDenied==='function')lisDenied('sig');return true;}
   if(SW||SECT.busy)return false;
-  if(!SECT.cur){
-    try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.ov'),null,2800);}catch(e){}
-    return true;
+  function toast(k,ms,v){try{if(typeof showModeToast==='function')showModeToast(T(k,v),null,ms);}catch(e){}}
+  if(!SECT.cur){toast('toast.tx.ov',2800);return true;}
+  var X=SECT.cur,nm=X.name||X.k,src=typeof sfxSector==='function'?sfxSector():null,key=null;
+  if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
+  if(txOn(X)){
+    var wasRcv=!!(TX.by[X.k]&&TX.by[X.k].recv);
+    txClear(X);
+    toast(wasRcv?'toast.tx.recvoff':'toast.tx.recall',2800,{s:nm});
+    haptic(12);return true;
   }
-  var src=typeof sfxSector==='function'?sfxSector():null;
-  var key=null;
-  if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')
-    key=keyFromAudio(activeSfx);
-  /* Di sektor sumber (SFX lokal / TX lokal) */
-  if(src&&src===SECT.cur){
-    if(txOn(src)&&(!key||TX.by[src.k].key===key)){
-      txRecall(src);
-      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.recall',{s:src.name||src.k}),null,2800);}catch(e){}
-      haptic(12);return true;
-    }
-    if(!key){
-      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.needplay'),null,3000);}catch(e){}
-      return true;
-    }
-    txDeploy(src,key);
-    try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.linked',{s:src.name||src.k}),null,3200);}catch(e){}
+  if(src&&src===X){
+    if(!key){toast('toast.tx.needplay',3000);return true;}
+    txDeploy(X,key);
+    toast('toast.tx.deploy',3200,{s:nm});
     haptic(14);return true;
   }
-  /* Sektor lain: receiver link ke BH mini */
   if(SUM.on&&BHSC>.05){
-    if(txRecvOn(SECT.cur)){
-      txRecvSet(SECT.cur,false);
-      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.recvoff',{s:SECT.cur.name||SECT.cur.k}),null,2800);}catch(e){}
-      haptic(10);return true;
-    }
-    txRecvSet(SECT.cur,true);
-    try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.linked',{s:SECT.cur.name||SECT.cur.k}),null,3200);}catch(e){}
+    txRecvSet(X,true);
+    var w=txWhy(src,X);
+    toast(w===''?'toast.tx.linked':(w==='needov'?'toast.tx.needov':(w==='far'?'toast.tx.far':(w==='none'?'toast.tx.muff':'toast.tx.needbh'))),3600,{s:nm});
     haptic(14);return true;
   }
-  try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.needbh'),null,3200);}catch(e){}
+  toast('toast.tx.needbh',3200);
   return true;
 }
 function txRecallFromTele(){return txLongPressTele();}

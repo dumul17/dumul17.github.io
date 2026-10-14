@@ -455,9 +455,9 @@ function bhuClamp(k,v){var r=BHU_RNG[k];v=+v;if(!(v===v))v=BHU_DEF[k];return Mat
 try{var _bc=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');if(_bc)for(var _bk in BHU_DEF)if(typeof _bc[_bk]==='number')BHU[_bk]=bhuClamp(_bk,_bc[_bk]);}catch(e){}
 /* ===== Tune terpisah: overview vs BH mini di dalam sector =====
    Sector: BHSC = BHU.size / BH_SECT_MAXSIZE. size 1.80 = seukuran BH overview (1.00×).
-   Default sector 0.90 → BHSC 0.50× (auto-summon saat masuk; bisa recall/summon lagi via tombol).
+   Default sector 0.50 (slider min) → BHSC 0.28× (bisa recall/summon lagi via tombol; nilai yang pernah di-Save di panel tune tetap dipakai sampai di-Reset).
    BH sector TIDAK membesar/mengecil karena dekat/jauh dari rasi (ukuran murni dari slider). */
-var BHU_SDEF={size:0.9,str:1,bloom:1,speed:1},BH_SECT_MAXSIZE=1.8;
+var BHU_SDEF={size:0.5,str:1,bloom:1,speed:1},BH_SECT_MAXSIZE=1.8;
 var BHU_O={},BHU_S={},BHU_CTX=0,bhuRepaint=null;
 (function(){for(var k in BHU_DEF){BHU_O[k]=BHU[k];BHU_S[k]=BHU_SDEF[k];}
   try{var c=JSON.parse(localStorage.getItem('dumul_bh_cfg_s')||'null');if(c)for(var k2 in BHU_SDEF)if(typeof c[k2]==='number')BHU_S[k2]=bhuClamp(k2,c[k2]);}catch(e){}})();
@@ -1159,20 +1159,31 @@ function sfxSector(){
   if(!activeSfx||typeof TRIGGERS==='undefined'||typeof keyFromAudio!=='function')return null;
   var key=keyFromAudio(activeSfx),tr=key&&TRIGGERS[key];if(!tr)return null;
   for(var i=0;i<SECT.list.length;i++)if(SECT.list[i].ids.indexOf(tr.cons)>=0)return SECT.list[i];
+  /* SECT.list[].ids cuma rasi AKTIF, tapi panel musik (shuffle / repeat all) memutar SEMUA SFX termasuk rasi off.
+     Tanpa fallback ini sumbernya dianggap 'tanpa sektor' -> spatialTarget jatuh ke cabang akhir (jernih di mana-mana)
+     dan txFollowSfx tidak jalan. */
+  var rb=(typeof SKY!=='undefined'&&SKY.rasiBy)?SKY.rasiBy[tr.cons]:null;
+  if(rb)for(var j=0;j<SECT.list.length;j++)if(SECT.list[j].k===rb.sector)return SECT.list[j];
   return null;
 }
+/* Beban teleskop saat kamera memfokus rasi/cluster di sektor selain sumber sinyal. 0 = tidak ada.
+   Jarak = selisih sudut sektor (SECTORS[].a) dengan sektor sumber, 0..180 derajat -> .50 .. .90. */
+function camStrain(s){
+  if(!CAMERA_MODE||SECT.on||!SECT.cur||!s||s===SECT.cur)return 0;
+  var f=typeof camFocusId==='function'?camFocusId():null;
+  if(!f||f==='bh'||f==='free')return 0;
+  var d=Math.abs(((SECT.cur.a-s.a)%360+360)%360);if(d>180)d=360-d;
+  return .5+.4*(d/180);
+}
+/* Sektor sumber interlocking penuh (indikator cyan): TX docked + BH mini di sektor itu + BH overview aktif.
+   Dipakai di overview supaya muffle selaras dengan ◉◉◉ (txInterlock), bukan cuma cek TX + BH overview. */
+function srcLinked(s){return !!(s&&typeof sigLinked==='function'&&sigLinked(s,null));}   /* sumber level 3, dilihat dari overview — aturan lengkapnya di txWhy (02-sky-logic.js) */
 function spatialTarget(){
   var cx=W*.5,cy=H*.5,maxD=Math.max(120,Math.hypot(W,H)*.48),t,p,s;
   var gone=(typeof lisGone==='function'&&lisGone());
   s=sfxSector();
   /* Sumber lokal (di dalam sektor sumber): selalu jernih */
-  if(SECT.cur&&s&&s===SECT.cur){
-    if(!CAMERA_MODE)return 0;
-    p=activeStarScreenPos();
-    if(!p||p[2]>=1)return .55;
-    t=Math.min(1,Math.max(0,Math.hypot(p[0]-cx,p[1]-cy)/maxD));
-    return Math.max(0,(t-.12)/.88);
-  }
+  if(SECT.cur&&s&&s===SECT.cur)return 0;   /* sektor sumber: selalu jernih, auto-fit zoom kamera tidak ikut meredam */
   /* Teleskop ditinggal: disconnect penuh (LIS) */
   if(gone)return 1;
   /* Star tracker / tunnel shortcut: muffled */
@@ -1182,21 +1193,18 @@ function spatialTarget(){
      Recall BH overview → muffled; summon lagi → jernih. TIDAK reset docking/TX. */
   if(SECT.on||SECT.busy){
     var _hbOk=!!(typeof HBH!=='undefined'&&HBH.on);
-    if(s&&typeof txOn==='function'&&txOn(s)&&_hbOk&&SECT.on&&SECT.phase!=='in')return 0;
+    if(srcLinked(s)&&SECT.on&&SECT.phase!=='in')return 0;
     if(s&&s.sx!=null){t=Math.min(1,Math.hypot(s.sx-cx,s.sy-cy)/maxD);t=Math.max(0,(t-.12)/.88);}
     else t=.7;
     if(!SECT.busy)t=Math.max(.7,t);
     if(!_hbOk)t=Math.max(.85,t); /* BH overview di-recall → muffled */
     return t;
   }
-  /* Sektor lain: jernih = TX sumber + receiver link (long-press tele→BH). Star tracker muffle di atas. */
+  /* Sektor lain: jernih HANYA kalau sektor sumber level 3 DAN sektor ini juga level 3 (BH mini + receiver + BH overview). Beda level = muffled.
+     Star tracker / tunnel muffle sudah di atas. Cam constellation fokus rasi/cluster di sektor bukan sumber = teleskop dipaksa menjauh dari sumber:
+     makin jauh sektornya dari sumber makin redam (camStrain), berlaku juga kalau sudah interlocking. */
   if(SECT.cur&&s&&s!==SECT.cur){
-    var _txOk=(typeof txOn==='function'&&txOn(s));
-    var _recv=(typeof txRecvOn==='function'&&txRecvOn(SECT.cur));
-    var _bhOk=!!(SUM.on&&BHSC>.05);
-    /* Jernih hanya jika TX sumber + receiver + BH mini di tujuan. Tunnel 2s sudah di atas. */
-    if(_txOk&&_recv&&_bhOk)return 0;
-    return .88; /* belum docking/summon di tujuan → muffled terus */
+    return Math.max(sigLinked(s,SECT.cur)?0:.88,camStrain(s));
   }
   if(!CAMERA_MODE)return 0;
   p=activeStarScreenPos();
@@ -1205,7 +1213,7 @@ function spatialTarget(){
   return Math.max(0,(t-.12)/.88);
 }
 function spatialHint(t){
-  var st='',s=sfxSector(),rel=!!(s&&typeof txOn==='function'&&txOn(s));
+  var st='',s=sfxSector(),w;
   var gone=(typeof lisGone==='function'&&lisGone());
   if(gone){ /* LIS handle toast sendiri; jangan spam spatial */
     if(AV._hint)AV._hint='';
@@ -1215,16 +1223,13 @@ function spatialHint(t){
     if(AV._hint!=='tracker'){AV._hint='tracker';}
     return; /* toast star tracker sudah dari lisStart */
   }
-  if(SECT.on&&!SECT.busy){
-    var _hbOk=!!(typeof HBH!=='undefined'&&HBH.on);
-    if(rel&&_hbOk)st='relay';
-    else if(!_hbOk&&rel)st='needbh'; /* TX ada, BH overview di-recall */
-    else if(t>.5)st='muffled';
-  }else if(SECT.cur&&!SECT.busy&&s&&s!==SECT.cur){
-    var _recv=(typeof txRecvOn==='function'&&txRecvOn(SECT.cur));
-    if(rel&&_recv)st='relay-here';
-    else if(rel&&!_recv)st='needrecv'; /* TX sumber ada, belum long-press tele di sini */
-    else st='far';
+  /* Alasan & syarat jernih SATU sumber dengan spatialTarget: txWhy (02-sky-logic.js). */
+  if(s&&SECT.on&&!SECT.busy){
+    w=txWhy(s,null);
+    st=w===''?'relay':(w==='far'?(t>.5?'muffled':''):w);
+  }else if(s&&SECT.cur&&!SECT.busy&&s!==SECT.cur){
+    w=txWhy(s,SECT.cur);
+    st=w===''?(camStrain(s)>0?'strain':'relay-here'):w;
   }
   if(st===AV._hint)return;
   AV._hint=st;
@@ -1233,11 +1238,13 @@ function spatialHint(t){
   else if(st==='relay')showModeToast(T('toast.tx.linked'),null,3600);
   else if(st==='far')showModeToast(T('toast.tx.far'),null,4600);
   else if(st==='needbh')showModeToast(T('toast.tx.needbh'),null,4200);
+  else if(st==='needov')showModeToast(T('toast.tx.needov'),null,4200);
   else if(st==='needrecv')showModeToast(T('toast.tx.tiprecv'),'tip',4200);
+  else if(st==='strain')showModeToast(T('toast.tx.strain'),null,4200);
   else showModeToast(T('toast.tx.linked'),null,3600);
 }
 function spatialRelease(){
-  AV.atten=0;AV._hint='';
+  AV.atten=0;AV._hint='';AV._attFor=null;
   if(AV._lpfLow&&AV.lpf&&AV.ctx){AV._lpfLow=false;try{AV.lpf.frequency.setTargetAtTime(16000,AV.ctx.currentTime,.06);}catch(e){}}
   if(AV._volEl){try{AV._volEl.volume=AV._volEl._bv||.85;}catch(e2){}AV._volLow=false;AV._volEl=null;}
 }
@@ -1252,7 +1259,10 @@ function spatialDbg(msg){
 function updateSpatialAttenuation(){
   if(!activeSfx||activeSfx.paused||activeSfx.ended){spatialRelease();return;}
   var t=spatialTarget(),useLpf=!!(AV.lpf&&AV.ctx&&!AV.fallback&&AV.ready);
-  AV.atten+=(t-AV.atten)*.14;
+  /* Track baru (shuffle / repeat all / next) mulai dari kondisi jernih (spatialRelease -> atten 0) lalu merambat redam:
+     kedengaran jernih sesaat. Snap langsung ke target kalau targetnya lebih redam. Tab hidden: tick jarang, snap saja. */
+  if(AV._attFor!==activeSfx){AV._attFor=activeSfx;if(t>AV.atten)AV.atten=t;}
+  if(document.hidden)AV.atten=t;else AV.atten+=(t-AV.atten)*.14;
   if(t===0&&AV.atten<.004)AV.atten=0;
   if(useLpf){
     var hz=400+15600*Math.pow(1-AV.atten,1.65);
@@ -1267,9 +1277,20 @@ function updateSpatialAttenuation(){
     AV._volEl=activeSfx;AV._volLow=AV.atten>0;
     try{activeSfx.volume=Math.max(.06,(activeSfx._bv||.85)*(1-.88*Math.pow(AV.atten,.8)));}catch(eV){}
   }
-  spatialHint(t);
+  if(!document.hidden)spatialHint(t);   /* toast nggak perlu muncul saat tab tersembunyi */
   spatialDbg('MUFFLE '+(useLpf?'LPF':'VOLUME-FALLBACK')+'\npotato='+IS_POTATO+' fb='+AV.fallback+' ready='+AV.ready+' lpf='+!!AV.lpf+'\nctx='+(AV.ctx?AV.ctx.state:'none')+'\nsect.on='+SECT.on+' busy='+SECT.busy+' cam='+CAMERA_MODE+'\ntarget='+t.toFixed(2)+' atten='+AV.atten.toFixed(2));
 }
+/* Render loop (rAF) berhenti saat tab hidden / PWA minimize, padahal audio tetap jalan: muffle & wiring harus tetap diurus.
+   Timer tetap hidup selama ada audio yang diputar. */
+setInterval(function(){
+  if(!document.hidden)return;
+  if(!activeSfx||activeSfx.paused||activeSfx.ended){spatialRelease();return;}
+  try{
+    var k=keyFromAudio(activeSfx);
+    if(!IS_POTATO&&k&&!AV.fallback&&!AV.sources[k])audioVizInit(activeSfx);
+    updateSpatialAttenuation();
+  }catch(eBg){}
+},400);
 function updateAudioViz(now){
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){audioVizOff();return;}
   if(!activeSfx||activeSfx.paused||activeSfx.ended){audioVizOff();spatialRelease();return;}
@@ -1713,6 +1734,16 @@ function pauseMusicForSfx(){
     try{musicForceStop();}catch(e){}
   }
 }
+/* Sambungkan track ke graph (analyser + lowpass muffle). Dulu cuma requestAnimationFrame: saat tab hidden / PWA minimize
+   rAF nggak jalan, jadi track berikutnya (auto-advance shuffle/repeat) main mentah tanpa muffle. Hidden -> langsung;
+   visible -> rAF (hindari hitch di frame klik) + timer cadangan. */
+function sfxWireSoon(a){
+  var done=false;
+  function go(){if(done)return;done=true;if(activeSfx===a){audioVizInit(a);try{updateSpatialAttenuation();}catch(e){}}}
+  if(document.hidden){go();return;}
+  requestAnimationFrame(go);
+  setTimeout(go,120);
+}
 function playSfx(a){
   /* Star SFX no longer warms, loads, or auto-resumes constellation music. */
   if(!a)return;
@@ -1732,7 +1763,7 @@ function playSfx(a){
       safePlay(a);
       /* Defer analyser wiring off the click frame — avoids a hitch when the
          music HUD was just torn down and a supernova burst is spawning. */
-      requestAnimationFrame(function(){if(activeSfx===a)audioVizInit(a);});
+      sfxWireSoon(a);
     }else{
       safePause(a);
       audioVizOff();
@@ -1759,13 +1790,12 @@ function playSfx(a){
     }
   }catch(eKill){}
   activeSfx=a;
-  /* Docking tetap: ganti bintang SFX → update key TX di sektor sumber (line ikut pindah nanti) */
+  /* Docking tetap: ganti bintang SFX (supernova / panel musik / repeat) → TX ikut sumber baru.
+     Satu sektor: key TX diganti. Sektor lain yang sudah relay: sumber TX pindah ke sana, sektor lama jadi receiver (txFollowSfx, 02-sky-logic.js). */
   try{
-    if(typeof TX!=='undefined'&&TX.by&&typeof keyFromAudio==='function'){
+    if(typeof txFollowSfx==='function'&&typeof keyFromAudio==='function'){
       var _pk=keyFromAudio(a),_ps=typeof sfxSector==='function'?sfxSector():null;
-      if(_ps&&_pk&&TX.by[_ps.k]&&TX.by[_ps.k].on&&!TX.by[_ps.k].recv){
-        TX.by[_ps.k].key=_pk;
-      }
+      if(_ps&&_pk)txFollowSfx(_pk,_ps);
     }
   }catch(eTxK){}
 
@@ -1782,9 +1812,10 @@ function playSfx(a){
     }
   };
   safePlay(a);
+  try{updateSpatialAttenuation();}catch(eSp0){}   /* redam sejak detik pertama, jangan nunggu frame render berikutnya */
   /* Loop mengikuti mode repeat panel musik walau diputar dari kanvas / supernova (panel tertutup). */
   try{if(typeof window.__mpSyncLoop==='function')window.__mpSyncLoop(a);}catch(eLp){}
-  requestAnimationFrame(function(){if(activeSfx===a)audioVizInit(a);});
+  sfxWireSoon(a);
 }
 
 var BH={x:0,y:0,hx:0,hy:0,R:26,Rr:0,h:0,sprite:null,S:0,ang:-.48};
