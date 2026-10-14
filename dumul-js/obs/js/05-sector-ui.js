@@ -595,7 +595,7 @@ function drawSectorOverview(now,age){
   try{sumUI();}catch(eU0){}
   sectSet(true);
   try{if(window.__hub)window.__hub.sect=SECT;}catch(e){}
-  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#bh-panel,#boot-screen,#terminal,#signal-fragment';
+  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#cam-whisper,#bh-panel,#boot-screen,#terminal,#signal-fragment';
   function owlShut(){var bc=document.body.classList;return bc.contains('owl-open')||bc.contains('owl-block');}
   document.addEventListener('pointerdown',function(e){
     if(owlShut()){SECT.down=null;return;} /* panel owl terbuka / baru ditutup: tap tidak boleh tembus ke ikon sektor (Virgo dll) */

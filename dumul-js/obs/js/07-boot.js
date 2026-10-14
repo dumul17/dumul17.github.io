@@ -697,22 +697,169 @@ function boot(){
 }
 if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTimeout(function(){if(!W)boot();},1500);}else{boot();}
 
+/* ===== Panel pamitan (back terakhir sebelum keluar site) =====
+   Dialog gaya visual-novel (kayak kotak dialog Harvest Moon) tapi tema observatory: karakter yang bicara nongol di sudut kiri-atas panel.
+   Teleskop menyampaikan pesan Dumb Owl; Dumb Owl sendiri cuma bisa "..." (potret ganti jadi owl waktu dia bicara).
+   DOM dibuat sekali, malas (lazy), dari JS. Teks lewat T('exit.*') di i18n.js. Dibuka/ditutup oleh backNav di bawah (EXITP.open / EXITP.stay).
+   Body dikasih class 'owl-block' selama panel terbuka, supaya sky/BH/portal tidak ikut kena sentuhan (mekanisme yang sama dengan panel About). */
+var EXITP=(function(){
+  var P=null,BD=null,NAME,TA,TB,NEXT,CH,E={open:false,i:0,typing:false,tm:0,fin:null,bt:0,leaving:false,doLeave:null};
+  var SCRIPT=[
+    {w:'t',k:'exit.l1',m:'n'},
+    {w:'t',k:'exit.l2',m:'smile'},
+    {w:'o',k:'exit.l3',m:'n',sp:95},          /* Dumb Owl: cuma "..." (diketik pelan) */
+    {w:'t',k:'exit.l4',m:'smile'},
+    {w:'t',k:'exit.l5',m:'soft'},
+    {w:'t',k:'exit.l6',m:'smile'}
+  ];
+  var TELE_SVG='<svg class="ex-tele" viewBox="0 0 64 64" aria-hidden="true">'+
+    '<g stroke="#3e5f72" stroke-width="2.2" stroke-linecap="round" fill="none"><path d="M33 42 L22 60"/><path d="M33 42 L33 61"/><path d="M33 42 L45 60"/></g>'+
+    '<circle cx="33" cy="41" r="3.2" fill="#143042" stroke="#6ee5ff" stroke-width="1.2"/>'+
+    '<g transform="rotate(-16 33 32)">'+
+      '<rect x="49" y="27" width="9" height="10" rx="3" fill="#10222e" stroke="#6ee5ff" stroke-width="1.2"/>'+
+      '<rect x="12" y="22" width="40" height="20" rx="8" fill="#0d1b26" stroke="#6ee5ff" stroke-width="1.4"/>'+
+      '<rect x="6" y="20" width="9" height="24" rx="4" fill="#10222e" stroke="#6ee5ff" stroke-width="1.4"/>'+
+      '<ellipse class="tl-glow" cx="7.5" cy="32" rx="2.2" ry="9" fill="#6ee5ff"/>'+
+      '<circle cx="26" cy="30" r="3" fill="#eafcff"/><circle cx="38" cy="30" r="3" fill="#eafcff"/>'+
+      '<circle cx="26.6" cy="30.4" r="1.4" fill="#0d1b26"/><circle cx="38.6" cy="30.4" r="1.4" fill="#0d1b26"/>'+
+      '<g class="tl-blush" fill="#ff9ad9" opacity=".5"><circle cx="21" cy="35.5" r="2.2"/><circle cx="43" cy="35.5" r="2.2"/></g>'+
+      '<g fill="none" stroke="#8eeeff" stroke-width="1.7" stroke-linecap="round">'+
+        '<path class="tl-m tl-m-n" d="M29 37.5 h6"/>'+
+        '<path class="tl-m tl-m-smile" d="M28 36 q4 4.6 8 0"/>'+
+        '<path class="tl-m tl-m-soft" d="M29.5 38.4 q2.5 -2.4 5 0"/>'+
+      '</g>'+
+    '</g></svg>';
+  var OWL_SVG='<svg class="ex-owl" viewBox="0 0 64 64" aria-hidden="true">'+
+    '<g stroke="#ffb3e0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+
+      '<path d="M32 10 C20 10 14 20 14 33 C14 47 22 55 32 55 C42 55 50 47 50 33 C50 20 44 10 32 10Z" fill="#1a0f1c"/>'+
+      '<path d="M17 12 L22 20 M47 12 L42 20" fill="none"/>'+
+      '<path d="M15 33 C9 37 10 47 18 50 M49 33 C55 37 54 47 46 50" fill="none"/>'+
+      '<circle cx="24" cy="29" r="8" fill="#2a1630"/><circle cx="40" cy="29" r="8" fill="#2a1630"/>'+
+      '<path d="M26 47 q6 3 12 0 M27 51.5 q5 2.5 10 0" fill="none" opacity=".5" stroke-width="1.2"/>'+
+      '<path d="M26 55 v4 M32 55.5 v4 M38 55 v4" fill="none"/>'+
+    '</g>'+
+    '<circle cx="24" cy="29" r="4" fill="#ffe3f3"/><circle cx="40" cy="29" r="4" fill="#ffe3f3"/>'+
+    '<circle cx="25" cy="29.8" r="2" fill="#1a0f1c"/><circle cx="41" cy="29.8" r="2" fill="#1a0f1c"/>'+
+    '<circle cx="25.6" cy="29" r=".7" fill="#fff"/><circle cx="41.6" cy="29" r=".7" fill="#fff"/>'+
+    '<path class="ow-beak" d="M29.5 36.5 L34.5 36.5 L32 42Z" fill="#ffb3e0" stroke="#ffb3e0" stroke-width="1" stroke-linejoin="round"/></svg>';
+  function build(){
+    if(P)return;
+    var d=document,b=d.body;
+    BD=d.createElement('div');BD.id='exit-backdrop';BD.setAttribute('aria-hidden','true');
+    P=d.createElement('div');P.id='exit-panel';P.setAttribute('role','dialog');P.setAttribute('aria-modal','true');P.setAttribute('aria-label',T('exit.aria'));
+    P.setAttribute('data-who','t');P.setAttribute('data-mood','n');
+    P.innerHTML='<div class="ex-portrait">'+TELE_SVG+OWL_SVG+'</div><div class="ex-name"></div>'+
+      '<p class="ex-text" aria-live="polite"><span class="ex-a"></span><span class="ex-b" style="visibility:hidden"></span></p><i class="ex-next"></i>'+
+      '<div class="ex-choices"><button type="button" data-a="stay"></button><button type="button" data-a="leave"></button></div>';
+    b.appendChild(BD);b.appendChild(P);
+    NAME=P.querySelector('.ex-name');TA=P.querySelector('.ex-a');TB=P.querySelector('.ex-b');NEXT=P.querySelector('.ex-next');CH=P.querySelector('.ex-choices');
+    P.querySelector('[data-a=stay]').textContent=T('exit.stay');P.querySelector('[data-a=leave]').textContent=T('exit.leave');
+    /* isolasi: sentuhan di panel / backdrop tidak tembus ke sky */
+    [P,BD].forEach(function(el){
+      ['pointerdown','pointerup','pointermove','touchstart','touchend','mousedown','mouseup','contextmenu'].forEach(function(tp){
+        el.addEventListener(tp,function(e){e.stopPropagation();},{passive:true});
+      });
+      ['touchmove','wheel'].forEach(function(tp){el.addEventListener(tp,function(e){e.stopPropagation();e.preventDefault();},{passive:false});});
+    });
+    BD.addEventListener('click',function(e){e.stopPropagation();});
+    P.addEventListener('click',function(e){
+      e.stopPropagation();
+      var btn=e.target.closest&&e.target.closest('button[data-a]');
+      if(btn){if(btn.getAttribute('data-a')==='stay')stay();else leave();return;}
+      advance();
+    });
+    d.addEventListener('keydown',function(e){
+      if(!E.open)return;
+      if(e.key==='Escape'){e.preventDefault();stay();return;}
+      if((e.key==='Enter'||e.key===' '||e.key==='ArrowRight'||e.key==='ArrowDown')&&!(e.target&&e.target.closest&&e.target.closest('button'))){e.preventDefault();advance();}
+    });
+  }
+  function say(txt,sp,done){   /* ketik huruf demi huruf; jeda di koma / titik / "..." supaya terasa ngomong */
+    clearTimeout(E.tm);var n=0;E.typing=true;P.classList.add('talk');
+    function fin(){clearTimeout(E.tm);E.typing=false;E.fin=null;TA.textContent=txt;TB.textContent='';P.classList.remove('talk');if(done)done();}
+    E.fin=fin;
+    function step(){
+      n++;TA.textContent=txt.slice(0,n);TB.textContent=txt.slice(n);
+      if(n>=txt.length){fin();return;}
+      var c=txt.charAt(n-1),nx=txt.charAt(n),dl=sp;
+      if(c===','||c==='—')dl=sp*5;
+      else if(c==='.'&&nx==='.')dl=sp*4;
+      else if(c==='.'||c==='?'||c==='!')dl=sp*9;
+      E.tm=setTimeout(step,dl);
+    }
+    TA.textContent='';TB.textContent=txt;
+    E.tm=setTimeout(step,sp);
+  }
+  function line(){
+    var L=SCRIPT[E.i];
+    P.setAttribute('data-who',L.w);P.setAttribute('data-mood',L.m);
+    NAME.textContent=T(L.w==='o'?'exit.name.o':'exit.name.t');
+    NEXT.classList.remove('on');
+    say(T(L.k),L.sp||26,function(){
+      if(E.i<SCRIPT.length-1)NEXT.classList.add('on');
+      else{CH.classList.add('on');setTimeout(function(){if(E.open&&!E.leaving){var b=P.querySelector('[data-a=stay]');if(b)try{b.focus({preventScroll:true});}catch(e){}}},380);}
+    });
+  }
+  function advance(){
+    if(!E.open||E.leaving)return;
+    if(E.typing){if(E.fin)E.fin();return;}
+    if(E.i<SCRIPT.length-1){E.i++;line();}
+  }
+  function hide(){
+    E.open=false;clearTimeout(E.tm);clearTimeout(E.bt);E.typing=false;E.fin=null;
+    if(P){P.classList.remove('on','talk');BD.classList.remove('on');CH.classList.remove('on');NEXT.classList.remove('on');}
+    setTimeout(function(){if(!E.open)document.body.classList.remove('owl-block');},380);
+  }
+  function open(){
+    if(E.open)return;
+    build();
+    E.open=true;E.leaving=false;E.i=0;
+    try{teleGreetHide();}catch(e){}
+    document.body.classList.add('owl-block');
+    CH.classList.remove('on');BD.classList.add('on');P.classList.add('on');
+    try{haptic(10);}catch(e2){}
+    line();
+  }
+  function stay(){
+    if(!E.open||E.leaving)return;
+    try{haptic(8);}catch(e){}
+    hide();
+    E.bt=setTimeout(function(){try{TG.anchor=null;tgShow(T('exit.stay.bub'));}catch(er){}},550);   /* teleskop senang: bubble di kanvas */
+  }
+  function leave(){
+    if(!E.open||E.leaving)return;
+    E.leaving=true;try{haptic(8);}catch(e){}
+    CH.classList.remove('on');NEXT.classList.remove('on');
+    P.setAttribute('data-who','t');P.setAttribute('data-mood','smile');NAME.textContent=T('exit.name.t');
+    say(T('exit.bye'),30,function(){
+      E.bt=setTimeout(function(){if(E.doLeave)E.doLeave();else{try{history.back();}catch(e){}}},1300);
+    });
+  }
+  function reset(){E.leaving=false;hide();}
+  return {open:open,stay:stay,reset:reset,isOpen:function(){return E.open;},setLeave:function(f){E.doLeave=f;}};
+})();
+
 /* ===== Tombol Back (tombol back HP / gesture back / Alt+←) =====
    Tiap lapisan yang bisa ditutup punya satu "guard" entry di history; back = tutup lapisan paling atas, urutannya:
    kartu ajak/tinggal → Sector Gate → panel About → panel Tune → music player → kamera rasi → Observation Mode → keluar sektor ke overview.
-   Selama transisi sektor back ditelan. Di overview tanpa lapisan terbuka, back berperilaku normal (keluar halaman).
+   Selama transisi sektor back ditelan. Di overview tanpa lapisan terbuka, back TERAKHIR membuka panel pamitan (EXITP: teleskop menyampaikan pesan Dumb Owl);
+   back lagi = tutup panel (tinggal), tombol "Maaf, aku harus pergi" = baru benar-benar keluar site (EXITP → doLeave: history.go mundur melewati semua guard).
+   Layer dasar (root guard) cuma dipasang setelah boot selesai + ada sentuhan user pertama (aturan Chrome soal entry history "skippable").
    PENTING: guard cuma di-push saat lapisan dibuka (poll 150 ms setelah sentuhan user), TIDAK PERNAH di dalam handler popstate:
    push tanpa sentuhan user membuat Chrome menandai entry sebelumnya "skippable", lalu back berikutnya melompatinya dan keluar site.
    Guard yang baru di-pop dipakai ulang lewat history.go(1). Guard berlebih (lapisan ditutup lewat jalur lain: long-press BH, tombol X, tap luar) dibuang otomatis. */
 (function backNav(){
   if(!window.history||!history.pushState)return;
-  var g=0,fwd=0,skip=0;   /* g = jumlah guard di history sekarang; fwd = guard yang baru di-pop back dan masih ada di "forward"; skip = history.go() buatan kita yang belum selesai */
+  var g=0,fwd=0,skip=0,leaving=false,touched=false;
+  try{var s0=history.state;if(s0&&s0.dumulBack>0)g=s0.dumulBack|0;}catch(e0){}   /* balik dari halaman lain lewat back: kita lagi duduk di guard lama, anggap itu guard root */
+  ['pointerdown','touchstart','mousedown','keydown'].forEach(function(ev){window.addEventListener(ev,function(){touched=true;},{capture:true,passive:true});});   /* g = jumlah guard di history sekarang; fwd = guard yang baru di-pop back dan masih ada di "forward"; skip = history.go() buatan kita yang belum selesai */
   function el(id){return document.getElementById(id);}
   function has(id,c){var e=el(id);return !!(e&&e.classList.contains(c));}
   function layers(){   /* semua lapisan aktif, paling atas dulu: {f:penutup, w:jumlah guard yang dimiliki} */
     var L=[];
     if(typeof isLayoutEdit==='function'&&isLayoutEdit())return L;   /* layout editor (dev): jangan ikut campur */
     try{
+      if(EXITP.isOpen())L.push({f:EXITP.stay,w:0});   /* panel pamitan: back = tutup (tinggal); guard-nya milik layer root di bawah */
       if(LIS&&LIS.ui&&!LIS.ui.hidden)L.push({f:lisCancel,w:(SECT.cur||SECT.busy)?0:1});   /* kartu ajak/tinggal: di dalam sektor muncul DARI back (sektor→overview) jadi nggak punya guard sendiri (guard sektor dipakai ulang); di overview (tap portal) dia lapisan sendiri */
       if(SGATE&&SGATE.open)L.push({f:sgClose,w:1});
       if(has('owl-panel','on'))L.push({f:function(){var b=el('owl-backdrop');if(b)b.click();},w:1});
@@ -722,12 +869,13 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
       if(OBSERVE_MODE)L.push({f:function(){setObserveMode(false);},w:1});
       if(SECT.busy)L.push({f:function(){},w:1});                  /* transisi sektor: telan back */
       else if(SECT.cur)L.push({f:sectToggle,w:1});               /* sektor → overview (lewat kartu ajak/tinggal kalau teleskop ada) */
+      if(bootDone&&(touched||g>0))L.push({f:EXITP.open,w:1});     /* layer dasar: back terakhir → panel pamitan (bukan langsung keluar site) */
     }catch(e){}
     return L;
   }
   function need(L){var n=0,i;for(i=0;i<L.length;i++)n+=L[i].w;return n;}
   function sync(fromPop){
-    if(document.hidden||skip>0)return;
+    if(document.hidden||skip>0||leaving)return;
     var n=need(layers()),d;
     if(g<n){
       d=n-g;
@@ -736,6 +884,7 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
     }else if(g>n){d=g-n;skip++;g-=d;fwd+=d;try{history.go(-d);}catch(e){skip--;}}   /* lapisan sudah tertutup lewat jalur lain: buang guard berlebih */
   }
   window.addEventListener('popstate',function(e){
+    if(leaving)return;
     if(skip>0){skip--;return;}                       /* popstate dari history.go() buatan kita sendiri */
     var dep=(e.state&&e.state.dumulBack)||0,L;
     if(dep>g){fwd=Math.max(0,fwd-(dep-g));g=dep;sync(false);return;}   /* mis. tombol forward desktop masuk lagi ke guard */
@@ -744,4 +893,18 @@ if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTime
     sync(true);                                       /* butuh guard lagi? (mis. kartu ajak/tinggal muncul) pakai guard forward, bukan push */
   });
   setInterval(function(){sync(false);},150);
+  /* Tombol "Maaf, aku harus pergi": mundur melewati semua guard + entry asli = keluar ke halaman sebelum situs ini.
+     Kalau tidak ada halaman sebelumnya (tab baru / dibuka langsung) history.go tidak melakukan apa-apa → coba tutup tab, terakhir ke about:blank. */
+  EXITP.setLeave(function(){
+    leaving=true;skip=0;
+    try{history.go(-(g+1));}catch(e){}
+    setTimeout(function(){
+      try{window.close();}catch(e1){}
+      setTimeout(function(){if(!document.hidden){try{location.replace('about:blank');}catch(e2){}}},350);
+    },700);
+  });
+  window.addEventListener('pageshow',function(e){   /* kembali dari bfcache setelah keluar: panel jangan nyangkut di state "pamit" */
+    if(!e.persisted)return;
+    leaving=false;skip=0;fwd=0;g=(history.state&&history.state.dumulBack)|0;EXITP.reset();
+  });
 })();
