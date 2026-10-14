@@ -941,13 +941,15 @@ body.camera-mode #cons-archive{opacity:0!important;visibility:hidden!important;p
 
 /* ---------- Sector overview (idle) ---------- */
 #mode-sectors,#mode-bh{width:32px;height:32px;padding:0;display:none;place-items:center;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);font:500 15px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
-body.sect-in #mode-sectors,body.sect-in #mode-bh{display:grid}
-#mode-sectors:hover,#mode-bh:hover{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
+body.sect-in #mode-bh{display:grid}
+/* Fase 2: kembali ke overview via long-press BH mini — tombol #mode-sectors disembunyikan */
+#mode-sectors{display:none!important;pointer-events:none!important}
+#mode-bh:hover{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
 #mode-bh.on{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);box-shadow:0 0 12px rgba(110,229,255,.15)}
 #mode-bh{font-size:14px}
-@media (max-width:520px){#mode-sectors,#mode-bh{width:31px;height:31px}body.sect-in #mp-now-playing{right:165px!important}}
-@media (max-height:520px) and (orientation:landscape){#mode-sectors,#mode-bh{width:28px;height:28px}}
-body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 114px + 8px)!important}
+@media (max-width:520px){#mode-bh{width:31px;height:31px}body.sect-in #mp-now-playing{right:130px!important}}
+@media (max-height:520px) and (orientation:landscape){#mode-bh{width:28px;height:28px}}
+body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 70px + 8px)!important}
 body.sect-ov .cap,body.sect-ov .hit{display:none!important}
 body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!important}
 /* Tombol bintang di luar sektor yang lagi dibuka disembunyikan oleh JS (fxSectSync menambah .fx-other) — tidak perlu aturan per sektor. */
@@ -1156,7 +1158,7 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 #lis-hud.red{border-color:rgba(255,80,80,.6);color:#ff9a9a}
 #lis-hud.red::before{content:'';display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#ff4848;box-shadow:0 0 6px #ff4848;animation:lisBlink .5s steps(2) infinite;vertical-align:1px}
 @keyframes lisBlink{50%{opacity:.2}}
-#lis-ask{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;padding:12px 14px;border:1px solid rgba(110,229,255,.35);border-radius:6px;background:rgba(2,7,12,.94);font:600 10px/1.5 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#bff4ff;text-align:center}
+#lis-ask{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:120;pointer-events:auto;padding:12px 14px;border:1px solid rgba(110,229,255,.35);border-radius:6px;background:rgba(2,7,12,.94);font:600 10px/1.5 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#bff4ff;text-align:center}
 #lis-ask[hidden]{display:none}
 #lis-ask .la-q{margin-bottom:9px}
 #lis-ask .la-b{display:flex;gap:8px;justify-content:center}
