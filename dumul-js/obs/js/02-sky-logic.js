@@ -456,27 +456,64 @@ function maybeShowLastSignalOnReturn(){
   setTimeout(tryShow,400);
 }
 
+/* ---- Toast: satu elemen, tapi dengan antrian. Aturan:
+   - tiap toast dapat waktu tampil minimal TOAST_MIN (biar sempat dibaca), toast baru yang datang saat itu ANTRI (bukan menimpa).
+   - teks sama dengan yang sedang tampil = cuma perpanjang, tanpa animasi ulang; teks sama di antrian = digabung.
+   - kind 'tip' (tutorial / petunjuk) tidak pernah menimpa toast status; kalau toast status datang, tip dipotong setelah TOAST_MIN lalu muncul lagi sesudahnya.
+   - toast status yang basi (>6,5 dtk di antrian) dibuang; tip tidak pernah basi (tutorial sekali-tampil nggak boleh hilang). */
+var TOAST_MIN=1100,TQ={cur:null,q:[],tm:0};
+function toastPlace(el){
+  var czEl=document.getElementById('cam-zoom'),vh=(window.visualViewport&&visualViewport.height)||innerHeight,r;
+  if(typeof LIS!=='undefined'&&LIS.ui&&!LIS.ui.hidden){      /* kartu ajak/tinggal sedang terbuka: toast naik di atasnya */
+    r=LIS.ui.getBoundingClientRect();el.style.bottom=Math.max(8,Math.round(vh-r.top+10))+'px';
+  }else if(CAMERA_MODE&&czEl&&(!STG.on||STG.rot)){
+    r=czEl.getBoundingClientRect();el.style.bottom=Math.max(8,Math.round(vh-r.top+18))+'px';
+  }else el.style.removeProperty('bottom');
+}
+function toastShow(it){
+  var el=document.getElementById('mode-toast');
+  if(!el){TQ.cur=null;return;}
+  TQ.cur=it;it.t0=performance.now();it.cut=false;
+  el.textContent=it.text;
+  el.classList.toggle('silence',it.kind==='silence');
+  el.classList.toggle('tip',!!it.tip);
+  toastPlace(el);
+  el.classList.remove('on');void el.offsetWidth;el.classList.add('on');
+  el.setAttribute('aria-hidden','false');
+  var pend=false,k;for(k=0;k<TQ.q.length;k++)if(!TQ.q[k].tip){pend=true;break;}
+  clearTimeout(TQ.tm);TQ.tm=setTimeout(toastEnd,(!it.tip&&pend)?Math.min(it.ms,2000):it.ms);   /* masih ada status lain antri: jangan lama-lama */
+}
+function toastEnd(){
+  var el=document.getElementById('mode-toast'),c=TQ.cur,now=performance.now(),i,n=null;
+  clearTimeout(TQ.tm);TQ.cur=null;
+  if(el){el.classList.remove('on');el.setAttribute('aria-hidden','true');}
+  if(c&&c.tip&&c.cut){c.t=now;TQ.q.push(c);}                     /* tip yang dipotong: muncul lagi nanti */
+  for(i=0;i<TQ.q.length;i++)if(!TQ.q[i].tip&&now-TQ.q[i].t>6500){TQ.q.splice(i,1);i--;}
+  for(i=0;i<TQ.q.length;i++)if(!TQ.q[i].tip){n=TQ.q.splice(i,1)[0];break;}   /* status dulu, tip belakangan */
+  if(!n&&TQ.q.length)n=TQ.q.shift();
+  if(n){n.t0=now+260;TQ.cur=n;TQ.tm=setTimeout(function(){toastShow(n);},260);}   /* jeda singkat: fade-out kelihatan */
+}
 function showModeToast(text,kind,ms){
   var el=document.getElementById('mode-toast');
   if(!el)return;
-  el.textContent=text;
-  el.classList.toggle('silence',kind==='silence');
-  var czEl=document.getElementById('cam-zoom');
-  if(CAMERA_MODE&&czEl&&(!STG.on||STG.rot)){
-    var czr=czEl.getBoundingClientRect();
-    var vh=(window.visualViewport&&visualViewport.height)||innerHeight;
-    el.style.bottom=Math.max(8,Math.round(vh-czr.top+18))+'px';
-  }else el.style.removeProperty('bottom');
-  el.classList.remove('on');
-  void el.offsetWidth;
-  el.classList.add('on');
-  el.setAttribute('aria-hidden','false');
-  clearTimeout(el._t);
-  el._t=setTimeout(function(){
-    el.classList.remove('on');
-    el.setAttribute('aria-hidden','true');
-  },ms||2200);
+  var now=performance.now(),tip=(kind==='tip'),c=TQ.cur,i,it;
+  ms=Math.max(1400,Math.min(ms||2200,tip?5000:3800));
+  it={text:text,kind:kind,tip:tip,ms:ms,t:now,t0:0,cut:false};
+  if(c&&c.text===text){                                            /* sama dengan yang tampil: perpanjang saja */
+    if(c.t0<=now){clearTimeout(TQ.tm);TQ.tm=setTimeout(toastEnd,ms);}
+    return;
+  }
+  for(i=0;i<TQ.q.length;i++)if(TQ.q[i].text===text){TQ.q[i].t=now;return;}
+  if(!c){toastShow(it);return;}
+  if(now-c.t0<TOAST_MIN){                                          /* toast sekarang masih dilindungi: antri */
+    TQ.q.push(it);
+    if(c.tip&&!tip){c.cut=true;clearTimeout(TQ.tm);TQ.tm=setTimeout(toastEnd,Math.max(0,TOAST_MIN-(now-c.t0)));}   /* tip jangan menahan toast status */
+    else if(!c.tip&&!tip&&c.t0<=now){clearTimeout(TQ.tm);TQ.tm=setTimeout(toastEnd,Math.max(0,c.t0+Math.max(TOAST_MIN,Math.min(c.ms,2200))-now));}   /* ada yang antri: toast status yang tampil nggak perlu nahan sampai habis */
+  }else if(tip){TQ.q.push(it);}                                    /* tip nggak pernah menimpa: nunggu giliran */
+  else{if(c.tip)c.cut=true;toastEnd0(c);toastShow(it);}            /* toast status, sudah cukup lama tampil: ganti langsung */
+  while(TQ.q.length>4){for(i=0;i<TQ.q.length;i++)if(!TQ.q[i].tip)break;TQ.q.splice(i<TQ.q.length?i:0,1);}
 }
+function toastEnd0(c){if(c&&c.tip&&c.cut){c.t=performance.now();TQ.q.push(c);}}   /* tip terpotong saat diganti langsung: masuk antrian lagi */
 
 function observeIcon(){
   /* Overview: out (shooting star) · inside a sector: in (signal dish) */

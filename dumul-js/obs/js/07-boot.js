@@ -696,3 +696,42 @@ function boot(){
   if(bootDone)startRenderLoop();
 }
 if(document.fonts&&document.fonts.ready){document.fonts.ready.then(boot);setTimeout(function(){if(!W)boot();},1500);}else{boot();}
+
+/* ===== Tombol Back (tombol back HP / gesture back / Alt+←) =====
+   Satu "guard" entry di history dipasang selama ADA yang bisa ditutup; back = tutup lapisan paling atas:
+   kartu ajak/tinggal → Sector Gate → panel About → panel Tune → music player → Observation Mode (+kamera) → keluar sektor ke overview.
+   Selama transisi sektor berjalan back ditelan (nggak ke mana-mana). Di overview tanpa lapisan terbuka, back berperilaku normal (keluar halaman).
+   Guard dipasang/dilepas otomatis (polling ringan) jadi jalur lain (long-press BH mini, tombol X, dll) nggak meninggalkan entry yatim. */
+(function backNav(){
+  if(!window.history||!history.pushState)return;
+  var guard=false,skip=0;
+  function el(id){return document.getElementById(id);}
+  function has(id,c){var e=el(id);return !!(e&&e.classList.contains(c));}
+  function top(){   /* penutup lapisan paling atas, atau null kalau nggak ada */
+    try{
+      if(LIS&&LIS.ui&&!LIS.ui.hidden)return lisCancel;
+      if(SGATE&&SGATE.open)return sgClose;
+      if(has('owl-panel','on'))return function(){var b=el('owl-backdrop');if(b)b.click();};
+      if(has('bh-panel','on'))return function(){if(typeof bhTuneClose==='function')bhTuneClose();};
+      if(has('music-player','open'))return function(){var c=el('music-close');if(c)c.click();};
+      if(OBSERVE_MODE)return function(){setObserveMode(false);};
+      if(SECT.busy)return function(){};            /* transisi sektor: telan back */
+      if(SECT.cur)return sectToggle;               /* sektor → overview (lewat kartu ajak/tinggal kalau teleskop ada) */
+    }catch(e){}
+    return null;
+  }
+  function sync(){
+    if(document.hidden)return;
+    var need=!!top();
+    if(need&&!guard){try{history.pushState({dumulBack:1},'');guard=true;}catch(e){}}
+    else if(!need&&guard){guard=false;skip++;try{history.back();}catch(e){skip--;}}   /* lapisan sudah tertutup lewat jalur lain: buang guard */
+  }
+  window.addEventListener('popstate',function(e){
+    if(skip>0){skip--;return;}                      /* popstate dari history.back() buatan kita sendiri */
+    if(!guard){if(e.state&&e.state.dumulBack)guard=true;sync();return;}   /* mis. tombol forward desktop masuk lagi ke guard */
+    guard=false;                                    /* guard terpakai oleh back ini */
+    var t=top();if(t){try{t();}catch(er){}}
+    sync();                                         /* masih ada lapisan lain? pasang guard baru */
+  });
+  setInterval(sync,150);
+})();

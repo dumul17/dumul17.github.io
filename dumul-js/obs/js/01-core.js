@@ -1230,7 +1230,7 @@ function spatialHint(t){
   else if(st==='relay')showModeToast(T('toast.tx.linked'),null,3600);
   else if(st==='far')showModeToast(T('toast.tx.far'),null,4600);
   else if(st==='needbh')showModeToast(T('toast.tx.needbh'),null,4200);
-  else if(st==='needrecv')showModeToast(T('toast.tx.tiprecv'),null,4200);
+  else if(st==='needrecv')showModeToast(T('toast.tx.tiprecv'),'tip',4200);
   else showModeToast(T('toast.tx.linked'),null,3600);
 }
 function spatialRelease(){

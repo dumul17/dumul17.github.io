@@ -246,7 +246,7 @@ function sumSet(on){
     SUM.on=true;SUM.x0=BH.x;SUM.y0=BH.y;SUM.moved=false;
     if(SECT.cur)SECT.cur.summed=1;
     try{focusRefresh();}catch(eFR){}
-    try{if(typeof showModeToast==='function')showModeToast(T('toast.bhsumtip'),null,4200);}catch(eT){}
+    try{if(typeof showModeToast==='function')showModeToast(T('toast.bhsumtip'),'tip',4200);}catch(eT){}
   }else{
     /* Recall di sektor selain sumber SFX → reset TX/receiver, sinyal muffled lagi */
     var _src=typeof sfxSector==='function'?sfxSector():null;
@@ -324,9 +324,9 @@ function sectStep(now){
       try{lisArrive(s.k);}catch(eL){}
       /* Tutorial sekali: summon BH (shortcut) + long-press balik overview. BH tidak auto-summon. */
       try{
-        if(!localStorage.getItem('dumul_bh_lp_tip')&&typeof showModeToast==='function'){
-          localStorage.setItem('dumul_bh_lp_tip','1');
-          showModeToast(T('toast.sectip'),null,5200);
+        if(!localStorage.getItem('dumul_bh_lp_tip2')&&typeof showModeToast==='function'){
+          localStorage.setItem('dumul_bh_lp_tip2','1');   /* tip2: teks baru (tombol Back) — tampil sekali lagi untuk yang sudah lihat tip lama */
+          showModeToast(T('toast.sectip'),'tip',5000);
         }
       }catch(eTip){}
     }
@@ -490,7 +490,7 @@ function drawSectorOverview(now,age){
     else if(skySect()){st=secStored();SECK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     if(bSave)bSave.classList.toggle('dirty',d);
   }
-  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:c.contains('sect-ov')||c.contains('sect-in'),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
+  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:NEB.on&&(c.contains('sect-ov')||c.contains('sect-in')),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
   function refresh(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
@@ -669,7 +669,7 @@ function lisEls(){
   },true);
   d.addEventListener('keydown',function(e){if(e.key==='Escape'&&!a.hidden)lisCancel();});
 }
-function lisCancel(){if(LIS.ui)LIS.ui.hidden=true;LIS.cb=null;}
+function lisCancel(){if(LIS.ui)LIS.ui.hidden=true;LIS.cb=null;document.body.classList.remove('lis-asking');}
 function lisAsk(cb,gate){
   var sfxOn=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);
   if(!LIS.ui)lisEls();
@@ -678,10 +678,10 @@ function lisAsk(cb,gate){
   a.querySelector('.la-q').textContent=T('lis.ask.q');
   a.querySelector('[data-a=bring]').textContent=T('lis.ask.bring');
   a.querySelector('[data-a=leave]').textContent=T('lis.ask.leave');
-  LIS.cb={fn:cb,gate:!!gate,sfx:sfxOn};a.hidden=false;
+  LIS.cb={fn:cb,gate:!!gate,sfx:sfxOn};a.hidden=false;document.body.classList.add('lis-asking');
 }
 function lisChoose(carry){
-  var c=LIS.cb;LIS.cb=null;if(LIS.ui)LIS.ui.hidden=true;if(!c)return;
+  var c=LIS.cb;LIS.cb=null;if(LIS.ui)LIS.ui.hidden=true;document.body.classList.remove('lis-asking');if(!c)return;
   LIS.pend={carry:!!carry,gate:c.gate,sfx:c.sfx,t:performance.now()};
   try{haptic(8);}catch(e){}
   c.fn();
@@ -723,7 +723,7 @@ function lisStart(full){
     lisToast('lis.toast.full',3200);
     try{TG.anchor=null;tgShow(T('lis.bub.start'));}catch(e2){}
     setTimeout(function(){
-      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.tiprecv'),null,4200);}catch(e3){}
+      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.tiprecv'),'tip',4200);}catch(e3){}
     },900);
   }else lisToast('lis.toast.cam',2600);
   LIS.tm=setTimeout(lisEnd,ms+30);LIS.iv=setInterval(lisHud,100);lisHud();
@@ -1757,7 +1757,7 @@ function sfxArrive(key){
       var _src=typeof sfxSector==='function'?sfxSector():null;
       var _docked=_src&&typeof txOn==='function'&&txOn(_src);
       if(!_docked&&typeof showModeToast==='function'){
-        showModeToast(T('toast.tx.tip'),null,4200);
+        showModeToast(T('toast.tx.tip'),'tip',4200);
       }
     }catch(eTx){}
     /* Stellar Memory: click/observe on interaction (fragment waits for SFX end). */
