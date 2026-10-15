@@ -256,17 +256,24 @@ function beginBHDrag(e){
   if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;
   drag.tapEligible=(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
-  drag.lpFired=false;clearBHlp();
+  drag.lpFired=false;drag.armed=false;clearBHlp();
   /* Fase 2: long-press BH mini di sektor → kembali ke overview (ganti tombol #mode-sectors). */
   if(SECT.cur&&SUM.on&&drag.tapEligible){
     try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580);}catch(eW0){}   /* wormhole (09): mulut portal tumbuh di BH mini selama hold */
     drag.lpTimer=setTimeout(function(){
       drag.lpTimer=null;
       if(!drag.on||drag.moved||!SECT.cur||!SUM.on||SECT.busy){try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCancel();}catch(eW1){}return;}
+      if(typeof WORMHOLE!=='undefined'&&WORMHOLE.supported){
+        /* Portal sudah terbuka penuh, tapi BELUM masuk: jari masih menahan, portal boleh di-drag. Masuk wormhole baru saat jari dilepas (endBHDrag). */
+        drag.armed=true;drag.lpFired=false;
+        haptic(18);
+        try{WORMHOLE.holdArm();}catch(eW2){}
+        return;
+      }
+      /* fallback (reduced-motion / tanpa canvas 2D): perilaku lama, langsung jalan saat hold selesai */
       drag.lpFired=true;drag.on=false;
       try{cv.releasePointerCapture(drag.pid);}catch(err){}
       haptic(18);
-      try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCommit();}catch(eW2){}
       try{if(typeof sectToggle==='function')sectToggle();}catch(e){}
     },580);
   }
@@ -288,10 +295,20 @@ function moveBHDrag(e){
     BH.y=Math.max(bm,Math.min(H-bm,BH.y));
     mouse.tx=Math.max(-1,Math.min(1,dx/(Math.min(W,H)*.24)));
     mouse.ty=Math.max(-1,Math.min(1,dy/(Math.min(W,H)*.24)));
+    if(drag.armed){try{var bpA=camBH();WORMHOLE.holdMove(bpA[0],bpA[1]);}catch(eW3){}}   /* mulut portal ikut BH mini yang di-drag */
   }
 }
 function endBHDrag(e){
   if(!drag.on||e.pointerId!==drag.pid)return;
+  if(drag.armed){   /* hold selesai & portal terbuka: lepas jari = masuk wormhole; pointercancel / keadaan berubah = batal */
+    drag.armed=false;drag.on=false;drag.moved=false;drag.lpFired=false;
+    try{cv.releasePointerCapture(e.pointerId);}catch(err){}
+    if(e.type==='pointercancel'||!SECT.cur||!SUM.on||SECT.busy){try{WORMHOLE.holdCancel();}catch(eW4){}return;}
+    haptic(18);
+    try{WORMHOLE.holdCommit();}catch(eW5){}
+    try{if(typeof sectToggle==='function')sectToggle();}catch(er){}
+    return;
+  }
   var was=drag.moved,lp=drag.lpFired;
   clearBHlp();drag.on=false;drag.lpFired=false;
   try{cv.releasePointerCapture(e.pointerId);}catch(err){}

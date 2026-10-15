@@ -29,6 +29,8 @@ var NEB_A=.09;        /* terang tiap blob dinding */
 var DUST_RATE=2200;   /* debu/streak halus per detik yang disuntik ke buffer -> jadi ribuan garis radial tipis (murah: cuma sprite kecil)*/
 var DUST_A=.55;       /* terang tiap debu */
 var GLOW_A=.32;       /* terang kilau hangat di tepi lubang (0 = matikan) */
+var EDGE_SOLID=.5;    /* mulut portal mini: bagian tengah (x radius) yang tetap pekat; sisanya meluruh halus jadi transparan ke arah tepi (makin kecil = tepi makin lembut) */
+var RIM_GLOW=.09;     /* kilau tipis di luar mulut portal mini (0 = tanpa kilau). Pengganti garis cincin cyan yang dulu */
 var R_HOLD=.22;       /* radius mulut portal saat hold, x min(W,H) */
 var CHARGE_MS=580;    /* harus sama dengan setTimeout long-press di beginBHDrag */
 var MIN_TRAVEL=2200;  /* ms minimal di dalam wormhole supaya efeknya kebaca */
@@ -119,7 +121,7 @@ function init(){
 }
 
 /* ---------- state machine ----------
-   idle -> charge (hold berjalan) -> held (portal terbuka, nunggu kartu teleskop / sectZoomOut) -> travel -> close -> idle
+   idle -> charge (hold berjalan) -> armed (portal terbuka penuh, jari masih menahan; boleh di-drag via holdMove) -> held (jari dilepas: nunggu kartu teleskop / sectZoomOut) -> travel -> close -> idle
    gate() langsung ke travel. holdCancel() / hold gagal -> close (mengecil). */
 function show(){if(cv&&cv.style.display!=='block'){resize();cv.style.display='block';}}
 function hide(){if(cv){cv.style.display='none';cv.style.opacity='1';}}
@@ -135,8 +137,10 @@ function holdStart(x,y,ms){
   state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1};
   dens=1;show();fresh=Math.min(winW(),winH())*R_HOLD;kick();
 }
-function holdCommit(){if(state==='charge'){S.p=1;state='held';S.th=performance.now();}}
-function holdCancel(){if(state==='charge')startClose(performance.now(),240,true);}
+function holdArm(){if(state==='charge'){S.p=1;state='armed';S.ta=performance.now();}}   /* hold selesai: portal siaga, TIDAK masuk dulu */
+function holdMove(x,y){if(state==='armed'||state==='charge'){S.x=x;S.y=y;}}            /* geser mulut portal (jari masih menahan) */
+function holdCommit(){if(state==='charge'||state==='armed'){S.p=1;state='held';S.th=performance.now();}}   /* jari dilepas -> lanjut masuk */
+function holdCancel(){if(state==='charge'||state==='armed')startClose(performance.now(),240,true);}
 function gate(s,pos){
   if(!usable()||!init())return;
   var now=performance.now(),x=pos&&pos[0]!=null?pos[0]:winW()*.5,y=pos&&pos[1]!=null?pos[1]:winH()*.5;
@@ -273,7 +277,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   g.globalCompositeOperation='source-over';g.globalAlpha=1;
   g.clearRect(0,0,W,H);
   g.save();
-  if(small){g.beginPath();g.arc(cx,cy,Math.max(1,r),0,6.283185307);g.clip();}
+  if(small){g.beginPath();g.arc(cx,cy,Math.max(1,r*1.06),0,6.283185307);g.clip();}   /* batas kerja saja; tepi tampak asli dibentuk mask alpha di bawah, bukan potongan ini */
   g.fillStyle=BG;g.fillRect(0,0,W,H);
   g.imageSmoothingEnabled=true;
   g.drawImage(bA,0,0,bw,bh,0,0,W,H);
@@ -312,9 +316,13 @@ function drawFrame(dt,cx,cy,r,cvr){
   g.fillStyle=gr;g.beginPath();g.arc(cx,cy,Rh*1.3,0,6.283185307);g.fill();
   /* vignette: portal mini = gelap di tepi lingkaran; layar penuh = tepi layar sedikit digelapkan */
   if(small){
-    gr=g.createRadialGradient(cx,cy,r*.62,cx,cy,r);
-    gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.9)');
-    g.fillStyle=gr;g.fillRect(cx-r,cy-r,r*2,r*2);
+    /* tepi mulut portal: alpha diluruhkan halus ke 0 (destination-in) -> terowongan menyatu dengan sky di bawahnya, tanpa potongan keras / vignette gelap */
+    g.globalCompositeOperation='destination-in';
+    gr=g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,r));
+    gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(EDGE_SOLID,'rgba(0,0,0,1)');
+    gr.addColorStop(EDGE_SOLID+(1-EDGE_SOLID)*.36,'rgba(0,0,0,.72)');gr.addColorStop(EDGE_SOLID+(1-EDGE_SOLID)*.68,'rgba(0,0,0,.26)');gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gr;g.fillRect(0,0,W,H);
+    g.globalCompositeOperation='source-over';
   }else{
     gr=g.createRadialGradient(cx,cy,Math.hypot(W,H)*.28,cx,cy,Math.hypot(W,H)*.62);
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
@@ -323,9 +331,12 @@ function drawFrame(dt,cx,cy,r,cvr){
   if(!small)drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
-  if(small&&S.rim>.02){
-    g.strokeStyle='rgba(110,229,255,'+(.9*S.rim).toFixed(3)+')';g.lineWidth=2;
-    g.beginPath();g.arc(cx,cy,Math.max(1,r-1),0,6.283185307);g.stroke();
+  if(small&&RIM_GLOW>0&&S.rim>.02){   /* kilau lembut di sekitar mulut (bukan garis): halo tipis yang memudar ke dua arah */
+    g.globalCompositeOperation='lighter';
+    gr=g.createRadialGradient(cx,cy,r*.7,cx,cy,r*1.25);
+    gr.addColorStop(0,'rgba(120,165,255,0)');gr.addColorStop(.55,'rgba(120,165,255,'+(RIM_GLOW*S.rim).toFixed(3)+')');gr.addColorStop(1,'rgba(120,165,255,0)');
+    g.fillStyle=gr;g.beginPath();g.arc(cx,cy,r*1.25,0,6.283185307);g.fill();
+    g.globalCompositeOperation='source-over';
   }
 }
 
@@ -339,6 +350,11 @@ function tick(now){
     p=clamp((now-S.t0)/S.ms,0,1);
     S.r=rh*eo(p);S.a=Math.min(1,p*1.7);S.rate=lerp(.5,.9,p);S.cx=S.x;S.cy=S.y;S.rim=1;env=.5*sm(p);
     if(now>S.t0+S.ms+220)startClose(now,240,true);   /* timer long-press batal di tengah jalan tanpa lapor */
+  }else if(state==='armed'){
+    /* siaga: mulut sedikit lebih besar & berdenyut, ikut jari dengan easing halus; tanpa batas waktu singkat (pengaman 30 dtk) */
+    p=Math.min(1,dt*16);S.cx+=(S.x-S.cx)*p;S.cy+=(S.y-S.cy)*p;
+    S.r=rh*(1.05+.03*Math.sin(now*.008));S.a=1;S.rate=lerp(S.rate,1,Math.min(1,dt*4));S.rim=1;env=.5;
+    if(now-S.ta>30000)startClose(now,260,true);
   }else if(state==='held'){
     S.r=rh*(1+.03*Math.sin(now*.008));S.a=1;S.rate=.9;S.rim=1;env=.5;
     if(secBusy()&&typeof SECT!=='undefined'&&SECT.phase==='out')engage(now);
@@ -375,6 +391,8 @@ function muffle(){return state==='idle'?0:.88*clamp(env,0,1);}
 
 window.WORMHOLE={
   holdStart:function(x,y,ms){try{holdStart(x,y,ms);}catch(e){}},
+  holdArm:function(){try{holdArm();}catch(e){}},
+  holdMove:function(x,y){try{holdMove(x,y);}catch(e){}},
   holdCommit:function(){try{holdCommit();}catch(e){}},
   holdCancel:function(){try{holdCancel();}catch(e){}},
   gate:function(s,pos){try{gate(s,pos);}catch(e){}},
