@@ -77,6 +77,12 @@
     'tune.ast.count':{en:'Count',id:'Jumlah'},'tune.ast.count.s':{en:'rocks',id:'batu'},'tune.ast.size.s':{en:'rock scale',id:'skala batu'},
     'tune.ast.orbit':{en:'Orbit',id:'Orbit'},'tune.ast.orbit.s':{en:'width',id:'lebar'},'tune.ast.thick':{en:'Thickness',id:'Ketebalan'},'tune.ast.thick.s':{en:'ring density',id:'kerapatan cincin'},
     'tune.ast.spd.s':{en:'orbit',id:'orbit'},
+    /* tuning panel: tab Tele (teleskop) */
+    'tune.tele.tab':{en:'Tele',id:'Tele'},'tune.sub.tele':{en:'Telescope // Tune',id:'Teleskop // Setelan'},'tune.saved.tele':{en:'TELESCOPE SETTINGS SAVED',id:'SETELAN TELESKOP TERSIMPAN'},
+    'tune.on':{en:'On',id:'Nyala'},'tune.off':{en:'Off',id:'Mati'},
+    'tune.tele.go':{en:'Bring along',id:'Ajak kemana saja'},'tune.tele.bub':{en:'Bubble messages',id:'Pesan bubble'},'tune.tele.led':{en:'LED color',id:'Warna LED'},
+    'tune.tele.hover':{en:'Hover',id:'Melayang'},'tune.tele.spin':{en:'Spin',id:'Putar'},
+    'tune.led.0':{en:'Green',id:'Hijau'},'tune.led.1':{en:'Amber',id:'Amber'},'tune.led.2':{en:'White',id:'Putih'},'tune.led.3':{en:'Blue',id:'Biru'},'tune.led.4':{en:'Violet',id:'Ungu'},
 
     /* kamera / HUD */
     'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.hint':{en:'TAP ‹ › TO FOCUS · PINCH / WHEEL · 1×–3×',id:'KETUK ‹ › UNTUK FOKUS · CUBIT / RODA · 1×–3×'},
