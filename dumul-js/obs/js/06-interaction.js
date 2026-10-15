@@ -238,7 +238,7 @@ function constellationHitDist(x,y){
   return best;
 }
 function clearBHlp(){
-  if(drag.lpTimer){try{clearTimeout(drag.lpTimer);}catch(e){}drag.lpTimer=null;}
+  if(drag.lpTimer){try{clearTimeout(drag.lpTimer);}catch(e){}drag.lpTimer=null;try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCancel();}catch(eW){}}   /* hold batal (geser / lepas): portal menutup */
 }
 function beginBHDrag(e){
   if(reduce||SW||drag.on||BHSC<.05)return false;
@@ -259,12 +259,14 @@ function beginBHDrag(e){
   drag.lpFired=false;clearBHlp();
   /* Fase 2: long-press BH mini di sektor → kembali ke overview (ganti tombol #mode-sectors). */
   if(SECT.cur&&SUM.on&&drag.tapEligible){
+    try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580);}catch(eW0){}   /* wormhole (09): mulut portal tumbuh di BH mini selama hold */
     drag.lpTimer=setTimeout(function(){
       drag.lpTimer=null;
-      if(!drag.on||drag.moved||!SECT.cur||!SUM.on||SECT.busy)return;
+      if(!drag.on||drag.moved||!SECT.cur||!SUM.on||SECT.busy){try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCancel();}catch(eW1){}return;}
       drag.lpFired=true;drag.on=false;
       try{cv.releasePointerCapture(drag.pid);}catch(err){}
       haptic(18);
+      try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCommit();}catch(eW2){}
       try{if(typeof sectToggle==='function')sectToggle();}catch(e){}
     },580);
   }

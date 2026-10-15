@@ -1178,7 +1178,7 @@ function camStrain(s){
 /* Sektor sumber interlocking penuh (indikator cyan): TX docked + BH mini di sektor itu + BH overview aktif.
    Dipakai di overview supaya muffle selaras dengan ◉◉◉ (txInterlock), bukan cuma cek TX + BH overview. */
 function srcLinked(s){return !!(s&&typeof sigLinked==='function'&&sigLinked(s,null));}   /* sumber level 3, dilihat dari overview — aturan lengkapnya di txWhy (02-sky-logic.js) */
-function spatialTarget(){
+function spatialTargetBase(){
   var cx=W*.5,cy=H*.5,maxD=Math.max(120,Math.hypot(W,H)*.48),t,p,s;
   var gone=(typeof lisGone==='function'&&lisGone());
   s=sfxSector();
@@ -1211,6 +1211,13 @@ function spatialTarget(){
   if(!p||p[2]>=1)return .55;
   t=Math.min(1,Math.max(0,Math.hypot(p[0]-cx,p[1]-cy)/maxD));
   return Math.max(0,(t-.12)/.88);
+}
+/* Wormhole (09-wormhole.js): redam audio selama portal terbuka / dilewati. Cuma batas bawah: aturan muffle asli (spatialTargetBase) tidak diubah.
+   Sektor sumber yang biasanya selalu jernih (0) ikut teredam selama wormhole aktif; LIS 'gone' (1) tetap 1. */
+function spatialTarget(){
+  var b=spatialTargetBase(),w=0;
+  try{if(typeof WORMHOLE!=='undefined')w=WORMHOLE.muffle()||0;}catch(eW){}
+  return w>b?w:b;
 }
 function spatialHint(t){
   var st='',s=sfxSector(),w;

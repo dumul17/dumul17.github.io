@@ -870,8 +870,10 @@ function sgJump(s){
     /* Tunnel side-effect: selalu muffle 2 dtk; lanjut muffle jika tujuan belum dock/summon siap */
     SGATE.tunnelUntil=performance.now()+2000;
     try{showModeToast(T('toast.jump',{s:sgNum(s)}),null,1500);}catch(e){}
+    var wp=null;try{wp=camBH();}catch(eP){}   /* posisi Gargantua mini SEBELUM sectZoomOut (sectApply menggeser kamera) */
     haptic(12);sectZoomOut();
     if(!SECT.busy)SGATE.pend=null;
+    else{try{if(typeof WORMHOLE!=='undefined')WORMHOLE.gate(s,wp);}catch(eW){}}   /* wormhole (09): dari BH mini sampai tiba di sektor tujuan */
   },true);
 }
 function sgHit(x,y){
