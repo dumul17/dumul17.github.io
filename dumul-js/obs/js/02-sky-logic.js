@@ -1184,10 +1184,28 @@ function bakeDustLayers(M,EW,EH,hk){
   }
 }
 var TELESCOPE={phase:1.7,init:false,x:0,y:0,vx:0,vy:0,tx:0,ty:0,ang:0,va:0,next:0,mode:'drift',targetX:0,targetY:0,orbitAngle:0,onWarpComplete:null,sx:0,sy:0,hitR:40,al:1,away:false,orbitR:38,followKind:null,followSect:null,busyShown:false};
+/* ===== Setelan teleskop (tab "Tele" di panel tuning) =====
+   bubble: 1/0 semua bubble teleskop (tap, sapaan, Lost-in-Space) · led: indeks warna LED idle (TELE_LED) · spd: kecepatan hover (drift) · spin: kecepatan putar · size: skala badan teleskop.
+   Dipakai: 01-core (showSecretSequence), 04-render (gerak/ukuran/LED/posisi bubble), 06-interaction (sapaan), 05-sector-ui (panel). Disimpan di localStorage 'dumul_tele_cfg' lewat tombol Save. */
+var TELE_CFG_KEY='dumul_tele_cfg';
+var TELE_LED=[[57,255,20],[255,176,32],[235,245,255],[88,150,255],[176,132,255]];   /* hijau neon (default), amber, putih, biru, ungu — cyan/pink/merah dipakai peran TX/RX/LIS */
+var TELE_RNG={spd:[0,3],spin:[0,3],size:[.5,2.5]};
+function teleCfgDef(){return{bubble:1,led:0,spd:1,spin:1,size:1};}
+function teleCfgClamp(k,v){var r=TELE_RNG[k];v=+v;if(!isFinite(v))v=1;return Math.max(r[0],Math.min(r[1],v));}
+function teleCfgNorm(o){
+  var d=teleCfgDef();
+  if(!o||typeof o!=='object')return d;
+  d.bubble=(o.bubble===0||o.bubble===false)?0:1;
+  var l=+o.led;d.led=(l>=0&&l<TELE_LED.length)?(l|0):0;
+  ['spd','spin','size'].forEach(function(k){if(typeof o[k]==='number')d[k]=teleCfgClamp(k,o[k]);});
+  return d;
+}
+var TELE_CFG=(function(){var o=null;try{o=JSON.parse(localStorage.getItem(TELE_CFG_KEY)||'null');}catch(e){}return teleCfgNorm(o);})();
+function teleBubbleGap(){return Math.max(0,TELE_CFG.size-1)*14;}   /* teleskop lebih besar -> bubble naik sedikit supaya tidak menutupi badan */
 function telescopeHitRadius(){
-  /* Generous mobile-friendly target; scales a bit with viewport. */
+  /* Generous mobile-friendly target; scales a bit with viewport (dan ikut ukuran teleskop). */
   var base=(typeof touchMode!=='undefined'&&touchMode)?48:36;
-  return Math.max(base,Math.min(64,(W||360)*0.09));
+  return Math.max(base,Math.min(64,(W||360)*0.09))*Math.max(.85,Math.min(1.6,TELE_CFG.size));
 }
 /* ===== Transmitter (Fase 3–4+) =====
    TEMP visual: dashed lines only — nanti diganti drone yang ngorbit dekat sumber sinyal.

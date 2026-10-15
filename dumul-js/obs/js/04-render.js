@@ -337,8 +337,9 @@ function drawTxLines(now){
 
 /* LED beacon teleskop: idle hijau neon, TX (sektor sumber, drone docked) cyan, RX (sektor lain, link ke BH mini) pink.
    Warna dilerp halus (TELED) supaya perpindahan peran tidak loncat. Peran dari TXFX.role() (08-tx-drone.js). */
-var TELED={c:[57,255,20],t:0};
-var TELED_IDLE=[57,255,20],TELED_TX=[110,229,255],TELED_RX=[255,154,217];
+var TELED_IDLE=TELE_LED[TELE_CFG.led].slice(),TELED_TX=[110,229,255],TELED_RX=[255,154,217];   /* warna idle dari setelan teleskop */
+var TELED={c:TELED_IDLE.slice(),t:0};
+function teleLedSet(i){TELE_CFG.led=i;TELED_IDLE=TELE_LED[i].slice();}
 function teLedStep(now,role){
   var tg=role==='src'?TELED_TX:role==='rcv'?TELED_RX:TELED_IDLE,dt=TELED.t?Math.min(100,now-TELED.t):100,k=reduce?1:1-Math.exp(-dt/200),i;
   if(now-TELED.t>400)k=1;
@@ -533,7 +534,7 @@ function drawFloatingTelescope(now){
     }else{
       /* Orbit the active star */
       TELESCOPE.orbitAngle+=dt*1.2;
-      var orbitRadius=TELESCOPE.orbitR||38;
+      var orbitRadius=(TELESCOPE.orbitR||38)*Math.max(1,TELE_CFG.size);
       var ok=Math.min(1,dt*9);
       TELESCOPE.ocx+=(TELESCOPE.targetX-TELESCOPE.ocx)*ok;TELESCOPE.ocy+=(TELESCOPE.targetY-TELESCOPE.ocy)*ok;
       TELESCOPE.x=TELESCOPE.ocx+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
@@ -553,9 +554,9 @@ function drawFloatingTelescope(now){
     var ease=Math.min(1,dt*.035);
     TELESCOPE.vx+=(TELESCOPE.tx-TELESCOPE.vx)*ease;
     TELESCOPE.vy+=(TELESCOPE.ty-TELESCOPE.vy)*ease;
-    TELESCOPE.x+=TELESCOPE.vx*dt;
-    TELESCOPE.y+=TELESCOPE.vy*dt;
-    TELESCOPE.ang+=TELESCOPE.va*dt;
+    TELESCOPE.x+=TELESCOPE.vx*dt*TELE_CFG.spd;   /* spd/spin: setelan hover teleskop */
+    TELESCOPE.y+=TELESCOPE.vy*dt*TELE_CFG.spd;
+    TELESCOPE.ang+=TELESCOPE.va*dt*TELE_CFG.spin;
 
     /* Soft bounce inside the viewport — avoids the old toroidal teleport that
        made the telescope flicker/jump on mobile near the edges. */
@@ -570,7 +571,7 @@ function drawFloatingTelescope(now){
   var margin=110;
   var lensD=Math.hypot(TELESCOPE.x-BH.x,TELESCOPE.y-BH.y);
   var lensMag=1+0.16*clamp((BH.Rr*8-lensD)/(BH.Rr*8),0,1);
-  var sc=Math.max(.18,Math.min(.24,W/600))*lensMag;
+  var sc=Math.max(.18,Math.min(.24,W/600))*lensMag*TELE_CFG.size;
   TELESCOPE.sc=sc;   /* dipakai 09-wormhole.js untuk menggambar teleskop di atas terowongan */
 
   /* Small distant scene object; still participates fully in Gargantua's gravity. */
@@ -1577,12 +1578,12 @@ function placeSecretMsg(){
   var el=$('#secret-msg'),p=telescopeScreenPos();
   if(!el||!p)return;
   if(STG.rot){
-    var vv=bubbleXYRot(p,(typeof touchMode!=='undefined'&&touchMode)?10:12,10,Math.min(220,STG.iw*.72));
+    var vv=bubbleXYRot(p,((typeof touchMode!=='undefined'&&touchMode)?10:12)+teleBubbleGap(),10,Math.min(220,STG.iw*.72));
     el.style.left=Math.round(vv[0])+'px';el.style.top=Math.round(vv[1])+'px';
     return;
   }
   /* Bottom of bubble sits just above the telescope (data-type=telescope uses translate(-50%,-100%)). */
-  var gap=(typeof touchMode!=='undefined'&&touchMode)?10:12;
+  var gap=((typeof touchMode!=='undefined'&&touchMode)?10:12)+teleBubbleGap();
   var pad=10;
   var maxW=Math.min(220,(W||innerWidth||360)*0.72);
   var x=p[0], y=p[1]-gap;

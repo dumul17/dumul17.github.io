@@ -1013,7 +1013,7 @@ function tgChoose(gap,fresh,hour,nowMs){
 function placeTeleGreet(){
   var el=TG&&TG.el,p=TG&&TG.anchor?TG.anchor:telescopeScreenPos();
   if(!el||!p)return;
-  var gap=TG&&TG.anchor?0:(touchMode?10:12),pad=10,maxW=Math.min(220,(W||innerWidth||360)*.72);
+  var gap=(TG&&TG.anchor)?0:((touchMode?10:12)+teleBubbleGap()),pad=10,maxW=Math.min(220,(W||innerWidth||360)*.72);
   if(STG.rot){
     var vv=bubbleXYRot(p,gap,pad,Math.min(220,STG.iw*.72));
     el.style.left=Math.round(vv[0])+'px';el.style.top=Math.round(vv[1])+'px';
@@ -1029,7 +1029,7 @@ function teleGreetHide(){
   clearTimeout(el._t);clearTimeout(el._type);TG.on=false;TG.anchor=null;el.classList.remove('on');
 }
 function tgShow(msg){
-  var el=TG.el;if(!el)return;
+  var el=TG.el;if(!el||!TELE_CFG.bubble)return;
   clearTimeout(el._t);clearTimeout(el._type);
   var short=msg.length<=24,txt=short?msg:teleWrapLines(msg,touchMode?24:28);
   el.classList.toggle('tele-short',short);
@@ -1038,7 +1038,7 @@ function tgShow(msg){
   teleTypeText(el,txt,function(){el._t=setTimeout(teleGreetHide,hold);},short?52:30);
 }
 function tgTrigger(gap,fresh){
-  if(TG.busy||!TG.el)return;
+  if(TG.busy||!TG.el||!TELE_CFG.bubble)return;
   var now=Date.now(),msg=tgChoose(Math.max(0,gap),fresh,new Date().getHours(),now);
   tgSave();
   if(!msg)return;

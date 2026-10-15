@@ -724,7 +724,7 @@ var EXITP=(function(){
       '<circle cx="26.6" cy="30.4" r="1.4" fill="#0d1b26"/><circle cx="38.6" cy="30.4" r="1.4" fill="#0d1b26"/>'+
       '<g class="tl-blush" fill="#ff9ad9" opacity=".5"><circle cx="21" cy="35.5" r="2.2"/><circle cx="43" cy="35.5" r="2.2"/></g>'+
       '<g fill="none" stroke="#8eeeff" stroke-width="1.7" stroke-linecap="round">'+
-        '<path class="tl-m tl-m-n" d="M29 37.5 h6"/>'+
+        '<path class="tl-m tl-m-n" d="M29 37.3 q3 .5 6 0"/>'+
         '<path class="tl-m tl-m-smile" d="M28 36 q4 4.6 8 0"/>'+
         '<path class="tl-m tl-m-soft" d="M29.5 38.4 q2.5 -2.4 5 0"/>'+
       '</g>'+

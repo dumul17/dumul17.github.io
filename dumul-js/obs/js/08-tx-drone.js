@@ -121,7 +121,7 @@ var TXFX=(function(){
     var t=tele();if(!t)return;
     var col=NEU;
     if(SECT.cur&&!SECT.on)col=fcol('hold',ilCol(SECT.cur),now);
-    var f=c01(el/HOLD_MS),R=26,fade=c01((el-HOLD_SHOW)/120),full=f>=1,pulse=full&&!reduce?.6+.4*Math.sin(now*.02):1;
+    var f=c01(el/HOLD_MS),R=26*(typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1),fade=c01((el-HOLD_SHOW)/120),full=f>=1,pulse=full&&!reduce?.6+.4*Math.sin(now*.02):1;
     g.save();g.lineCap='round';
     g.strokeStyle='rgba('+col+','+(.18*fade)+')';g.lineWidth=2;g.beginPath();g.arc(t[0],t[1],R,0,6.283);g.stroke();
     g.strokeStyle='rgba('+col+','+(.28*fade*pulse)+')';g.lineWidth=6;g.beginPath();g.arc(t[0],t[1],R,-1.5708,-1.5708+6.283*f);g.stroke();

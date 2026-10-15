@@ -564,18 +564,34 @@ function drawInterlock(x,y,il){
     if(k==='HALO'){SECT_HALO[0]=SECT_HALO[1]=null;SECT_HALO_A[0]=NEB.HALO;SECT_HALO_A[1]=NEB.HALO*.64;return;}   /* sprite halo dibuat ulang di frame berikutnya */
     skyBake();
   }
+  /* ---- tab Tele ---- */
+  var TK=['spd','spin','size'],tin={},tout={},tBub=document.getElementById('bp-tele-bub'),tAuto=document.getElementById('bp-tele-auto'),tLeds=[].slice.call(panel.querySelectorAll('.bp-led'));
+  TK.forEach(function(k){tin[k]=document.getElementById('tp-'+k);tout[k]=document.getElementById('tp-'+k+'-v');});
+  function teleStored(){var o=null;try{o=JSON.parse(localStorage.getItem(TELE_CFG_KEY)||'null');}catch(e){}return teleCfgNorm(o);}
+  function teleDirty(){var st=teleStored();if(st.bubble!==TELE_CFG.bubble||st.led!==TELE_CFG.led)return true;return TK.some(function(k){return Math.abs(st[k]-TELE_CFG[k])>.004;});}
+  function teleBubbleOff(){   /* bubble yang lagi tampil ikut dimatikan */
+    try{teleGreetHide();}catch(e){}
+    var m=document.getElementById('secret-msg');if(m){clearTimeout(m._t);clearTimeout(m._type);m.classList.remove('on');}
+  }
+  function paintTele(){
+    if(tBub){var bo=!!TELE_CFG.bubble;tBub.setAttribute('aria-pressed',bo?'true':'false');tBub.textContent=tx(bo?'tune.on':'tune.off',bo?'On':'Off');tBub.classList.toggle('off',!bo);}
+    try{lisAutoSync();}catch(e){}
+    tLeds.forEach(function(b,i){var on=i===TELE_CFG.led;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');});
+    TK.forEach(function(k){var el=tin[k];if(el){el.value=String(Math.round(TELE_CFG[k]*100));fill(el);}if(tout[k])tout[k].textContent=TELE_CFG[k].toFixed(2)+'\u00d7';});
+  }
   /* ---- umum ---- */
   function paint(){
-    if(sub)sub.textContent=cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
-    paintBH();paintSky();paintAst();
+    if(sub)sub.textContent=cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
+    paintBH();paintSky();paintAst();paintTele();
     var d=false,st;
     if(cur==='bh'){st=stored();allKeys.forEach(function(k){if(Math.abs(st[k]-BHU[k])>.004)d=true;});}
     else if(cur==='ast')d=astDirty();
+    else if(cur==='tele')d=teleDirty();
     else if(skyOv()){st=skyStored();SKYK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     else if(skySect()){st=secStored();SECK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     if(bSave)bSave.classList.toggle('dirty',d);
   }
-  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:NEB.on&&(c.contains('sect-ov')||c.contains('sect-in')),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
+  function avail(){var c=body.classList;return{bh:c.contains('bh-live'),sky:NEB.on&&(c.contains('sect-ov')||c.contains('sect-in')),ast:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in'),tele:c.contains('bh-live')||c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
   function refresh(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
@@ -612,6 +628,12 @@ function drawInterlock(x,y,il){
     if(!sin[k])return;
     sin[k].addEventListener('input',function(){nebSTuneApply(k,sin[k].value/100);sectChanged(k);paint();});
   });
+  if(tBub)tBub.addEventListener('click',function(e){e.stopPropagation();TELE_CFG.bubble=TELE_CFG.bubble?0:1;if(!TELE_CFG.bubble)teleBubbleOff();paint();haptic(6);});
+  tLeds.forEach(function(b,i){b.addEventListener('click',function(e){e.stopPropagation();teleLedSet(i);paint();haptic(6);});});
+  TK.forEach(function(k){
+    if(!tin[k])return;
+    tin[k].addEventListener('input',function(){TELE_CFG[k]=teleCfgClamp(k,tin[k].value/100);paint();});
+  });
   if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();AST_CFG.on=AST_CFG.on?0:1;paint();haptic(6);});
   AK.forEach(function(k){
     if(!ain[k])return;
@@ -623,7 +645,9 @@ function drawInterlock(x,y,il){
   });
   if(bSave)bSave.addEventListener('click',function(e){
     e.stopPropagation();
-    if(cur==='ast'){
+    if(cur==='tele'){
+      try{localStorage.setItem(TELE_CFG_KEY,JSON.stringify(TELE_CFG));}catch(er){}
+    }else if(cur==='ast'){
       try{localStorage.setItem('dumul_ast_cfg',JSON.stringify(AST_CFG));}catch(er){}
     }else if(cur==='sky'){
       if(skyOv()){var o={};SKYK.forEach(function(k){o[k]=NEB[k];});
@@ -632,11 +656,14 @@ function drawInterlock(x,y,il){
         try{localStorage.setItem('dumul_sky_cfg_s',JSON.stringify(o2));}catch(er){}}
     }else{try{localStorage.setItem(bhuKey(),JSON.stringify(BHU));}catch(er){}}
     paint();haptic(10);
-    try{if(typeof showModeToast==='function')showModeToast(cur==='ast'?tx('tune.saved.ast','Asteroid saved'):cur==='sky'?(skySect()?T('tune.saved.skys'):T('tune.saved.sky')):T('tune.saved.bh'),null,1500);}catch(er){}
+    try{if(typeof showModeToast==='function')showModeToast(cur==='tele'?tx('tune.saved.tele','TELESCOPE SETTINGS SAVED'):cur==='ast'?tx('tune.saved.ast','Asteroid saved'):cur==='sky'?(skySect()?T('tune.saved.skys'):T('tune.saved.sky')):T('tune.saved.bh'),null,1500);}catch(er){}
   });
   if(bReset)bReset.addEventListener('click',function(e){
     e.stopPropagation();
-    if(cur==='ast'){
+    if(cur==='tele'){
+      var dc=teleCfgDef();Object.keys(dc).forEach(function(k){TELE_CFG[k]=dc[k];});teleLedSet(dc.led);
+      try{localStorage.removeItem(TELE_CFG_KEY);}catch(er){}
+    }else if(cur==='ast'){
       AST_CFG=astNorm(null);astResize();
       try{localStorage.removeItem('dumul_ast_cfg');}catch(er){}
     }else if(cur==='sky'){
@@ -713,9 +740,9 @@ function drawInterlock(x,y,il){
 var LIS={at:'ov',last:'ov',cd:0,kind:'',pend:null,tm:0,iv:0,deny:0,ui:null,hud:null,fx:null,cb:null,wasGone:false,auto:false};
 /* Mode "selalu ajak teleskop": panel ajak/tinggal dilewati, selalu dianggap AJAK. Disimpan; centang di panel ajak (pertama kali) dan di panel Tuning (untuk mematikan). */
 try{LIS.auto=localStorage.getItem('dumul_lis_auto')==='1';}catch(eLA){}
-function lisAutoSync(){var el=document.getElementById('bp-tele-auto');if(el)el.checked=!!LIS.auto;}
+function lisAutoSync(){var el=document.getElementById('bp-tele-auto');if(!el)return;var on=!!LIS.auto;el.setAttribute('aria-pressed',on?'true':'false');el.textContent=T(on?'tune.on':'tune.off');el.classList.toggle('off',!on);}   /* switch di tab Tele */
 function lisAutoSet(on){LIS.auto=!!on;try{localStorage.setItem('dumul_lis_auto',LIS.auto?'1':'0');}catch(e){}lisAutoSync();}
-(function(){var el=document.getElementById('bp-tele-auto');if(!el)return;el.checked=!!LIS.auto;el.addEventListener('change',function(){lisAutoSet(el.checked);});})();
+(function(){var el=document.getElementById('bp-tele-auto');if(!el)return;lisAutoSync();el.addEventListener('click',function(e){e.stopPropagation();lisAutoSet(!LIS.auto);try{haptic(6);}catch(er){}});})();
 function lisLoc(){return SECT.busy?null:(SECT.cur?SECT.cur.k:'ov');}
 function lisGone(){var l=lisLoc();return l!==null&&LIS.at!==l;}
 function lisBlock(kind){

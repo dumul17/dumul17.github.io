@@ -983,6 +983,7 @@ function showUltraLoveSequence(el){
 
 function showSecretSequence(){
   var el=$('#secret-msg');if(!el)return;
+  if(!TELE_CFG.bubble)return;   /* bubble teleskop dimatikan di tab Tele */
   teleGreetHide();
   clearTimeout(el._t);clearTimeout(el._type);
   el.dataset.type='telescope'; /* Telescope voice — track with placeSecretMsg each frame */
@@ -1236,7 +1237,9 @@ function spatialHint(t){
     st=w===''?'relay':(w==='far'?(t>.5?'muffled':''):w);
   }else if(s&&SECT.cur&&!SECT.busy&&s!==SECT.cur){
     w=txWhy(s,SECT.cur);
-    st=w===''?(camStrain(s)>0?'strain':'relay-here'):w;
+    /* Cam constellation (auto-fit zoom fokus rasi) di dalam sektor: redamnya datang dari kamera (camStrain), bukan dari BH mini,
+       jadi toast "panggil BH mini" tidak relevan di sini; tampilkan toast 'strain' saja. */
+    st=w===''?(camStrain(s)>0?'strain':'relay-here'):((w==='needbh'&&camStrain(s)>0)?'strain':w);
   }
   if(st===AV._hint)return;
   AV._hint=st;
