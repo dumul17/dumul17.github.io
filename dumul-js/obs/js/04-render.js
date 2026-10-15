@@ -346,156 +346,10 @@ function teLedStep(now,role){
   for(i=0;i<3;i++)TELED.c[i]+=(tg[i]-TELED.c[i])*k;
   return Math.round(TELED.c[0])+','+Math.round(TELED.c[1])+','+Math.round(TELED.c[2]);
 }
-function drawFloatingTelescope(now){
-  /* Free-floating telescope: drift / warp / orbit state machine.
-     Warp + orbit triggered by star supernova; otherwise inertial drift. */
-  if(!TELESCOPE.init){
-    TELESCOPE.init=true;
-    /* Only seed free-float pose when not already warping (e.g. star tapped before first draw). */
-    if(TELESCOPE.mode!=='warp'&&TELESCOPE.mode!=='orbit'){
-      TELESCOPE.x=W*(.18+Math.random()*.64);
-      TELESCOPE.y=H*(.16+Math.random()*.62);
-      TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.2+Math.random()*2.2);
-      TELESCOPE.vy=(Math.random()<.5?-1:1)*(.8+Math.random()*1.6);
-      TELESCOPE.tx=TELESCOPE.vx;TELESCOPE.ty=TELESCOPE.vy;
-      TELESCOPE.ang=Math.random()*6.283;
-      TELESCOPE.va=(Math.random()-.5)*.004;
-      TELESCOPE.next=now+16000+Math.random()*18000;
-      TELESCOPE.mode='drift';
-    }else if(!TELESCOPE.x&&!TELESCOPE.y){
-      /* Warp requested before layout: seed a start point so glide has somewhere to leave from. */
-      TELESCOPE.x=W*(.18+Math.random()*.64);
-      TELESCOPE.y=H*(.16+Math.random()*.62);
-      TELESCOPE.ang=Math.random()*6.283;
-      TELESCOPE.va=0;
-      TELESCOPE.next=now+16000+Math.random()*18000;
-    }
-  }
-  var dt=Math.min(40,Math.max(0,now-(TELESCOPE.last||now)))/1000;
-  TELESCOPE.last=now;
-  try{teleSectorLogic(dt);}catch(eTs){}
-
-  /* --- Movement logic by mode --- */
-  if((TELESCOPE.mode==='warp'||TELESCOPE.mode==='orbit')&&TELESCOPE.follow){
-    var fq=TELESCOPE.follow();
-    if(fq){TELESCOPE.targetX=fq[0];TELESCOPE.targetY=fq[1];}
-  }
-  if(TELESCOPE.mode==='warp'){
-    /* Fast glide toward the target star */
-    var dx=TELESCOPE.targetX-TELESCOPE.x;
-    var dy=TELESCOPE.targetY-TELESCOPE.y;
-    var dist=Math.hypot(dx,dy);
-
-    TELESCOPE.x+=dx*Math.min(1,dt*7.5);
-    TELESCOPE.y+=dy*Math.min(1,dt*7.5);
-    TELESCOPE.ang+=dt*5.0; /* Spin while warping */
-
-    /* Arrived near the star (< 25px) */
-    if(dist<25){
-      TELESCOPE.mode='orbit';
-      TELESCOPE.ocx=TELESCOPE.targetX;TELESCOPE.ocy=TELESCOPE.targetY;
-      TELESCOPE.orbitAngle=Math.atan2(dy,dx);
-      if(typeof TELESCOPE.onWarpComplete==='function'){
-        TELESCOPE.onWarpComplete();
-        TELESCOPE.onWarpComplete=null;
-      }
-    }
-  }else if(TELESCOPE.mode==='orbit'){
-    /* Stay in orbit while SFX is still playing */
-    var sfxActive=activeSfx&&!activeSfx.paused&&!activeSfx.ended;
-    if(!sfxActive){
-      /* SFX finished/paused → free drift again */
-      TELESCOPE.mode='drift';TELESCOPE.follow=null;
-      TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.4+Math.random()*1.8);
-      TELESCOPE.vy=(Math.random()<.5?-1:1)*(1.0+Math.random()*1.4);
-      TELESCOPE.tx=TELESCOPE.vx;
-      TELESCOPE.ty=TELESCOPE.vy;
-    }else{
-      /* Orbit the active star */
-      TELESCOPE.orbitAngle+=dt*1.2;
-      var orbitRadius=TELESCOPE.orbitR||38;
-      var ok=Math.min(1,dt*9);
-      TELESCOPE.ocx+=(TELESCOPE.targetX-TELESCOPE.ocx)*ok;TELESCOPE.ocy+=(TELESCOPE.targetY-TELESCOPE.ocy)*ok;
-      TELESCOPE.x=TELESCOPE.ocx+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
-      TELESCOPE.y=TELESCOPE.ocy+Math.sin(TELESCOPE.orbitAngle)*orbitRadius;
-      TELESCOPE.ang=TELESCOPE.orbitAngle+Math.PI/2; /* Face tangent to orbit */
-    }
-  }else{
-    /* Mode 'drift' — original free-float motion */
-    if(now>TELESCOPE.next){
-      var a=Math.random()*6.283,sp=1.1+Math.random()*2.4;
-      TELESCOPE.tx=Math.cos(a)*sp;
-      TELESCOPE.ty=Math.sin(a)*sp*.72;
-      TELESCOPE.va+=(Math.random()-.5)*.0015;
-      TELESCOPE.va=clamp(TELESCOPE.va,-.006,.006);
-      TELESCOPE.next=now+16000+Math.random()*18000;
-    }
-    var ease=Math.min(1,dt*.035);
-    TELESCOPE.vx+=(TELESCOPE.tx-TELESCOPE.vx)*ease;
-    TELESCOPE.vy+=(TELESCOPE.ty-TELESCOPE.vy)*ease;
-    TELESCOPE.x+=TELESCOPE.vx*dt;
-    TELESCOPE.y+=TELESCOPE.vy*dt;
-    TELESCOPE.ang+=TELESCOPE.va*dt;
-
-    /* Soft bounce inside the viewport — avoids the old toroidal teleport that
-       made the telescope flicker/jump on mobile near the edges. */
-    var mX=Math.max(48,W*.08),mY=Math.max(56,H*.10);
-    if(TELESCOPE.x<mX){TELESCOPE.x=mX;TELESCOPE.vx=Math.abs(TELESCOPE.vx);TELESCOPE.tx=Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
-    else if(TELESCOPE.x>W-mX){TELESCOPE.x=W-mX;TELESCOPE.vx=-Math.abs(TELESCOPE.vx);TELESCOPE.tx=-Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
-    if(TELESCOPE.y<mY){TELESCOPE.y=mY;TELESCOPE.vy=Math.abs(TELESCOPE.vy);TELESCOPE.ty=Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
-    else if(TELESCOPE.y>H-mY){TELESCOPE.y=H-mY;TELESCOPE.vy=-Math.abs(TELESCOPE.vy);TELESCOPE.ty=-Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
-  }
-
-  /* margin used by edge-wrap ghost copies during draw (all modes). */
-  var margin=110;
-  var lensD=Math.hypot(TELESCOPE.x-BH.x,TELESCOPE.y-BH.y);
-  var lensMag=1+0.16*clamp((BH.Rr*8-lensD)/(BH.Rr*8),0,1);
-  var sc=Math.max(.18,Math.min(.24,W/600))*lensMag;
-
-  /* Small distant scene object; still participates fully in Gargantua's gravity. */
-  var swallowedTelescope=null;
-  if(SW){
-    swallowedTelescope=pull(TELESCOPE.x,TELESCOPE.y);
-    if(swallowedTelescope[2]>.985)return;
-  }
-
-  var copies=SW?[[0,0]]:[[0,0]];
-  if(TELESCOPE.x<margin)copies.push([W,0]);
-  if(TELESCOPE.x>W-margin)copies.push([-W,0]);
-  if(TELESCOPE.y<margin)copies.push([0,H]);
-  if(TELESCOPE.y>H-margin)copies.push([0,-H]);
-  var baseCopies=copies.slice();
-  for(var ci=0;ci<baseCopies.length;ci++){
-    var bx=baseCopies[ci][0],by=baseCopies[ci][1];
-    if(TELESCOPE.y<margin&&TELESCOPE.x<margin)copies.push([bx+W,by+H]);
-    if(TELESCOPE.y<margin&&TELESCOPE.x>W-margin)copies.push([bx-W,by+H]);
-    if(TELESCOPE.y>H-margin&&TELESCOPE.x<margin)copies.push([bx+W,by-H]);
-    if(TELESCOPE.y>H-margin&&TELESCOPE.x>W-margin)copies.push([bx-W,by-H]);
-  }
-
-  /* Cache the on-screen position of the primary body for hit-testing.
-     Must match what the user actually sees (lens + BH), not raw world coords. */
-  var primaryTQ=SW?swallowedTelescope:lens(TELESCOPE.x,TELESCOPE.y);
-  if(primaryTQ&&primaryTQ[0]!=null){
-    TELESCOPE.sx=primaryTQ[0];TELESCOPE.sy=primaryTQ[1];
-  }else{
-    TELESCOPE.sx=TELESCOPE.x;TELESCOPE.sy=TELESCOPE.y;
-  }
-  TELESCOPE.hitR=telescopeHitRadius();
-  /* TX lines digambar di drawTxLines() setelah portal sx/sy di-set */
-
-  for(var ci=0;TELESCOPE.al>.02&&ci<copies.length;ci++){
-    var tqx=TELESCOPE.x+copies[ci][0],tqy=TELESCOPE.y+copies[ci][1];
-    var tq=SW?swallowedTelescope:lens(tqx,tqy);
-    if(!tq)continue;
-
-    g.save();
-    g.translate(tq[0],tq[1]);
-    g.rotate(TELESCOPE.ang);
-    g.scale(sc,sc);
-    g.globalAlpha=TELESCOPE.al;
-
-    /*
+/* Badan teleskop (origin di titik pusat, sudah di-translate/rotate/scale oleh pemanggil, globalAlpha diatur pemanggil).
+   Dipakai drawFloatingTelescope (canvas #sky) DAN 09-wormhole.js (digambar ulang di atas terowongan wormhole). */
+function teleDrawBody(g,now){
+  /*
       Solid Hubble-like silhouette.
       The previous version looked like a flat transparent icon because the
       panels and body were mostly line-art. Here every major surface is filled
@@ -611,6 +465,158 @@ function drawFloatingTelescope(now){
     /* Small service-box details: opaque and restrained. */
     g.fillStyle='rgb(91,105,114)';g.fillRect(-4,-15,9,3);g.fillRect(-3,12,8,3);
     g.fillStyle='rgb(211,220,225)';g.fillRect(0,-14,4,2);g.fillRect(0,12,4,2);
+}
+function drawFloatingTelescope(now){
+  /* Free-floating telescope: drift / warp / orbit state machine.
+     Warp + orbit triggered by star supernova; otherwise inertial drift. */
+  if(!TELESCOPE.init){
+    TELESCOPE.init=true;
+    /* Only seed free-float pose when not already warping (e.g. star tapped before first draw). */
+    if(TELESCOPE.mode!=='warp'&&TELESCOPE.mode!=='orbit'){
+      TELESCOPE.x=W*(.18+Math.random()*.64);
+      TELESCOPE.y=H*(.16+Math.random()*.62);
+      TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.2+Math.random()*2.2);
+      TELESCOPE.vy=(Math.random()<.5?-1:1)*(.8+Math.random()*1.6);
+      TELESCOPE.tx=TELESCOPE.vx;TELESCOPE.ty=TELESCOPE.vy;
+      TELESCOPE.ang=Math.random()*6.283;
+      TELESCOPE.va=(Math.random()-.5)*.004;
+      TELESCOPE.next=now+16000+Math.random()*18000;
+      TELESCOPE.mode='drift';
+    }else if(!TELESCOPE.x&&!TELESCOPE.y){
+      /* Warp requested before layout: seed a start point so glide has somewhere to leave from. */
+      TELESCOPE.x=W*(.18+Math.random()*.64);
+      TELESCOPE.y=H*(.16+Math.random()*.62);
+      TELESCOPE.ang=Math.random()*6.283;
+      TELESCOPE.va=0;
+      TELESCOPE.next=now+16000+Math.random()*18000;
+    }
+  }
+  var dt=Math.min(40,Math.max(0,now-(TELESCOPE.last||now)))/1000;
+  TELESCOPE.last=now;
+  try{teleSectorLogic(dt);}catch(eTs){}
+
+  /* --- Movement logic by mode --- */
+  if((TELESCOPE.mode==='warp'||TELESCOPE.mode==='orbit')&&TELESCOPE.follow){
+    var fq=TELESCOPE.follow();
+    if(fq){TELESCOPE.targetX=fq[0];TELESCOPE.targetY=fq[1];}
+  }
+  if(TELESCOPE.mode==='warp'){
+    /* Fast glide toward the target star */
+    var dx=TELESCOPE.targetX-TELESCOPE.x;
+    var dy=TELESCOPE.targetY-TELESCOPE.y;
+    var dist=Math.hypot(dx,dy);
+
+    TELESCOPE.x+=dx*Math.min(1,dt*7.5);
+    TELESCOPE.y+=dy*Math.min(1,dt*7.5);
+    TELESCOPE.ang+=dt*5.0; /* Spin while warping */
+
+    /* Arrived near the star (< 25px) */
+    if(dist<25){
+      TELESCOPE.mode='orbit';
+      TELESCOPE.ocx=TELESCOPE.targetX;TELESCOPE.ocy=TELESCOPE.targetY;
+      TELESCOPE.orbitAngle=Math.atan2(dy,dx);
+      if(typeof TELESCOPE.onWarpComplete==='function'){
+        TELESCOPE.onWarpComplete();
+        TELESCOPE.onWarpComplete=null;
+      }
+    }
+  }else if(TELESCOPE.mode==='orbit'){
+    /* Stay in orbit while SFX is still playing */
+    var sfxActive=activeSfx&&!activeSfx.paused&&!activeSfx.ended;
+    if(!sfxActive){
+      /* SFX finished/paused → free drift again */
+      TELESCOPE.mode='drift';TELESCOPE.follow=null;
+      TELESCOPE.vx=(Math.random()<.5?-1:1)*(1.4+Math.random()*1.8);
+      TELESCOPE.vy=(Math.random()<.5?-1:1)*(1.0+Math.random()*1.4);
+      TELESCOPE.tx=TELESCOPE.vx;
+      TELESCOPE.ty=TELESCOPE.vy;
+    }else{
+      /* Orbit the active star */
+      TELESCOPE.orbitAngle+=dt*1.2;
+      var orbitRadius=TELESCOPE.orbitR||38;
+      var ok=Math.min(1,dt*9);
+      TELESCOPE.ocx+=(TELESCOPE.targetX-TELESCOPE.ocx)*ok;TELESCOPE.ocy+=(TELESCOPE.targetY-TELESCOPE.ocy)*ok;
+      TELESCOPE.x=TELESCOPE.ocx+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
+      TELESCOPE.y=TELESCOPE.ocy+Math.sin(TELESCOPE.orbitAngle)*orbitRadius;
+      TELESCOPE.ang=TELESCOPE.orbitAngle+Math.PI/2; /* Face tangent to orbit */
+    }
+  }else{
+    /* Mode 'drift' — original free-float motion */
+    if(now>TELESCOPE.next){
+      var a=Math.random()*6.283,sp=1.1+Math.random()*2.4;
+      TELESCOPE.tx=Math.cos(a)*sp;
+      TELESCOPE.ty=Math.sin(a)*sp*.72;
+      TELESCOPE.va+=(Math.random()-.5)*.0015;
+      TELESCOPE.va=clamp(TELESCOPE.va,-.006,.006);
+      TELESCOPE.next=now+16000+Math.random()*18000;
+    }
+    var ease=Math.min(1,dt*.035);
+    TELESCOPE.vx+=(TELESCOPE.tx-TELESCOPE.vx)*ease;
+    TELESCOPE.vy+=(TELESCOPE.ty-TELESCOPE.vy)*ease;
+    TELESCOPE.x+=TELESCOPE.vx*dt;
+    TELESCOPE.y+=TELESCOPE.vy*dt;
+    TELESCOPE.ang+=TELESCOPE.va*dt;
+
+    /* Soft bounce inside the viewport — avoids the old toroidal teleport that
+       made the telescope flicker/jump on mobile near the edges. */
+    var mX=Math.max(48,W*.08),mY=Math.max(56,H*.10);
+    if(TELESCOPE.x<mX){TELESCOPE.x=mX;TELESCOPE.vx=Math.abs(TELESCOPE.vx);TELESCOPE.tx=Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
+    else if(TELESCOPE.x>W-mX){TELESCOPE.x=W-mX;TELESCOPE.vx=-Math.abs(TELESCOPE.vx);TELESCOPE.tx=-Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
+    if(TELESCOPE.y<mY){TELESCOPE.y=mY;TELESCOPE.vy=Math.abs(TELESCOPE.vy);TELESCOPE.ty=Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
+    else if(TELESCOPE.y>H-mY){TELESCOPE.y=H-mY;TELESCOPE.vy=-Math.abs(TELESCOPE.vy);TELESCOPE.ty=-Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
+  }
+
+  /* margin used by edge-wrap ghost copies during draw (all modes). */
+  var margin=110;
+  var lensD=Math.hypot(TELESCOPE.x-BH.x,TELESCOPE.y-BH.y);
+  var lensMag=1+0.16*clamp((BH.Rr*8-lensD)/(BH.Rr*8),0,1);
+  var sc=Math.max(.18,Math.min(.24,W/600))*lensMag;
+  TELESCOPE.sc=sc;   /* dipakai 09-wormhole.js untuk menggambar teleskop di atas terowongan */
+
+  /* Small distant scene object; still participates fully in Gargantua's gravity. */
+  var swallowedTelescope=null;
+  if(SW){
+    swallowedTelescope=pull(TELESCOPE.x,TELESCOPE.y);
+    if(swallowedTelescope[2]>.985)return;
+  }
+
+  var copies=SW?[[0,0]]:[[0,0]];
+  if(TELESCOPE.x<margin)copies.push([W,0]);
+  if(TELESCOPE.x>W-margin)copies.push([-W,0]);
+  if(TELESCOPE.y<margin)copies.push([0,H]);
+  if(TELESCOPE.y>H-margin)copies.push([0,-H]);
+  var baseCopies=copies.slice();
+  for(var ci=0;ci<baseCopies.length;ci++){
+    var bx=baseCopies[ci][0],by=baseCopies[ci][1];
+    if(TELESCOPE.y<margin&&TELESCOPE.x<margin)copies.push([bx+W,by+H]);
+    if(TELESCOPE.y<margin&&TELESCOPE.x>W-margin)copies.push([bx-W,by+H]);
+    if(TELESCOPE.y>H-margin&&TELESCOPE.x<margin)copies.push([bx+W,by-H]);
+    if(TELESCOPE.y>H-margin&&TELESCOPE.x>W-margin)copies.push([bx-W,by-H]);
+  }
+
+  /* Cache the on-screen position of the primary body for hit-testing.
+     Must match what the user actually sees (lens + BH), not raw world coords. */
+  var primaryTQ=SW?swallowedTelescope:lens(TELESCOPE.x,TELESCOPE.y);
+  if(primaryTQ&&primaryTQ[0]!=null){
+    TELESCOPE.sx=primaryTQ[0];TELESCOPE.sy=primaryTQ[1];
+  }else{
+    TELESCOPE.sx=TELESCOPE.x;TELESCOPE.sy=TELESCOPE.y;
+  }
+  TELESCOPE.hitR=telescopeHitRadius();
+  /* TX lines digambar di drawTxLines() setelah portal sx/sy di-set */
+
+  for(var ci=0;TELESCOPE.al>.02&&ci<copies.length;ci++){
+    var tqx=TELESCOPE.x+copies[ci][0],tqy=TELESCOPE.y+copies[ci][1];
+    var tq=SW?swallowedTelescope:lens(tqx,tqy);
+    if(!tq)continue;
+
+    g.save();
+    g.translate(tq[0],tq[1]);
+    g.rotate(TELESCOPE.ang);
+    g.scale(sc,sc);
+    g.globalAlpha=TELESCOPE.al;
+
+    teleDrawBody(g,now);
 
     g.restore();
   }

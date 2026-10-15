@@ -1,11 +1,13 @@
 /* ===== 09-wormhole.js — wormhole transisi (gate Sector Gate + hold Gargantua mini) + muffle audio =====
-   v3: terowongan hujan-kode "Matrix" (glyph + palet neon yang sama dengan boot di 07-boot.js) melesat radial dari tengah,
-   dengan lubang hitam polos di tengah, 3 layer kedalaman (jauh: kecil/redup/lambat, dekat: besar/terang/cepat) seperti boot matrix. Canvas 2D biasa: tanpa WebGL, tanpa tekstur,
-   tanpa shader -> ringan, tajam (DPR sampai 2), dan nggak butuh lisensi pen CodePen lagi (kodenya bukan turunan pen itu).
-   Perspektif: kepala stream bergerak eksponensial ke arah kamera, glyph di ekornya berjarak geometris (makin ke tengah makin rapat),
-   ukuran glyph ~ jarak dari pusat.
+   v4: terowongan "warp" biru-ungu-magenta dengan kilau hangat di tepi lubang, streak bintang melesat radial + berputar pelan
+   (referensi: foto wormhole berkilau). Canvas 2D biasa: tanpa WebGL, tanpa shader, tanpa tekstur eksternal.
+   Cara kerjanya (ringan): 2 buffer kecil (setengah resolusi layar) dipakai ping-pong sebagai "feedback zoom" — tiap frame isi buffer
+   sebelumnya digambar lagi sedikit lebih besar + diputar sedikit + diredupkan, lalu disuntik titik bintang & blob warna dinding
+   di dekat lubang. Zoom itulah yang bikin ekor streak/blur radial otomatis (panjang ekor ~ jarak dari pusat = perspektif), jadi
+   nggak perlu gambar ratusan glyph/garis. Di atasnya digambar ~110 streak bintang tajam (garis pendek) + lubang hitam + vignette.
+   Biaya per frame: 1 drawImage kecil (feedback) + ~120 sprite + 1 drawImage ke layar + ~110 garis.
 
-   Titik sambung (semua lewat window.WORMHOLE, selalu dibungkus try/catch + cek keberadaan):
+   Titik sambung (semua lewat window.WORMHOLE, selalu dibungkus try/catch + cek keberadaan) — TIDAK BERUBAH dari v3:
      - 05-sector-ui.js  sgJump()         -> WORMHOLE.gate(s,camBH())        gate antar sektor
      - 06-interaction.js beginBHDrag()   -> holdStart / holdCommit / holdCancel   hold BH mini (long-press 580ms)
      - 01-core.js       spatialTarget()  -> WORMHOLE.muffle()               redam audio selama di dalam wormhole
@@ -13,24 +15,29 @@
 (function(){
 'use strict';
 /* ---------- setelan (ubah di sini) ---------- */
-var MATRIX_GREEN=false;   /* true = hijau Matrix klasik; false = palet neon CYBER_PAL yang sama dengan boot */
-var GLYPHS='ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇ0123456789';
-var PAL=MATRIX_GREEN?[[0,255,110],[60,255,140],[120,255,170],[0,210,80],[170,255,200],[30,230,100],[0,180,70]]
-                    :[[34,230,255],[255,43,214],[180,74,255],[255,220,50],[80,160,255],[255,80,140],[80,255,180]];
-var N_STREAMS=917, N_STREAMS_LOW=100;   /* jumlah stream total (potato lebih sedikit) */
-/* Layer kedalaman (urutan jauh -> dekat, sama konsepnya dengan LAYERS di boot): kecepatan, alpha, ukuran glyph, porsi jumlah stream */
-var LAYERS=[{sp:.40,al:.45,sz:.55,cnt:.46},{sp:.85,al:.75,sz:.78,cnt:.34},{sp:1.50,al:1,sz:1,cnt:.20}];
-var SPEED=1.7;          /* pengali kecepatan keseluruhan stream (0.6 = lebih santai) */
+var STAR_PAL=[[255,255,255],[175,205,255],[150,125,255],[255,125,205],[255,175,95],[95,225,255],[255,238,170]];  /* warna bintang (dominan putih/biru, sisanya "pelangi" kecil) */
+var NEB_PAL=[[70,95,255],[150,65,240],[255,75,175],[255,125,70],[90,190,255]];   /* warna dinding terowongan; dipilih menurut sudut -> lengan spiral berwarna */
+var N_STARS=380, N_STARS_LOW=110;   /* jumlah streak bintang tajam (potato lebih sedikit) */
+/* Layer kedalaman (urutan jauh -> dekat): kecepatan, alpha, ketebalan, porsi jumlah */
+var LAYERS=[{sp:.6,al:.5,sz:.6,cnt:.50},{sp:1.3,al:.8,sz:1.1,cnt:.32},{sp:2.2,al:1,sz:1.7,cnt:.18}];
+var SPEED=1;          /* pengali kecepatan bintang (0.6 = lebih santai) */
+var ZOOM=2.0;         /* kecepatan zoom buffer (e-fold/detik) = seberapa kencang terowongan "melesat" */
+var SPIN=.20;         /* kecepatan putar terowongan (rad/detik); 0 = lurus tanpa swirl */
+var DECAY=.955;       /* sisa terang buffer per frame @60fps. makin besar = ekor streak makin panjang */
+var NEB_RATE=60;      /* blob warna dinding per detik. makin banyak = dinding makin pekat/terang */
+var NEB_A=.09;        /* terang tiap blob dinding */
+var DUST_RATE=2200;   /* debu/streak halus per detik yang disuntik ke buffer -> jadi ribuan garis radial tipis (murah: cuma sprite kecil)*/
+var DUST_A=.55;       /* terang tiap debu */
+var GLOW_A=.32;       /* terang kilau hangat di tepi lubang (0 = matikan) */
 var R_HOLD=.22;       /* radius mulut portal saat hold, x min(W,H) */
 var CHARGE_MS=580;    /* harus sama dengan setTimeout long-press di beginBHDrag */
-var MIN_TRAVEL=2200;  /* ms minimal di dalam wormhole supaya efeknya kebaca (tadinya 750: kecepetan) */
+var MIN_TRAVEL=2200;  /* ms minimal di dalam wormhole supaya efeknya kebaca */
 var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / geser ke tengah / fade-in / tutup */
 
-var COL2=true;   /* tiap stream punya kolom kedua di sampingnya (lebih rapat di tepi layar; dimatikan otomatis di potato) */
-var ZN=.05, ZF=1.7, RATIO=.915, MAXLEN=26;
-var cv=null,g=null,atlas=null,CELL=64,dpr=1,GCOLS=GLYPHS.length,WHITE=PAL.length,RGB=[],RP=[],
-    ST=[],inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,churn=0,
-    W=0,H=0;
+var ZN=.05, BG='#02050d', WARM=16;
+var cv=null,g=null,spr=null,SC=48,dpr=1,RGB=[],NP=STAR_PAL.length,NN=NEB_PAL.length,
+    ST=[],inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
+    W=0,H=0,bw=0,bh=0,bq=.5,bA=null,bB=null,gA=null,gB=null,fresh=0,nebAcc=0,dustAcc=0;
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
 function usable(){return ok&&!(reduceMq&&reduceMq.matches);}
@@ -42,52 +49,55 @@ function winW(){return window.innerWidth||document.documentElement.clientWidth;}
 function winH(){return window.innerHeight||document.documentElement.clientHeight;}
 function cover(){return Math.hypot(winW(),winH())*1.08;}
 
-/* ---------- atlas glyph (di-bake sekali: tiap glyph x tiap warna + 1 baris putih untuk kepala) ---------- */
-function buildAtlas(){
-  var c=document.createElement('canvas'),x,r,i,ch;
-  CELL=potato()?40:64;
-  c.width=GCOLS*CELL;c.height=(PAL.length+1)*CELL;
+/* ---------- sprite titik lembut (di-bake sekali: satu baris per warna bintang + warna dinding) ---------- */
+function buildSprites(){
+  var all=STAR_PAL.concat(NEB_PAL),c=document.createElement('canvas'),x,i,col,gr,cy;
+  SC=potato()?32:48;
+  c.width=SC;c.height=all.length*SC;
   x=c.getContext('2d');
-  x.textAlign='center';x.textBaseline='middle';
-  x.font=Math.round(CELL*.60)+'px "Courier New",monospace';
-  for(r=0;r<=PAL.length;r++){
-    var col=r===WHITE?[255,255,255]:PAL[r];
-    x.fillStyle='rgb('+col[0]+','+col[1]+','+col[2]+')';
-    x.shadowColor='rgba('+col[0]+','+col[1]+','+col[2]+',.9)';x.shadowBlur=potato()?0:CELL*.10;
-    for(i=0;i<GCOLS;i++){ch=GLYPHS.charAt(i);x.fillText(ch,i*CELL+CELL/2,r*CELL+CELL/2+CELL*.03);}
+  for(i=0;i<all.length;i++){
+    col=all[i];cy=i*SC+SC/2;
+    gr=x.createRadialGradient(SC/2,cy,0,SC/2,cy,SC/2);
+    gr.addColorStop(0,'rgba('+col+',1)');gr.addColorStop(.28,'rgba('+col+',.5)');gr.addColorStop(1,'rgba('+col+',0)');
+    x.fillStyle=gr;x.fillRect(0,i*SC,SC,SC);
   }
-  atlas=c;
+  spr=c;
 }
-function randG(){return (Math.random()*GCOLS)|0;}
-function spawn(c,fresh){   /* fresh=true: langsung muncul (isi awal); false: fade-in singkat */
-  var j,L=LAYERS[c.L];
+function spawn(c,isFresh){   /* isFresh=true: langsung muncul (isi awal); false: fade-in singkat */
+  var L=LAYERS[c.L];
   c.th=Math.random()*6.283185307;
-  /* posisi kepala seragam terhadap RADIUS (bukan log): tepi layar ikut terisi sejak frame pertama, nggak nunggu stream merambat dari tengah */
-  c.z=ZN/(.08+.9*Math.random());c.age=fresh?1:0;
+  /* posisi kepala seragam terhadap RADIUS: tepi layar ikut terisi sejak frame pertama */
+  c.z=ZN/(.08+.9*Math.random());c.age=isFresh?1:0;
   c.v=(.9+Math.random()*1.0)*L.sp*SPEED;
-  c.len=potato()?(8+((Math.random()*6)|0)):(12+((Math.random()*(MAXLEN-12))|0));
-  c.ci=(Math.random()*PAL.length)|0;
-  c.bar=Math.random()<.30;
+  c.ci=Math.random()<.55?((Math.random()*2)|0):((Math.random()*NP)|0);   /* dominan putih/biru-putih */
   c.al=(.6+Math.random()*.4)*L.al;
-  for(j=0;j<MAXLEN;j++){c.gl[j]=randG();c.g2[j]=randG();}
-  c.off=(Math.random()<.5?-1:1)*(.03+Math.random()*.035);
+  c.lf=.8+Math.random()*.5;   /* pengali panjang streak */
 }
 function build(){
-  var n=potato()?N_STREAMS_LOW:N_STREAMS,i,li,k,c;
+  var n=potato()?N_STARS_LOW:N_STARS,i,li,k,c;
   ST.length=0;
   for(li=0;li<LAYERS.length;li++){
     k=Math.round(n*LAYERS[li].cnt);
-    for(i=0;i<k;i++){c={gl:new Array(MAXLEN),g2:new Array(MAXLEN),L:li,r:Math.random()};spawn(c,true);ST.push(c);}   /* urut jauh -> dekat: yang dekat digambar terakhir (di atas) */
+    for(i=0;i<k;i++){c={L:li,r:Math.random()};spawn(c,true);ST.push(c);}   /* urut jauh -> dekat: yang dekat digambar terakhir */
   }
-  RGB=PAL.map(function(p){return 'rgb('+p[0]+','+p[1]+','+p[2]+')';});
-  RP=[];for(i=0;i<MAXLEN;i++)RP.push(Math.pow(RATIO,i));
+  RGB=STAR_PAL.map(function(p){return 'rgb('+p[0]+','+p[1]+','+p[2]+')';});
 }
-
+function mkBuf(){var c=document.createElement('canvas');c.width=bw;c.height=bh;return c;}
+function clearBufs(){
+  [gA,gB].forEach(function(x){if(!x)return;x.setTransform(1,0,0,1,0,0);x.globalCompositeOperation='source-over';x.globalAlpha=1;x.fillStyle=BG;x.fillRect(0,0,bw,bh);});
+}
 function resize(){
   if(!cv)return;
+  var nw,nh;
   W=winW();H=winH();
   dpr=Math.min(window.devicePixelRatio||1,potato()?1:2);
   cv.width=Math.max(64,Math.round(W*dpr));cv.height=Math.max(64,Math.round(H*dpr));
+  bq=potato()?.3:.5;
+  nw=Math.max(32,Math.round(W*bq));nh=Math.max(32,Math.round(H*bq));
+  if(!bA||nw!==bw||nh!==bh){
+    bw=nw;bh=nh;bA=mkBuf();bB=mkBuf();gA=bA.getContext('2d');gB=bB.getContext('2d');
+  }
+  clearBufs();
 }
 function init(){
   if(inited||!usable())return inited&&ok;
@@ -97,7 +107,7 @@ function init(){
     g=cv.getContext('2d',{alpha:true});
     if(!g)throw new Error('no 2d');
     document.body.appendChild(cv);
-    buildAtlas();build();
+    buildSprites();build();
     inited=true;
   }catch(err){
     ok=false;inited=false;
@@ -123,7 +133,7 @@ function holdStart(x,y,ms){
   if(!usable()||state!=='idle'&&state!=='close')return;
   if(!init())return;
   state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1};
-  dens=1;show();kick();
+  dens=1;show();fresh=Math.min(winW(),winH())*R_HOLD;kick();
 }
 function holdCommit(){if(state==='charge'){S.p=1;state='held';S.th=performance.now();}}
 function holdCancel(){if(state==='charge')startClose(performance.now(),240,true);}
@@ -131,7 +141,7 @@ function gate(s,pos){
   if(!usable()||!init())return;
   var now=performance.now(),x=pos&&pos[0]!=null?pos[0]:winW()*.5,y=pos&&pos[1]!=null?pos[1]:winH()*.5;
   if(state==='idle'||state==='close'){dens=1;S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.5,a:.4,rate:.7,rim:1};}
-  engage(now);show();kick();
+  engage(now);show();fresh=Math.hypot(winW(),winH())*.56;kick();
 }
 function engage(now){
   state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=S.a;S.rate1=S.rate;
@@ -141,68 +151,176 @@ function gatePending(){return typeof SGATE!=='undefined'&&!!SGATE.pend;}
 function askOpen(){return (typeof LIS!=='undefined'&&!!LIS.cb)||document.body.classList.contains('lis-asking');}
 
 /* ---------- gambar satu frame ---------- */
+function moveStars(dt,adv){
+  var n=ST.length,i,c;
+  for(i=0;i<n;i++){
+    c=ST[i];
+    if(c.r>dens)continue;   /* kurangi bintang kalau frame berat */
+    c.z*=Math.exp(-c.v*adv);
+    if(c.z<ZN*.85)spawn(c,false);
+    if(c.age<1)c.age=Math.min(1,c.age+dt*3);
+  }
+}
+/* sprite lembut memanjang searah radial (len x w, px layar) di posisi layar (px,py) dengan sudut ang */
+function dot(x,ci,px,py,w,len,ang,al){
+  var co=Math.cos(ang),si=Math.sin(ang);
+  x.globalAlpha=al;
+  x.setTransform(co,si,-si,co,px*bq,py*bq);
+  x.drawImage(spr,0,ci*SC,SC,SC,-len*bq/2,-w*bq/2,len*bq,w*bq);
+}
+/* satu langkah feedback: buffer lama di-zoom+putar+redam ke buffer baru, lalu suntik blob dinding, debu, kilau, dan kepala bintang */
+function stepBuf(dt,cx,cy,Rv,Rh,adv){
+  var s=Math.exp(ZOOM*adv),rot=SPIN*adv,co=Math.cos(rot)*s,si=Math.sin(rot)*s,x=cx*bq,y=cy*bq,
+      dec=Math.pow(DECAY,dt*60),k=Math.min(1.6,dt*60),sg=s-1,
+      i,n=ST.length,c,L,rh,a,rr,d,ci,f,t,ang,ga;
+  gB.globalCompositeOperation='source-over';gB.globalAlpha=1;
+  gB.setTransform(1,0,0,1,0,0);
+  gB.fillStyle=BG;gB.fillRect(0,0,bw,bh);
+  gB.setTransform(co,si,-si,co,x-(co*x-si*y),y-(si*x+co*y));
+  gB.globalAlpha=dec;gB.drawImage(bA,0,0);
+  gB.globalCompositeOperation='lighter';
+  /* blob dinding terowongan: besar & lembut, muncul dekat tepi lubang, warna menurut sudut -> lengan spiral berwarna */
+  nebAcc+=NEB_RATE*adv;
+  if(nebAcc>40)nebAcc=40;
+  while(nebAcc>=1){
+    nebAcc-=1;
+    ang=Math.random()*6.283185307;
+    f=ang/6.283185307*NN+(Math.random()*2-.5);
+    ci=NP+(((Math.floor(f)%NN)+NN)%NN);
+    rr=Rh*(1.1+.8*Math.random());
+    d=rr*(2.2+Math.random()*1.6);
+    dot(gB,ci,cx+Math.cos(ang)*rr,cy+Math.sin(ang)*rr,d,d+rr*sg*2,ang,NEB_A*(.5+Math.random()*.7)*k);
+  }
+  /* debu halus: titik kecil dekat tepi lubang; zoom+putar memanjangkannya jadi streak radial tipis berwarna (inti tampilan "warp") */
+  dustAcc+=DUST_RATE*adv;
+  if(dustAcc>120)dustAcc=120;
+  while(dustAcc>=1){
+    dustAcc-=1;
+    ang=Math.random()*6.283185307;
+    if(Math.random()<.22)ci=(Math.random()*2)|0;   /* sebagian putih/biru-putih */
+    else{f=ang/6.283185307*NN+(Math.random()*2.4-.7);ci=NP+(((Math.floor(f)%NN)+NN)%NN);}
+    rr=Rh*(1.05+.35*Math.random());
+    d=1.5+Math.random()*2.2;
+    dot(gB,ci,cx+Math.cos(ang)*rr,cy+Math.sin(ang)*rr,d,d+rr*sg*1.4,ang,DUST_A*(.4+Math.random()*.6)*k);
+  }
+  /* kilau putih-hangat di tepi lubang: titik terang rapat di satu sisi -> lengkung terang yang melebar ke luar */
+  if(GLOW_A>0){
+    ga=-2.3+.35*Math.sin(tt*.35);
+    for(i=0;i<4;i++){
+      ang=ga+(Math.random()-.5)*.7;rr=Rh*(1.05+.25*Math.random());
+      d=Rh*(.3+.45*Math.random());
+      dot(gB,i&1?6:4,cx+Math.cos(ang)*rr,cy+Math.sin(ang)*rr,d,d+rr*sg*1.6,ang,GLOW_A*.6*k);
+    }
+  }
+  /* kepala bintang -> garis pendek di buffer (ekornya diperpanjang feedback) */
+  for(i=0;i<n;i++){
+    c=ST[i];
+    if(c.r>dens)continue;
+    L=LAYERS[c.L];
+    rh=Rv*ZN/c.z;
+    if(rh<Rh*1.3)continue;
+    a=c.th+roll;
+    t=clamp((rh-Rh)/(Rh*1.5+1),0,1);
+    d=1.4+rh*.005*L.sz;
+    dot(gB,c.ci,cx+Math.cos(a)*rh,cy+Math.sin(a)*rh,d,d+rh*sg*1.3,a,c.al*c.age*t*.7*k);
+  }
+  gB.setTransform(1,0,0,1,0,0);
+  t=bA;bA=bB;bB=t;t=gA;gA=gB;gB=t;
+}
+/* Teleskop ikut "terbang" lewat wormhole. Aslinya digambar di canvas #sky (04-render.js), yang tertutup canvas ini, jadi badannya
+   digambar ulang di sini lewat teleDrawBody() (di-share dari 04-render.js). Goyangan/pembesaran naik pelan seiring portal membuka.
+   Mendukung portrait, landscape biasa (body.ls, #sky di-scale) dan mode ROT (body.lr / lr-cw, stage diputar 90°). */
+function drawTele(){
+  var T=typeof TELESCOPE!=='undefined'?TELESCOPE:null,sk,rc,k,wob,x,y,sc,rot=0,cl;
+  if(!T||typeof teleDrawBody!=='function'||!(T.al>.02)||!T.sc||!(T.sx||T.sy))return;
+  sk=document.getElementById('sky');if(!sk)return;
+  rc=sk.getBoundingClientRect();cl=document.body.classList;
+  if(cl.contains('lr')){
+    /* mode ROT: #stage diputar 90° (ccw default, cw kalau body.lr-cw). rect = kotak pembatas hasil rotasi, jadi koordinat sky -> layar dihitung dari sisinya */
+    k=sk.clientWidth?rc.height/sk.clientWidth:1;
+    if(cl.contains('lr-cw')){x=rc.right-T.sy*k;y=rc.top+T.sx*k;rot=1.5707963;}
+    else{x=rc.left+T.sy*k;y=rc.bottom-T.sx*k;rot=-1.5707963;}
+  }else{
+    k=sk.clientWidth?rc.width/sk.clientWidth:1;
+    x=rc.left+T.sx*k;y=rc.top+T.sy*k;
+  }
+  wob=clamp((S.a-.4)/.6,0,1);
+  x+=Math.sin(tt*5.3)*3*wob;y+=Math.cos(tt*4.1)*2.5*wob;
+  sc=T.sc*k*(1+.10*wob);
+  g.save();
+  g.translate(x,y);g.rotate(T.ang+rot+Math.sin(tt*2.7)*.14*wob);g.scale(sc,sc);
+  g.globalAlpha=clamp(T.al,0,1);
+  try{teleDrawBody(g,performance.now());}catch(e){}
+  g.restore();
+}
 function drawFrame(dt,cx,cy,r,cvr){
-  var Rv=Math.min(r,Math.hypot(W,H)*.56),                 /* radius tampilan perspektif (kepala stream menyentuh Rv = tepi) */
-      Rh=Math.min(r*.14,Math.min(W,H)*.06),              /* radius lubang hitam tengah */
-      smax=Math.max(3,Math.min(17,Rv*.055)),
-      small=r<cvr*.98,n=ST.length,L,gl,ln,nc=(COL2&&!potato())?2:1,
-      i,j,k,c,rh,rj,s,a,cs,sn,fade,al,w,sp,gr,adv=dt*S.rate;
+  var Rv=Math.min(r,Math.hypot(W,H)*.56),                 /* radius tampilan perspektif (kepala bintang menyentuh Rv = tepi) */
+      Rh=Math.min(r*.15,Math.min(W,H)*.06),              /* radius lubang hitam tengah */
+      small=r<cvr*.98,n=ST.length,low=potato(),adv=dt*S.rate,
+      i,c,L,rh,a,w,ca,sa,lf,tr,hx,hy,tx,ty,al,gr,Rw,Rhw,sd;
+  tt+=dt;
+  /* isi awal supaya terowongan sudah "penuh" begitu kebuka (bukan merambat pelan dari tengah) */
+  if(fresh){
+    Rw=Math.max(Rv,fresh);Rhw=Math.min(Rw*.15,Math.min(W,H)*.06);sd=.03*S.rate;
+    for(i=0;i<(low?8:(Rw>Math.min(W,H)*.4?WARM:9));i++){roll+=sd*SPIN;tt+=.03;moveStars(.03,sd);stepBuf(.03,cx,cy,Rw,Rhw,sd);}
+    fresh=0;
+  }
+  roll+=adv*SPIN;
+  moveStars(dt,adv);
+  stepBuf(dt,cx,cy,Rv,Rh,adv);
+
   g.setTransform(dpr,0,0,dpr,0,0);
+  g.globalCompositeOperation='source-over';g.globalAlpha=1;
   g.clearRect(0,0,W,H);
   g.save();
   if(small){g.beginPath();g.arc(cx,cy,Math.max(1,r),0,6.283185307);g.clip();}
-  g.fillStyle='#02060e';g.fillRect(0,0,W,H);
-  roll+=adv*.10;
-  churn+=dt;
+  g.fillStyle=BG;g.fillRect(0,0,W,H);
+  g.imageSmoothingEnabled=true;
+  g.drawImage(bA,0,0,bw,bh,0,0,W,H);
+  if(!low){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
+
+  /* streak bintang tajam: garis tipis radial, ekor makin panjang kalau makin dekat tepi (perspektif) */
+  g.globalCompositeOperation='lighter';g.lineCap='round';
   for(i=0;i<n;i++){
     c=ST[i];
-    if(c.r>dens)continue;   /* kurangi stream acak kalau frame berat */
+    if(c.r>dens)continue;
     L=LAYERS[c.L];
-    c.z*=Math.exp(-c.v*adv);
-    if(c.z<ZN*.85){spawn(c,false);}
-    if(c.age<1)c.age=Math.min(1,c.age+dt*3);
     rh=Rv*ZN/c.z;
     if(rh<Rh*1.3)continue;
-    if(churn>.07){c.gl[(Math.random()*MAXLEN)|0]=randG();c.g2[(Math.random()*MAXLEN)|0]=randG();}
-    if(c.bar){
-      a=c.th+roll;cs=Math.cos(a)*dpr;sn=Math.sin(a)*dpr;
-      g.setTransform(cs,sn,-sn,cs,cx*dpr,cy*dpr);
-      w=Math.max(1,rh*.008*L.sz+.5);
-      sp=Math.max(Rh,rh*.40);
-      g.fillStyle=RGB[c.ci];
-      g.globalAlpha=c.al*c.age*.30;g.fillRect(sp,-w/2,rh-sp,w);
-      g.globalAlpha=c.al*c.age*.95;g.fillRect(Math.max(sp,rh*.86),-w/2,rh-Math.max(sp,rh*.86),w);
-    }else{
-      for(k=0;k<nc;k++){
-        a=c.th+roll+(k?c.off:0);cs=Math.cos(a)*dpr;sn=Math.sin(a)*dpr;
-        g.setTransform(cs,sn,-sn,cs,cx*dpr,cy*dpr);
-        gl=k?c.g2:c.gl;ln=k?((c.len*.65)|0):c.len;
-        for(j=0;j<ln;j++){
-          rj=rh*RP[j];
-          if(rj<Rh*1.1)break;
-          s=clamp(rj*.06,2.2,smax*L.sz);
-          fade=clamp((rj-Rh)/(Rh*1.4+1),0,1);
-          al=Math.pow(1-j/ln,1.15)*fade*c.al*c.age*(k?.8:1);
-          if(al<.03)continue;
-          g.globalAlpha=al;
-          g.drawImage(atlas,gl[j]*CELL,(j===0&&!k?WHITE:c.ci)*CELL,CELL,CELL,rj-s/2,-s/2,s,s);
-        }
-      }
+    a=c.th+roll;
+    lf=clamp(.17*Math.sqrt(c.v)*c.lf*S.rate,.06,.5);   /* panjang ekor relatif */
+    tr=Math.max(Rh*1.05,rh*(1-lf));
+    ca=Math.cos(a);sa=Math.sin(a);
+    hx=cx+ca*rh;hy=cy+sa*rh;
+    a-=SPIN*lf/Math.max(.3,c.v);   /* ekor sedikit melengkung mengikuti putaran */
+    tx=cx+Math.cos(a)*tr;ty=cy+Math.sin(a)*tr;
+    al=c.al*c.age*clamp((rh-Rh)/(Rh*1.5+1),0,1);
+    if(al<.03)continue;
+    w=clamp(.5+rh*.0018*L.sz,.5,2.2);
+    g.beginPath();g.moveTo(tx,ty);g.lineTo(hx,hy);
+    g.strokeStyle=RGB[c.ci];g.lineWidth=w;g.globalAlpha=al*.55;g.stroke();      /* seluruh streak, redup */
+    if(!low&&c.L>0){   /* ujung kepala lebih terang: segmen pendek + inti putih */
+      g.beginPath();g.moveTo(hx-(hx-tx)*.35,hy-(hy-ty)*.35);g.lineTo(hx,hy);
+      g.lineWidth=w*1.2;g.globalAlpha=al;g.stroke();
+      if(c.L>1){g.strokeStyle='#fff';g.lineWidth=w*.6;g.globalAlpha=al*.9;g.stroke();}
     }
   }
-  if(churn>.07)churn=0;
-  g.globalAlpha=1;
-  g.setTransform(dpr,0,0,dpr,0,0);
-  /* vignette tepi portal mini + bloom hangat Gargantua */
-  if(small){
-    gr=g.createRadialGradient(cx,cy,r*.62,cx,cy,r);
-    gr.addColorStop(0,'rgba(2,6,14,0)');gr.addColorStop(1,'rgba(2,6,14,.9)');
-    g.fillStyle=gr;g.fillRect(cx-r,cy-r,r*2,r*2);
-  }
-  /* pusat: lingkaran hitam polos dengan tepi lembut */
-  gr=g.createRadialGradient(cx,cy,Rh*.78,cx,cy,Rh*1.3);
+  g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  /* pusat: lubang hitam dengan tepi lembut */
+  gr=g.createRadialGradient(cx,cy,Rh*.8,cx,cy,Rh*1.3);
   gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');
   g.fillStyle=gr;g.beginPath();g.arc(cx,cy,Rh*1.3,0,6.283185307);g.fill();
+  /* vignette: portal mini = gelap di tepi lingkaran; layar penuh = tepi layar sedikit digelapkan */
+  if(small){
+    gr=g.createRadialGradient(cx,cy,r*.62,cx,cy,r);
+    gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.9)');
+    g.fillStyle=gr;g.fillRect(cx-r,cy-r,r*2,r*2);
+  }else{
+    gr=g.createRadialGradient(cx,cy,Math.hypot(W,H)*.28,cx,cy,Math.hypot(W,H)*.62);
+    gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
+    g.fillStyle=gr;g.fillRect(0,0,W,H);
+  }
+  if(!small)drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
   if(small&&S.rim>.02){
