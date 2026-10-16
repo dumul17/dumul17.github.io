@@ -1285,7 +1285,7 @@ var SN_COOLDOWN={};
   var rows=[].slice.call(panel.querySelectorAll('.mp-track'));
   var trackNames=tracks.map(function(t){return t.name;});
   var activeIdx=SFX_N; /* default highlighted row: Constellation BGM */
-  var specRAF=0;
+  var specRAF=0,specLast=0; /* specLast: throttle tickSpec ~24fps (dulu tiap frame = 7 bar x style.height + transition restart) */
   var nowTimer=0;
   var nowPhase=''; /* '' | 'show' | 'absorb' */
   var lastTrackName='';
@@ -1408,11 +1408,14 @@ var SN_COOLDOWN={};
       var wave=.5+.5*Math.sin(now*.0085+i*1.21+activeIdx*2.4);
       var center=1-Math.abs((i-(bars.length-1)/2)/Math.max(1,(bars.length-1)/2));
       var h=minH+(maxH-minH)*wave*(.32+.68*center);
-      bars[i].style.height=h.toFixed(1)+'px';
+      var hs=(Math.round(h*2)/2).toFixed(1);
+      if(bars[i]._h!==hs){bars[i]._h=hs;bars[i].style.height=hs+'px';}
     }
   }
   function tickSpec(now){
     specRAF=0;
+    if(now-specLast<41){specRAF=requestAnimationFrame(tickSpec);return;}
+    specLast=now;
     var playingIdx=getPlayingTrackIndex();
     if(playingIdx===-1){stopSpec();return;}
     var open=panelOpen();
@@ -1429,8 +1432,8 @@ var SN_COOLDOWN={};
   }
   function stopSpec(){
     if(specRAF){cancelAnimationFrame(specRAF);specRAF=0;}
-    rowSpecs.forEach(function(bars){bars.forEach(function(b){b.style.height='3px';});});
-    miniBars.forEach(function(b){b.style.height='4px';});
+    rowSpecs.forEach(function(bars){bars.forEach(function(b){b._h=null;b.style.height='3px';});});
+    miniBars.forEach(function(b){b._h=null;b.style.height='4px';});
   }
   /* Called from playSfx (pauseMusicForSfx) the instant a star SFX takes
      over — clears playing UI immediately without waiting for the BGM's
@@ -1732,17 +1735,18 @@ var SN_COOLDOWN={};
     }
     /* Panel tertutup: jangan gambar waveform / update DOM seek (hemat GPU) */
     if(!panelOpen())return;
-    if(t0El)t0El.textContent=fmtTime(cur);
-    if(t1El)t1El.textContent=dur>0?fmtTime(dur):'0:00';
-    if(seekEl&&!seekDrag)seekEl.value=String(Math.round(prog*1000));
+    var s0=fmtTime(cur),s1=dur>0?fmtTime(dur):'0:00',sv=String(Math.round(prog*1000));
+    if(t0El&&t0El._v!==s0){t0El._v=s0;t0El.textContent=s0;}
+    if(t1El&&t1El._v!==s1){t1El._v=s1;t1El.textContent=s1;}
+    if(seekEl&&!seekDrag&&seekEl._v!==sv){seekEl._v=sv;seekEl.value=sv;}
     paintWave(prog,!!a&&!a.paused);
   }
-  var seekRAF=0;
-  function tickSeek(){
+  var seekRAF=0,seekLast=0;
+  function tickSeek(ts){
     seekRAF=0;
     /* Hanya jalan saat panel terbuka + ada audio playing */
     if(!panelOpen()||getPlayingTrackIndex()===-1){stopSeekTick();return;}
-    updateSeekUI();
+    if(!(ts-seekLast<66)){seekLast=ts;updateSeekUI();} /* ~15fps: cukup utk teks waktu + waveform */
     seekRAF=requestAnimationFrame(tickSeek);
   }
   function startSeekTick(){
