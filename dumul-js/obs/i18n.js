@@ -21,6 +21,10 @@
     'owl.close':{en:'Close',id:'Tutup'},
     'owl.source':{en:'Source',id:'Kode'},
     'lang.btn':{en:'Language: EN',id:'Bahasa: ID'},
+    'owl.tab.set':{en:'Settings',id:'Setelan'},'owl.tab.about':{en:'About',id:'Tentang'},
+    'perf.chip':{en:'Perf · {m}',id:'Performa · {m}'},
+    'tune.quality':{en:'Quality',id:'Kualitas'},'tune.quality.hint':{en:'HIGH = full effects. LOW = lighter for weak devices. Tap to switch, then Save.',id:'HIGH = efek penuh. LOW = lebih ringan untuk perangkat lemah. Ketuk untuk ganti, lalu Simpan.'},
+    'tune.none':{en:'Nothing to tune here yet.',id:'Belum ada yang bisa disetel di sini.'},
     'lang.label':{en:'EN → ID',id:'ID → EN'},
 
     /* boot */
@@ -263,16 +267,16 @@
     document.documentElement.lang=lang;
     applyDom();
     /* tombol bahasa: dibuat di panel owl (.owl-links) tanpa edit HTML */
-    var host=document.querySelector('.owl-links');
+    var host=document.getElementById('owl-sys')||document.querySelector('.owl-links');
     if(host&&!document.getElementById('lang-toggle')){
       /* struktur sama persis dengan <a class="owl-link"> lain (svg langsung + <span>), jadi ukuran/gaya ikut CSS yang sama */
       var b=document.createElement('a');
-      b.href='#';b.id='lang-toggle';b.className='owl-link';b.setAttribute('role','button');
+      b.href='#';b.id='lang-toggle';b.className='owl-chip';b.setAttribute('role','button');
       b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg><span>'+T('lang.label')+'</span>';
       b.setAttribute('aria-label',T('lang.btn'));b.title=T('lang.btn');
       b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();window.I18N.toggle();});
       ['pointerdown','pointerup','touchstart','touchend'].forEach(function(ev){b.addEventListener(ev,function(e){e.stopPropagation();});});
-      host.appendChild(b);
+      host.insertBefore(b,host.firstChild);   /* bahasa di kiri, performa di kanan */
     }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
