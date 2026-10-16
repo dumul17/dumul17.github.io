@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=57">
+<link rel="stylesheet" href="index.css?v=58">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -133,7 +133,7 @@
   </div>
   <div class="mp-foot">
     <div class="mp-seek" id="mp-seek-wrap">
-      <canvas id="mp-wave" width="280" height="32" aria-hidden="true"></canvas>
+      <div id="mp-wave" aria-hidden="true"><i class="mp-rail-fill"></i><i class="mp-notch"></i></div>
       <input type="range" id="mp-seek" class="mp-seek-range" min="0" max="1000" value="0" step="1" aria-label="Seek" data-i18n-aria="mp.seek">
       <div class="mp-time"><span id="mp-t0">0:00</span><span id="mp-t1">0:00</span></div>
     </div>
@@ -275,7 +275,7 @@
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=111"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=99"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=109"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=117"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=118"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=107"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=104"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=3"></script>
