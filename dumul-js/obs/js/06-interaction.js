@@ -203,27 +203,60 @@ document.addEventListener('pointerdown',function(e){
       _close();
     };
   })();
-  /* Performance toggle: HIGH <-> LOW (?perf=) */
+  /* Quality HIGH/LOW: localStorage.dumul_quality (persist). Save = tulis + reload. Reset = hapus preferensi, balik deteksi device. */
   (function owlPerf(){
-    var b=document.getElementById('owl-perf');if(!b)return;
-    function cur(){
+    var b=document.getElementById('owl-perf'),bSave=document.getElementById('owl-perf-save'),bReset=document.getElementById('owl-perf-reset');
+    if(!b)return;
+    var draft=null; /* pending choice before Save; null = tampilkan yang aktif */
+    function stored(){
+      try{var s=localStorage.getItem('dumul_quality');if(s==='high'||s==='low')return s;}catch(e){}
+      return null;
+    }
+    function live(){
       try{var m=/[?&]perf=(high|low)/.exec(location.search);if(m)return m[1];}catch(e){}
+      var s=stored();if(s)return s;
       return (typeof IS_POTATO!=='undefined'&&IS_POTATO)?'low':'high';
     }
+    function cur(){return draft||live();}
     function paint(){
-      var v=cur();b.textContent=v==='low'?'LOW':'HIGH';b.setAttribute('aria-pressed',v==='low'?'true':'false');b.classList.toggle('on',v==='low');
+      var v=cur(),st=stored(),lv=live();
+      b.textContent=v==='low'?'LOW':'HIGH';
+      b.setAttribute('aria-pressed',v==='low'?'true':'false');
+      b.classList.toggle('on',v==='low');
+      b.classList.toggle('dirty',draft!=null&&draft!==lv);
+      if(bSave)bSave.disabled=!(draft!=null&&draft!==st);
+    }
+    function apply(v,clearUrl){
+      try{
+        if(v==null)localStorage.removeItem('dumul_quality');
+        else localStorage.setItem('dumul_quality',v);
+      }catch(e){}
+      try{
+        var u=new URL(location.href);
+        if(clearUrl||v==null)u.searchParams.delete('perf');
+        else u.searchParams.set('perf',v);
+        location.replace(u.pathname+u.search+u.hash);
+      }catch(err){
+        location.reload();
+      }
     }
     paint();
     b.addEventListener('click',function(e){
       e.stopPropagation();
-      var next=cur()==='low'?'high':'low';
-      try{
-        var u=new URL(location.href);
-        u.searchParams.set('perf',next);
-        location.replace(u.toString());
-      }catch(err){
-        location.search=(location.search.replace(/[?&]perf=(high|low)/g,'').replace(/^&/,'?')||'?')+'&perf='+next;
-      }
+      draft=cur()==='low'?'high':'low';
+      paint();
+      try{haptic(6);}catch(eH){}
+    });
+    if(bSave)bSave.addEventListener('click',function(e){
+      e.stopPropagation();
+      var v=cur();
+      draft=null;
+      apply(v,false);
+    });
+    if(bReset)bReset.addEventListener('click',function(e){
+      e.stopPropagation();
+      draft=null;
+      apply(null,true); /* hapus preferensi → device detect lagi */
     });
   })();
   /* Language button: hook I18N if present */
