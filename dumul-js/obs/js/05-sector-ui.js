@@ -1447,10 +1447,21 @@ var SN_COOLDOWN={};
     clearNowPlaying();
     if(MS&&msKey){try{MS.playbackState='paused';}catch(e){}}
   };
+  /* Marquee cuma buat judul grup yang kepotong: ukur sekali tiap panel dibuka (rAF, layout toh jalan di frame itu). */
+  function markMarq(){
+    var els=panel.querySelectorAll('.mp-grp-marq');
+    for(var i=0;i<els.length;i++){
+      var e=els[i],p=e.parentNode,lg=e.offsetWidth>p.clientWidth+1;
+      if(e._mq!==lg){e._mq=lg;e.classList.toggle('mq',lg);}
+    }
+  }
+  var _mqT=0;
+  window.addEventListener('resize',function(){if(!panelOpen())return;clearTimeout(_mqT);_mqT=setTimeout(markMarq,250);},{passive:true});
   function openPanel(){
     panel.classList.add('open');panel.setAttribute('aria-hidden','false');toggle.setAttribute('aria-expanded','true');
     if(typeof renderStellarRecord==='function')renderStellarRecord();
     sync();
+    requestAnimationFrame(markMarq);
   }
   function shutPanel(){
     panel.classList.remove('open');panel.setAttribute('aria-hidden','true');toggle.setAttribute('aria-expanded','false');
