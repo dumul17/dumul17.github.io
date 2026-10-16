@@ -87,7 +87,7 @@ document.addEventListener('pointerdown',function(e){
   if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
     e.preventDefault();e.stopPropagation();
-    scatterAsteroid(ai,e.clientX,e.clientY);
+    scatterAsteroidArea(e.clientX,e.clientY,80); /* area tap: radius px */
   }
 },{passive:false});
 /* Header title glitch removed — branding lives in #owl-panel only. */
