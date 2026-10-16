@@ -363,7 +363,8 @@ function fxPlace(hit){
     var key=SKY.FX_KEYS[i],el=FXBTN[key],p=el&&fxBase(SKY.sfxBy[key]);
     if(!p)continue;
     var q=hit?skyHitXY(p[0],p[1]):[p[0]+skyPan.x,p[1]+skyPan.y];
-    el.style.transform='translate('+Math.round(q[0])+'px,'+Math.round(q[1])+'px)';
+    var tf='translate('+Math.round(q[0])+'px,'+Math.round(q[1])+'px)';
+    if(el._tf!==tf){el._tf=tf;el.style.transform=tf;}
   }
 }
 /* Sembunyikan tombol bintang yang bukan milik sektor yang lagi dibuka. */

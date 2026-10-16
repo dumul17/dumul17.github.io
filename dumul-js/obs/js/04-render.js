@@ -1716,7 +1716,8 @@ function drawPortals(age,now){
       var ptf='translate('+fx.toFixed(1)+'px,'+fy.toFixed(1)+'px)'+STG.pt;
       if(p._tf!==ptf){p._tf=ptf;p.el.style.transform=ptf;}
       var hs=c.stars[p.hit],hp=gSky(hs.x+ox,hs.y+oy);
-      p.hitEl.style.transform='translate('+(hp[0]).toFixed(1)+'px,'+(hp[1]).toFixed(1)+'px)';
+      var htf='translate('+Math.round(hp[0])+'px,'+Math.round(hp[1])+'px)';
+      if(p._htf!==htf){p._htf=htf;p.hitEl.style.transform=htf;} /* hit target nggak butuh subpixel; tulis cuma kalau berubah */
     }
     if(na<=0)return;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid){p.el.classList.remove('mobile-show');return;}
