@@ -87,7 +87,7 @@ document.addEventListener('pointerdown',function(e){
   if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
     e.preventDefault();e.stopPropagation();
-    scatterAsteroidArea(e.clientX,e.clientY,80); /* area tap: radius px */
+    scatterAsteroid(ai,e.clientX,e.clientY);
   }
 },{passive:false});
 /* Header title glitch removed — branding lives in #owl-panel only. */
@@ -363,8 +363,7 @@ function fxPlace(hit){
     var key=SKY.FX_KEYS[i],el=FXBTN[key],p=el&&fxBase(SKY.sfxBy[key]);
     if(!p)continue;
     var q=hit?skyHitXY(p[0],p[1]):[p[0]+skyPan.x,p[1]+skyPan.y];
-    var tf='translate('+Math.round(q[0])+'px,'+Math.round(q[1])+'px)';
-    if(el._tf!==tf){el._tf=tf;el.style.transform=tf;}
+    el.style.transform='translate('+Math.round(q[0])+'px,'+Math.round(q[1])+'px)';
   }
 }
 /* Sembunyikan tombol bintang yang bukan milik sektor yang lagi dibuka. */
@@ -1234,7 +1233,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
     var wasLp=lpFired;
     reset();
     if(wasLp||!fireBubble)return;
-    haptic(8);showSecretSequence();placeSecretMsg();
+    haptic(8);try{UIS.tap();}catch(eUT){}showSecretSequence();placeSecretMsg();
   }
   document.addEventListener('pointerup',end,true);
   document.addEventListener('pointercancel',function(e){if(e.pointerId===lpPid)reset();},true);

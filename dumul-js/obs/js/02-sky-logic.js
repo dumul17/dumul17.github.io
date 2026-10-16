@@ -190,6 +190,7 @@ function lockedHint(key){
   var n=performance.now();
   if(n-_lockHintAt<4200)return; /* > durasi toast, biar tap berulang nggak mengulang animasinya */
   _lockHintAt=n;
+  try{UIS.deny();}catch(eUD){}
   haptic(6);
   if(typeof showModeToast==='function'){
     if(key==='pleione')showModeToast(T('toast.lock.ple'),null,4200);
@@ -750,6 +751,7 @@ function endAlignment(ok){
 /* Langkah terakhir: unlock -> SFX (kalau ada) -> popup. viaKey = kunci TRIGGERS yang dibunyikan. */
 function alignDone(cid,viaKey){
   endAlignment(true);
+  try{UIS.chime(-1);}catch(eUC){}   /* chord penutup */
   unlock(cid);
   tapFlash={until:performance.now()+1500,cons:cid}; /* garis yang baru muncul ikut menyala */
   /* viaKey ada = langkah terakhir adalah bintang SFX → supernova + audio.

@@ -625,6 +625,7 @@ function drawFloatingTelescope(now){
 
 /* ---------- [FITUR 2] Synthesizer Chime untuk Bintang Biasa (Web Audio) ---------- */
 function playStarChime(s){
+  try{UIS.chime((ALIGN.cid&&ALIGN.next>0)?ALIGN.next-1:0);return;}catch(eUC){}   /* UIS belum termuat -> jatuh ke chime lama di bawah */
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   try {
     /* Must build the full analyser graph — never leave a bare AudioContext
@@ -907,7 +908,7 @@ function astDepth(s){return .52+.62*(s+1)/2;}
 /* Posisi layar 1 batu: elips (rr, rr*e) diputar BH.ang(+upAng di landscape) = bidang yang sama dengan cakram. out.s = sin(t): <0 = separuh belakang. */
 function astPlace(a,now,c,out){
   var T=AST_CFG.t,rk=a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*T):a.r,ee=Math.max(.12,Math.min(.75,.40+(a.e-.40)*T)); /* T = ketebalan cincin: sebaran radius + sebaran kemiringan elips */
-  var t=(a.ph||0)+a.seed,rr=rk*AST_K*AST_CFG.w*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom;
+  var t=AST_T*a.spd+a.seed,rr=rk*AST_K*AST_CFG.w*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom;
   var ex=Math.cos(t)*rr,ey=Math.sin(t)*rr*ee,ba=BH.ang+upAng(),ca=Math.cos(ba),sa=Math.sin(ba); /* + upAng(): landscape (stage diputar 90deg) bidang sabuk ikut tegak bareng cakram BH (sama dgn 03-gargantua: BH.ang+upAng()); portrait/desktop upAng()=0 */
   out.x=c[0]+ex*ca-ey*sa;out.y=c[1]+ex*sa+ey*ca;out.s=Math.sin(t);
   return out;
@@ -915,12 +916,14 @@ function astPlace(a,now,c,out){
 var _astP={x:0,y:0,s:0};
 function asteroidScreenAt(x,y){
   if(!AST.length||!AST_CFG.on)return -1;
-  var best=-1,bd=Infinity;
+  var best=-1,bd=Infinity,now=performance.now(),c=astAnchor(),p=_astP;
   for(var i=0;i<AST.length;i++){
-    var a=AST[i];
-    if(!a._vis)continue; /* disembunyikan (di luar layar / di dalam horizon) = nggak bisa di-tap */
-    var d=Math.hypot(x-a._x,y-a._y);
-    if(d<Math.max(8,a._sz*1.9)&&d<bd){bd=d;best=i;}
+    var a=AST[i];astPlace(a,now,c,p);
+    var ax=p.x,ay=p.y,z=astDepth(p.s),sz=a.sz*z*skyZoom*AST_CFG.sz;
+    if(SW){var q=pull(ax,ay);ax=q[0];ay=q[1];sz*=1-.45*q[2];}
+    ax+=a.ox;ay+=a.oy;
+    var d=Math.hypot(x-ax,y-ay);
+    if(d<Math.max(8,sz*1.9)&&d<bd){bd=d;best=i;}
   }
   return best;
 }
@@ -940,28 +943,6 @@ function scatterAsteroid(i,x,y){
   a.kick=1;a.kickUntil=now+700;
   haptic(6);
   return true;
-}
-/* Tap = AREA: semua batu dalam radius R dari titik tap ditendang menjauhi jari (makin dekat makin kuat). Haptic cuma sekali. */
-function scatterAsteroidArea(x,y,R){
-  if(SW||!AST.length||!AST_CFG.on)return 0;
-  var now=performance.now(),c=astAnchor(),n=0;
-  for(var i=0;i<AST.length;i++){
-    var a=AST[i];
-    if(!a._vis)continue;
-    var dx=a._x-x,dy=a._y-y,d=Math.hypot(dx,dy);
-    if(d>=R)continue;
-    if(d<1){dx=a._x-c[0];dy=a._y-c[1];d=Math.hypot(dx,dy)||1;} /* tepat di titik tap: jatuh ke arah menjauhi pusat */
-    var nx=dx/d,ny=dy/d,tx=-ny,ty=nx,f=1-.5*Math.min(1,d/R);
-    var kick=(240+Math.random()*100)*f,side=(Math.random()-.5)*60;
-    a.vx=nx*kick+tx*side;
-    a.vy=ny*kick+ty*side;
-    a.ox=Math.max(-70,Math.min(70,a.ox));
-    a.oy=Math.max(-70,Math.min(70,a.oy));
-    a.kick=1;a.kickUntil=now+700;
-    n++;
-  }
-  if(n)haptic(6);
-  return n;
 }
 /* Bake a small set of rocky asteroid sprites once. Per-frame cost is then only
    translate/rotate/drawImage (+ the cheap spring for kick/scatter). Visual
@@ -1028,62 +1009,28 @@ function ensureAsteroidSprites(){
   AST_SPRITES=list;AST_SPRITES.back=back;
   return list;
 }
-/* Radius orbit dasar 1 batu (sebelum pengali lebar/zoom) */
-function astRk(a){return a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*AST_CFG.t):a.r;}
-/* Faktor laju orbit: diikat ke RADIUS ORBIT (konstan per batu), bukan jarak layar -> batu satu cincin sama lambat, nggak ada yang menyusul/numpuk.
-   1 = normal (jauh dari BH), AST_SLOW_MIN = hampir diam di dekat horizon. Zona: 1.6R .. 9.5R. */
-var AST_SLOW_MIN=.08;
-function astSlow(rk,R){
-  if(R<1)return 1;
-  var u=Math.max(0,Math.min(1,(rk*AST_K*AST_CFG.w*skyZoom/R-1.6)/7.9));
-  return AST_SLOW_MIN+(1-AST_SLOW_MIN)*u*u*(3-2*u);
-}
-/* Satu langkah per frame: posisi + spring semua batu dihitung sekali (di pass belakang / pass tunggal), pass depan tinggal pakai hasilnya.
-   Batu di luar layar (cincin seluruhnya di luar, atau posisinya di luar + bukan zona lensing) = a._vis 0: nggak dihitung lens/spring, nggak digambar. */
+/* Satu langkah per frame: posisi + spring semua batu dihitung sekali (di pass belakang / pass tunggal), pass depan tinggal pakai hasilnya. */
 function astStep(now){
-  var dtc=AST_TL?Math.min(100,Math.max(0,now-AST_TL)):0;AST_TL=now;AST_T+=dtc*AST_CFG.spd; /* AST_T cuma dipakai sbg fase awal batu baru */
-  var c=astAnchor(),p=_astP,bp=camBH(),R=BH.Rr*(BHZ||1),T=AST_CFG.t,mg=200,
-      dmax=Math.max(Math.hypot(c[0],c[1]),Math.hypot(W-c[0],c[1]),Math.hypot(c[0],H-c[1]),Math.hypot(W-c[0],H-c[1]))+mg,
-      lz=R*9.5+mg;lz*=lz;
+  var dtc=AST_TL?Math.min(100,Math.max(0,now-AST_TL)):0;AST_TL=now;AST_T+=dtc*AST_CFG.spd; /* jam orbit sendiri: ganti kecepatan nggak bikin batu loncat */
+  var c=astAnchor(),p=_astP;
   for(var i=0;i<AST.length;i++){
-    var a=AST[i],rk=astRk(a);
-    /* fase per batu (diintegrasi): ganti slider / zoom / ukuran BH nggak bikin batu loncat */
-    a.ph=(a.ph==null?AST_T*a.spd:a.ph)+dtc*AST_CFG.spd*a.spd*astSlow(rk,R);
-    if(!SW){
-      /* cull tingkat cincin: titik terdekat cincin ke pusat = rr*ee; kalau sudah lewat sudut layar terjauh, tak ada bagian cincin yang kelihatan */
-      var ee=Math.max(.12,Math.min(.75,.40+(a.e-.40)*T));
-      if(rk*AST_K*AST_CFG.w*skyZoom*.96*ee>dmax){a._vis=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;continue;}
-    }
-    astPlace(a,now,c,p);
-    var x=p.x,y=p.y,z=astDepth(p.s),sz=a.sz*z*skyZoom*AST_CFG.sz,vis=1;
+    var a=AST[i];astPlace(a,now,c,p);
+    var x=p.x,y=p.y,z=astDepth(p.s),sz=a.sz*z*skyZoom*AST_CFG.sz;
     if(SW){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
-    else{
-      var dx0=x-bp[0],dy0=y-bp[1];
-      if(dx0*dx0+dy0*dy0>lz){
-        /* jauh dari BH (di luar zona lensing): kalau di luar layar, lewati sisanya */
-        if(x<-mg||x>W+mg||y<-mg||y>H+mg){vis=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;a._vis=0;continue;}
-      }else if(p.s<0){
-        /* lensing cuma untuk batu BELAKANG BH (batu yang lewat di depan nggak dibelokkan) */
-        var L=lens(x,y);
-        if(L){
-          var d0=Math.sqrt(dx0*dx0+dy0*dy0)||1,f=Math.hypot(L[0]-bp[0],L[1]-bp[1])/d0;
-          x=L[0];y=L[1];sz*=1+.35*Math.min(1,f-1); /* sedikit membesar dekat BH */
-        }else vis=0; /* di dalam horizon: tersembunyi di balik lubang */
-      }
-    }
     /* Damped spring: the rock gets one impulse, flies a little, then settles back. */
     var last=a._lastNow||now,dt=Math.min(.032,Math.max(.001,(now-last)/1000));
     a._lastNow=now;
-    var spring=5.0,damper=4.5;
+    var spring=9.0,damper=5.8;
     a.vx+=(-spring*a.ox-damper*a.vx)*dt;
     a.vy+=(-spring*a.oy-damper*a.vy)*dt;
     a.ox+=a.vx*dt;a.oy+=a.vy*dt;
     if(a.kick&&now>a.kickUntil)a.kick=0;
     if(Math.abs(a.ox)+Math.abs(a.oy)<.12&&Math.abs(a.vx)+Math.abs(a.vy)<1.2){a.ox=a.oy=a.vx=a.vy=0;a.kick=0;}
-    a._x=x+a.ox;a._y=y+a.oy;a._sz=sz;a._back=p.s<0;a._s=p.s;a._vis=vis;
+    a._x=x+a.ox;a._y=y+a.oy;a._sz=sz;a._back=p.s<0;a._s=p.s;
   }
   AST._stamp=now;
 }
+/* half: -1 = separuh belakang (gambar SEBELUM Rasi/BH, lebih redup), 1 = separuh depan (SESUDAH BH), 0/undefined = semua sekaligus. */
 function drawAsteroids(now,half){
   if(!AST.length||!AST_CFG.on)return;
   half=half|0;
@@ -1091,7 +1038,6 @@ function drawAsteroids(now,half){
   var sprites=ensureAsteroidSprites(),bsp=sprites.back;
   for(var i=0;i<AST.length;i++){
     var a=AST[i];
-    if(!a._vis)continue;
     if(half<0&&!a._back)continue;
     if(half>0&&a._back)continue;
     var si2=(a.sprite|0)%sprites.length,sp=a._back?bsp[si2]:sprites[si2];
@@ -1716,8 +1662,7 @@ function drawPortals(age,now){
       var ptf='translate('+fx.toFixed(1)+'px,'+fy.toFixed(1)+'px)'+STG.pt;
       if(p._tf!==ptf){p._tf=ptf;p.el.style.transform=ptf;}
       var hs=c.stars[p.hit],hp=gSky(hs.x+ox,hs.y+oy);
-      var htf='translate('+Math.round(hp[0])+'px,'+Math.round(hp[1])+'px)';
-      if(p._htf!==htf){p._htf=htf;p.hitEl.style.transform=htf;} /* hit target nggak butuh subpixel; tulis cuma kalau berubah */
+      p.hitEl.style.transform='translate('+(hp[0]).toFixed(1)+'px,'+(hp[1]).toFixed(1)+'px)';
     }
     if(na<=0)return;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid){p.el.classList.remove('mobile-show');return;}
