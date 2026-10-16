@@ -521,7 +521,7 @@ function drawInterlock(x,y,il){
    GARGANTUA = size / strength / bloom / speed, LANGIT = toggle asteroid (overview + di dalam sektor) + kabut, nebula, vignette, halo portal (baris ini hanya di overview). Save/Reset berlaku untuk tab yang aktif. */
 (function bhTune(){
   var panel=document.getElementById('bh-panel'),btn=document.getElementById('mode-bhset');
-  if(!panel||!btn)return;
+  if(!panel)return; /* mode-bhset removed — panel lives in owl Tune tab */
   var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),AK=['n','sz','w','t','spd'],ain={},aout={},inp={},out={},
       bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),bClose=document.getElementById('bp-close'),sub=document.getElementById('bp-sub'),
       tabs=[].slice.call(panel.querySelectorAll('.bp-tab')),pages={},cur='bh',SKYK=['HAZE','BAND','DRIFT','A_OV','THICK','VIG','HALO'],SECK=['A_SEC','SDIM','SPREAD','ZF'],ALLK=SKYK.concat(SECK),sin={},sout={},bakeT=0,tintT=0;
@@ -607,13 +607,13 @@ function drawInterlock(x,y,il){
   function open(on){
     var a=avail();on=!!on&&(a.bh||a.sky||a.ast);
     panel.classList.toggle('on',on);panel.setAttribute('aria-hidden',on?'false':'true');
-    btn.classList.toggle('on',on);btn.setAttribute('aria-expanded',on?'true':'false');
+    if(btn)btn.classList.toggle('on',on);if(btn)btn.setAttribute('aria-expanded',on?'true':'false');
     if(on)refresh();
   }
   bhuRepaint=paint;
   bhTuneSync=refresh;
   try{new MutationObserver(function(){if(panel.classList.contains('on'))refresh();}).observe(body,{attributes:true,attributeFilter:['class']});}catch(e){}
-  btn.addEventListener('click',function(e){e.stopPropagation();open(!panel.classList.contains('on'));haptic(6);});
+  if(btn)btn.addEventListener('click',function(e){e.stopPropagation();open(!panel.classList.contains('on'));haptic(6);});
   if(bClose)bClose.addEventListener('click',function(e){e.stopPropagation();open(false);});
   tabs.forEach(function(tb){tb.addEventListener('click',function(e){e.stopPropagation();var id=tb.getAttribute('data-tab');if(!avail()[id])return;cur=id;refresh();haptic(6);});});
   keys.forEach(function(k){
@@ -684,19 +684,52 @@ function drawInterlock(x,y,il){
     paint();haptic(8);
   });
   panel.addEventListener('pointerdown',function(e){e.stopPropagation();});
+
+  /* Scrub: saat geser slider, panel nyusut — cuma baris itu + angka, sky kelihatan di belakang */
+  (function scrubMode(){
+    var owl=document.getElementById('owl-panel'),back=document.getElementById('owl-backdrop');
+    if(!panel||!owl)return;
+    var active=null;
+    function end(){
+      if(!active)return;
+      try{active.classList.remove('owl-scrub-row');}catch(e){}
+      active=null;
+      owl.classList.remove('owl-scrub');
+      if(back)back.classList.remove('owl-scrub-bg');
+    }
+    function start(row){
+      if(!row||!owl.classList.contains('on'))return;
+      end();
+      active=row;row.classList.add('owl-scrub-row');
+      owl.classList.add('owl-scrub');
+      if(back)back.classList.add('owl-scrub-bg');
+    }
+    panel.querySelectorAll('input.bp-range').forEach(function(inp){
+      inp.addEventListener('pointerdown',function(e){
+        var row=inp.closest('.bp-row');if(row)start(row);
+      });
+      inp.addEventListener('pointerup',end);
+      inp.addEventListener('pointercancel',end);
+      inp.addEventListener('change',end);
+      /* touch: kadang pointerup ke document */
+    });
+    document.addEventListener('pointerup',function(){if(active)end();});
+    document.addEventListener('pointercancel',function(){if(active)end();});
+  })();
+
   /* Isolasi: sentuhan/scroll/klik di panel tidak boleh tembus ke langit, BH, asteroid, atau zoom kamera. */
   ['pointerup','click','touchstart','touchmove','wheel','contextmenu'].forEach(function(tp){
     panel.addEventListener(tp,function(e){e.stopPropagation();},{passive:true});
   });
   /* Tap di luar panel menutup (pola sama dengan panel music); tombol gear ditangani handler-nya sendiri. */
-  document.addEventListener('pointerdown',function(e){
-    if(!panel.classList.contains('on'))return;
-    var tg=e.target;
-    if(panel.contains(tg)||(btn&&btn.contains(tg)))return;
-    open(false);
-  },true);
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panel.classList.contains('on'))open(false);});
+  /* Panel embedded in owl — close is owned by owl close / tab switch, not a floating outside-tap. */
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panel.classList.contains('on')&&!document.body.classList.contains('owl-open'))open(false);});
   bhTuneClose=function(){if(panel.classList.contains('on'))open(false);};
+  /* Embedded in owl: force visible while Tune tab active */
+  window.__bhTuneShow=function(show){
+    if(show){panel.classList.add('on');panel.setAttribute('aria-hidden','false');refresh();}
+    else{panel.classList.remove('on');panel.setAttribute('aria-hidden','true');}
+  };
   refresh();
 })();
 
@@ -1701,10 +1734,16 @@ var SN_COOLDOWN={};
   }
   function paintWave(prog,playing){
     if(!waveCx||!waveCv)return;
-    var cw=waveCv.clientWidth,ch=waveCv.clientHeight;
-    if(cw>0&&ch>0){
-      var dpr=Math.min(2,window.devicePixelRatio||1),nw=Math.round(cw*dpr),nh=Math.round(ch*dpr);
-      if(waveCv.width!==nw||waveCv.height!==nh){waveCv.width=nw;waveCv.height=nh;}   /* bitmap = ukuran tampil, jadi 36 bar selalu ngisi lebar seekbar */
+    /* Jangan biarkan set canvas.width/height mengubah layout box (bug WebView: seekbar mengecil).
+       Ukur dari CSS box; fallback ke parent .mp-seek; kunci style width/height setelah resize bitmap. */
+    var wrap=waveCv.parentElement,cw=waveCv.clientWidth,ch=waveCv.clientHeight;
+    if(!(cw>1)&&wrap)cw=Math.max(0,(wrap.clientWidth||0)-10);
+    if(!(ch>1))ch=12;
+    if(cw>1){
+      var dpr=Math.min(2,window.devicePixelRatio||1),nw=Math.max(1,Math.round(cw*dpr)),nh=Math.max(1,Math.round(ch*dpr));
+      if(waveCv.width!==nw||waveCv.height!==nh){waveCv.width=nw;waveCv.height=nh;}
+      if(waveCv.style.width!==cw+'px')waveCv.style.width=cw+'px';
+      if(waveCv.style.height!==ch+'px')waveCv.style.height=ch+'px';
     }
     var w=waveCv.width,h=waveCv.height;
     waveCx.setTransform(1,0,0,1,0,0);

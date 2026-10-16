@@ -87,7 +87,7 @@ document.addEventListener('pointerdown',function(e){
   if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
     e.preventDefault();e.stopPropagation();
-    scatterAsteroid(ai,e.clientX,e.clientY);
+    scatterAsteroidArea(e.clientX,e.clientY,80); /* area tap: radius px */
   }
 },{passive:false});
 /* Header title glitch removed — branding lives in #owl-panel only. */
@@ -178,6 +178,80 @@ document.addEventListener('pointerdown',function(e){
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'&&panel.classList.contains('on'))closeOwl();
   });
+
+  /* Tabs: About | Tune */
+  (function owlTabs(){
+    var tabs=[].slice.call(panel.querySelectorAll('.owl-tab'));
+    var panes={about:document.getElementById('owl-pane-about'),tune:document.getElementById('owl-pane-tune'),ui:document.getElementById('owl-pane-ui')};
+    function setTab(name){
+      tabs.forEach(function(t){var on=t.getAttribute('data-owl-tab')===name;t.classList.toggle('on',on);t.setAttribute('aria-selected',on?'true':'false');});
+      Object.keys(panes).forEach(function(k){var p=panes[k];if(!p)return;var on=k===name;p.classList.toggle('on',on);if(on)p.removeAttribute('hidden');else p.setAttribute('hidden','');});
+      try{if(typeof window.__bhTuneShow==='function')window.__bhTuneShow(name==='tune');}catch(e){}
+    }
+    tabs.forEach(function(t){t.addEventListener('click',function(e){e.stopPropagation();setTab(t.getAttribute('data-owl-tab'));});});
+    setTab('about');
+    var _open=openOwl;
+    openOwl=function(){_open();setTab(panel.getAttribute('data-last-tab')||'about');};
+    var _close=closeOwl;
+    closeOwl=function(){
+      var on=panel.querySelector('.owl-tab.on');
+      if(on)panel.setAttribute('data-last-tab',on.getAttribute('data-owl-tab')||'about');
+      try{panel.classList.remove('owl-scrub');var _bd=document.getElementById('owl-backdrop');if(_bd)_bd.classList.remove('owl-scrub-bg');
+        var _sr=panel.querySelectorAll('.owl-scrub-row');for(var _i=0;_i<_sr.length;_i++)_sr[_i].classList.remove('owl-scrub-row');
+      }catch(eS){}
+      try{if(typeof window.__bhTuneShow==='function')window.__bhTuneShow(false);}catch(e){}
+      _close();
+    };
+  })();
+  /* Performance toggle: HIGH <-> LOW (?perf=) */
+  (function owlPerf(){
+    var b=document.getElementById('owl-perf');if(!b)return;
+    function cur(){
+      try{var m=/[?&]perf=(high|low)/.exec(location.search);if(m)return m[1];}catch(e){}
+      return (typeof IS_POTATO!=='undefined'&&IS_POTATO)?'low':'high';
+    }
+    function paint(){
+      var v=cur();b.textContent=v==='low'?'LOW':'HIGH';b.setAttribute('aria-pressed',v==='low'?'true':'false');b.classList.toggle('on',v==='low');
+    }
+    paint();
+    b.addEventListener('click',function(e){
+      e.stopPropagation();
+      var next=cur()==='low'?'high':'low';
+      try{
+        var u=new URL(location.href);
+        u.searchParams.set('perf',next);
+        location.replace(u.toString());
+      }catch(err){
+        location.search=(location.search.replace(/[?&]perf=(high|low)/g,'').replace(/^&/,'?')||'?')+'&perf='+next;
+      }
+    });
+  })();
+  /* Language button: hook I18N if present */
+  (function owlLang(){
+    var b=document.getElementById('owl-lang');if(!b)return;
+    function paint(){
+      var lang=(window.I18N&&I18N.lang)||'en';
+      b.textContent=String(lang).toUpperCase();
+    }
+    paint();
+    b.addEventListener('click',function(e){
+      e.stopPropagation();
+      try{
+        if(window.I18N&&typeof I18N.toggle==='function'){I18N.toggle();paint();return;}
+        if(window.I18N&&typeof I18N.setLang==='function'){
+          var next=(I18N.lang==='id')?'en':'id';I18N.setLang(next);paint();return;
+        }
+      }catch(err){}
+      /* fallback: flip ?lang= */
+      try{
+        var u=new URL(location.href);
+        var cur=u.searchParams.get('lang')||'en';
+        u.searchParams.set('lang',cur==='id'?'en':'id');
+        location.replace(u.toString());
+      }catch(e2){}
+    });
+  })();
+
 })();
 var bhA=$('#bh');
 bhA.addEventListener('click',function(e){if(SECT.cur){e.preventDefault();if(SUM.on)sgToggle();}}); /* di sector: link BH ke dumul.html dimatikan (keyboard/AT) */

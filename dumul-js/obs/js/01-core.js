@@ -446,7 +446,7 @@ var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3]};
    jari-jari tetap (AST_K, pengali global), bidang miring ikut BH.ang. Toggle ada di panel tab Langit, disimpan di localStorage.dumul_ast_cfg. */
 var AST_K=1;
 /* AST_CFG: on = tampil, n = jumlah batu (-1 = otomatis dari ukuran layar), sz/w/spd = pengali ukuran / lebar orbit / kecepatan orbit, t = ketebalan cincin (sebaran radius + kemiringan elips; kecil = cincin tipis rapat). Disimpan di localStorage.dumul_ast_cfg */
-var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_RNG={n:[0,200],sz:[.4,2.5],w:[.3,4],spd:[0,3],t:[.1,3]},AST_CFG={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_AUTO=40,AST_T=0,AST_TL=0;
+var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_RNG={n:[0,300],sz:[.4,2.5],w:[.3,4],spd:[0,3],t:[.1,3]},AST_CFG={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_AUTO=40,AST_T=0,AST_TL=0;
 function astClamp(k,v){v=+v;if(!isFinite(v))return AST_DEF[k];var r=AST_RNG[k];return Math.max(r[0],Math.min(r[1],k==='n'?Math.round(v):v));}
 function astNorm(o){var r={on:AST_DEF.on,n:AST_DEF.n,sz:AST_DEF.sz,w:AST_DEF.w,spd:AST_DEF.spd,t:AST_DEF.t};if(o&&typeof o==='object'){if(typeof o.on==='number')r.on=o.on>=.5?1:0;
   if(typeof o.n==='number'&&o.n>=0)r.n=astClamp('n',o.n);['sz','w','spd','t'].forEach(function(k){if(typeof o[k]==='number')r[k]=astClamp(k,o[k]);});}return r;}
