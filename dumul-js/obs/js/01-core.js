@@ -22,9 +22,8 @@ function resetCanvasState(){
   g.setLineDash([]);
 }
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
-var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
-/* Prioritas quality: ?perf= (tes) > localStorage.dumul_quality (pilihan user) > deteksi device.
-   Potato device yang pilih HIGH tetap HIGH saat revisit. */
+/* Tanpa auto-detect device: default HIGH. Prioritas quality: ?perf= (tes) > localStorage.dumul_quality (pilihan user lewat panel Setelan) > HIGH. */
+var IS_POTATO=false;
 try{
   var _pf=/[?&]perf=(high|low)/.exec(location.search);
   if(_pf){IS_POTATO=_pf[1]==='low';}
