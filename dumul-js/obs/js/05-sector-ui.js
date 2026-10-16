@@ -601,7 +601,7 @@ function drawInterlock(x,y,il){
     var ov=skyOv(),ovp=skyPortals();[].slice.call(panel.querySelectorAll('[data-ov]')).forEach(function(el){el.hidden=!ov;});
     [].slice.call(panel.querySelectorAll('[data-ovo]')).forEach(function(el){el.hidden=!ovp;});
     var sc=skySect();[].slice.call(panel.querySelectorAll('[data-sc]')).forEach(function(el){el.hidden=!sc;});   /* baris khusus overview (halo portal) */
-    if(!a.bh&&!a.sky&&!a.ast&&panel.classList.contains('on'))open(false);
+    panel.classList.toggle('empty',!(a.bh||a.sky||a.ast||a.tele));   /* belum ada yang bisa di-tune (mis. saat boot): tampilkan keterangan, sembunyikan tab/slider */
     paint();
   }
   function open(on){

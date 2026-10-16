@@ -179,7 +179,7 @@ document.addEventListener('pointerdown',function(e){
     if(e.key==='Escape'&&panel.classList.contains('on'))closeOwl();
   });
 
-  /* Tabs: About | Tune */
+  /* Tabs: Settings (tune) | About */
   (function owlTabs(){
     var tabs=[].slice.call(panel.querySelectorAll('.owl-tab'));
     var panes={about:document.getElementById('owl-pane-about'),tune:document.getElementById('owl-pane-tune'),ui:document.getElementById('owl-pane-ui')};
@@ -189,13 +189,13 @@ document.addEventListener('pointerdown',function(e){
       try{if(typeof window.__bhTuneShow==='function')window.__bhTuneShow(name==='tune');}catch(e){}
     }
     tabs.forEach(function(t){t.addEventListener('click',function(e){e.stopPropagation();setTab(t.getAttribute('data-owl-tab'));});});
-    setTab('about');
+    setTab('tune');
     var _open=openOwl;
-    openOwl=function(){_open();setTab(panel.getAttribute('data-last-tab')||'about');};
+    openOwl=function(){_open();setTab(panel.getAttribute('data-last-tab')||'tune');};
     var _close=closeOwl;
     closeOwl=function(){
       var on=panel.querySelector('.owl-tab.on');
-      if(on)panel.setAttribute('data-last-tab',on.getAttribute('data-owl-tab')||'about');
+      if(on)panel.setAttribute('data-last-tab',on.getAttribute('data-owl-tab')||'tune');
       try{panel.classList.remove('owl-scrub');var _bd=document.getElementById('owl-backdrop');if(_bd)_bd.classList.remove('owl-scrub-bg');
         var _sr=panel.querySelectorAll('.owl-scrub-row');for(var _i=0;_i<_sr.length;_i++)_sr[_i].classList.remove('owl-scrub-row');
       }catch(eS){}
@@ -205,7 +205,7 @@ document.addEventListener('pointerdown',function(e){
   })();
   /* Quality HIGH/LOW: localStorage.dumul_quality (persist). Save = tulis + reload. Reset = hapus preferensi, balik deteksi device. */
   (function owlPerf(){
-    var b=document.getElementById('owl-perf'),bSave=document.getElementById('owl-perf-save'),bReset=document.getElementById('owl-perf-reset');
+    var b=document.getElementById('owl-perf'),bSave=document.getElementById('owl-perf-save'),bReset=document.getElementById('owl-perf-reset'),bAct=document.getElementById('owl-perf-act'),bTxt=document.getElementById('owl-perf-t');
     if(!b)return;
     var draft=null; /* pending choice before Save; null = tampilkan yang aktif */
     function stored(){
@@ -220,11 +220,14 @@ document.addEventListener('pointerdown',function(e){
     function cur(){return draft||live();}
     function paint(){
       var v=cur(),st=stored(),lv=live();
-      b.textContent=v==='low'?'LOW':'HIGH';
+      var lbl=v==='low'?'LOW':'HIGH';
+      if(bTxt)bTxt.textContent=T('perf.chip',{m:lbl});else b.textContent=lbl;
+      b.title=T('tune.quality.hint');
       b.setAttribute('aria-pressed',v==='low'?'true':'false');
       b.classList.toggle('on',v==='low');
       b.classList.toggle('dirty',draft!=null&&draft!==lv);
       if(bSave)bSave.disabled=!(draft!=null&&draft!==st);
+      if(bAct){var hasUrl=false;try{hasUrl=/[?&]perf=(high|low)/.test(location.search);}catch(eU){}bAct.hidden=!(draft!=null||st!=null||hasUrl);}   /* Save/Reset cuma muncul kalau ada perubahan atau preferensi tersimpan */
     }
     function apply(v,clearUrl){
       try{
