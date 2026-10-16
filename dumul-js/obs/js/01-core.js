@@ -23,9 +23,18 @@ function resetCanvasState(){
 }
 var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 var IS_POTATO=!!((navigator.deviceMemory&&navigator.deviceMemory<=2)||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.connection&&navigator.connection.saveData));
-/* Override manual buat ngetes: ?perf=high (paksa normal) / ?perf=low (paksa potato). Berguna di WebView yang salah lapor spek. */
-try{var _pf=/[?&]perf=(high|low)/.exec(location.search);if(_pf)IS_POTATO=_pf[1]==='low';}catch(e){}
-try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');}catch(e){}
+/* Prioritas quality: ?perf= (tes) > localStorage.dumul_quality (pilihan user) > deteksi device.
+   Potato device yang pilih HIGH tetap HIGH saat revisit. */
+try{
+  var _pf=/[?&]perf=(high|low)/.exec(location.search);
+  if(_pf){IS_POTATO=_pf[1]==='low';}
+  else{
+    var _qs=null;try{_qs=localStorage.getItem('dumul_quality');}catch(eQ){}
+    if(_qs==='high')IS_POTATO=false;
+    else if(_qs==='low')IS_POTATO=true;
+  }
+}catch(e){}
+try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');else document.documentElement.classList.remove('perf-tier-0');}catch(e){}
 var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
 var lastActivity=performance.now(),idleMode=false,IDLE_MS=60000;
