@@ -1301,3 +1301,10 @@ body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)
 #owl-panel.owl-scrub .bp-page .bp-tog{display:none!important}
 #owl-panel.owl-scrub .bp-page .owl-scrub-row{display:grid!important;margin:0}
 #owl-backdrop.owl-scrub-bg{opacity:0!important;pointer-events:none!important}
+
+.owl-prefs-about{margin-top:10px}
+.owl-pref-hint{margin:2px 2px 0;font:500 8.5px/1.35 'Courier New',monospace;letter-spacing:.04em;color:rgba(184,198,214,.48);text-transform:none}
+.owl-pref-act{display:flex;gap:6px;margin-top:4px}
+.owl-pref-act button{flex:1;min-height:30px;border:1px solid rgba(110,229,255,.2);border-radius:7px;background:rgba(110,229,255,.06);color:rgba(214,228,240,.85);font:600 10px/1 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.owl-pref-act button:hover,.owl-pref-act button:focus-visible{border-color:rgba(110,229,255,.45);color:#eafcff;background:rgba(110,229,255,.12)}
+.owl-pref-btn.dirty{box-shadow:0 0 0 1px rgba(255,176,80,.45)}
