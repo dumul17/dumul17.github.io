@@ -1701,7 +1701,13 @@ var SN_COOLDOWN={};
   }
   function paintWave(prog,playing){
     if(!waveCx||!waveCv)return;
+    var cw=waveCv.clientWidth,ch=waveCv.clientHeight;
+    if(cw>0&&ch>0){
+      var dpr=Math.min(2,window.devicePixelRatio||1),nw=Math.round(cw*dpr),nh=Math.round(ch*dpr);
+      if(waveCv.width!==nw||waveCv.height!==nh){waveCv.width=nw;waveCv.height=nh;}   /* bitmap = ukuran tampil, jadi 36 bar selalu ngisi lebar seekbar */
+    }
     var w=waveCv.width,h=waveCv.height;
+    waveCx.setTransform(1,0,0,1,0,0);
     waveCx.clearRect(0,0,w,h);
     var bars=36,gap=2,bw=(w-gap*(bars-1))/bars,mid=h*.55;
     var seed=waveSeed;
@@ -1721,7 +1727,7 @@ var SN_COOLDOWN={};
     }
     var px=Math.max(0,Math.min(w,prog*w));
     waveCx.fillStyle='rgba(234,252,255,.9)';
-    waveCx.fillRect(px-0.5,2,1.5,h-4);
+    waveCx.fillRect(px-0.5,2,Math.max(1.5,w/190),h-4);
   }
   function updateSeekUI(){
     var i=getPlayingTrackIndex();

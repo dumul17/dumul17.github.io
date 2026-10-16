@@ -117,10 +117,10 @@ var UIS=(function(){
     tone(c,t,fr,fr,.5,.1);tone(c,t,fr*2,fr*2,.3,.025); /* + harmonik tipis */
   }
 
-  /* delegasi tap: ikon HUD, owl, music, portal, tombol fokus cam (teleskop: panggil UIS.tap() manual di 06) */
+  /* delegasi tap: ikon HUD, owl (+ isi panelnya), music, portal, tombol fokus cam, panel exit teleskop, kartu pilihan teleskop (tap teleskop sendiri: UIS.tap() manual di 06) */
   document.addEventListener('pointerdown',function(e){
     var t=e.target;
-    if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#bp-close,#music-close'))tap();
+    if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#bp-close,#music-close,#exit-panel button,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,#lis-ask button'))tap();
   },true);
 
   return {noise:noise,radar:radar,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul};
