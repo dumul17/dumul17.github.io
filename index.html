@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=59">
+<link rel="stylesheet" href="index.css?v=54">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -133,7 +133,7 @@
   </div>
   <div class="mp-foot">
     <div class="mp-seek" id="mp-seek-wrap">
-      <div id="mp-wave" aria-hidden="true"><i class="mp-rail-fill"></i><i class="mp-notch"></i></div>
+      <canvas id="mp-wave" width="280" height="32" aria-hidden="true"></canvas>
       <input type="range" id="mp-seek" class="mp-seek-range" min="0" max="1000" value="0" step="1" aria-label="Seek" data-i18n-aria="mp.seek">
       <div class="mp-time"><span id="mp-t0">0:00</span><span id="mp-t1">0:00</span></div>
     </div>
@@ -225,7 +225,7 @@
   </div>
   <div class="bp-page" data-page="ast" hidden>
     <div class="bp-row bp-tog"><span class="bp-k"><span data-i18n="tune.ast">Asteroids</span><i data-i18n="tune.ast.s">orbiting rocks</i></span><button type="button" id="bp-ast" class="bp-switch" aria-pressed="true" data-i18n="tune.show">Show</button></div>
-    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.ast.count">Count</span><i data-i18n="tune.ast.count.s">rocks</i></span><input type="range" class="bp-range" id="ap-n" min="0" max="300" step="1" value="60"><output id="ap-n-v">60</output></label>
+    <label class="bp-row"><span class="bp-k"><span data-i18n="tune.ast.count">Count</span><i data-i18n="tune.ast.count.s">rocks</i></span><input type="range" class="bp-range" id="ap-n" min="0" max="200" step="1" value="60"><output id="ap-n-v">60</output></label>
     <label class="bp-row"><span class="bp-k"><span data-i18n="tune.size">Size</span><i data-i18n="tune.ast.size.s">rock scale</i></span><input type="range" class="bp-range" id="ap-sz" min="40" max="250" step="1" value="100"><output id="ap-sz-v">1.00×</output></label>
     <label class="bp-row"><span class="bp-k"><span data-i18n="tune.ast.orbit">Orbit</span><i data-i18n="tune.ast.orbit.s">width</i></span><input type="range" class="bp-range" id="ap-w" min="30" max="400" step="1" value="100"><output id="ap-w-v">1.00×</output></label>
     <label class="bp-row"><span class="bp-k"><span data-i18n="tune.ast.thick">Thickness</span><i data-i18n="tune.ast.thick.s">ring density</i></span><input type="range" class="bp-range" id="ap-t" min="10" max="300" step="1" value="100"><output id="ap-t-v">1.00×</output></label>
@@ -271,15 +271,16 @@
 <script defer src="dumul-js/obs/i18n.js?v=11"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=1"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=111"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=111"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=110"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=112"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=99"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=109"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=120"></script>
-<script defer src="dumul-js/obs/js/06-interaction.js?v=107"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=108"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=117"></script>
+<script defer src="dumul-js/obs/js/06-interaction.js?v=106"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=104"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=3"></script>
-<script defer src="dumul-js/obs/js/09-wormhole.js?v=4"></script>
+<script defer src="dumul-js/obs/js/09-wormhole.js?v=5"></script>
+<script defer src="dumul-js/obs/js/10-ui-sound.js?v=1"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
