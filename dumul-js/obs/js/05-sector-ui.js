@@ -1298,6 +1298,7 @@ var SN_COOLDOWN={};
   function getPlayingTrackIndex(){
     for(var i=0;i<tracks.length;i++){
       var a=tracks[i].audio;
+      if(a===xfOut&&xfIn&&!xfIn.paused)continue; /* crossfade: lagu yang memudar keluar tidak dihitung, UI ikut lagu baru */
       if(a&&!a.paused&&!a.ended)return i;
     }
     return -1;
@@ -1467,6 +1468,81 @@ var SN_COOLDOWN={};
     panel.classList.remove('open');panel.setAttribute('aria-hidden','true');toggle.setAttribute('aria-expanded','false');
     sync();
   }
+  /* ---- Crossfade BGM <-> BGM (pindah manual, tombol next/prev, dan auto-lanjut) ----
+     Equal-power: lagu lama cos, lagu baru sin. Volume dibaca live dari __mpMasterVol, jadi slider volume tetap jalan.
+     Kendali volume ditandai a._xf (applyMasterVol melewatinya) supaya nggak tabrakan dengan fadeTo/applyMasterVol. */
+  var XF_MS=4000;                 /* durasi crossfade (ms); auto-lanjut mulai sebanyak ini sebelum lagu habis */
+  var xfOut=null,xfIn=null,xfTimer=0,xfDur=0,xfStep=null;
+  function xfTarget(a){
+    var bv=a._bv!=null?a._bv:.5,m=window.__mpMasterVol!=null?window.__mpMasterVol:.85;
+    return Math.max(0,Math.min(1,bv*m));
+  }
+  /* lepas kendali tanpa menyentuh status play. failed===true: lagu baru gagal start -> lagu lama lanjut normal */
+  function xfRelease(failed){
+    if(xfTimer){clearInterval(xfTimer);xfTimer=0;}
+    xfStep=null;
+    var o=xfOut,n=xfIn;xfOut=xfIn=null;
+    [o,n].forEach(function(a){if(a){a._xf=0;a._xfAbort=null;}});
+    if(failed===true){
+      if(n)safeReset(n);
+      if(o){try{o.volume=xfTarget(o);}catch(e){}}
+    }
+  }
+  /* selesai: lagu lama dimatikan & di-reset, volume dua-duanya dinormalkan */
+  function xfFinish(){
+    var o=xfOut,n=xfIn;
+    xfRelease();
+    if(o){safeReset(o);try{o.volume=xfTarget(o);}catch(e){}}
+    if(n){try{n.volume=xfTarget(n);}catch(e2){}}
+  }
+  function xfStart(from,to,ms){
+    xfFinish(); /* crossfade sebelumnya (kalau ada) diselesaikan dulu */
+    xfOut=from;xfIn=to;from._xf=1;to._xf=1;
+    from._xfAbort=to._xfAbort=xfRelease;
+    try{to.currentTime=0;}catch(e){}
+    /* .011 (bukan 0): safePlay() menaikkan volume ke .5 kalau volume <= .01 -> bunyi "pop" di awal */
+    try{to.volume=.011;}catch(e1){}
+    safePlay(to);
+    var t0=performance.now(),wait=0,started=false;
+    xfStep=function(){
+      if(xfIn!==to||xfOut!==from)return;
+      if(!started){
+        /* tunggu lagu baru benar-benar jalan (buffering) sebelum lagu lama mulai turun */
+        if(to.paused||to.readyState<3){
+          if(++wait<50){t0=performance.now();return;}   /* maks ~2 detik */
+          if(to.paused){xfRelease(true);sync();return;} /* gagal start: lagu lama lanjut */
+        }
+        started=true;t0=performance.now();
+      }else if(to.paused){
+        /* user pause / SFX bintang menjeda lagu baru di tengah crossfade: matikan dua-duanya, jangan ada yang nyala sendiri */
+        xfFinish();sync();return;
+      }
+      var u=Math.min(1,(performance.now()-t0)/ms),r=u*Math.PI/2;
+      try{from.volume=xfTarget(from)*Math.cos(r);to.volume=xfTarget(to)*Math.sin(r);}catch(e2){}
+      if(u>=1){xfFinish();sync();}
+    };
+    xfTimer=setInterval(xfStep,40);
+  }
+  /* Auto-lanjut: dipanggil dari timeupdate. 'ended' terlalu telat buat crossfade. Hanya BGM -> BGM
+     (repeat all / shuffle). Repeat off + shuffle off = BGM loop biasa; repeat one = loop biasa. */
+  function xfWatch(t){
+    if(!t||t.type!=='bgm'||xfTimer)return;
+    var a=t.audio;
+    if(!a||a.paused||a.ended||repeatMode===1)return;
+    if(!(repeatMode===2||shuffleOn))return;
+    if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
+    var d=a.duration;if(!isFinite(d)||d<XF_MS/1000*2.5)return;
+    var rem=d-a.currentTime;
+    if(rem>XF_MS/1000||rem<.2)return;
+    var cur=tracks.indexOf(t);
+    if(getPlayingTrackIndex()!==cur)return;
+    var n=pickNext(cur,1,(repeatMode===2&&!shuffleOn)?t.type:null);
+    var nt=tracks[n];
+    if(n<0||n===cur||!nt||nt.type!=='bgm')return; /* tujuan SFX / satu-satunya track: biarkan alur 'ended' lama */
+    xfDur=Math.max(300,Math.min(XF_MS,rem*1000));
+    selectAndPlay(n);
+    xfDur=0;
+  }
   function selectAndPlay(i){
     var target=tracks[i];
     if(!target)return;
@@ -1483,7 +1559,9 @@ var SN_COOLDOWN={};
     }
 
     activeIdx=i;
-    stopAllExcept(null);
+    var fromT=playingIdx>=0?tracks[playingIdx]:null;
+    var doXf=!!(target.type==='bgm'&&fromT&&fromT.type==='bgm'&&fromT.audio!==target.audio&&!fromT.audio.paused);
+    stopAllExcept(doXf?fromT.audio:null);
 
     if(target.type==='sfx'){
       /* Same path as clicking the star on the canvas: spectrum, star
@@ -1498,8 +1576,13 @@ var SN_COOLDOWN={};
         setAVColor(null,false);
       }
       target.audio._bv=.5;
-      try{target.audio.volume=Math.max(0,Math.min(1,.5*(window.__mpMasterVol!=null?window.__mpMasterVol:.85)));}catch(eV){target.audio.volume=.5;}
-      safePlay(target.audio);
+      if(doXf){
+        xfStart(fromT.audio,target.audio,xfDur||XF_MS);
+      }else{
+        xfFinish(); /* kalau ada crossfade berjalan & user pindah ke SFX / mulai dari diam */
+        try{target.audio.volume=Math.max(0,Math.min(1,.5*(window.__mpMasterVol!=null?window.__mpMasterVol:.85)));}catch(eV){target.audio.volume=.5;}
+        safePlay(target.audio);
+      }
     }
     sync();
   }
@@ -1570,7 +1653,7 @@ var SN_COOLDOWN={};
       if(!a)return;
       var bv=a._bv!=null?a._bv:(a===AMB||a===MUSIC_COLLAP?.5:.85);
       a._bv=bv;
-      try{if(a._f)return;a.volume=Math.max(0,Math.min(1,bv*masterVol));}catch(e){}
+      try{if(a._f||a._xf)return;a.volume=Math.max(0,Math.min(1,bv*masterVol));}catch(e){}
     }
     tracks.forEach(function(t){setA(t.audio);});
     try{if(typeof SFX==='object')Object.keys(SFX).forEach(function(k){setA(SFX[k]);});}catch(eS){}
@@ -1821,8 +1904,9 @@ var SN_COOLDOWN={};
       /* retry async dari track lama yang sudah ditinggalkan: matikan lagi */
       if(!t.audio._want){safePause(t.audio);if(t.type==='sfx')t.audio.loop=false;sync();return;}
       /* ada track baru mulai: pastikan semua track lain berhenti (single voice) */
+      if(t.type==='sfx')xfFinish();
       tracks.forEach(function(o){
-        if(o.audio&&o.audio!==t.audio&&!o.audio.paused&&!o.audio.ended){
+        if(o.audio&&o.audio!==t.audio&&(o.audio!==xfOut||t.type!=='bgm')&&!o.audio.paused&&!o.audio.ended){
           if(o.audio===activeSfx&&t.type==='sfx'){o.audio.onended=null;}
           safePause(o.audio);
           if(o.type==='sfx')o.audio.loop=false;
@@ -1832,7 +1916,7 @@ var SN_COOLDOWN={};
     });
     t.audio.addEventListener('pause',sync);
     t.audio.addEventListener('ended',function(){onTrackEnded(t);sync();});
-    t.audio.addEventListener('timeupdate',function(){if(!seekDrag&&panelOpen())updateSeekUI();});
+    t.audio.addEventListener('timeupdate',function(){if(xfStep)xfStep();xfWatch(t);if(!seekDrag&&panelOpen())updateSeekUI();});
   });
   var _sel0=selectAndPlay;
   selectAndPlay=function(i){

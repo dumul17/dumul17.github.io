@@ -1012,6 +1012,7 @@ function showSecretSequence(){
 }
 function fadeTo(a,vol,ms,opts){
   opts=opts||{};
+  if(a._xfAbort)a._xfAbort(); /* crossfade player melepas kendali volume (mis. swallow Gargantua) */
   clearInterval(a._f);var v0=a.volume,t0=performance.now();
   /* Only resume if the caller explicitly asks. Mute/unmute must not wake every paused track. */
   if(opts.resume&&vol>0&&a.paused)safePlay(a);
