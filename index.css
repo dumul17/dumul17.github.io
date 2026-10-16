@@ -1230,8 +1230,16 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 
 /* ===== v57: panel musik ringan — tanpa spektrum palsu (titik .mp-state berkedip), seek = notch, panel lebih pendek ===== */
 .mp-track .mp-spec{display:none}
-.mp-track{grid-template-columns:18px minmax(0,1fr) auto auto}
-.mp-track[data-type="bgm"]{grid-template-columns:20px minmax(0,1fr) auto}
+.mp-track{grid-template-columns:18px minmax(0,1fr) 12px}
+.mp-track[data-type="bgm"]{grid-template-columns:20px minmax(0,1fr) 12px}
+/* titik kedip menempati sel yang sama dgn penanda ○ (obs) — sejajar & seukuran; obs sudah disembunyikan saat .playing */
+.mp-track .mp-obs,.mp-track .mp-state{grid-column:3;grid-row:1;justify-self:center}
+.mp-track .mp-state{font:600 8px/1 'Courier New',monospace;min-width:8px;text-align:center}
 @keyframes mpDot{0%,100%{opacity:1}50%{opacity:.2}}
 .mp-track.playing .mp-state{animation:mpDot 1s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.mp-track.playing .mp-state{animation:none}}
+
+/* marquee judul grup: hanya untuk judul yang benar-benar kepotong (kelas .mq dipasang JS saat panel dibuka) */
+.mp-grp-marq{will-change:auto;animation:none}
+#music-player.open .mp-grp-marq.mq{will-change:transform;animation:mp-marq 7.5s ease-in-out 2 alternate}
+@media (prefers-reduced-motion:reduce){#music-player.open .mp-grp-marq.mq{animation:none}}
