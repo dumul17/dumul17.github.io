@@ -1420,7 +1420,7 @@ var SN_COOLDOWN={};
     if(playingIdx===-1){stopSpec();return;}
     var open=panelOpen();
     if(open){
-      pulseBars(rowSpecs[playingIdx],now,2.2,11);
+      /* spektrum baris dihapus: titik .mp-state berkedip lewat CSS (.mp-track.playing) */
     }else{
       pulseBars(miniBars,now,3,13);
     }
@@ -1522,8 +1522,10 @@ var SN_COOLDOWN={};
   var btnShuffle=document.getElementById('mp-shuffle');
   var btnRepeat=document.getElementById('mp-repeat');
   var seekEl=document.getElementById('mp-seek');
-  var waveCv=document.getElementById('mp-wave');
-  var waveCx=waveCv?waveCv.getContext('2d'):null;
+  var railEl=document.getElementById('mp-wave');
+  var railFill=railEl&&railEl.querySelector('.mp-rail-fill');
+  var railNotch=railEl&&railEl.querySelector('.mp-notch');
+  var _rp=-1;
   var t0El=document.getElementById('mp-t0');
   var t1El=document.getElementById('mp-t1');
   var volEl=document.getElementById('mp-vol');
@@ -1700,29 +1702,13 @@ var SN_COOLDOWN={};
     s=Math.floor(s);
     return ((s/60)|0)+':'+((s%60)<10?'0':'')+(s%60);
   }
+  /* Seek = rel tipis + notch (dulu waveform canvas digambar ulang ~15x/detik). Hanya ubah style kalau posisinya berubah (per 0.1%). */
   function paintWave(prog,playing){
-    if(!waveCx||!waveCv)return;
-    var w=waveCv.width,h=waveCv.height;
-    waveCx.clearRect(0,0,w,h);
-    var bars=36,gap=2,bw=(w-gap*(bars-1))/bars,mid=h*.55;
-    var seed=waveSeed;
-    for(var i=0;i<bars;i++){
-      seed=(seed*16807+i*13)%2147483647;
-      var n=((seed%1000)/1000);
-      var env=.35+.65*Math.sin((i/bars)*Math.PI);
-      var bh=Math.max(2,mid*env*(.45+.55*n));
-      if(playing){
-        var pulse=.5+.5*Math.sin(performance.now()*.006+i*.55);
-        bh*=.75+.25*pulse;
-      }
-      var x=i*(bw+gap);
-      var filled=(i/bars)<prog;
-      waveCx.fillStyle=filled?'rgba(110,229,255,.75)':'rgba(110,229,255,.18)';
-      waveCx.fillRect(x,mid-bh*.55,bw,bh);
-    }
-    var px=Math.max(0,Math.min(w,prog*w));
-    waveCx.fillStyle='rgba(234,252,255,.9)';
-    waveCx.fillRect(px-0.5,2,1.5,h-4);
+    if(!railFill||!railNotch)return;
+    var s=Math.round(Math.max(0,Math.min(1,prog))*1000);
+    if(s===_rp)return;_rp=s;
+    railFill.style.transform='scaleX('+(s/1000)+')';
+    railNotch.style.left=(s/10)+'%';
   }
   function updateSeekUI(){
     var i=getPlayingTrackIndex();
@@ -1746,7 +1732,7 @@ var SN_COOLDOWN={};
     seekRAF=0;
     /* Hanya jalan saat panel terbuka + ada audio playing */
     if(!panelOpen()||getPlayingTrackIndex()===-1){stopSeekTick();return;}
-    if(!(ts-seekLast<66)){seekLast=ts;updateSeekUI();} /* ~15fps: cukup utk teks waktu + waveform */
+    if(!(ts-seekLast<200)){seekLast=ts;updateSeekUI();} /* ~5fps: notch bergeser <2px/detik, teks waktu cuma berubah 1x/detik */
     seekRAF=requestAnimationFrame(tickSeek);
   }
   function startSeekTick(){
