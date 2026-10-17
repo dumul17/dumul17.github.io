@@ -1280,7 +1280,7 @@ function txWhy(src,here){
   var a=txComp(src);
   if(!a.p)return 'far';                       /* TX sumber belum di-dock */
   if(!a.c)return 'needov';                    /* BH overview di-recall */
-  if(!a.y)return 'needbh';                    /* BH mini sektor sumber belum/dilepas */
+  if(!a.y)return here?'needbhsrc':'needbh';   /* BH mini sektor SUMBER belum/dilepas (beda dengan needbh = BH mini di sektor ini) */
   if(!here)return '';
   var h=txComp(here);
   if(!h.y)return 'needbh';                    /* panggil BH mini di sini */
@@ -1350,10 +1350,10 @@ function txLongPressTele(){
   if(SUM.on&&BHSC>.05){
     txRecvSet(X,true);
     var w=txWhy(src,X);
-    toast(w===''?'toast.tx.linked':(w==='needov'?'toast.tx.needov':(w==='far'?'toast.tx.far':(w==='none'?'toast.tx.muff':'toast.tx.needbh'))),3600,{s:nm});
+    toast(w===''?'toast.tx.linked.rx':(w==='needov'?'toast.tx.needov':(w==='far'?'toast.tx.far':(w==='none'?'toast.tx.muff':(w==='needbhsrc'?'toast.tx.needbhsrc':'toast.tx.needbh')))),3600,{s:nm});
     haptic(14);return true;
   }
-  toast('toast.tx.needbh',3200);
+  toast('toast.tx.needbh',3200);   /* sektor non-sumber: butuh BH mini dulu, baru receiver */
   return true;
 }
 function txRecallFromTele(){return txLongPressTele();}

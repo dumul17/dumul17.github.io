@@ -1246,9 +1246,9 @@ function spatialHint(t){
     st=w===''?'relay':(w==='far'?(t>.5?'muffled':''):w);
   }else if(s&&SECT.cur&&!SECT.busy&&s!==SECT.cur){
     w=txWhy(s,SECT.cur);
-    /* Cam constellation (auto-fit zoom fokus rasi) di dalam sektor: redamnya datang dari kamera (camStrain), bukan dari BH mini,
-       jadi toast "panggil BH mini" tidak relevan di sini; tampilkan toast 'strain' saja. */
-    st=w===''?(camStrain(s)>0?'strain':'relay-here'):((w==='needbh'&&camStrain(s)>0)?'strain':w);
+    /* 'strain' (kamera cam constellation menjauh dari sektor sumber) HANYA muncul kalau receiver sudah tersambung penuh (w===''):
+       kalau rantai belum lengkap, toast harus menunjuk langkah yang kurang (BH mini / receiver), bukan 'terbebani'. */
+    st=w===''?(camStrain(s)>0?'strain':'relay-here'):w;
   }
   if(st===AV._hint)return;
   AV._hint=st;
@@ -1257,6 +1257,8 @@ function spatialHint(t){
   else if(st==='relay')showModeToast(T('toast.tx.linked'),null,3600);
   else if(st==='far')showModeToast(T('toast.tx.far'),null,4600);
   else if(st==='needbh')showModeToast(T('toast.tx.needbh'),null,4200);
+  else if(st==='needbhsrc')showModeToast(T('toast.tx.needbhsrc'),null,4200);
+  else if(st==='relay-here')showModeToast(T('toast.tx.linked.rx'),null,3600);
   else if(st==='needov')showModeToast(T('toast.tx.needov'),null,4200);
   else if(st==='needrecv')showModeToast(T('toast.tx.tiprecv'),'tip',4200);
   else if(st==='strain')showModeToast(T('toast.tx.strain'),null,4200);
