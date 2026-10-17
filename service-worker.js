@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v124'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v125'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -24,7 +24,7 @@ const SHELL = [
   './',
   'index.html',
   'dumul.html',
-  'index.css?v=58',
+  'index.css?v=59',
   /* harus sama persis dengan <script src> di index.html */
   'dumul-js/obs/sky-data.js?v=22',
   'dumul-js/obs/texts.js?v=1',
@@ -32,10 +32,10 @@ const SHELL = [
   'dumul-js/obs/i18n-sky.js?v=1',
   'dumul-js/obs/i18n-texts.js?v=1',
   'dumul-js/obs/js/01-core.js?v=113',
-  'dumul-js/obs/js/02-sky-logic.js?v=113',
-  'dumul-js/obs/js/03-gargantua.js?v=99',
-  'dumul-js/obs/js/04-render.js?v=109',
-  'dumul-js/obs/js/05-sector-ui.js?v=120',
+  'dumul-js/obs/js/02-sky-logic.js?v=114',
+  'dumul-js/obs/js/03-gargantua.js?v=100',
+  'dumul-js/obs/js/04-render.js?v=110',
+  'dumul-js/obs/js/05-sector-ui.js?v=121',
   'dumul-js/obs/js/06-interaction.js?v=109',
   'dumul-js/obs/js/07-boot.js?v=105',
   'dumul-js/obs/js/08-tx-drone.js?v=4',

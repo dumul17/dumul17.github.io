@@ -53,7 +53,7 @@ h1.gl .kicker{animation:gk .65s steps(1,end)}
 #music-close{width:24px;height:24px;border:1px solid rgba(110,229,255,.12);border-radius:4px;background:rgba(110,229,255,.035);color:rgba(214,228,240,.65);font:300 17px/1 system-ui;cursor:pointer;transition:border-color .25s ease,background .25s ease,color .25s ease,transform .15s ease;flex:0 0 auto}
 #music-close:hover,#music-close:focus-visible{border-color:rgba(110,229,255,.4);background:rgba(110,229,255,.08);color:#eafcff}
 .mp-tracks{display:grid;gap:3px}.mp-track{display:grid;grid-template-columns:18px minmax(0,1fr) 12px auto 9px;align-items:center;width:100%;padding:5px 7px;border:1px solid rgba(110,229,255,.09);border-radius:5px;background:rgba(110,229,255,.018);color:rgba(214,228,240,.62);text-align:left;cursor:pointer;gap:0 3px;transition:border-color .28s ease,background .28s ease,color .28s ease,box-shadow .28s ease}.mp-track.active{border-color:rgba(110,229,255,.38);background:rgba(110,229,255,.055);color:#eafcff;box-shadow:0 0 12px rgba(110,229,255,.06)}.mp-track.observed{border-color:rgba(110,229,255,.18)}.mp-num{font:600 7.5px/1 'Courier New',monospace;color:rgba(110,229,255,.5);transition:color .28s ease}.mp-name{font:500 9px/1.2 'Courier New',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .28s ease}.mp-obs{font:600 8px/1 'Courier New',monospace;letter-spacing:0;color:rgba(184,198,214,.28);white-space:nowrap;min-width:8px;text-align:center;transition:color .28s ease}.mp-track.observed .mp-obs{color:#6ee5ff;text-shadow:0 0 6px rgba(110,229,255,.45)}.mp-track.playing .mp-obs{opacity:0;max-width:0;overflow:hidden;margin:0;padding:0;font-size:0;min-width:0}.mp-track[data-type="bgm"]{grid-template-columns:20px minmax(0,1fr) auto 9px}.mp-state{font-size:6px;opacity:0;color:#6ee5ff;transition:opacity .3s ease}.mp-track.playing .mp-state{opacity:1}
-.mp-spec{display:inline-flex;align-items:flex-end;gap:1.4px;height:11px;margin-left:2px;opacity:0;max-width:0;overflow:hidden;pointer-events:none;transition:opacity .32s ease,max-width .32s ease,margin .32s ease}.mp-track.playing .mp-spec{opacity:1;max-width:28px;margin-left:2px}.mp-spec i{display:block;width:1.6px;height:3px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 4px rgba(110,229,255,.55);transform-origin:bottom center;will-change:height;transition:height .12s ease-out}
+.mp-spec{display:inline-flex;align-items:flex-end;gap:1.4px;height:11px;margin-left:2px;opacity:0;max-width:0;overflow:hidden;pointer-events:none;transition:opacity .32s ease,max-width .32s ease,margin .32s ease}.mp-track.playing .mp-spec{opacity:1;max-width:28px;margin-left:2px}.mp-spec i{display:block;width:1.6px;height:11px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 4px rgba(110,229,255,.55);transform-origin:bottom center;transform:scaleY(.273);transition:transform .12s ease-out}.mp-track.playing .mp-spec i{will-change:transform}
 .mp-foot{display:flex;flex-direction:column;gap:6px}
 .mp-seek{position:relative;width:100%;min-width:0;min-height:26px;height:26px;box-sizing:border-box;flex-shrink:0;border-radius:5px;overflow:hidden;border:1px solid rgba(110,229,255,.12);background:rgba(110,229,255,.03)}
 #mp-wave{position:absolute;left:5px;right:5px;top:6px;width:calc(100% - 10px);height:12px;max-width:100%;box-sizing:border-box;border-radius:2px;background:rgba(110,229,255,.14);pointer-events:none;display:block}
@@ -74,7 +74,7 @@ h1.gl .kicker{animation:gk .65s steps(1,end)}
 .mp-play:active,.mp-ctrl:active,.mp-track:active,#music-close:active{transform:translateY(1px)}
 .mp-play-icon{font-size:11px;color:#6ee5ff;line-height:1;transition:color .25s ease}
 #music-toggle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;display:grid;place-items:center;width:32px;height:32px;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.7);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .3s ease,border-color .3s ease,background .3s ease,box-shadow .3s ease;overflow:hidden}#music-toggle:hover,#music-toggle:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.07)}#music-toggle svg{width:15px;height:15px;display:block;grid-area:1/1;transition:opacity .28s ease,transform .28s ease}#music-toggle.playing-closed{color:#6ee5ff;border-color:rgba(110,229,255,.5);background:rgba(110,229,255,.1);box-shadow:0 0 12px rgba(110,229,255,.18)}#music-toggle.playing-closed svg{opacity:0;transform:scale(.55)}
-.mp-spec-mini{grid-area:1/1;display:inline-flex;align-items:flex-end;justify-content:center;gap:1.5px;height:14px;opacity:0;pointer-events:none;transform:scale(.7);transition:opacity .3s ease,transform .3s ease}.mp-spec-mini i{display:block;width:2px;height:4px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 5px rgba(110,229,255,.65);transform-origin:bottom center;will-change:height;transition:height .12s ease-out}#music-toggle.playing-closed .mp-spec-mini{opacity:1;transform:scale(1)}
+.mp-spec-mini{grid-area:1/1;display:inline-flex;align-items:flex-end;justify-content:center;gap:1.5px;height:14px;opacity:0;pointer-events:none;transform:scale(.7);transition:opacity .3s ease,transform .3s ease}.mp-spec-mini i{display:block;width:2px;height:13px;border-radius:1px;background:#6ee5ff;box-shadow:0 0 5px rgba(110,229,255,.65);transform-origin:bottom center;transform:scaleY(.308);transition:transform .12s ease-out}#music-toggle.playing-closed .mp-spec-mini i{will-change:transform}#music-toggle.playing-closed .mp-spec-mini{opacity:1;transform:scale(1)}
 /* Now-playing title: beside logo when HUD closed, then slides into logo after 2s */
 #mp-now-playing{position:fixed;right:50px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;height:32px;display:flex;align-items:center;max-width:min(160px,calc(100vw - 72px));padding:0 10px;border:1px solid rgba(110,229,255,.22);border-radius:5px;background:rgba(3,8,13,.95);box-shadow:0 0 12px rgba(110,229,255,.08);font:500 9px/1 'Courier New',monospace;letter-spacing:.06em;color:#dff7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateX(10px) scale(.96);pointer-events:none;visibility:hidden;transition:opacity .38s ease,transform .42s cubic-bezier(.22,.7,.3,1),visibility 0s linear .42s}
 #mp-now-playing.show{opacity:1;transform:none;visibility:visible;transition:opacity .38s ease,transform .42s cubic-bezier(.22,.7,.3,1),visibility 0s}
@@ -872,6 +872,7 @@ body.lis-asking #mode-toast{bottom:calc(160px + env(safe-area-inset-bottom,0px))
    no content-visibility anywhere near the canvas. */
 #mode-toast{contain:layout style paint}
 #music-player,#mp-now-playing,#cam-whisper,#cam-zoom,#sector-scan{contain:layout style}
+#music-player{contain:layout style paint}
 /* tier 0 (low-end / saveData, tied to IS_POTATO): drop the expensive backdrop blur, use a more opaque panel */
 .perf-tier-0 *,.perf-tier-0 *::before,.perf-tier-0 *::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .perf-tier-0 #cam-whisper,.perf-tier-0 #cam-zoom,.perf-tier-0 #sector-scan,.perf-tier-0 #music-player{background-color:rgba(2,7,12,.98)!important}
@@ -1331,3 +1332,24 @@ body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)
 @media (prefers-reduced-motion:no-preference){#live-count i{animation:lcPulse 2s ease-in-out infinite}}
 @keyframes lcPulse{50%{opacity:.35}}
 body.tesseract-running #live-count{visibility:hidden}
+
+/* Bar spektrum digerakkan CSS keyframe (jalan di compositor, nol kerja JS/main-thread per frame). Rumus meniru versi JS lama:
+   periode ~740ms, fase antar-bar 142ms, amplitudo membesar ke tengah. */
+@keyframes mpBar{0%,100%{transform:scaleY(.2)}50%{transform:scaleY(var(--mx,1))}}
+@keyframes mpBarM{0%,100%{transform:scaleY(.231)}50%{transform:scaleY(var(--mx,1))}}
+.mp-track.playing .mp-spec i{animation:mpBar .74s ease-in-out infinite}
+.mp-track.playing .mp-spec i:nth-child(1){--mx:.456;animation-delay:0s}
+.mp-track.playing .mp-spec i:nth-child(2){--mx:.638;animation-delay:-.142s}
+.mp-track.playing .mp-spec i:nth-child(3){--mx:.818;animation-delay:-.284s}
+.mp-track.playing .mp-spec i:nth-child(4){--mx:1;animation-delay:-.426s}
+.mp-track.playing .mp-spec i:nth-child(5){--mx:.818;animation-delay:-.568s}
+.mp-track.playing .mp-spec i:nth-child(6){--mx:.638;animation-delay:-.71s}
+.mp-track.playing .mp-spec i:nth-child(7){--mx:.456;animation-delay:-.852s}
+#music-player:not(.open) .mp-spec i{animation:none}
+#music-toggle.playing-closed .mp-spec-mini i{animation:mpBarM .74s ease-in-out infinite}
+#music-toggle.playing-closed .mp-spec-mini i:nth-child(1){--mx:.477;animation-delay:0s}
+#music-toggle.playing-closed .mp-spec-mini i:nth-child(2){--mx:.738;animation-delay:-.142s}
+#music-toggle.playing-closed .mp-spec-mini i:nth-child(3){--mx:1;animation-delay:-.284s}
+#music-toggle.playing-closed .mp-spec-mini i:nth-child(4){--mx:.738;animation-delay:-.426s}
+#music-toggle.playing-closed .mp-spec-mini i:nth-child(5){--mx:.477;animation-delay:-.568s}
+@media (prefers-reduced-motion:reduce){.mp-track.playing .mp-spec i,#music-toggle.playing-closed .mp-spec-mini i{animation:none}}
