@@ -880,7 +880,16 @@ function lisStart(full){
     lisToast('lis.toast.full',3200);
     try{TG.anchor=null;tgShow(T('lis.bub.start'));}catch(e2){}
     setTimeout(function(){
-      try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.tiprecv'),'tip',4200);}catch(e3){}
+      /* Cek ulang state SAAT toast mau muncul (bukan saat lisStart dipanggil): lompat gate antar sektor yang sudah interlocking
+         nggak boleh menyuruh dock/sambung lagi — TX/receiver tidak di-reset oleh star tracker, jadi kalau sektor ini sudah terpasang, diam.
+         Sektor sumber yang belum dock → petunjuk dock drone (bukan receiver). */
+      try{
+        if(typeof showModeToast!=='function'||!SECT.cur||lisGone())return;
+        var X=SECT.cur;
+        if(typeof txOn==='function'&&txOn(X))return;
+        var isSrc=(typeof sfxSector==='function'&&sfxSector()===X);
+        showModeToast(T(isSrc?'toast.tx.tip':'toast.tx.tiprecv'),'tip',4200);
+      }catch(e3){}
     },900);
   }else lisToast('lis.toast.cam',2600);
   LIS.tm=setTimeout(lisEnd,ms+30);LIS.iv=setInterval(lisHud,100);lisHud();
