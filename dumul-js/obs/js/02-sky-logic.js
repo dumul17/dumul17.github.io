@@ -1280,7 +1280,7 @@ function txWhy(src,here){
   var a=txComp(src);
   if(!a.p)return 'far';                       /* TX sumber belum di-dock */
   if(!a.c)return 'needov';                    /* BH overview di-recall */
-  if(!a.y)return here?'needbhsrc':'needbh';   /* BH mini sektor SUMBER belum/dilepas (beda dengan needbh = BH mini di sektor ini) */
+  if(!a.y)return 'needbhsrc';                 /* BH mini sektor SUMBER belum/dilepas — berlaku juga dari overview (here=null; 'needbh' = BH mini di sektor ini, nggak ada artinya di overview) */
   if(!here)return '';
   var h=txComp(here);
   if(!h.y)return 'needbh';                    /* panggil BH mini di sini */
