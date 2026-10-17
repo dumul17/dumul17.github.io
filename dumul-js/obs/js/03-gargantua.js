@@ -326,7 +326,9 @@ function drawHole(now,age){
   /* Audio-reactive Gargantua ring. The black hole core and drag physics are
      untouched; this is a visual layer drawn on top of the normal ring only
      while one of Betelgeuse/Rigel/Spica SFX is actively playing. */
+  if(typeof PERF!=='undefined'&&PERF)pmk('hole.draw');
   drawAudioVisualizer(now,R);
+  if(typeof PERF!=='undefined'&&PERF)pmk('viz');
 
   /*
    * Animated gravitational pulse rings.

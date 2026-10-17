@@ -1086,11 +1086,33 @@ function astStep(now){
   AST._stamp=now;
 }
 /* half: -1 = separuh belakang (gambar SEBELUM Rasi/BH, lebih redup), 1 = separuh depan (SESUDAH BH), 0/undefined = semua sekaligus. */
+var AST_DRAWN=0;   /* jumlah batu yang benar-benar di-drawImage pada frame ini (dibaca probe) */
 function drawAsteroids(now,half){
-  if(!AST.length||!AST_CFG.on)return;
+  if(!AST.length||!AST_CFG.on||(typeof PX!=='undefined'&&PX.ast))return;
   half=half|0;
   if(half<=0||AST._stamp!==now)astStep(now);
   var sprites=ensureAsteroidSprites(),bsp=sprites.back;
+  /* Hemat panggilan canvas: 300 batu x (save+alpha+translate+rotate+drawImage+restore) = 1800 call/pass di WebView lemah.
+     Sekarang satu save/restore untuk seluruh loop, lalu per batu cuma setTransform (= translate+rotate digabung, matriks dasar M dibaca sekali) + alpha + drawImage.
+     Hasil gambar identik: M * T(x,y) * R(th). */
+  var m0=g.getTransform?g.getTransform():null,A0=g.globalAlpha,
+      ma=m0?m0.a:1,mb=m0?m0.b:0,mc=m0?m0.c:0,md=m0?m0.d:1,me=m0?m0.e:0,mf=m0?m0.f:0;
+  if(!m0){   /* fallback tanpa getTransform: jalur lama */
+    for(var i0=0;i0<AST.length;i0++){
+      var a0=AST[i0];
+      if(!a0._vis)continue;
+      if(half<0&&!a0._back)continue;
+      if(half>0&&a0._back)continue;
+      var sj=(a0.sprite|0)%sprites.length,sq=a0._back?bsp[sj]:sprites[sj],hq=sq.pad*(a0._sz/sq.R);
+      g.save();
+      if(a0._back)g.globalAlpha*=.86+.36*a0._s; else g.globalAlpha*=Math.min(1,.9+.1*a0._s);
+      g.translate(a0._x,a0._y);g.rotate(a0.rot+now*a0.rs);
+      g.drawImage(sq.c,-hq,-hq,hq*2,hq*2);
+      g.restore();
+    }
+    return;
+  }
+  g.save();
   for(var i=0;i<AST.length;i++){
     var a=AST[i];
     if(!a._vis)continue;
@@ -1098,14 +1120,16 @@ function drawAsteroids(now,half){
     if(half>0&&a._back)continue;
     var si2=(a.sprite|0)%sprites.length,sp=a._back?bsp[si2]:sprites[si2];
     var scale=a._sz/sp.R,hf=sp.pad*scale;
-    g.save();
+    /* Cull layar ketat: margin cull di astStep (200px) cuma buat hitung lensing; batu yang kotaknya sepenuhnya di luar kanvas tidak kelihatan -> jangan digambar. */
+    if(a._x+hf<0||a._x-hf>W||a._y+hf<0||a._y-hf>H)continue;
+    AST_DRAWN++;
     /* belakang: makin jauh (sin t -> -1) makin redup + kecil; depan: sedikit lebih terang saat paling dekat */
-    if(a._back)g.globalAlpha*=.86+.36*a._s; else g.globalAlpha*=Math.min(1,.9+.1*a._s);
-    g.translate(a._x,a._y);
-    g.rotate(a.rot+now*a.rs);
+    g.globalAlpha=A0*(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s));
+    var th=a.rot+now*a.rs,co=Math.cos(th),si=Math.sin(th),x=a._x,y=a._y;
+    g.setTransform(ma*co+mc*si,mb*co+md*si,mc*co-ma*si,md*co-mb*si,ma*x+mc*y+me,mb*x+md*y+mf);
     g.drawImage(sp.c,-hf,-hf,hf*2,hf*2);
-    g.restore();
   }
+  g.restore();   /* transform + alpha kembali ke kondisi sebelum loop */
 }
 
 function drawTriggerVisuals(now){

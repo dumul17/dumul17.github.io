@@ -210,10 +210,10 @@ function renderStellarRecord(){
   var consEl=document.getElementById('sr-cons');
   var n=StellarMem.count();
   var nn=(n<10?'0':'')+n;
-  if(countEl)countEl.innerHTML='// <em>'+nn+'</em>/'+pad2(STELLAR_KEYS.length);
+  if(countEl){var ch0='// <em>'+nn+'</em>/'+pad2(STELLAR_KEYS.length);if(countEl._h!==ch0){countEl._h=ch0;countEl.innerHTML=ch0;}}
   if(badge){
-    badge.textContent=String(n);
-    badge.setAttribute('aria-hidden',n>0?'false':'true');
+    var bs=String(n);
+    if(badge.textContent!==bs){badge.textContent=bs;badge.setAttribute('aria-hidden',n>0?'false':'true');}
   }
   if(musicToggle)musicToggle.classList.toggle('has-stellar',n>0);
   /* Reflect capture state on each Stellar Signal row (status beside spectrum). */
@@ -222,6 +222,9 @@ function renderStellarRecord(){
     var row=rows[i],key=row.getAttribute('data-key');
     var on=!!(key&&StellarMem.isObserved(key));
     var lk=!!(key&&!isUnlocked(key));
+    var st=(lk?'L'+T('mp.locked'):(on?'O'+T('mp.captured'):'U'));   /* sertakan teks title: ganti bahasa tetap ke-refresh */
+    if(row._st===st)continue;   /* state baris tidak berubah: jangan sentuh DOM */
+    row._st=st;
     row.classList.toggle('observed',on);
     row.classList.toggle('locked',lk);
     row.disabled=lk;
@@ -247,7 +250,7 @@ function renderStellarRecord(){
       html2+='<span class="sr-cons-state">'+state+'</span>';
       html2+='</div>';
     }
-    consEl.innerHTML=html2;
+    if(consEl._h!==html2){consEl._h=html2;consEl.innerHTML=html2;}
   }
 }
 
@@ -1652,7 +1655,7 @@ function layout(){
   if(SW)return;
   W=stageCalc();H=STG.vh;
   try{document.body.classList.toggle('cam-compact',!!STG.rot||(H<=560&&W>=H*1.3));_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
-  DPR=(IS_POTATO?1:Math.min(window.devicePixelRatio||1,2))*(STG.on?STG.k:1);
+  DPR=(IS_POTATO?1:Math.min(window.devicePixelRatio||1,2))*(STG.on?STG.k:1)*(window.__dprMul||1);
   G_DEPTH=0;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
   fitTitle();
   var hb=vrect($('#header')).bottom,ft=vrect($('#footer')).top;

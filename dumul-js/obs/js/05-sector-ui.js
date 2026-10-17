@@ -996,6 +996,54 @@ window.addEventListener('pointercancel',function(){SGATE.down=null;},true);
 window.addEventListener('click',function(e){if(SGATE.sup&&performance.now()<SGATE.sup){e.stopPropagation();e.preventDefault();}},true); /* klik susulan tidak tembus ke tombol di bawah portal */
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&SGATE.open)sgClose();});
 
+/* ---------- PROBE PERFORMA (aktif hanya dengan ?perf=1 atau localStorage dumul_perf=1) ----------
+   Ukur: interval antar frame (rAF) vs waktu JS per frame + waktu per tahap. Kalau interval besar tapi JS kecil =>
+   beban ada di GPU/compositor, bukan di JS. Titik jank mencatat konteks: panel terbuka? SFX main? mode sektor? */
+var PX={sky:0,lines:0,stars:0,pulse:0,ast:0,hole:0,all:0,pa:0,pw:0,pb:0,slow:0};   /* saklar diagnosa (diubah dengan ketuk overlay); semua 0/1 = normal */
+var PX_MODES=['normal','panel HIDDEN','asteroid OFF','bintang OFF','SEMUA OFF (loop kosong)'];
+/* override style inline pada #music-player untuk diagnosa biaya render panel (dikembalikan ke '' tiap ganti mode) */
+var PX_PANEL={'panel HIDDEN':{visibility:'hidden'},'panel OPAQUE':{background:'#040a10'},'panel NO-CLIP':{overflow:'visible',contain:'none',borderRadius:'0'},'panel NO-WILLCHANGE':{willChange:'auto'},'panel NO-SHADOW':{boxShadow:'none'}};
+var PERF=false;try{PERF=/[?&]perf=1(&|$)/.test(location.search)||localStorage.getItem('dumul_perf')==='1';}catch(ePf){}
+var PP={fs:0,t0:0,last:0,cur:{},tot:{},n:0,isum:0,jsum:0,jank:0,ev:[],el:null,upd:0,pnl:null,imax:0};
+function pmk(n){if(!PERF)return;var t=performance.now();PP.cur[n]=(PP.cur[n]||0)+(t-PP.t0);PP.t0=t;}
+function pBegin(){if(!PERF)return;PP.fs=PP.t0=performance.now();PP.cur={};AST_DRAWN=0;}
+function pEnd(now){
+  if(!PERF)return;
+  pmk('end');
+  var js=performance.now()-PP.fs,iv=PP.last?now-PP.last:0;PP.last=now;PP.ad=AST_DRAWN;
+  if(iv>0&&iv<1000){
+    PP.n++;PP.isum+=iv;PP.jsum+=js;if(iv>PP.imax)PP.imax=iv;
+    for(var k in PP.cur)PP.tot[k]=(PP.tot[k]||0)+PP.cur[k];
+    if(iv>34){
+      PP.jank++;
+      var top='',tv=0;for(var k2 in PP.cur)if(PP.cur[k2]>tv){tv=PP.cur[k2];top=k2;}
+      var pn=PP.pnl||(PP.pnl=document.getElementById('music-player'));
+      PP.ev.push((iv|0)+'ms js'+(js|0)+' '+top+(tv|0)+' '+(pn&&pn.classList.contains('open')?'PANEL ':'')+(activeSfx&&!activeSfx.paused?'SFX ':'')+(SECT.on?'OVW':'SEC'));
+      if(PP.ev.length>6)PP.ev.shift();
+    }
+  }
+  if(now-PP.upd>700){
+    PP.upd=now;
+    if(!PP.el){var d=document.createElement('pre');d.style.cssText='position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:4px 6px;font:9px/1.25 monospace;color:#9ff;background:rgba(0,0,0,.72);pointer-events:auto;white-space:pre';document.body.appendChild(d);PP.el=d;PP.mode=0;
+      d.addEventListener('click',function(){
+        PP.mode=(PP.mode+1)%PX_MODES.length;var m=PP.mode;
+        var nm=PX_MODES[m];
+        PX.pa=nm==='panel anim OFF'?1:0;PX.pw=nm==='wave OFF'?1:0;PX.pb=nm==='bars OFF'?1:0;PX.slow=nm==='panel anim ~8fps'?1:0;PX.sky=nm==='langit OFF'?1:0;PX.lines=nm==='garis rasi OFF'?1:0;PX.stars=nm==='bintang OFF'?1:0;PX.pulse=nm==='pulse+TX OFF'?1:0;PX.ast=nm==='asteroid OFF'?1:0;PX.hole=nm==='lubang hitam OFF'?1:0;PX.all=nm.indexOf('SEMUA')===0?1:0;
+        var mpn=document.getElementById('music-player');
+        if(mpn){for(var pk in PX_PANEL)for(var pp in PX_PANEL[pk])mpn.style[pp]='';var ov=PX_PANEL[nm];if(ov)for(var pp2 in ov)mpn.style[pp2]=ov[pp2];}
+        PP.n=PP.isum=PP.jsum=PP.jank=PP.imax=0;PP.tot={};PP.ev=[];
+      },true);}
+    var n=PP.n||1,arr=[];for(var k3 in PP.tot)arr.push([k3,PP.tot[k3]/n]);arr.sort(function(a,b){return b[1]-a[1];});
+    var tx='['+PX_MODES[PP.mode|0]+'] ketuk=ganti\nfps '+(1000/(PP.isum/n)).toFixed(0)+'  int '+(PP.isum/n).toFixed(1)+'ms (max '+(PP.imax|0)+')  js '+(PP.jsum/n).toFixed(1)+'ms\njank>34ms: '+PP.jank+'/'+PP.n+'\n';
+    for(var i=0;i<Math.min(6,arr.length);i++)tx+=arr[i][0]+' '+arr[i][1].toFixed(2)+'\n';
+    var av=0;for(var ai2=0;ai2<AST.length;ai2++)if(AST[ai2]._vis)av++;
+    tx+='batu: gambar '+(PP.ad|0)+' / _vis '+av+' / total '+AST.length+'\n';
+    tx+=PP.ev.join('\n');
+    PP.el.textContent=tx;
+    if(PP.n>240){PP.n=PP.isum=PP.jsum=PP.jank=PP.imax=0;PP.tot={};PP.ev=[];}   /* jendela bergulir ~4 dtk */
+  }
+}
+
 function frame(now){
   /* Capture generation at entry. If a watchdog/visibility restart bumped
      renderGeneration while this callback was already queued, bail out so
@@ -1008,13 +1056,15 @@ function frame(now){
      bad frame can no longer freeze the page until a manual reload - at
      worst you lose one frame and the next one recovers. */
   try{
+    pBegin();
+    if(PX.all){resetCanvasState();g.clearRect(0,0,W,H);pmk('kosong');lastFrameOK=now;pEnd(now);return;}   /* diagnosa: loop jalan, tidak ada gambar sama sekali */
     var age=reduce?99:(now-START)/1000;
     if(SW)swP=clamp((now-SW.t0)/SW.dur);
     mouse.x+=(mouse.tx-mouse.x)*.05;mouse.y+=(mouse.ty-mouse.y)*.05;
-    updateAudioViz(now);
+    updateAudioViz(now);pmk('audioViz');
     ofxSafe(ofxUpdate,now);
     updateConstellationFocus(now);
-    updateTimeDilation(now);
+    updateTimeDilation(now);pmk('updates');
     if(hoverDirty&&mouse.px!=null&&!drag.on&&!SECT.on&&(now-lastHoverAt)>=HOVER_MIN_MS){
       updateHover(mouse.px,mouse.py);
       hoverDirty=false;lastHoverAt=now;
@@ -1038,9 +1088,10 @@ function frame(now){
         syncSkyPanHits();
       }
     }
+    pmk('logic');
     resetCanvasState();
     g.clearRect(0,0,W,H);
-    if(bgCanvas){
+    if(bgCanvas&&!PX.sky){
       // 1. Warna dasar ruang angkasa agar pinggiran layar tidak bocor saat background bergeser
       g.fillStyle='#050b12';
       g.fillRect(0,0,W,H);
@@ -1062,24 +1113,28 @@ function frame(now){
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
       drawHud();
     }
-    ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
+    pmk('sky');
+    if(!PX.sky)ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
     drawFloatingTelescope(now);
     var msgEl=frame._m||(frame._m=$('#secret-msg'));
     if(msgEl&&msgEl.classList.contains('on')&&msgEl.dataset.type==='telescope')placeSecretMsg();
     teleGreetFollow();
     updateClockDilation(now);
+    pmk('tint+tele');
     drawShooting(now);
     try{drawAsteroids(now,-1);}catch(err){window.__hub.renderError='drawAsteroidsBack: '+(err&&err.message||err);} /* separuh belakang: di belakang Rasi & BH */
+    pmk('shoot+astB');
     cullBegin();
     sectStep(now);
     if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);try{if(typeof drawTxLines==='function')drawTxLines(now);}catch(eTx){}}
     else{
-    CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
-    drawPulses(now,age);
-    CONS.forEach(function(c){if(sectShow(c.id))drawStars(c,age,now);});
-    if(sectShow('pleiades'))drawPleiades(age,now);
-    try{if(typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
+    if(!PX.lines)CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
+    if(!PX.pulse)drawPulses(now,age);
+    if(!PX.stars){CONS.forEach(function(c){if(sectShow(c.id))drawStars(c,age,now);});
+    if(sectShow('pleiades'))drawPleiades(age,now);}
+    try{if(!PX.pulse&&typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
     }
+    pmk('cons+stars');
     drawTriggerVisuals(now);
     ofxSafe(ofxDrawAvail,now);
     drawFocusFx(now);
@@ -1087,19 +1142,25 @@ function frame(now){
     ofxSafe(ofxDrawDust,now);
 
     // RENDER EFEK KOSMIK BARU:
+    pmk('fx');
     drawBHShockwaves(now);
     drawHyperspaceWarp(now);
     drawTargetLock(now);
 
     /* Isolate late-stage canvas effects so one mobile/WebView compatibility
        issue cannot abort the frame before Gargantua is rendered. */
+    pmk('warp');
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
-    drawHoleSafe(now,age);
+    pmk('portals');
+    if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
     try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: melintas di depan BH */
+    pmk('astFront');
     try{drawSectorGate(now);}catch(err){window.__hub.renderError='sectorGate: '+(err&&err.message||err);}
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}
+    pmk('tail');
     lastFrameOK=now;
+    pEnd(now);
   }catch(err){
     window.__hub.renderError='frame: '+(err&&err.message||err);
     /* If a burst or particle state caused this, clearing it is safer than
@@ -1430,43 +1491,19 @@ var SN_COOLDOWN={};
        when closed it relocates into the music logo. */
     toggle.classList.toggle('playing-closed',playing&&!open);
     playBtn.setAttribute('aria-label',playing?T('mp.pause'):T('mp.play'));
+    if(playBtn._pl!==playing){playBtn._pl=playing;
     playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true"><svg class="ico ico-play" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"'+(playing?' hidden':'')+'><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg><svg class="ico ico-pause" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"'+(playing?'':' hidden')+'><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>';
+    }
     if(playing)startSpec();else stopSpec();
     /* Title migrates to logo side when HUD closes while music plays;
        after 2s it slides into the logo. */
     if(playing&&!open)showNowPlaying();
     else clearNowPlaying();
   }
-  function pulseBars(bars,now,minH,maxH){
-    if(!bars||!bars.length)return;
-    for(var i=0;i<bars.length;i++){
-      var wave=.5+.5*Math.sin(now*.0085+i*1.21+activeIdx*2.4);
-      var center=1-Math.abs((i-(bars.length-1)/2)/Math.max(1,(bars.length-1)/2));
-      var h=minH+(maxH-minH)*wave*(.32+.68*center);
-      bars[i].style.height=h.toFixed(1)+'px';
-    }
-  }
-  function tickSpec(now){
-    specRAF=0;
-    var playingIdx=getPlayingTrackIndex();
-    if(playingIdx===-1){stopSpec();return;}
-    var open=panelOpen();
-    if(open){
-      pulseBars(rowSpecs[playingIdx],now,2.2,11);
-    }else{
-      pulseBars(miniBars,now,3,13);
-    }
-    specRAF=requestAnimationFrame(tickSpec);
-  }
-  function startSpec(){
-    if(specRAF||reduce)return;
-    specRAF=requestAnimationFrame(tickSpec);
-  }
-  function stopSpec(){
-    if(specRAF){cancelAnimationFrame(specRAF);specRAF=0;}
-    rowSpecs.forEach(function(bars){bars.forEach(function(b){b.style.height='3px';});});
-    miniBars.forEach(function(b){b.style.height='4px';});
-  }
+  /* Bar spektrum sekarang murni CSS (.mp-track.playing / #music-toggle.playing-closed) -> tidak ada loop JS lagi.
+     startSpec/stopSpec dipertahankan sebagai no-op supaya pemanggil lama tetap aman. */
+  function startSpec(){}
+  function stopSpec(){}
   /* Called from playSfx (pauseMusicForSfx) the instant a star SFX takes
      over — clears playing UI immediately without waiting for the BGM's
      'pause' event, so the HUD never flashes a stale state. */
@@ -1476,11 +1513,13 @@ var SN_COOLDOWN={};
     rows.forEach(function(row){row.classList.remove('playing');});
     playBtn.setAttribute('aria-label',T('mp.play'));
     playBtn.innerHTML='<span class="mp-play-icon" aria-hidden="true"><svg class="ico ico-play" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg><svg class="ico ico-pause" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true" hidden><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>';
+    playBtn._pl=false;
     clearNowPlaying();
     if(MS&&msKey){try{MS.playbackState='paused';}catch(e){}}
   };
   function openPanel(){
     panel.classList.add('open');panel.setAttribute('aria-hidden','false');toggle.setAttribute('aria-expanded','true');
+    if(typeof waveInvalidate==='function')waveInvalidate();
     if(typeof renderStellarRecord==='function')renderStellarRecord();
     sync();
   }
@@ -1732,10 +1771,14 @@ var SN_COOLDOWN={};
     s=Math.floor(s);
     return ((s/60)|0)+':'+((s%60)<10?'0':'')+(s%60);
   }
-  function paintWave(prog,playing){
-    if(!waveCx||!waveCv)return;
+  var waveCW=0,waveLast=0;
+  function waveInvalidate(){waveCW=0;waveKey='';}
+  window.addEventListener('resize',waveInvalidate,{passive:true});
+  window.addEventListener('orientationchange',waveInvalidate,{passive:true});
+  function measureWave(){
     /* Jangan biarkan set canvas.width/height mengubah layout box (bug WebView: seekbar mengecil).
-       Ukur dari CSS box; fallback ke parent .mp-seek; kunci style width/height setelah resize bitmap. */
+       Ukur dari CSS box; fallback ke parent .mp-seek; kunci style width/height setelah resize bitmap.
+       Dipanggil SEKALI (buka panel / resize), bukan tiap frame -> tidak ada forced reflow di loop. */
     var wrap=waveCv.parentElement,cw=waveCv.clientWidth,ch=waveCv.clientHeight;
     if(!(cw>1)&&wrap)cw=Math.max(0,(wrap.clientWidth||0)-10);
     if(!(ch>1))ch=12;
@@ -1744,21 +1787,26 @@ var SN_COOLDOWN={};
       if(waveCv.width!==nw||waveCv.height!==nh){waveCv.width=nw;waveCv.height=nh;}
       if(waveCv.style.width!==cw+'px')waveCv.style.width=cw+'px';
       if(waveCv.style.height!==ch+'px')waveCv.style.height=ch+'px';
+      waveCW=cw;
     }
+  }
+  var waveKey='';
+  function paintWave(prog,playing){
+    if(!waveCx||!waveCv||PX.pa||PX.pw)return;
+    if(!(waveCW>1))measureWave();
+    var bars=36,filledN=Math.min(bars,Math.ceil(prog*bars)),key=Math.round(prog*waveCv.width)+'|'+filledN+'|'+waveCv.width+'x'+waveCv.height+'|'+waveSeed;
+    if(key===waveKey)return;   /* tidak ada yang berubah: jangan sentuh canvas (hindari upload tekstur + commit panel) */
+    waveKey=key;
     var w=waveCv.width,h=waveCv.height;
     waveCx.setTransform(1,0,0,1,0,0);
     waveCx.clearRect(0,0,w,h);
-    var bars=36,gap=2,bw=(w-gap*(bars-1))/bars,mid=h*.55;
+    var gap=2,bw=(w-gap*(bars-1))/bars,mid=h*.55;
     var seed=waveSeed;
     for(var i=0;i<bars;i++){
       seed=(seed*16807+i*13)%2147483647;
       var n=((seed%1000)/1000);
       var env=.35+.65*Math.sin((i/bars)*Math.PI);
       var bh=Math.max(2,mid*env*(.45+.55*n));
-      if(playing){
-        var pulse=.5+.5*Math.sin(performance.now()*.006+i*.55);
-        bh*=.75+.25*pulse;
-      }
       var x=i*(bw+gap);
       var filled=(i/bars)<prog;
       waveCx.fillStyle=filled?'rgba(110,229,255,.75)':'rgba(110,229,255,.18)';
@@ -1779,17 +1827,19 @@ var SN_COOLDOWN={};
     }
     /* Panel tertutup: jangan gambar waveform / update DOM seek (hemat GPU) */
     if(!panelOpen())return;
-    if(t0El)t0El.textContent=fmtTime(cur);
-    if(t1El)t1El.textContent=dur>0?fmtTime(dur):'0:00';
-    if(seekEl&&!seekDrag)seekEl.value=String(Math.round(prog*1000));
+    var s0=fmtTime(cur),s1=dur>0?fmtTime(dur):'0:00',sv=String(Math.round(prog*1000));
+    if(t0El&&t0El.textContent!==s0)t0El.textContent=s0;
+    if(t1El&&t1El.textContent!==s1)t1El.textContent=s1;
+    if(seekEl&&!seekDrag&&seekEl.value!==sv)seekEl.value=sv;
     paintWave(prog,!!a&&!a.paused);
   }
   var seekRAF=0;
-  function tickSeek(){
+  var seekLast=0;
+  function tickSeek(now){
     seekRAF=0;
     /* Hanya jalan saat panel terbuka + ada audio playing */
     if(!panelOpen()||getPlayingTrackIndex()===-1){stopSeekTick();return;}
-    updateSeekUI();
+    if(!(now-seekLast<100)){seekLast=now;updateSeekUI();}   /* playhead gerak pelan: 10Hz cukup */
     seekRAF=requestAnimationFrame(tickSeek);
   }
   function startSeekTick(){
