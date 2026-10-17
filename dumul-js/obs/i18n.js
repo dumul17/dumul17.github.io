@@ -26,6 +26,7 @@
     'tune.quality':{en:'Quality',id:'Kualitas'},'tune.quality.hint':{en:'HIGH = full effects. LOW = lighter for weak devices. Tap to switch, then Save.',id:'HIGH = efek penuh. LOW = lebih ringan untuk perangkat lemah. Ketuk untuk ganti, lalu Simpan.'},
     'tune.none':{en:'Nothing to tune here yet.',id:'Belum ada yang bisa disetel di sini.'},
     'lang.label':{en:'EN → ID',id:'ID → EN'},
+    'live.one':{en:'observer',id:'pengamat'},'live.many':{en:'observers',id:'pengamat'},
 
     /* boot */
     'boot.observer':{en:'OBSERVER',id:'PENGAMAT'},'boot.audio':{en:'AUDIO',id:'AUDIO'},'boot.starmap':{en:'STAR MAP',id:'PETA BINTANG'},
