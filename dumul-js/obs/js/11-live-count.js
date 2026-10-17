@@ -37,6 +37,9 @@ function deviceId() {
 try {
   const el = document.getElementById('live-count');
   const num = el && el.querySelector('b');
+  const lab = el && el.querySelector('span');
+  /* label: "1 observer" / "5 observers" (EN), "pengamat" (ID, tanpa jamak). T dari i18n.js; fallback Inggris kalau belum ada. */
+  const word = (n) => { try { return window.T(n === 1 ? 'live.one' : 'live.many'); } catch (e) { return n === 1 ? 'observer' : 'observers'; } };
   if (el && num) {
     const db = getDatabase(initializeApp(firebaseConfig));
     const me = ref(db, 'presence/' + deviceId() + '/' + rid());
@@ -47,6 +50,7 @@ try {
     });
     onValue(ref(db, 'presence'), (s) => {
       num.textContent = s.size;   /* jumlah perangkat unik */
+      if (lab) lab.textContent = word(s.size);
       el.hidden = false;
     }, () => { el.hidden = true; });
   }
