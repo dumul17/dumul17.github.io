@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=57">
+<link rel="stylesheet" href="index.css?v=58">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -277,6 +277,7 @@
   <p class="quote" data-i18n="footer.quote">Keep creating, even without the applause.</p>
 </footer>
 <!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (7 file, urutan JANGAN diubah) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
+<div id="live-count" hidden aria-hidden="true"><i></i><b>0</b><span>watching</span></div>
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=22"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
@@ -293,6 +294,7 @@
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=4"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=6"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=4"></script>
+<script type="module" src="dumul-js/obs/js/11-live-count.js?v=1"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
