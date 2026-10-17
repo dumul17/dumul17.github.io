@@ -1803,27 +1803,31 @@ var SN_COOLDOWN={};
   function paintWave(prog,playing){
     if(!waveCx||!waveCv||PX.pa||PX.pw)return;
     if(!(waveCW>1))measureWave();
-    var bars=36,filledN=Math.min(bars,Math.ceil(prog*bars)),key=Math.round(prog*waveCv.width)+'|'+filledN+'|'+waveCv.width+'x'+waveCv.height+'|'+waveSeed;
+    /* Gaya "ruler": garis tipis + tick (besar tiap 4 segmen, kecil di antaranya) + playhead kotak tegak. Warna ikut cyan player. */
+    var SEG=24,w=waveCv.width,h=waveCv.height,u=w/(waveCW>1?waveCW:w),pad=Math.round(3*u),
+        span=Math.max(1,w-pad*2),px=pad+Math.max(0,Math.min(1,prog))*span,
+        key=Math.round(px)+'|'+w+'x'+h;
     if(key===waveKey)return;   /* tidak ada yang berubah: jangan sentuh canvas (hindari upload tekstur + commit panel) */
     waveKey=key;
-    var w=waveCv.width,h=waveCv.height;
     waveCx.setTransform(1,0,0,1,0,0);
     waveCx.clearRect(0,0,w,h);
-    var gap=2,bw=(w-gap*(bars-1))/bars,mid=h*.55;
-    var seed=waveSeed;
-    for(var i=0;i<bars;i++){
-      seed=(seed*16807+i*13)%2147483647;
-      var n=((seed%1000)/1000);
-      var env=.35+.65*Math.sin((i/bars)*Math.PI);
-      var bh=Math.max(2,mid*env*(.45+.55*n));
-      var x=i*(bw+gap);
-      var filled=(i/bars)<prog;
-      waveCx.fillStyle=filled?'rgba(110,229,255,.75)':'rgba(110,229,255,.18)';
-      waveCx.fillRect(x,mid-bh*.55,bw,bh);
+    var mid=Math.round(h/2),lw=Math.max(1,Math.round(1.6*u)),i,x,major,th;
+    /* garis dasar: sisa redup, bagian terputar terang */
+    waveCx.fillStyle='rgba(110,229,255,.18)';waveCx.fillRect(px,mid-lw/2,Math.max(0,w-pad-px),lw);
+    waveCx.fillStyle='rgba(110,229,255,.85)';waveCx.fillRect(pad,mid-lw/2,Math.max(0,px-pad),lw);
+    /* tick */
+    for(i=0;i<=SEG;i++){
+      x=pad+span*i/SEG;major=(i%4===0);
+      th=Math.round(h*(major?.62:.32));
+      waveCx.fillStyle=x<=px?(major?'rgba(110,229,255,.7)':'rgba(110,229,255,.42)'):(major?'rgba(110,229,255,.3)':'rgba(110,229,255,.16)');
+      waveCx.fillRect(Math.round(x-lw/2),mid-Math.round(th/2),lw,th);
     }
-    var px=Math.max(0,Math.min(w,prog*w));
-    waveCx.fillStyle='rgba(234,252,255,.9)';
-    waveCx.fillRect(px-0.5,2,Math.max(1.5,w/190),h-4);
+    /* playhead */
+    var pw=Math.max(3,Math.round(4*u)),ph=Math.round(h*.78),lw2=Math.max(1,Math.round(1.4*u)),
+        hx=Math.round(px-pw/2),hy=mid-Math.round(ph/2);
+    waveCx.fillStyle='rgba(110,229,255,.35)';waveCx.fillRect(hx,hy,pw,ph);
+    waveCx.lineWidth=lw2;waveCx.strokeStyle='rgba(234,252,255,.95)';
+    waveCx.strokeRect(hx+lw2/2,hy+lw2/2,pw-lw2,ph-lw2);
   }
   function updateSeekUI(){
     var i=getPlayingTrackIndex();
