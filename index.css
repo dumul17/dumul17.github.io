@@ -1326,10 +1326,24 @@ body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)
 #owl-backdrop.owl-scrub-bg{opacity:0!important;pointer-events:none!important}
 
 /* Live watching counter (Firebase RTDB presence) */
-#live-count{position:fixed;left:12px;top:calc(14px + env(safe-area-inset-top,0px));z-index:5;pointer-events:none;display:flex;align-items:center;gap:5px;font:500 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(196,226,240,.58);text-shadow:0 0 7px rgba(110,229,255,.16)}
+#live-count{position:fixed;left:12px;top:calc(14px + env(safe-area-inset-top,0px));z-index:5;pointer-events:none;display:flex;align-items:center;gap:5px;white-space:nowrap;font:500 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(196,226,240,.58);text-shadow:0 0 7px rgba(110,229,255,.16)}
 #live-count[hidden]{display:none}
 #live-count i{width:5px;height:5px;border-radius:50%;background:#6ee5ff;box-shadow:0 0 6px #6ee5ff}
 #live-count b{font:600 10.5px/1 'Courier New',monospace;color:#6ee5ff}
+#live-count i{flex:0 0 auto}
+#live-count b{flex:0 0 auto;letter-spacing:.045em}
+#live-count span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* Ukuran font DISERAGAMKAN dengan #bh-clock (label 8.5px + angka 10.5px; ikut breakpoint jam: <=520px, landscape pendek, body.lr) */
+@media (max-width:520px){#live-count{font-size:7.5px;letter-spacing:.06em}#live-count b{font-size:9.5px;letter-spacing:.025em}}
+@media (orientation:landscape) and (max-height:520px){body:not(.ls):not(.lr) #live-count{font-size:7.2px!important}body:not(.ls):not(.lr) #live-count b{font-size:9px!important}}
+body.lr #live-count{font-size:7.5px;letter-spacing:.06em}
+body.lr #live-count b{font-size:9.5px;letter-spacing:.025em}
+/* Mode cam fokus: kartu #cam-whisper ada di tengah-atas (lebar min(80vw,270px)). Counter dibatasi sampai tepi kiri kartu, teks lebih dipotong "…"; di layar sempit label disembunyikan (tinggal titik + angka). */
+body.camera-mode #live-count{max-width:calc((100vw - min(80vw,270px)) / 2 - 12px - 8px)}
+@media (max-width:520px){body.camera-mode #live-count span{display:none}}
+/* kartu cam dipindah ke kanan (cam-compact) / ke gutter (landscape stage): ruang kiri lega lagi */
+body.camera-mode.cam-compact #live-count,body.camera-mode.ls #live-count{max-width:calc(100vw - 24px)}
+body.camera-mode.cam-compact #live-count span,body.camera-mode.ls #live-count span{display:inline}
 @media (prefers-reduced-motion:no-preference){#live-count i{animation:lcPulse 2s ease-in-out infinite}}
 @keyframes lcPulse{50%{opacity:.35}}
 body.tesseract-running #live-count{visibility:hidden}
