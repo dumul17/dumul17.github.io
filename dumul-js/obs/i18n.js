@@ -90,7 +90,7 @@
     'tune.led.0':{en:'Green',id:'Hijau'},'tune.led.1':{en:'Amber',id:'Amber'},'tune.led.2':{en:'White',id:'Putih'},'tune.led.3':{en:'Blue',id:'Biru'},'tune.led.4':{en:'Violet',id:'Ungu'},
 
     /* kamera / HUD */
-    'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.zoom.aria':{en:'Camera zoom',id:'Zoom kamera'},'cam.hint':{en:'TAP ‹ › TO FOCUS',id:'KETUK ‹ › UNTUK FOKUS'},
+    'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.zoom.aria':{en:'Camera zoom',id:'Zoom kamera'},'cam.hint':{en:'TAP ‹ › TO FOCUS · CENTER = SNAP-BACK',id:'KETUK ‹ › UNTUK FOKUS · TENGAH = SPRINGBACK'},
     'cam.fact':{en:'FACT',id:'FAKTA'},
     'cam.band.vis':{en:'BAND · VIS',id:'PITA · VIS'},'cam.band.uv':{en:'BAND · UV',id:'PITA · UV'},'cam.band.ir':{en:'BAND · IR',id:'PITA · IR'},
     'cam.band.aria':{en:'Spectral band filter: visible, ultraviolet, infrared',id:'Filter pita spektral: tampak, ultraviolet, inframerah'},
