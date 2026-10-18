@@ -38,7 +38,7 @@ function updateHover(px,py){
 }
 document.addEventListener('pointerdown',function(e){
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return;
-  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return;
+  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#sector-scan'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
   /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
@@ -82,7 +82,7 @@ document.addEventListener('pointerdown',function(e){
 },{passive:true});
 document.addEventListener('pointerdown',function(e){
   if(SW||reduce)return;
-  if(e.target&&e.target.closest&&e.target.closest('#bh-panel'))return; /* panel tune: jangan tembus ke asteroid */
+  if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#mode-cluster,#music-player'))return; /* panel (tune / CAM / kartu rasi / katalog): jangan tembus ke asteroid */
   var ai=asteroidScreenAt(e.clientX,e.clientY);
   if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
@@ -1309,7 +1309,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
   function reset(){clearTimer();lpPid=null;lpMoved=false;lpFired=false;try{if(window.TXFX)TXFX.holdEnd();}catch(eH){}}
   function teleHitOk(e){
     if(SW||SECT.busy)return false;
-    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-whisper,#cam-cat,#lis-ask'))return false;
+    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask'))return false;
     if(typeof telescopeHitAt!=='function'||!telescopeHitAt(e.clientX,e.clientY))return false;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid)return false;
     var _tp=typeof telescopeScreenPos==='function'?telescopeScreenPos():[0,0];

@@ -670,7 +670,7 @@ function setCameraMode(on){
     btn.setAttribute('aria-label',CAMERA_MODE?T('mode.camera.exit'):T('mode.camera'));
     btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   }
-  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;setSkyZoom(1,false);FOCUS.list=null;}
+  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;_focusHome=null;setSkyZoom(1,false);FOCUS.list=null;}
   else{FOCUS.list=focusList();FOCUS.i=0;}
   if(!CAMERA_MODE){FFX.id=null;hideWhisper();setBand('vis');setLines(true);}
   focusUI();
@@ -770,19 +770,43 @@ function focusCycle(d){
   FOCUS.i=i;FOCUS.anim=true;_freeReset=false;
   focusUI();focusFx(FOCUS.list[i].id);haptic(8);
 }
-/* Tombol tengah: lagi fokus rasi -> Free (ingat rasi terakhir); lagi Free -> balik ke rasi terakhir (atau rasi pertama yang valid). */
+/* Tombol tengah = saklar springback (BUKAN auto zoom / auto fokus).
+   FOKUS (●): layout langit (rasi / cluster) dikunci ke posisi saat tombol ditekan; digeser lalu dilepas -> meluncur balik ke posisi itu. Zoom TETAP.
+   BEBAS: nggak ada springback, langit bebas digeser. Zoom & posisi nggak diubah sama sekali waktu pindah mode.
+   Auto zoom + pusatkan ke rasi tetap cuma dari tombol < >, ketuk bintang, atau pilih bintang di katalog. */
 var _focusBack=-1;
+var _focusHome=null;   /* {id,x,y}: posisi pan "rumah" untuk springback; null = pakai titik tengah rasi (perilaku < > / ketuk bintang) */
+/* Target fokus terdekat ke tengah area bebas (tanpa animasi): dipakai saat saklar dinyalakan dari BEBAS biar yang terfokus rasi yang lagi kelihatan. */
+function focusNearest(){
+  var L=FOCUS.list,cb=camBox(),ccx=W*.5,ccy=H*.5,z=Math.max(.2,skyZoom),best=-1,bd=1e18,k,g,dx,dy,qx,qy,sx,sy,d,rc=1,rs=0;
+  if(!L)return -1;
+  if(skyRot*skyRot>=1e-8){rc=Math.cos(skyRot);rs=Math.sin(skyRot);}
+  for(k=1;k<L.length;k++){
+    g=focusGeom(L[k].id);if(!g)continue;
+    dx=g.x+skyPan.x-ccx;dy=g.y+skyPan.y-ccy;
+    qx=dx*rc-dy*rs;qy=dx*rs+dy*rc;
+    sx=ccx+z*qx;sy=ccy+z*qy;
+    d=(sx-cb.cx)*(sx-cb.cx)+(sy-cb.cy)*(sy-cb.cy);
+    if(d<bd){bd=d;best=k;}
+  }
+  return best;
+}
 function focusToggleFree(){
   if(!FOCUS.list)FOCUS.list=focusList();
-  var cur=FOCUS.list[FOCUS.i],i,id;
-  if(cur&&cur.id!=='free'){
-    _focusBack=FOCUS.i;FOCUS.i=0;FOCUS.anim=false;_freeReset=false;   /* Free dari tombol tengah: zoom & posisi TETAP (nggak balik ke 1x) */
+  var cur=FOCUS.list[FOCUS.i],i;
+  if(cur&&cur.id!=='free'){   /* FOKUS -> BEBAS: lepas springback, zoom & posisi TETAP */
+    _focusBack=FOCUS.i;FOCUS.i=0;FOCUS.anim=false;_freeReset=false;_focusHome=null;
     focusUI();focusFx('free');haptic(8);return;
   }
-  i=_focusBack>0&&_focusBack<FOCUS.list.length&&focusGeom(FOCUS.list[_focusBack].id)?_focusBack:-1;
-  if(i<0){for(var k=1;k<FOCUS.list.length;k++)if(focusGeom(FOCUS.list[k].id)){i=k;break;}}
+  /* BEBAS -> FOKUS: pilih rasi terdekat ke tengah layar, kunci posisi sekarang sebagai "rumah". Nggak ada animasi zoom / geser. */
+  i=focusNearest();
+  if(i<0){   /* nggak ada yang kebaca: jatuh ke rasi terakhir / pertama yang valid */
+    i=_focusBack>0&&_focusBack<FOCUS.list.length&&focusGeom(FOCUS.list[_focusBack].id)?_focusBack:-1;
+    if(i<0){for(var k=1;k<FOCUS.list.length;k++)if(focusGeom(FOCUS.list[k].id)){i=k;break;}}
+  }
   if(i<0)return;
-  FOCUS.i=i;FOCUS.anim=true;_freeReset=false;
+  FOCUS.i=i;FOCUS.anim=false;_freeReset=false;
+  _focusHome={id:FOCUS.list[i].id,x:skyPan.x,y:skyPan.y};
   focusUI();focusFx(FOCUS.list[i].id);haptic(8);
 }
 /* Mode katalog (sheet bintang terbuka): < dan > pindah ke bintang sebelumnya / berikutnya di daftar; tombol tengah = lepas kunci (fokus rasi), lalu Free. */
@@ -1232,6 +1256,9 @@ function focusStep(){
         var cb=camBox(),zz=Math.max(.2,FOCUS.anim?g.z:skyZoom),ccx=W*.5,ccy=H*.5,ddx=(cb.cx-ccx)/zz,ddy=(cb.cy-ccy)/zz;
         if(id!=='bh'&&skyRot*skyRot>=1e-8){var rc=Math.cos(skyRot),rs=Math.sin(skyRot),qx=ddx*rc+ddy*rs;ddy=-ddx*rs+ddy*rc;ddx=qx;}
         var tx=Math.max(-lim.x,Math.min(lim.x,ccx+ddx-g.x)),ty=Math.max(-lim.y,Math.min(lim.y,ccy+ddy-g.y));
+        /* Saklar FOKUS dari tombol tengah: springback ke posisi saat dinyalakan (bukan ke titik tengah rasi). Animasi < > / ketuk bintang membuangnya. */
+        if(FOCUS.anim||(_focusHome&&_focusHome.id!==id))_focusHome=null;
+        if(_focusHome){tx=Math.max(-lim.x,Math.min(lim.x,_focusHome.x));ty=Math.max(-lim.y,Math.min(lim.y,_focusHome.y));}
         if(Math.abs(tx-skyPan.x)+Math.abs(ty-skyPan.y)>.3){skyPan.x+=(tx-skyPan.x)*k;skyPan.y+=(ty-skyPan.y)*k;ch=true;}
       }
       if(FOCUS.anim){
@@ -1254,6 +1281,13 @@ function focusStep(){
   if(cl){cl.addEventListener('pointerdown',function(e){e.stopPropagation();});
     cl.addEventListener('click',function(e){e.stopPropagation();toggleLines();});}
   setBand(BAND);setLines(CAM_LINES);   /* teks + aria awal sesuai bahasa (HTML cuma fallback Inggris) */
+  /* Anti tembus: seluruh permukaan panel CAM, kartu rasi, dan sheet katalog (bukan cuma tombolnya) menelan pointerdown/touchstart,
+     jadi ketukan di panel nggak ikut kena bintang / Pleiades / asteroid / teleskop / pan langit di bawahnya. */
+  ['cam-zoom','cam-whisper','cam-cat'].forEach(function(pid){
+    var pe=document.getElementById(pid);if(!pe)return;
+    pe.addEventListener('pointerdown',function(e){e.stopPropagation();try{markActivity();}catch(eM){}},{passive:true});
+    pe.addEventListener('touchstart',function(e){e.stopPropagation();},{passive:true});
+  });
 })();
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
