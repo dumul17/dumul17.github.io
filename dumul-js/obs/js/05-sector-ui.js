@@ -740,7 +740,7 @@ function drawInterlock(x,y,il){
   try{sumUI();}catch(eU0){}
   sectSet(true);
   try{if(window.__hub)window.__hub.sect=SECT;}catch(e){}
-  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#boot-screen,#terminal,#signal-fragment';
+  var SKIP='#bh,.portal,.hit,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#music-toggle,#music-player,#mode-cluster,#mode-sectors,#mode-bh,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#boot-screen,#terminal,#signal-fragment';
   function owlShut(){var bc=document.body.classList;return bc.contains('owl-open')||bc.contains('owl-block');}
   document.addEventListener('pointerdown',function(e){
     if(owlShut()){SECT.down=null;return;} /* panel owl terbuka / baru ditutup: tap tidak boleh tembus ke ikon sektor (Virgo dll) */
@@ -1154,7 +1154,6 @@ function frame(now){
     // RENDER EFEK KOSMIK BARU:
     pmk('fx');
     drawBHShockwaves(now);
-    drawHyperspaceWarp(now);
     drawTargetLock(now);
 
     /* Isolate late-stage canvas effects so one mobile/WebView compatibility
@@ -1211,7 +1210,7 @@ setInterval(function(){
    Audio is intentionally NOT paused: the browser may choose to suspend
    background media on its own, but this page never calls pause() here.
    On resume, shift every absolute performance.now()-based deadline/timestamp
-   by the hidden duration so transient FX (shockwaves, hyperspace streaks,
+   by the hidden duration so transient FX (shockwaves,
    particles, cooldowns, telescope schedule) pick up where they left off. */
 document.addEventListener('visibilitychange',function(){
   var now=performance.now();
@@ -1233,12 +1232,9 @@ document.addEventListener('visibilitychange',function(){
     for(var j=0;j<SN_BURSTS.length;j++)SN_BURSTS[j].t+=pause;
     for(var k=0;k<SS.length;k++)SS[k].t+=pause;
 
-    /* Transient FX introduced later: gravitational shockwaves + hyperspace streaks */
+    /* Transient FX introduced later: gravitational shockwaves */
     if(typeof BH_SHOCKWAVES!=='undefined'){
       for(var bi=0;bi<BH_SHOCKWAVES.length;bi++)BH_SHOCKWAVES[bi].t0+=pause;
-    }
-    if(typeof WARP_STREAKS!=='undefined'){
-      for(var wi=0;wi<WARP_STREAKS.length;wi++)WARP_STREAKS[wi].t0+=pause;
     }
 
     /* Absolute "until / next" deadlines */
@@ -1990,7 +1986,6 @@ activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
   }
   /* Sisa efek dari klik sebelumnya dibersihin dulu. */
   SN_BURSTS.length=0;
-  if(typeof WARP_STREAKS!=='undefined')WARP_STREAKS.length=0;
 
   /* 1. Supernova flash & particle burst */
   flash.style.setProperty('--sx',Math.round(q[0])+'px');
@@ -2014,9 +2009,6 @@ activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
   /* One core burst at a time — stacking SN_BURSTS was pure overdraw. */
   if(SN_BURSTS.length>=1)SN_BURSTS.length=0;
   SN_BURSTS.push({key:key,t:t0,d:busy?620:760});
-
-  // Trigger efek kilatan garis hyperspace ke arah bintang target
-  triggerHyperspaceWarp(sx, sy);
 
   /* Fase 4: teleskop tidak lagi auto-warp/orbit ke SFX. SFX langsung play. */
   sfxArrive(key);

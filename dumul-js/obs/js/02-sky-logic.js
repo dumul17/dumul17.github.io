@@ -955,11 +955,11 @@ function updateConstellationFocus(now){
   /* Strict focus: only the constellation whose SFX is currently playing is lit.
      Fresh open / after any SFX ends → aid null → everything stays dim. */
   CF.active=playing;
-  var aid=CF.active;
+  var aid=CAMERA_MODE?null:CF.active;   /* mode kamera: tidak ada rasi yang disorot, sweep kedip rasi aktif ikut mati. CF.active tetap = "ada SFX bunyi" untuk pemakai lain */
   var dt=Math.min(50,Math.max(0,now-(CF.lastNow||now)));
   for(var i=0;i<CONS.length;i++){
     var on=!!(aid&&CONS[i].id===aid);
-    CF.target[i]=on?1:.24;
+    CF.target[i]=(CAMERA_MODE||on)?1:.24;   /* mode kamera: semua rasi terang normal (tanpa sorotan & tanpa sapuan kedip karena aid=null) */
     var k=1-Math.pow(.001,dt/420);CF.current[i]+=(CF.target[i]-CF.current[i])*k;
   }
   if(aid&&!(SECT.on&&!SECT.busy)){ /* overview diam: rasi nggak digambar, sweep twinkle-nya nggak perlu dihitung */

@@ -355,7 +355,7 @@ function beginBHDrag(e){
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -441,7 +441,7 @@ document.addEventListener('pointercancel',endBHDrag,{passive:false});
 
 /* ---------- mobile constellation pan + 2-finger rotate (±180°) ---------- */
 function skyPanLimits(){
-  var z=skyZoom||1,lx,ly;
+  var z=Math.min(skyZoom||1,3),lx,ly;   /* batas pan (ruang dunia) berhenti tumbuh di atas x3: x10 nggak perlu 10 layar ruang kosong */
   if(CAMERA_MODE){lx=Math.max(W*.62,Math.max(80,W*.38)*z);ly=Math.max(H*.62,Math.max(70,H*.32)*z);}
   else{lx=Math.max(80,W*.38)*z;ly=Math.max(70,H*.32)*z;}
   /* Landscape ROT: pan hidup di ruang sky (sebelum skyRot), jadi saat sky diputar ~90deg (kamera fokus rasi) sumbu x/y batasnya ikut tertukar */
@@ -484,6 +484,7 @@ function fxSectSync(){
 function syncSkyPanHits(){
   try{
     fxPlace(true); /* tombol hit bintang SFX ikut pan/zoom/lensing */
+    catLockPlace(); /* reticle kunci bintang katalog ikut pan/zoom/lensing */
   }catch(err){
     /* Silently dropping this would leave the invisible rigel/betel/sirius/
        aldebaran/pleione hit targets stuck at their pre-rotation position with
@@ -514,7 +515,7 @@ function beginSkyPan(e){
   /* FIX pinch zoom di cam fokus (dalam sektor): dulu SETIAP jari dicek ke hit-test bintang/asteroid/BH, dan di dalam sektor
      hampir seluruh layar = target bintang -> jari ke-2 ditolak -> pinch nggak pernah mulai. Sekarang semua kontak sentuh dicatat,
      dan jari ke-2 cuma ditolak kalau jatuh di UI (panel/tombol), bukan di bintang. */
-  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cam-whisper,#lis-ask,#title,#footer,#owl-source,#bh-clock,#music-toggle';
+  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#title,#footer,#owl-source,#bh-clock,#music-toggle';
   if(e.target.closest&&e.target.closest(UI_T))return false;
   var multi=false;
   if(e.pointerType!=='mouse'){
@@ -529,7 +530,7 @@ function beginSkyPan(e){
       if(!skyPtrs[ids2[qi]])skyPtrs[ids2[qi]]={x:skyAll[ids2[qi]].x,y:skyAll[ids2[qi]].y};
     }
   }else{
-  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -586,6 +587,9 @@ function moveSkyPan(e){
   /* Landscape ROT: pan ada di ruang sky yang sudah diputar skyRot (kamera fokus rasi => ~90deg), sedangkan jari terbaca di ruang stage.
      Putar balik delta jari dgn -skyRot (rumus sama dgn focusStep) supaya geser kiri/kanan di layar = sky gerak kiri/kanan. */
   if(STG.rot&&skyRot*skyRot>=1e-8){var rc=Math.cos(skyRot),rs=Math.sin(skyRot),qx=dx*rc+dy*rs;dy=-dx*rs+dy*rc;dx=qx;}
+  /* skyPan hidup di ruang dunia lalu dikali skyZoom di skyXF (screen = c + z*(pt+pan-c)): 1px jari = z px layar, makin zoom makin sensitif.
+     Bagi delta dengan zoom supaya langit mengikuti jari 1:1 di zoom berapa pun. */
+  var zd=skyZoom>1?skyZoom:1;dx/=zd;dy/=zd;
   skyPan.x=Math.max(-lim.x,Math.min(lim.x,skyDrag.px+dx));
   skyPan.y=Math.max(-lim.y,Math.min(lim.y,skyDrag.py+dy));
   syncSkyPanHits();
@@ -854,7 +858,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#lis-ask,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
@@ -1305,7 +1309,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
   function reset(){clearTimer();lpPid=null;lpMoved=false;lpFired=false;try{if(window.TXFX)TXFX.holdEnd();}catch(eH){}}
   function teleHitOk(e){
     if(SW||SECT.busy)return false;
-    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-whisper,#lis-ask'))return false;
+    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-whisper,#cam-cat,#lis-ask'))return false;
     if(typeof telescopeHitAt!=='function'||!telescopeHitAt(e.clientX,e.clientY))return false;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid)return false;
     var _tp=typeof telescopeScreenPos==='function'?telescopeScreenPos():[0,0];
