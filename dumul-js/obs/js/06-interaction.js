@@ -24,7 +24,7 @@ function updateHover(px,py){
       var s=c.stars[k],q=gSky(s.x+c.ox,s.y+c.oy),d=Math.hypot(px-q[0],py-q[1]);
       if(d<Math.max(10,s.r*3.5)&&d<best){best=d;hit={c:c,star:k};}
     });
-    if(isUnlocked(c.id))c.lines.forEach(function(l,i){
+    if(isUnlocked(c.id)&&!(CAMERA_MODE&&!CAM_LINES))c.lines.forEach(function(l,i){   /* LINES·OFF: garis tersembunyi tidak boleh bisa di-tap (nyala/flash) */
       var a=c.stars[l[0]],b=c.stars[l[1]];
       var qa=gSky(a.x+c.ox,a.y+c.oy),qb=gSky(b.x+c.ox,b.y+c.oy);
       var ax=qa[0],ay=qa[1],bx=qb[0],by=qb[1];

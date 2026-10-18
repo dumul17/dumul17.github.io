@@ -1302,7 +1302,7 @@ function drawCons(c,age,now){
   if(locked)drawLockedSignal(c,age,now,ox,oy,focus);
   /* Adaptive lens samples: few when far from BH; denser only near horizon.
      One sample pass per line — glow (if any) reuses the same points. */
-  var lines=c.lines,nLines=locked?0:lines.length;
+  var lines=c.lines,nLines=(locked||(CAMERA_MODE&&!CAM_LINES))?0:lines.length;   /* LINES·OFF (kamera) menyembunyikan garis saja */
   /* Reward pas unlock: garis digambar satu-satu dari waktu unlock (bukan dari boot). */
   if(c._reveal!=null&&(reduce||now-c._reveal>lines.length*90+1400))c._reveal=null;
   for(var i=0;i<nLines;i++){
@@ -1425,6 +1425,31 @@ function drawStarGlow(x,y,r,rgbStr,alpha){
   g.globalAlpha=prev;
 }
 
+/* Filter pita (UV/IR). Dasar fisika: kecerlangan = geser magnitudo benda hitam (SKY.bandShift); hue = false-color per kelas suhu.
+   Palet 4 bucket Teff per pita → paling banyak 8 sprite glow ter-cache (getStarSprite). Semua dihitung sekali per bintang per pita (s._bf/_bg/_bk). */
+var BAND_PAL={
+  uv:[[10000,'205,190,255','240,236,255'],[6500,'185,150,255','228,216,255'],[4500,'165,125,250','218,205,252'],[0,'140,100,235','205,190,248']],   /* panas = violet-putih terang, dingin = violet pekat (hampir padam) */
+  ir:[[10000,'255,215,200','255,240,235'],[6500,'255,185,150','255,232,220'],[4500,'255,150,100','255,220,200'],[0,'255,110,70','255,205,185']]    /* panas = putih-rose pucat, dingin = oranye-merah menyala */
+};
+function bandBucket(band,T){var P=BAND_PAL[band],i;for(i=0;i<P.length-1;i++)if(T>=P[i][0])return P[i];return P[P.length-1];}
+function bandFactor(s,cid,k){
+  if(s._bb!==BAND){
+    var ph=SKY.physOf(cid,k),bk=bandBucket(BAND,ph.teff);
+    s._bf=Math.pow(10,-.4*SKY.bandShift(ph.teff,BAND));   /* >1 = lebih terang di pita ini */
+    s._bg=bk[1];s._bk=bk[2];s._sp=ph.known?ph.spt:null;s._bb=BAND;
+  }
+  return s._bf;
+}
+/* Latar saat filter aktif: nebula/tint sektor adalah gambar cahaya tampak, jadi tidak valid di UV/IR → diredam satu fillRect berwarna pita
+   (pola sama dengan "pass 1: dim" di sectDrawSky). Fade halus lewat BANDV; biaya per frame = 1 fillRect, 0 saat VIS. */
+var BANDV=0,BANDLAST='uv',BAND_BG={uv:'8,4,26',ir:'26,6,4'};
+function bandDimDraw(){
+  var on=CAMERA_MODE&&BAND!=='vis';
+  if(on)BANDLAST=BAND;
+  BANDV+=((on?1:0)-BANDV)*.12;if(Math.abs((on?1:0)-BANDV)<.004)BANDV=on?1:0;
+  if(BANDV<.01)return;
+  g.save();g.globalAlpha=BANDV*.62;g.fillStyle='rgb('+BAND_BG[BANDLAST]+')';g.fillRect(0,0,W,H);g.restore();
+}
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   c._vis=0;
@@ -1438,16 +1463,23 @@ function drawStars(c,age,now){
     var isPlaying=!!(tr&&activeSfx===SFX[triggerKey]&&!SFX[triggerKey].paused);
     var cheap=audioFocus&&!isPlaying;
     var q=gSkyC(s.x+c.ox,s.y+c.oy,72);if(!q)return;c._vis++;var tw=cheap?1:(reduce?1:(1+s._tw*(.30+1.8*s.twinkleDepth))),x=q[0],y=q[1],kq=q[2],r=s.r*k2*(1-.6*q[2])*(.97+.10*s._tw);a*=(1-.85*kq)*focus*(1+.40*s._tw);
+    var bandOn=CAMERA_MODE&&BAND!=='vis',bandCol=null,bandCore=null;
+    if(bandOn){
+      var bf=bandFactor(s,c.id,k);
+      r*=Math.max(.5,Math.min(1.3,Math.pow(bf,.2)));
+      a*=Math.max(.1,Math.min(1.5,Math.sqrt(bf)));
+      bandCol=s._bg;bandCore=s._bk;
+    }
     if(cheap){
       /* During potato audio-focus, keep the star visible but replace its
          animated halo with one tiny core draw. This removes a radial-gradient
          allocation per star while the audio star is doing the heavy work. */
-      g.fillStyle='rgba(255,255,255,'+(.82*a)+')';
+      g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.82*a)+')';
       g.beginPath();g.arc(x,y,Math.max(.72,r*.56),0,6.283);g.fill();
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now);
-      drawStarGlow(x,y,r*(1+.14*sb),s.rgb,a*tw*(1+.3*sb));
-      g.fillStyle='rgba(255,255,255,'+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
+      drawStarGlow(x,y,r*(1+.14*sb),bandCol||s.rgb,a*tw*(1+.3*sb));
+      g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
     }
     var am=ALIGN.cid?alignMark(c,k):null;
     if(am==='lit'){
@@ -1463,9 +1495,12 @@ function drawStars(c,age,now){
        - bintang tanpa SFX: tampil tipis cuma pas mode cam fokus di rasi ini
        Fade halus lewat s._la (mengejar target lblT). */
     var lblT=0;
-    if(s.name&&age>3.5&&kq<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
-      if(isPlaying)lblT=1;
-      else if(!tr&&CAMERA_MODE&&camFocusId()===c.id)lblT=.34;
+    if(s.name&&age>3.5&&kq<.25){
+      if(bandOn)lblT=.8;   /* filter UV/IR aktif: semua bintang bernama berlabel (nama + tipe spektral) */
+      else if(!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
+        if(isPlaying)lblT=1;
+        else if(!tr&&CAMERA_MODE&&camFocusId()===c.id)lblT=.34;
+      }
     }
     var lblA=s._la||0;
     if(reduce)lblA=lblT;
@@ -1485,13 +1520,19 @@ function drawStars(c,age,now){
       g.font='500 10px "Space Grotesk",system-ui,sans-serif';
       /* Closer gap for edge stars (Antares) so the label hugs the pulse. */
       var gapH=s.specAfter? (r*1.6+4) : (r*3.4+7);
-      var _wT=g.measureText(s.name).width,_sp=(tr&&isPlaying)?(8+7*1.35+6*1.8):0;
+      var _wT=s._wT||(s._wT=g.measureText(s.name).width),_sp=(tr&&isPlaying)?(8+7*1.35+6*1.8):0;
       var _nx=lblSide(x,y,s.nx,gapH,_wT,(s.specAfter?0:(s.nx<0?_sp:0)),(s.specAfter?_sp:(s.nx<0?0:_sp)));
       g.textAlign=_nx<0?'right':'left';
       var labelX=x+_nx*gapH, labelY=y+3+lblDY(x,y,(s.dy||0));
       var labelAlpha=lblA*(isPlaying?.95:1);
-      g.fillStyle=tr?'rgba('+tr.rgb+','+labelAlpha+')':'rgba(184,198,214,'+labelAlpha+')';
+      g.fillStyle=tr?'rgba('+tr.rgb+','+labelAlpha+')':(bandOn?'rgba('+bandCore+','+labelAlpha+')':'rgba(184,198,214,'+labelAlpha+')');
       g.fillText(s.name,labelX,labelY);
+      if(bandOn&&s._sp){   /* tipe spektral di bawah nama (dari STAR_PHYS) */
+        g.font='500 8px "Space Grotesk",system-ui,sans-serif';
+        g.fillStyle='rgba('+bandCol+','+(labelAlpha*.85)+')';
+        g.fillText(s._sp,labelX,labelY+10);
+        g.font='500 10px "Space Grotesk",system-ui,sans-serif';
+      }
 
       /*
        * Mini spectrum:
@@ -1528,6 +1569,16 @@ function drawStars(c,age,now){
     }
   });
 }
+/* Pleiades: klaster muda, bintangnya panas tipe B (~12-14 ribu K) -> terang di UV, meredup di IR. Pleione pakai STAR_PHYS (pleiades.pleione);
+   bintang klaster lain tidak punya data per bintang, jadi memakai Teff klaster (PL_TEFF) dan tanpa label tipe spektral. Cache per bintang per pita. */
+var PL_TEFF=13000;
+function plBand(st){
+  if(st._bb!==BAND){
+    var ph=st.interactive?SKY.physOf('pleiades','pleione'):{teff:PL_TEFF,spt:null,known:false},bk=bandBucket(BAND,ph.teff);
+    st._bf=Math.pow(10,-.4*SKY.bandShift(ph.teff,BAND));st._bg=bk[1];st._bk=bk[2];st._sp=ph.known?ph.spt:null;st._bb=BAND;
+  }
+  return st._bf;
+}
 function drawPleiades(age,now){
   var tn=now-(TD.lag.pleiades||0);
   if(!PLEIADES.ready)return;
@@ -1559,11 +1610,18 @@ function drawPleiades(age,now){
     if(!q||q[2]>=1)return;
     PLEIADES._vis++;
     x=q[0];y=q[1];a*=(1-.75*q[2]);r*=1-.45*q[2];
+    var bandOn=CAMERA_MODE&&BAND!=='vis',bandCol=null,bandCore=null;   /* filter UV/IR: pola sama dengan drawStars */
+    if(bandOn){
+      var bf=plBand(star);
+      r*=Math.max(.5,Math.min(1.3,Math.pow(bf,.2)));
+      a*=Math.max(.1,Math.min(1.5,Math.sqrt(bf)));
+      bandCol=star._bg;bandCore=star._bk;
+    }
     /* Reuse constellation star sprite; scale so extent ≈ r*(dim?4.5:5.8).
        drawStarGlow uses extent=r*5, so pass rAdj = r * factor/5. */
     var rAdj=r*((dim?4.5:5.8)/5);
-    drawStarGlow(x,y,rAdj,rgbc,a*.82);
-    g.fillStyle='rgba(238,246,255,'+(a*.94)+')';g.beginPath();g.arc(x,y,Math.max(.7,r*.58),0,6.283);g.fill();
+    drawStarGlow(x,y,rAdj,bandCol||rgbc,a*.82);
+    g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94)+')';g.beginPath();g.arc(x,y,Math.max(.7,r*.58),0,6.283);g.fill();
     if(star.interactive){
       var hotP=(hot==='pleione'),tr=TRIGGERS.pleione;
       /* Exact same compact pulse geometry as Betelgeuse/Rigel/Spica/Sirius (TRIGGER_PULSE_BASE). */
@@ -1615,6 +1673,15 @@ function drawPleiades(age,now){
           g.restore();
         }
         uprEnd(_upP);
+      }
+      if(bandOn&&age>3.5&&q[2]<.25){   /* filter UV/IR aktif: Pleione berlabel nama + tipe spektral (di mode cam label di atas tidak tampil) */
+        var _upB=uprBegin(x,y);
+        g.font='500 10px "Space Grotesk",system-ui,sans-serif';g.textAlign='left';
+        var bLX=x+r*3.4+7,bLY=y+3,bLW=g.measureText('Pleione').width,bFlip=(STG.rot?(v2c(x,y)[0]+(bLX-x)+bLW+8>STG.iw):(bLX+bLW+8>W));
+        if(bFlip)bLX=x-r*3.4-7-bLW;
+        g.fillStyle='rgba('+bandCore+','+(.8*fade)+')';g.fillText('Pleione',bLX,bLY);
+        if(star._sp){g.font='500 8px "Space Grotesk",system-ui,sans-serif';g.fillStyle='rgba('+bandCol+','+(.68*fade)+')';g.fillText(star._sp,bLX,bLY+10);}
+        uprEnd(_upB);
       }
     }
   }
@@ -1679,7 +1746,7 @@ function drawPulses(now,age){
   if(now>nextPU){nextPU=now+500+Math.random()*900;
     /* Pick any constellation (Orion / Virgo / Canis Major) so every figure gets line pulses */
     var c=CONS[(Math.random()*CONS.length)|0],l=c.lines[(Math.random()*c.lines.length)|0],f=Math.random()<.5;
-    if(isUnlocked(c.id)&&!SECT.on&&sectShow(c.id))PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});} /* terkunci = nggak ada garis buat dilewati pulse */
+    if(isUnlocked(c.id)&&!SECT.on&&sectShow(c.id)&&!(CAMERA_MODE&&!CAM_LINES))PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});} /* terkunci = nggak ada garis buat dilewati pulse */
   for(var i=PU.length-1;i>=0;i--){
     var p=PU[i],u=(now-p.t)/p.d;if(u>1){PU.splice(i,1);continue;}
     if(SECT.on||!sectShow(p.shock?TRIGGERS[p.snKey].cons:p.c.id))continue;
@@ -1698,6 +1765,7 @@ function drawPulses(now,age){
       }
       continue;
     }
+    if(CAMERA_MODE&&!CAM_LINES)continue;   /* LINES·OFF: pulse yang sudah terlanjur ada di garis ikut disembunyikan (kedaluwarsa sendiri di atas) */
     var A=p.c.stars[p.a],B=p.c.stars[p.b],ox=p.c.ox,oy=p.c.oy;
     if(!cullSegAt(A.x+ox,A.y+oy,B.x+ox,B.y+oy))continue;
     var t2=Math.max(0,u-.2),al=Math.sin(u*Math.PI);

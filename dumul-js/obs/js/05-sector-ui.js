@@ -1123,6 +1123,7 @@ function frame(now){
       drawHud();
     }
     pmk('sky');
+    bandDimDraw();   /* filter UV/IR: redam latar cahaya-tampak (04-render.js) */
     if(!PX.sky)ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
     drawFloatingTelescope(now);
     var msgEl=frame._m||(frame._m=$('#secret-msg'));

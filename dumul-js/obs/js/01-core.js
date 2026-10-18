@@ -212,6 +212,8 @@ window.__layoutEditMode=false;
 function isLayoutEdit(){return!!window.__layoutEditMode;}
 
 var CAMERA_MODE=false;
+var CAM_LINES=true;   /* garis rasi di mode kamera: tombol LINES (reset ON saat kamera mati) */
+var BAND='vis';   /* filter pita spektral kamera: 'vis' | 'uv' | 'ir' (aktif hanya saat CAMERA_MODE) */
 /* Rasi yang digabung di overview (mis. Taurus nyambung ke Auriga lewat Elnath): `joinTo` di sky-data.js.
    Di overview keduanya gerak/goyang bareng (satu 'lead'), di mode kamera fokus rasi pasangannya disembunyikan. */
 var JOIN_LEAD={};SKY.rasi.forEach(function(r){if(r.joinTo)JOIN_LEAD[r.id]=r.joinTo;});
@@ -544,6 +546,22 @@ function updateCamZoomUI(){
   }
 }
 
+/* ---------- Filter pita spektral (VIS → UV → IR). Efeknya digambar di drawStars (04-render.js) dari SKY.physOf + SKY.bandShift. ---------- */
+var BAND_ORDER=['vis','uv','ir'];   /* label tombol lewat T('cam.band.<pita>') di i18n.js */
+function setBand(b){
+  if(BAND_ORDER.indexOf(b)<0)b='vis';
+  BAND=b;
+  var el=document.getElementById('cb-btn');
+  if(el){el.textContent=T('cam.band.'+b);el.setAttribute('aria-label',T('cam.band.aria'));el.setAttribute('data-band',b);el.setAttribute('aria-pressed',b!=='vis'?'true':'false');}
+}
+function setLines(on){
+  CAM_LINES=!!on;
+  var el=document.getElementById('cl-btn');
+  if(el){el.textContent=T(CAM_LINES?'cam.lines.on':'cam.lines.off');el.setAttribute('aria-label',T('cam.lines.aria'));el.setAttribute('aria-pressed',CAM_LINES?'false':'true');el.setAttribute('data-off',CAM_LINES?'0':'1');}
+}
+function toggleLines(){setLines(!CAM_LINES);haptic(8);}
+function cycleBand(){setBand(BAND_ORDER[(BAND_ORDER.indexOf(BAND)+1)%BAND_ORDER.length]);haptic(8);}
+
 /* Tap bintang non-SFX → pastikan Observation + Camera on, fokus ke rasi, tampilkan whisper/info. */
 function openCamOnCons(cid){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
@@ -578,7 +596,7 @@ function setCameraMode(on){
   }
   if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;setSkyZoom(1,false);FOCUS.list=null;}
   else{FOCUS.list=focusList();FOCUS.i=0;}
-  if(!CAMERA_MODE){FFX.id=null;hideWhisper();}
+  if(!CAMERA_MODE){FFX.id=null;hideWhisper();setBand('vis');setLines(true);}
   focusUI();
   updateCamZoomUI();
   if(!CAMERA_MODE)flushConsPopups();
@@ -668,6 +686,56 @@ var FOCUS_WHISPER=SKY.FOCUS_WHISPER;
 var FOCUS_INFO=SKY.FOCUS_INFO;
 var FFX={id:null,t0:0},_whT=0;
 function hideWhisper(){var w=document.getElementById('cam-whisper');if(w)w.classList.remove('on');clearTimeout(_whT);}
+/* ---------- Spektrograf mini di kartu info rasi (#cam-whisper) ----------
+   Strip spektrum bintang acuan rasi (SKY.consPhys): kontinum pelangi diredam sesuai suhu (benda hitam) + garis serapan ILUSTRATIF per kelas spektral
+   (H Balmer, Ca H&K, Na D, Mg b, Fe, He I/II, pita TiO). Posisi garis dari panjang gelombang asli, tapi kekuatannya perkiraan artistik, bukan data pengukuran. */
+var SPEC_L0=380,SPEC_L1=700,SPEC_W=240;
+var SPEC_LINES={H:[410.2,434,486.1,656.3],CaHK:[393.4,396.8],Na:[589],Mg:[517.3],Gb:[430.5],Fe:[404,407,438,441,466,489,495,527,532,538,561,617,640,667],HeI:[402.6,447.1,471.3,492.2,587.6],HeII:[454.2,468.6,541.1]};
+var SPEC_COL=[[400,'#7b2fff'],[450,'#3a5bff'],[500,'#19d6c8'],[550,'#7de02e'],[600,'#ffc22b'],[650,'#ff4b2b'],[700,'#a01212']];
+function specStrength(L,s){   /* L = huruf kelas, s = 0..0.9 (digit/10) -> kekuatan tiap keluarga garis 0..1 */
+  var o={H:0,CaHK:0,Na:0,Mg:0,Gb:0,Fe:0,HeI:0,HeII:0,TiO:0};
+  switch(L){
+    case'O':o.HeII=.55;o.HeI=.35;o.H=.35;break;
+    case'B':o.HeI=.6-.5*s;o.H=.45+.4*s;break;
+    case'A':o.H=.95-.35*s;o.CaHK=.2+.5*s;o.Fe=.1+.3*s;break;
+    case'F':o.H=.65-.35*s;o.CaHK=.6+.2*s;o.Gb=.15;o.Fe=.25+.2*s;o.Na=.1;o.Mg=.1;break;
+    case'G':o.H=.3-.1*s;o.CaHK=.9;o.Gb=.5;o.Mg=.45+.15*s;o.Na=.4+.2*s;o.Fe=.45;break;
+    case'K':o.H=.15;o.CaHK=.95;o.Gb=.6;o.Mg=.6+.2*s;o.Na=.65+.2*s;o.Fe=.55;o.TiO=s>.4?.25:0;break;
+    case'M':o.CaHK=.6;o.Mg=.5;o.Na=.6;o.Fe=.4;o.TiO=.55+.25*s;break;
+  }
+  return o;
+}
+function specSvg(spt,teff){
+  var m=/^([OBAFGKM])(\d(?:\.\d)?)/.exec(spt||'');if(!m)return '';
+  var L=m[1],s=Math.min(.9,parseFloat(m[2])/10),st=specStrength(L,s),sup=/I(a|b|ab)\b/.test(spt)?.7:1,W=SPEC_W,H=14,i,k,x,n,svg;
+  function P(l){return 1/(Math.pow(l,5)*(Math.exp(1.438777e-2/(l*teff))-1));}
+  var mx=0;for(i=0;i<=16;i++)mx=Math.max(mx,P((SPEC_L0+(SPEC_L1-SPEC_L0)*i/16)*1e-9));
+  svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="'+T('cam.spec.note')+'"><defs><linearGradient id="ci-spg" x1="0" x2="1" y1="0" y2="0">';
+  for(i=0;i<SPEC_COL.length;i++){
+    var lam=SPEC_COL[i][0],f=Math.sqrt(P(lam*1e-9)/mx);
+    svg+='<stop offset="'+((lam-SPEC_L0)/(SPEC_L1-SPEC_L0)).toFixed(3)+'" stop-color="'+SPEC_COL[i][1]+'" stop-opacity="'+(.16+.84*f).toFixed(2)+'"/>';
+  }
+  svg+='</linearGradient></defs><rect width="'+W+'" height="'+H+'" fill="#02070c"/><rect width="'+W+'" height="'+H+'" fill="url(#ci-spg)"/>';
+  if(st.TiO>0){[[615,22],[670,26],[490,9]].forEach(function(b){
+    x=(b[0]-SPEC_L0)/(SPEC_L1-SPEC_L0)*W;var bw=b[1]/(SPEC_L1-SPEC_L0)*W;
+    svg+='<rect x="'+(x-bw/2).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+H+'" fill="#000" opacity="'+(.5*st.TiO).toFixed(2)+'"/>';
+  });}
+  for(k in SPEC_LINES){
+    var v=st[k];if(!v||v<.12)continue;
+    for(i=0,n=SPEC_LINES[k];i<n.length;i++){
+      x=(n[i]-SPEC_L0)/(SPEC_L1-SPEC_L0)*W;
+      svg+='<rect x="'+(x-.5).toFixed(1)+'" width="'+((.9+1.4*v)*sup).toFixed(2)+'" height="'+H+'" fill="#000" opacity="'+Math.min(.92,.2+.8*v).toFixed(2)+'"/>';
+    }
+  }
+  return svg+'</svg>';
+}
+/* baris spektrograf untuk rasi id (string HTML kosong kalau rasi tidak punya bintang acuan / kelasnya tidak terbaca) */
+function specRow(id,delay){
+  var p=SKY.consPhys&&SKY.consPhys(id);if(!p)return '';
+  var svg=specSvg(p.spt,p.teff);if(!svg)return '';
+  var q=p.key.split('.'),c=cons(q[0]),nm=(c&&c.stars&&c.stars[q[1]]&&c.stars[q[1]].name)||(q[1].charAt(0).toUpperCase()+q[1].slice(1));
+  return '<div class="ci-i ci-spec" style="--d:'+delay+'s">'+svg+'<i>'+T('cam.spec')+' \u00b7 '+nm+' \u00b7 '+p.spt+'</i></div>';
+}
 function showWhisper(id){
   var w=document.getElementById('cam-whisper'),a=FOCUS_WHISPER[id],d=FOCUS_INFO[id],f=FOCUS.list&&FOCUS.list[FOCUS.i];
   if(!w||!d||!f)return;
@@ -683,8 +751,10 @@ function showWhisper(id){
   var rows=d.rows.slice(0,3),n=rows.length;
   var h='<div class="ci-i ci-tag" style="--d:.15s">'+d.tag+'</div><div class="ci-i ci-name" style="--d:.3s">'+f.n+'</div><div class="ci-rows">';
   for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+rows[i][0]+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+rows[i][1]+'</span>';
-  var t=.55+n*.14+.15;
-  h+='</div><div class="ci-i ci-fact" style="--d:'+t+'s"><em>'+T('cam.fact')+'</em>'+d.fact+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+wh+'\u201d</div>';
+  var t=.55+n*.14+.15,sp=specRow(id,t);
+  h+='</div>';
+  if(sp){h+=sp;t+=.25;}   /* spektrograf bintang acuan (tidak ada untuk BH) */
+  h+='<div class="ci-i ci-fact" style="--d:'+t+'s"><em>'+T('cam.fact')+'</em>'+d.fact+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+wh+'\u201d</div>';
   w.style.setProperty('--cc','rgb('+(d.rgb||'110,229,255')+')');
   setTimeout(function(){if(FFX.id!==id)return;w.innerHTML=h;w.classList.add('on');},260);
 }
@@ -693,17 +763,34 @@ function focusFx(id){
   FFX.id=id;FFX.t0=performance.now();showWhisper(id);
   if(id==='bh'){[350,650,950].forEach(function(d){setTimeout(function(){if(FFX.id==='bh'){var p=camBH();createBHShockwave(p[0],p[1]);}},d);});}
 }
+/* Palet cincin fokus BH per pita (VIS = tampilan lama persis). gc/ga/gw = glow, lc/la/lw = garis tipis, hc = titik ujung, rm = pengali radius. */
+var BH_FX_PAL={
+  vis:{gc:'110,229,255',ga:.16,gw:7,lc:'234,252,255',la:.85,lw:1.6,hc:'255,255,255',rm:1.2},
+  uv:{gc:'160,120,255',ga:.2,gw:5,lc:'226,208,255',la:.9,lw:1.2,hc:'240,230,255',rm:1.12},   /* gas panas dekat horizon: cincin ketat, ungu */
+  ir:{gc:'255,110,60',ga:.14,gw:9,lc:'255,172,122',la:.7,lw:2,hc:'255,205,160',rm:1.38}      /* debu hangat: cincin lebar, oranye redup */
+};
 function drawFocusFx(now){
   var id=FFX.id;if(!id||!CAMERA_MODE||reduce)return;
   var t=now-FFX.t0,i,q,A,B,segs=[],rgb='110,229,255';
   g.save();g.globalCompositeOperation='lighter';g.lineCap='round';
   if(id==='bh'){
-    var bp=camBH(),R=BH.Rr*BHZ;
+    var bp=camBH(),R=BH.Rr*BHZ,pal=BH_FX_PAL[BAND]||BH_FX_PAL.vis,rr=R*pal.rm;
     if(R>=1&&t<2800){
       var u=Math.min(1,t/1200),e=u*u*(3-2*u),al=t<1200?1:Math.max(0,1-(t-1200)/1600),a0=-1.5708,a1=a0+6.2832*e;
-      g.strokeStyle='rgba(110,229,255,'+(.16*al)+')';g.lineWidth=7;g.beginPath();g.arc(bp[0],bp[1],R*1.2,a0,a1);g.stroke();
-      g.strokeStyle='rgba(234,252,255,'+(.85*al)+')';g.lineWidth=1.6;g.beginPath();g.arc(bp[0],bp[1],R*1.2,a0,a1);g.stroke();
-      if(u<1){g.fillStyle='rgba(255,255,255,.95)';g.beginPath();g.arc(bp[0]+Math.cos(a1)*R*1.2,bp[1]+Math.sin(a1)*R*1.2,3.2,0,6.2832);g.fill();}
+      g.strokeStyle='rgba('+pal.gc+','+(pal.ga*al)+')';g.lineWidth=pal.gw;g.beginPath();g.arc(bp[0],bp[1],rr,a0,a1);g.stroke();
+      g.strokeStyle='rgba('+pal.lc+','+(pal.la*al)+')';g.lineWidth=pal.lw;g.beginPath();g.arc(bp[0],bp[1],rr,a0,a1);g.stroke();
+      if(u<1){g.fillStyle='rgba('+pal.hc+',.95)';g.beginPath();g.arc(bp[0]+Math.cos(a1)*rr,bp[1]+Math.sin(a1)*rr,3.2,0,6.2832);g.fill();}
+    }
+    /* IR: inframerah menembus debu di sekitar lubang hitam, jadi bintang-bintang yang mengorbit dekat (mirip bintang S di Sgr A*) kelihatan.
+       4 titik kecil elips miring, makin dekat makin cepat; fade-in 0.9 dtk. Murah: 4 arc/frame. */
+    if(BAND==='ir'&&R>=1){
+      var fi=Math.min(1,t/900),j,ra,an,ox2,oy2;
+      for(j=0;j<4;j++){
+        ra=R*(1.9+.55*j);an=t*.0016/(1+.55*j)+j*1.7;
+        ox2=bp[0]+Math.cos(an)*ra;oy2=bp[1]+Math.sin(an)*ra*.62;
+        g.fillStyle='rgba(255,170,110,'+(.16*fi)+')';g.beginPath();g.arc(ox2,oy2,5,0,6.2832);g.fill();
+        g.fillStyle='rgba(255,226,196,'+(.8*fi)+')';g.beginPath();g.arc(ox2,oy2,1.7,0,6.2832);g.fill();
+      }
     }
     g.restore();return;
   }
@@ -727,6 +814,7 @@ function drawFocusFx(now){
     g.restore();return;
   }else{
     var c=cons(id);if(!c||!isUnlocked(c.id)){g.restore();return;} /* rasi terkunci: garis belum boleh muncul */
+    if(!CAM_LINES){g.restore();return;}   /* LINES·OFF: jejak garis fokus (yang tetap menyala redup setelah animasi) ikut mati */
     for(i=0;i<c.lines.length;i++){
       A=c.stars[c.lines[i][0]];B=c.stars[c.lines[i][1]];if(!A||!B)continue;
       var qa=gSky(A.x+c.ox,A.y+c.oy),qb=gSky(B.x+c.ox,B.y+c.oy);
@@ -817,6 +905,13 @@ function focusStep(){
     b.addEventListener('pointerdown',function(e){e.stopPropagation();});
     b.addEventListener('click',function(e){e.stopPropagation();focusCycle(d);});}
   bind('cf-prev',-1);bind('cf-name',1);bind('cf-next',1);
+  var cb=document.getElementById('cb-btn');
+  if(cb){cb.addEventListener('pointerdown',function(e){e.stopPropagation();});
+    cb.addEventListener('click',function(e){e.stopPropagation();cycleBand();});}
+  var cl=document.getElementById('cl-btn');
+  if(cl){cl.addEventListener('pointerdown',function(e){e.stopPropagation();});
+    cl.addEventListener('click',function(e){e.stopPropagation();toggleLines();});}
+  setBand(BAND);setLines(CAM_LINES);   /* teks + aria awal sesuai bahasa (HTML cuma fallback Inggris) */
 })();
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
