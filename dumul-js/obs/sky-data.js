@@ -82,7 +82,7 @@ var RASI=[
   /* ANCHOR — Capella saja sampai layout Auriga penuh */
   {id:'auriga', sector:'winter', label:'Auriga', focusName:'Auriga', focus:6, dist:43, unlock:true,
    box:{portrait:function(W,top,ah,bot){return [W*.68,top+ah*.02,W*.95,top+ah*.42];}, land:function(W,top,ah,bot){return [W*.52,top+ah*.02,W*.78,top+ah*.48];}},
-   scene:{k:2.905, th:2, pv:[315,113], at:[687.107,-7413.935]},
+   scene:{k:2.905, th:2, pv:[315,113], at:[688.362,-7427.697]},   /* at digeser (+1.255,-13.762) dari [687.107,-7413.935] supaya Elnath Auriga persis menimpa Elnath Taurus (bentuk Auriga tetap, cuma geser) */
    whisper:["Capella waits where the chariot will stand.","A single warm point — the rest of Auriga is still arriving."],
    info:{"tag":"Constellation · The Charioteer","rows":[["Brightest","Capella · mag 0.08"],["Distance","~43 ly"],["Type","G-type giant pair"],["Area","657 sq°"]],"fact":"Capella is the sixth-brightest star in the night sky and a cornerstone of the Winter Hexagon."}},
   /* ANCHOR — Procyon saja sampai layout Canis Minor penuh */
@@ -299,11 +299,11 @@ var GEOMETRY=[
    o12:{fx:783,fy:482,r:2.3,c:'#dcefff'},
    o13:{fx:772,fy:574,r:2.3,c:'#dcefff'},
    o14:{fx:733,fy:597,r:2.3,c:'#dcefff'},
-   alnitak:{fx:490,fy:658,r:3.1,c:'#cfeeff'},
-   alnilam:{fx:460,fy:688,r:3.1,c:'#cfeeff'},
-   mintaka:{fx:428,fy:708,r:3.1,c:'#cfeeff'},
+   alnitak:{fx:490,fy:658,r:3.1,c:'#cfeeff',name:'Alnitak'},
+   alnilam:{fx:460,fy:688,r:3.1,c:'#cfeeff',name:'Alnilam'},
+   mintaka:{fx:428,fy:708,r:3.1,c:'#cfeeff',name:'Mintaka'},
    rigel:{fx:674,fy:875,r:4.2,c:'#bfe0ff',name:'Rigel',nx:-1,dy:2},
-   saiph:{fx:378,fy:936,r:3.1,c:'#cde6ff'}
+   saiph:{fx:378,fy:936,r:3.1,c:'#cde6ff',name:'Saiph'}
   },
   lines:[
    ["o1","o3"],["o2","o4"],["o3","o5"],["o4","o5"],
@@ -367,7 +367,7 @@ var GEOMETRY=[
  {id:'taurus',ra0:68.9,delay:1.0,phase:1.2,
   /* Taurus dari taurus.html (viewBox 720×860 → ×1000/720). Aldebaran SFX. */
   stars:{
-   elnath:{fx:218,fy:180,r:2.9,c:'#eaf6ff',name:'Alnath',nx:-1,dy:-8},
+   elnath:{fx:218,fy:180,r:3.4,c:'#eaf6ff',name:'Alnath',nx:-1,dy:-8},
    t2:{fx:424,fy:399,r:2.9,c:'#eaf6ff'},
    t3:{fx:145,fy:438,r:2.5,c:'#eaf6ff'},
    t4:{fx:495,fy:539,r:2.2,c:'#eaf6ff'},
@@ -395,13 +395,13 @@ var GEOMETRY=[
    b1:{fx:536,fy:88,r:2.2,c:'#eaf6ff'},
    b2:{fx:556,fy:88,r:2.2,c:'#eaf6ff'},
    b3:{fx:549,fy:147,r:2.2,c:'#eaf6ff'},
-   nekkar:{fx:407,fy:233,r:2.5,c:'#eaf6ff'},
-   seginus:{fx:501,fy:268,r:2.5,c:'#eaf6ff'},
-   princeps:{fx:362,fy:336,r:2.5,c:'#eaf6ff'},
+   nekkar:{fx:407,fy:233,r:2.5,c:'#eaf6ff',name:'Nekkar'},
+   seginus:{fx:501,fy:268,r:2.5,c:'#eaf6ff',name:'Seginus'},
+   princeps:{fx:362,fy:336,r:2.5,c:'#eaf6ff',name:'Princeps'},
    b7:{fx:511,fy:361,r:2.7,c:'#eaf6ff'},
-   izar:{fx:456,fy:418,r:3.0,c:'#eaf6ff'},
+   izar:{fx:456,fy:418,r:3.0,c:'#eaf6ff',name:'Izar'},
    arcturus:{fx:550,fy:501,r:4.5,c:'#ffb450',name:'Arcturus',nx:-1,dy:12},
-   muphrid:{fx:615,fy:508,r:2.7,c:'#eaf6ff'},
+   muphrid:{fx:615,fy:508,r:2.7,c:'#eaf6ff',name:'Muphrid'},
    b11:{fx:492,fy:590,r:2.4,c:'#eaf6ff'}
   },
   lines:[
@@ -432,7 +432,7 @@ var GEOMETRY=[
    bottomLeft:{fx:235,fy:905,r:2.2,c:'#fff2cc'},
    tiny:{fx:145,fy:810,r:1.5,c:'#eaf6ff'},
    small:{fx:185,fy:745,r:1.6,c:'#dcefff'},
-   shaula:{fx:285,fy:665,r:3.2,c:'#7dd8e0'}
+   shaula:{fx:285,fy:665,r:3.2,c:'#7dd8e0',name:'Shaula'}
   },
   lines:[
    ["antares","topmost"],["antares","midRight"],["antares","rightmost"],["antares","belowAntares"],
@@ -467,10 +467,10 @@ var GEOMETRY=[
  {id:'ursa',ra0:0,delay:1.2,phase:1.0,
   /* Ursa Major dari ursa major.html (viewBox 1000×1000). Alioth SFX. */
   stars:{
-   alkaid:{fx:80,fy:55,r:3.2,c:'#eaf6ff'},
-   mizar:{fx:215,fy:83,r:3.2,c:'#eaf6ff'},
+   alkaid:{fx:80,fy:55,r:3.2,c:'#eaf6ff',name:'Alkaid'},
+   mizar:{fx:215,fy:83,r:3.2,c:'#eaf6ff',name:'Mizar'},
    alioth:{fx:284,fy:173,r:4.2,c:'#ffe9a0',name:'Alioth',nx:-1,dy:-10},
-   megrez:{fx:370,fy:274,r:2.9,c:'#eaf6ff'},
+   megrez:{fx:370,fy:274,r:2.9,c:'#eaf6ff',name:'Megrez'},
    u5:{fx:360,fy:399,r:2.9,c:'#eaf6ff'},
    u6:{fx:517,fy:472,r:2.9,c:'#eaf6ff'},
    u7:{fx:576,fy:348,r:2.9,c:'#eaf6ff'},
@@ -777,13 +777,13 @@ var GEOMETRY=[
      Koordinat SEMUA bintang tetap — posisi rasi + join Elnath↔Taurus utuh. */
   stars:{
    au1:{fx:315,fy:113,r:3.2,c:'#eaf6ff'},
-   menkalinan:{fx:306,fy:404,r:3.2,c:'#eaf6ff'},
+   menkalinan:{fx:306,fy:404,r:3.2,c:'#eaf6ff',name:'Menkalinan'},
    capella:{fx:490,fy:365,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
    au4:{fx:557,fy:407,r:2.8,c:'#eaf6ff'},
    au5:{fx:542,fy:501,r:2.8,c:'#eaf6ff'},
    au6:{fx:570,fy:492,r:2.8,c:'#eaf6ff'},
-   almaaz:{fx:299,fy:646,r:3.2,c:'#eaf6ff'},
-   haedus:{fx:609,fy:749,r:3.2,c:'#eaf6ff'},
+   almaaz:{fx:299,fy:646,r:3.2,c:'#eaf6ff',name:'Almaaz'},
+   haedus:{fx:609,fy:749,r:3.2,c:'#eaf6ff',name:'Haedus'},
    elnath:{fx:469,fy:915,r:3.4,c:'#eaf6ff'}
   },
   lines:[
@@ -795,7 +795,7 @@ var GEOMETRY=[
   /* Canis Minor full dari canis minor.html (viewBox 1000×1000). Procyon SFX. */
   stars:{
    procyon:{fx:263,fy:620,r:4.5,c:'#e8f0ff',name:'Procyon',nx:1,dy:12},
-   gomeisa:{fx:705,fy:227,r:3.8,c:'#eaf6ff'},
+   gomeisa:{fx:705,fy:227,r:3.8,c:'#eaf6ff',name:'Gomeisa'},
    cm3:{fx:673,fy:143,r:2.6,c:'#dcefff'},
    cm4:{fx:799,fy:80,r:2.6,c:'#dcefff'}
   },
@@ -926,6 +926,16 @@ var STAR_PHYS={
        Markab: spt 'B9 III', teff 10000
        Scheat: spt 'M2.5 II-III', teff 3700
        Algenib: spt 'B2 IV', teff 21000 */
+/* PL_PHYS: bintang bernama klaster Pleiades (selain Pleione, yang tetap di STAR_PHYS). Key = nama huruf kecil.
+   Dipisah dari STAR_PHYS karena titik klaster non-SFX tidak ada di GEOMETRY (check-sky akan menolak). Tipe spektral dicek ke SIMBAD (Alcyone, Electra, Atlas, Maia, Merope, Taygeta); Teff perkiraan. */
+var PL_PHYS={
+  alcyone:{spt:'B7 IIIe',teff:12300},
+  atlas:{spt:'B8 III',teff:13000},
+  electra:{spt:'B6 IIIe',teff:14000},
+  maia:{spt:'B7 III',teff:12500},
+  merope:{spt:'B6 IV(e)',teff:14000},
+  taygeta:{spt:'B6 IV',teff:13000}
+};
 var CONS_REF={orion:'orion.rigel',taurus:'taurus.aldebaran',canis:'canis.sirius',pleiades:'pleiades.pleione',gemini:'gemini.g9',auriga:'auriga.capella',canmin:'canmin.procyon',virgo:'virgo.spica',bootes:'bootes.arcturus',ursa:'ursa.alioth',leo:'leo.regulus',hydra:'hydra.alphard',scorpius:'scorpius.antares',sagit:'sagit.s14',lyra:'lyra.y2',cygnus:'cygnus.c1',ophiuchus:'ophiuchus.o4',aquila:'aquila.aq2',cassiopeia:'cassiopeia.k4',perseus:'perseus.p9',aries:'aries.a2',pegasus:'pegasus.pg1',pisces:'pisces.alpherg'};
 
 /* Geser magnitudo model benda hitam relatif ke cahaya tampak (550 nm), nol = Vega (9600 K).
@@ -1010,6 +1020,10 @@ function check(){
     if(typeof p.teff!=='number'||p.teff<2000||p.teff>50000)P.push(w+'teff harus angka 2000-50000');
     if(typeof p.spt!=='string'||!sptRe.test(p.spt))P.push(w+'tipe spektral tidak valid ("'+p.spt+'")');
   });
+  Object.keys(PL_PHYS).forEach(function(k){var p=PL_PHYS[k],w='PL_PHYS '+k+': ';
+    if(typeof p.teff!=='number'||p.teff<2000||p.teff>50000)P.push(w+'teff harus angka 2000-50000');
+    if(typeof p.spt!=='string'||!sptRe.test(p.spt))P.push(w+'tipe spektral tidak valid ("'+p.spt+'")');
+  });
   SFX.forEach(function(s){if(!STAR_PHYS[s.cons+'.'+s.key])P.push('sfx '+s.key+': belum ada di STAR_PHYS ('+s.cons+'.'+s.key+')');});
   RASI.forEach(function(r){
     if(r.off)return;
@@ -1032,7 +1046,7 @@ return {
   STAR_DATA:D.STAR_DATA,SIGNAL_NAMES:D.SIGNAL_NAMES,FOCUS_WHISPER:D.FOCUS_WHISPER,FOCUS_INFO:D.FOCUS_INFO,
   TERM_DIST:D.TERM_DIST,UNLOCK_CONS:D.UNLOCK_CONS,STAR_KEY:D.STAR_KEY,FX_KEYS:D.FX_KEYS,
   focusOrder:focusOrder,panelGroups:panelGroups,audioFiles:audioFiles,check:check,
-  PHYS:PHYS,STAR_PHYS:STAR_PHYS,CONS_REF:CONS_REF,bandShift:bandShift,physOf:physOf,consPhys:consPhys,physNotes:physNotes
+  PHYS:PHYS,STAR_PHYS:STAR_PHYS,PL_PHYS:PL_PHYS,CONS_REF:CONS_REF,bandShift:bandShift,physOf:physOf,consPhys:consPhys,physNotes:physNotes
 };
 })();
 

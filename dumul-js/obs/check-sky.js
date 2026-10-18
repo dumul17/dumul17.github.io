@@ -38,6 +38,11 @@ if(tctx.TXT)['TELE_SCOPE_MESSAGES','TERM_POOL','TERM_W','TERM_PROMPTS','TG_POOL'
 });
 /* sisa pola lama */
 var js=jsFiles.map(function(f){return rd('js/'+f);}).join('\n');
+/* bintang bernama klaster Pleiades (PLEIADES.bright di js/*.js) harus punya tipe spektral: Pleione = STAR_PHYS, sisanya = PL_PHYS (kunci huruf kecil) */
+var plM=js.match(/var PLEIADES=\{\s*bright:\[([\s\S]*?)\],\s*dim:/);
+if(plM){var plRe=/name:'([^']+)'/g,pn;while((pn=plRe.exec(plM[1]))){var plk=pn[1].toLowerCase();
+  if(!(plk==='pleione'?ctx.SKY.STAR_PHYS['pleiades.pleione']:(ctx.SKY.PL_PHYS&&ctx.SKY.PL_PHYS[plk])))P.push('Pleiades '+pn[1]+': belum ada tipe spektral (PL_PHYS di sky-data.js)');}}
+else P.push('js/*.js: blok PLEIADES.bright tidak ketemu (check-sky.js: cek Pleiades perlu disesuaikan)');
 ['TELE_SCOPE_MESSAGES','TERM_POOL','TERM_PROMPTS','TG_POOL'].forEach(function(k){if(new RegExp('var '+k+'=[\\[{]').test(js))P.push('js/*.js: '+k+' masih literal (harus TXT.'+k+', data ada di texts.js)');});
 if(/\/08\b/.test(html)&&/sr-count/.test(html)&&/<em>00<\/em>\/08/.test(html))P.push('index.html: hitungan /08 hardcoded');
 if(/getElementById\('(?:betel|rigel|sirius|pleione|aldebaran|arcturus|antares)-fx'\)/.test(js))P.push('js/*.js: tombol -fx per-bintang hardcoded (pakai FXBTN[key])');
