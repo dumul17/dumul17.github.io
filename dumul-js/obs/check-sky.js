@@ -8,6 +8,7 @@ function rdR(f){return fs.readFileSync(path.join(root,f),'utf8');}     /* file d
 if(!fs.existsSync(path.join(root,'index.html'))||!fs.existsSync(path.join(root,'service-worker.js'))){console.log('MASALAH: index.html / service-worker.js tidak ada di '+root+' — kasih folder root situs sebagai argumen: node check-sky.js <root>');process.exit(1);}
 var ctx={};vm.runInNewContext(rd('sky-data.js')+';this.SKY=SKY',ctx);
 P=P.concat(ctx.SKY.check());
+if(ctx.SKY.physNotes){var PN=ctx.SKY.physNotes();if(PN.length){console.log('CATATAN fisik bintang (tidak menggagalkan, perlu keputusan — lihat docx 3.6):');PN.forEach(function(m){console.log('  ~ '+m);});}}
 /* audio (hanya kalau folder audio/ ada di folder ini) */
 if(fs.existsSync(path.join(root,'audio')))ctx.SKY.audioFiles().forEach(function(f){if(!fs.existsSync(path.join(root,f)))P.push('file audio hilang: '+f);});
 else console.log('(folder audio/ tidak ada di root situs — cek file audio dilewati)');

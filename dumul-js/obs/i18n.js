@@ -92,6 +92,11 @@
     /* kamera / HUD */
     'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.hint':{en:'TAP ‹ › TO FOCUS · PINCH / WHEEL · 1×–3×',id:'KETUK ‹ › UNTUK FOKUS · CUBIT / RODA · 1×–3×'},
     'cam.fact':{en:'FACT',id:'FAKTA'},
+    'cam.band.vis':{en:'BAND · VIS',id:'PITA · VIS'},'cam.band.uv':{en:'BAND · UV',id:'PITA · UV'},'cam.band.ir':{en:'BAND · IR',id:'PITA · IR'},
+    'cam.band.aria':{en:'Spectral band filter: visible, ultraviolet, infrared',id:'Filter pita spektral: tampak, ultraviolet, inframerah'},
+    'cam.lines.on':{en:'LINES · ON',id:'GARIS · ON'},'cam.lines.off':{en:'LINES · OFF',id:'GARIS · OFF'},
+    'cam.lines.aria':{en:'Toggle constellation lines',id:'Nyalakan / matikan garis rasi'},
+    'cam.spec':{en:'SPECTRUM',id:'SPEKTRUM'},'cam.spec.note':{en:'Illustrative spectrum: line positions are real, strengths are approximate',id:'Spektrum ilustratif: posisi garis nyata, kekuatannya perkiraan'},
     'ls.tag':{en:'LAST SIGNAL DETECTED',id:'SINYAL TERAKHIR TERDETEKSI'},
     'sf.close':{en:'Dismiss',id:'Tutup'},
     'sf.recovered':{en:'RECOVERED · {s}',id:'DIPULIHKAN · {s}'},'sf.acquired':{en:'SIGNAL ACQUIRED',id:'SINYAL DIPEROLEH'},

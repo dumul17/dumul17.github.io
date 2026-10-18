@@ -28,6 +28,8 @@
      3. Pastikan rasinya unlock:true (kalau belum, tambahkan).
      4. Jalankan  node check-sky.js
 
+   FISIK BINTANG (filter UV/IR): STAR_PHYS + CONS_REF di bagian 5; fungsi SKY.physOf / SKY.consPhys / SKY.bandShift. Titik baru = tambah satu baris di STAR_PHYS.
+
    YANG MASIH DI index.js (bukan data):  posisi cluster (Pleiades), logika alignment khusus (PLE_CHAIN).
    DEPLOY: naikkan ?v= sky-data.js + index.js di index.html, SHELL + VERSION di service-worker.js.
    ===================================================================================================== */
@@ -233,9 +235,9 @@ var SFX=[
    data:{"name":"ARCTURUS","dist":"36.7 LY","spec":"K1.5III","mag":"-0.05","ra":"14h 15m","dec":"+19°10′"},
    fragment:{"tag":"FRAGMENT // ARCTURUS","title":"Bear Guardian · Arc","body":"The golden tip of Boötes. Follow the arc of the Dipper’s handle and you arrive here — then spike to Spica.","meta":["RA 14h 15m","DEC +19° 10′","SPEC K1.5 III","LINK · Spring Triangle / Arc to Spica"]}},
   {key:'regulus', label:'Regulus', cons:'leo', star:'regulus', rgb:'180,210,255',
-   recap:{"name":"REGULUS","spec":"B7 V","dist":"79 LY"},
-   data:{"name":"REGULUS","dist":"79 LY","spec":"B7V","mag":"1.40","ra":"10h 08m","dec":"+11°58′"},
-   fragment:{"tag":"FRAGMENT // REGULUS","title":"Heart of the Lion · Spring","body":"The sickle’s point and the heart of Leo. One corner of the Spring Triangle — blue-white, steady, royal.","meta":["RA 10h 08m","DEC +11° 58′","SPEC B7 V","LINK · Spring Triangle"]}},
+   recap:{"name":"REGULUS","spec":"B8 IVn","dist":"79 LY"},
+   data:{"name":"REGULUS","dist":"79 LY","spec":"B8IVn","mag":"1.40","ra":"10h 08m","dec":"+11°58′"},
+   fragment:{"tag":"FRAGMENT // REGULUS","title":"Heart of the Lion · Spring","body":"The sickle’s point and the heart of Leo. One corner of the Spring Triangle — blue-white, steady, royal.","meta":["RA 10h 08m","DEC +11° 58′","SPEC B8 IVn","LINK · Spring Triangle"]}},
   {key:'spica', label:'Spica', cons:'virgo', star:'spica', rgb:'140,200,255', fx:false,
    recap:{"name":"SPICA","spec":"B1 III-IV","dist":"250 LY"},
    data:{"name":"SPICA","dist":"250 LY","spec":"B1III","mag":"0.98","ra":"13h 25m","dec":"-11°10′"},
@@ -859,6 +861,103 @@ function audioFiles(){
     .concat(DUMUL_AUDIO.map(function(n){return 'audio/'+n+'.opus';}));
 }
 
+/* ---------- 5. FISIK BINTANG (dasar filter UV / IR; sumber: katalog_bintang_star_hopping_per_musim.docx Bagian 3) ----------
+   STAR_PHYS : key "rasi.key" (alamat titik di GEOMETRY; untuk cluster = id rasi + key SFX) -> tipe spektral + suhu efektif (K).
+               Hanya data fisik; rekaman SFX (recap/data.spec) TIDAK disentuh. Nilai berstatus "S" di docx masih perlu cek SIMBAD.
+   CONS_REF  : id rasi -> key bintang acuan (filter tingkat rasi memakai Teff bintang ini).
+   Titik yang tidak ada di STAR_PHYS dipakai Teff netral (NEUTRAL_T): filter hanya mengubah kecerlangan, bukan warna. */
+var PHYS={VIS:550e-9,UV:300e-9,IR:2.2e-6,VEGA_T:9600,NEUTRAL_T:9500};
+var STAR_PHYS={
+  /* WINTER */
+  'taurus.aldebaran':{spt:'K5 III',teff:3900},
+  'orion.betel':{spt:'M1-2 Ia-ab',teff:3600},
+  'orion.rigel':{spt:'B8 Ia',teff:12100},
+  'gemini.g2':{spt:'A1 V',teff:10300},
+  'gemini.g9':{spt:'K0 III',teff:4700},
+  'pleiades.pleione':{spt:'B8 Vne',teff:12000},
+  'canis.sirius':{spt:'A1 V',teff:9900},
+  'auriga.capella':{spt:'G3 III',teff:5200},
+  'canmin.procyon':{spt:'F5 IV-V',teff:6500},
+  /* SPRING */
+  'ursa.alioth':{spt:'A0p (Cr)',teff:9400},
+  'hydra.alphard':{spt:'K3 II-III',teff:4100},
+  'bootes.arcturus':{spt:'K1.5 III',teff:4300},
+  'leo.l5':{spt:'A3 V',teff:8500},
+  'virgo.spica':{spt:'B1 III-IV',teff:22400},
+  'leo.regulus':{spt:'B8 IVn',teff:12500},
+  /* SUMMER */
+  'aquila.aq2':{spt:'A7 V',teff:7700},
+  'lyra.y2':{spt:'A0 V',teff:9600},
+  'cygnus.c1':{spt:'A2 Ia',teff:8500},
+  'scorpius.antares':{spt:'M1.5 Iab-Ib',teff:3600},
+  'sagit.s14':{spt:'B2.5 V',teff:18800},
+  'ophiuchus.o4':{spt:'A5 III',teff:8000},
+  /* AUTUMN */
+  'pegasus.pg1':{spt:'B8 IVp',teff:13800},
+  'cassiopeia.k4':{spt:'K0 II-III',teff:4500},
+  'pisces.alpherg':{spt:'G7 IIIa',teff:4900},
+  'aries.a2':{spt:'K2 III',teff:4500},
+  'perseus.p9':{spt:'B8 V',teff:12600},
+  /* Tabel B: bintang bernama di canvas (belum di katalog) */
+  'orion.alnitak':{spt:'O9.5 Ib',teff:29500},
+  'orion.alnilam':{spt:'B0 Ia',teff:27000},
+  'orion.mintaka':{spt:'O9.5 II',teff:29500},
+  'orion.saiph':{spt:'B0.5 Ia',teff:26500},
+  'canis.wezen':{spt:'F8 Ia',teff:6000},
+  'taurus.elnath':{spt:'B7 III',teff:13600},  /* bintang yang sama dengan auriga.elnath */
+  'auriga.elnath':{spt:'B7 III',teff:13600},
+  'scorpius.shaula':{spt:'B2 IV',teff:25000},
+  'canmin.gomeisa':{spt:'B8 Ve',teff:12000},
+  'auriga.menkalinan':{spt:'A2 IV',teff:9200},
+  'auriga.almaaz':{spt:'F0 Iab',teff:7000},
+  'auriga.haedus':{spt:'B3 V',teff:17000},
+  'bootes.nekkar':{spt:'G8 III',teff:4900},
+  'bootes.seginus':{spt:'A7 III',teff:7700},
+  'bootes.princeps':{spt:'G8 III',teff:4900},
+  'bootes.izar':{spt:'K0 II-III',teff:4700},
+  'bootes.muphrid':{spt:'G0 IV',teff:6000},
+  'ursa.alkaid':{spt:'B3 V',teff:16000},
+  'ursa.mizar':{spt:'A2 V',teff:9000},
+  'ursa.megrez':{spt:'A3 V',teff:9000},
+  'leo.l4':{spt:'K1 III',teff:4500}
+};
+  /* BELUM bisa dipakai (titik belum dinamai di GEOMETRY / rasi belum ada) — isi key-nya setelah bintangnya dinamai (Tahap 2, langkah 8):
+       Cor Caroli: spt 'A0p', teff 11500
+       Markab: spt 'B9 III', teff 10000
+       Scheat: spt 'M2.5 II-III', teff 3700
+       Algenib: spt 'B2 IV', teff 21000 */
+var CONS_REF={orion:'orion.rigel',taurus:'taurus.aldebaran',canis:'canis.sirius',pleiades:'pleiades.pleione',gemini:'gemini.g9',auriga:'auriga.capella',canmin:'canmin.procyon',virgo:'virgo.spica',bootes:'bootes.arcturus',ursa:'ursa.alioth',leo:'leo.regulus',hydra:'hydra.alphard',scorpius:'scorpius.antares',sagit:'sagit.s14',lyra:'lyra.y2',cygnus:'cygnus.c1',ophiuchus:'ophiuchus.o4',aquila:'aquila.aq2',cassiopeia:'cassiopeia.k4',perseus:'perseus.p9',aries:'aries.a2',pegasus:'pegasus.pg1',pisces:'pisces.alpherg'};
+
+/* Geser magnitudo model benda hitam relatif ke cahaya tampak (550 nm), nol = Vega (9600 K).
+   band: 'uv' | 'ir' | panjang gelombang dalam meter. Minus = lebih terang di pita itu, plus = lebih redup. */
+function bandShift(T,band){
+  var h=6.62607015e-34,c=2.99792458e8,k=1.380649e-23,lam=band==='uv'?PHYS.UV:band==='ir'?PHYS.IR:band;
+  function B(l,t){return 1/(Math.pow(l,5)*(Math.exp(h*c/(l*k*t))-1));}
+  function r(t){return B(lam,t)/B(PHYS.VIS,t);}
+  return -2.5*Math.log10(r(T)/r(PHYS.VEGA_T));
+}
+/* fisik satu titik: {spt,teff,known}. Tanpa entri -> Teff netral, known:false. */
+function physOf(cons,key){
+  var p=STAR_PHYS[cons+'.'+key];
+  return p?{spt:p.spt,teff:p.teff,known:true}:{spt:null,teff:PHYS.NEUTRAL_T,known:false};
+}
+/* fisik bintang acuan sebuah rasi (null kalau rasi tidak punya acuan) */
+function consPhys(id){var k=CONS_REF[id],p=k&&STAR_PHYS[k];return p?{spt:p.spt,teff:p.teff,key:k}:null;}
+/* kelas spektral utama ("K5", "B1", "M1") dari string tipe spektral */
+function sptClass(s){var m=/^([OBAFGKM])(\d(?:\.\d)?)/.exec(s||'');return m?m[1]+m[2]:null;}
+/* catatan (BUKAN error) soal data lama yang beda dengan STAR_PHYS — keputusan ada di docx 3.6 */
+function physNotes(){
+  var N=[];
+  SFX.forEach(function(s){
+    var p=STAR_PHYS[s.cons+'.'+s.key];if(!p)return;
+    var a=sptClass(s.data&&s.data.spec),b=sptClass(p.spt);
+    if(a&&b&&a!==b)N.push('sfx '+s.key+': data.spec "'+s.data.spec+'" beda kelas dengan STAR_PHYS "'+p.spt+'"');
+    var ra=sptClass(s.recap&&s.recap.spec);
+    if(ra&&b&&ra!==b)N.push('sfx '+s.key+': recap.spec "'+s.recap.spec+'" beda kelas dengan STAR_PHYS "'+p.spt+'"');
+  });
+  return N;
+}
+
 /* pemeriksaan konsistensi -> array pesan masalah (kosong = aman). Dipakai check-sky.js; juga jalan sekali di console kalau ?dev. */
 function check(){
   var P=[],geo={},seen={};
@@ -902,6 +1001,27 @@ function check(){
       if(s.star!==s.key)P.push(w+'id bintang di GEOMETRY harus sama dengan key ('+s.key+')');
     }
   });
+  /* fisik bintang (STAR_PHYS / CONS_REF) */
+  var sptRe=/^[OBAFGKM]\d(\.\d)?([-\/]\d(\.\d)?)?( ?(Ia|Iab|Ib|II|III|IV|V)([-\/]?(ab|Ia|Iab|Ib|II|III|IV|V))?)?[A-Za-z ()]*$/,sfxAddr={};
+  SFX.forEach(function(s){sfxAddr[s.cons+'.'+s.key]=1;});
+  Object.keys(STAR_PHYS).forEach(function(k){
+    var p=STAR_PHYS[k],q=k.split('.'),c=geo[q[0]],w='STAR_PHYS '+k+': ';
+    if(!(c&&c.stars[q[1]])&&!sfxAddr[k])P.push(w+'titik tidak ada di GEOMETRY (dan bukan SFX cluster)');
+    if(typeof p.teff!=='number'||p.teff<2000||p.teff>50000)P.push(w+'teff harus angka 2000-50000');
+    if(typeof p.spt!=='string'||!sptRe.test(p.spt))P.push(w+'tipe spektral tidak valid ("'+p.spt+'")');
+  });
+  SFX.forEach(function(s){if(!STAR_PHYS[s.cons+'.'+s.key])P.push('sfx '+s.key+': belum ada di STAR_PHYS ('+s.cons+'.'+s.key+')');});
+  RASI.forEach(function(r){
+    if(r.off)return;
+    var k=CONS_REF[r.id];
+    if(!k)P.push('rasi '+r.id+': belum punya CONS_REF');
+    else if(!STAR_PHYS[k])P.push('rasi '+r.id+': CONS_REF "'+k+'" tidak ada di STAR_PHYS');
+  });
+  Object.keys(CONS_REF).forEach(function(id){if(!rasiBy[id])P.push('CONS_REF '+id+': rasi tidak ada');});
+  /* uji cepat bandShift terhadap nilai docx (toleransi 0.1 mag) */
+  [['Betelgeuse',3600,4.0,-3.2],['Vega',9600,0,0],['Rigel',12100,-0.5,0.3],['Aldebaran',3900,3.5,-2.8]].forEach(function(t){
+    if(Math.abs(bandShift(t[1],'uv')-t[2])>0.1||Math.abs(bandShift(t[1],'ir')-t[3])>0.1)P.push('bandShift menyimpang untuk '+t[0]);
+  });
   return P;
 }
 
@@ -911,7 +1031,8 @@ return {
   CONS_LABELS:D.CONS_LABELS,CONS_STARS:D.CONS_STARS,SIGNAL_FRAGMENTS:D.SIGNAL_FRAGMENTS,LAST_SIGNAL_DATA:D.LAST_SIGNAL_DATA,
   STAR_DATA:D.STAR_DATA,SIGNAL_NAMES:D.SIGNAL_NAMES,FOCUS_WHISPER:D.FOCUS_WHISPER,FOCUS_INFO:D.FOCUS_INFO,
   TERM_DIST:D.TERM_DIST,UNLOCK_CONS:D.UNLOCK_CONS,STAR_KEY:D.STAR_KEY,FX_KEYS:D.FX_KEYS,
-  focusOrder:focusOrder,panelGroups:panelGroups,audioFiles:audioFiles,check:check
+  focusOrder:focusOrder,panelGroups:panelGroups,audioFiles:audioFiles,check:check,
+  PHYS:PHYS,STAR_PHYS:STAR_PHYS,CONS_REF:CONS_REF,bandShift:bandShift,physOf:physOf,consPhys:consPhys,physNotes:physNotes
 };
 })();
 
