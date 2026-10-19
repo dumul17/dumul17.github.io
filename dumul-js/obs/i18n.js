@@ -90,7 +90,7 @@
     'tune.led.0':{en:'Green',id:'Hijau'},'tune.led.1':{en:'Amber',id:'Amber'},'tune.led.2':{en:'White',id:'Putih'},'tune.led.3':{en:'Blue',id:'Biru'},'tune.led.4':{en:'Violet',id:'Ungu'},
 
     /* kamera / HUD */
-    'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.zoom.aria':{en:'Camera zoom',id:'Zoom kamera'},'cam.hint':{en:'TAP ‹ › TO FOCUS · CENTER = SNAP-BACK',id:'KETUK ‹ › UNTUK FOKUS · TENGAH = SPRINGBACK'},
+    'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.zoom.aria':{en:'Camera zoom',id:'Zoom kamera'},'cam.hint':{en:'TAP ‹ › TO ZOOM TO A CONSTELLATION',id:'KETUK ‹ › UNTUK ZOOM KE RASI'},'cam.sb.on':{en:'SPRINGBACK · ON',id:'SPRINGBACK · ON'},'cam.sb.off':{en:'SPRINGBACK · OFF',id:'SPRINGBACK · OFF'},'cam.prev.aria':{en:'Previous constellation',id:'Rasi sebelumnya'},'cam.next.aria':{en:'Next constellation',id:'Rasi berikutnya'},'cam.lock.on':{en:'LOCK · ON',id:'KUNCI · ON'},'cam.lock.off':{en:'LOCK · OFF',id:'KUNCI · OFF'},'cam.lock.aria':{en:'Lock camera on this star',id:'Kunci kamera ke bintang ini'},'cam.sb.aria':{en:'Toggle springback: sky returns to its position when released',id:'Springback: langit balik ke posisi semula saat dilepas'},
     'cam.fact':{en:'FACT',id:'FAKTA'},
     'cam.band.vis':{en:'BAND · VIS',id:'PITA · VIS'},'cam.band.uv':{en:'BAND · UV',id:'PITA · UV'},'cam.band.ir':{en:'BAND · IR',id:'PITA · IR'},
     'cam.band.aria':{en:'Spectral band filter: visible, ultraviolet, infrared',id:'Filter pita spektral: tampak, ultraviolet, inframerah'},
