@@ -1120,6 +1120,11 @@ function frame(now){
       }
       sectDrawSky();   /* warna langit per sektor (data: SECTORS[].sky di sky-data.js) */
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      /* Grid RA/Dec: canvas terpisah, cuma di mode cam; param blit persis sama dgn bgCanvas */
+      if(CAMERA_MODE){
+        ensureCamGrid();
+        if(gridCanvas)plateBlit(gridCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      }
       drawHud();
     }
     pmk('sky');
@@ -1536,7 +1541,6 @@ var SN_COOLDOWN={};
   function selectAndPlay(i){
     var target=tracks[i];
     if(!target)return;
-    if(target.type==='sfx'&&!isUnlocked(target.key)){lockedHint(target.key);return;}
     if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE){showModeToast(T('toast.silence'),'silence',1800);return;}
     var playingIdx=getPlayingTrackIndex();
 
@@ -1683,7 +1687,6 @@ var SN_COOLDOWN={};
   function isPlayable(i){
     var t=tracks[i];
     if(!t)return false;
-    if(t.type==='sfx'&&typeof isUnlocked==='function'&&!isUnlocked(t.key))return false;
     return true;
   }
   function playableList(){
@@ -1955,7 +1958,6 @@ function triggerSupernova(key){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(SW)return;
   if(typeof lisBlock==='function'&&lisBlock('sig')){lisDenied('sig');return;}   /* Lost-in-Space */
-  if(!isUnlocked(key)){lockedHint(key);return;}
   var tr=TRIGGERS[key],
       c=tr&&tr.cons==='pleiades'?PLEIADES:(tr&&cons(tr.cons)),
       s=tr&&c&&(tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star]);
@@ -2029,12 +2031,6 @@ function sfxArrive(key){
       var firstObs=StellarMem.markObserved(key);
       if(typeof rememberLastSignal==='function')rememberLastSignal(key);
       renderStellarRecord();
-      var cid=STELLAR_CONS[key];
-      if(cid&&StellarMem.consComplete(cid)&&!StellarMem.isArchived(cid)){
-        if(StellarMem.markArchived(cid)){
-          setTimeout(function(){showConsArchive(cid);renderStellarRecord();},1200);
-        }
-      }
       if(firstObs){/* light tick already via haptic above */}
     }
 }

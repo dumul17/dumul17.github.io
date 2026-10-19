@@ -190,7 +190,7 @@ var LBLR=[];LBLR.t=-1;
 /* Area terlarang label = panel UI yang menutupi langit: panel CAM (zoom + tombol fokus/pita/garis), kartu rasi, sheet katalog, radar sektor, tombol mode.
    Kotaknya dibaca dari DOM tiap ~250ms (bukan tiap frame) dan diubah ke ruang yang sama dengan lblFit (ruang stage; mode ROT = koordinat layar asli). */
 var _lblUi={t:-1e9,r:[]};
-var LBL_UI_SEL=['#cam-zoom','#cam-whisper','#cam-cat','#sector-scan','#mode-cluster'];
+var LBL_UI_SEL=['#cam-zoom','#cam-whisper','#cam-cat','#cam-ach','#sector-scan','#cg-btn','#mode-cluster'];
 function lblUiSeed(){
   var tn=performance.now(),i,el,b,cs,k,x0,x1,y0,y1,rr;
   if(tn-_lblUi.t>250){
@@ -257,6 +257,8 @@ window.__layoutEditMode=false;
 function isLayoutEdit(){return!!window.__layoutEditMode;}
 
 var CAMERA_MODE=false;
+var GAME_ON=false;   /* mode 🎮 (game alignment) di kamera: default mati, mati lagi saat kamera mati. Game cuma jalan kalau true. */
+var _gamePrevLines=true;   /* pilihan tombol GARIS sebelum 🎮 dinyalakan (dipulihkan saat 🎮 mati) */
 var CAM_LINES=true;   /* garis rasi di mode kamera: tombol LINES (reset ON saat kamera mati) */
 var BAND='vis';   /* filter pita spektral kamera: 'vis' | 'uv' | 'ir' (aktif hanya saat CAMERA_MODE) */
 /* Rasi yang digabung di overview (mis. Taurus nyambung ke Auriga lewat Elnath): `joinTo` di sky-data.js.
@@ -367,7 +369,7 @@ function sectorScanUpdate(now){
   if(!SSC.el)ssInit();
   if(!SSC.el)return;
   var on=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE&&!SECT.on&&!!SECT.cur);
-  if(on!==SSC.on){SSC.on=on;SSC.el.classList.toggle('on',on);SSC.el.setAttribute('aria-hidden',on?'false':'true');}
+  if(on!==SSC.on){SSC.on=on;SSC.el.classList.toggle('on',on);SSC.el.setAttribute('aria-hidden',on?'false':'true');placeGameBtn();if(on)setTimeout(placeGameBtn,420);}
   if(!on||!SSC.cx||!W||!H)return;
   if(now-SSC.t<(IS_POTATO?250:100))return;
   SSC.t=now;
@@ -592,8 +594,20 @@ function updateCamZoomUI(){
     var show=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
     el.classList.toggle('on',show);
     el.setAttribute('aria-hidden',show?'false':'true');
+    if(show!==_czShown){_czShown=show;camDock();setTimeout(function(){camDock();placeGameBtn();},420);}
   }
 }
+/* Ukur posisi atas panel CAM -> var --cz-top. CSS pakai ini buat: (1) kartu info compact (landscape) nggak boleh turun ke bawah slider zoom,
+   (2) radar HUD (portrait) naik di atas panel CAM, bukan nimpa. Panel off/hidden => var dihapus (CSS jatuh ke nilai bawaan). */
+var _czShown=false;
+function camDock(){
+  var z=document.getElementById('cam-zoom'),rs=document.documentElement.style;
+  if(!z||!z.classList.contains('on')){rs.removeProperty('--cz-top');return;}
+  var r=z.getBoundingClientRect();
+  if(r.height>0)rs.setProperty('--cz-top',Math.round(r.top)+'px');else rs.removeProperty('--cz-top');
+}
+window.addEventListener('resize',function(){setTimeout(function(){camDock();placeGameBtn();},120);});
+window.addEventListener('orientationchange',function(){setTimeout(function(){camDock();placeGameBtn();},400);});
 
 /* Slider zoom kamera: skala logaritmik 1..ZOOM_MAX (t 0..1000, supaya 1→10 terasa rata), snap magnetik ke ZOOM_LEVELS, tanda tick dibuat dari ZOOM_LEVELS. */
 function zoomToT(z){return Math.round(Math.log(Math.max(1,z))/Math.log(ZOOM_MAX)*1000);}
@@ -635,7 +649,49 @@ function setLines(on){
   var el=document.getElementById('cl-btn');
   if(el){el.textContent=T(CAM_LINES?'cam.lines.on':'cam.lines.off');el.setAttribute('aria-label',T('cam.lines.aria'));el.setAttribute('aria-pressed',CAM_LINES?'false':'true');el.setAttribute('data-off',CAM_LINES?'0':'1');}
 }
-function toggleLines(){setLines(!CAM_LINES);haptic(8);}
+function toggleLines(){if(GAME_ON)return;setLines(!CAM_LINES);haptic(8);}   /* 🎮 ON: garis dipaksa ON, tombol GARIS disembunyikan */
+/* 🎮: saklar game alignment (achievement ALIGNED). ON: garis dipaksa ON; OFF: pilihan GARIS sebelumnya dipulihkan. */
+function setGame(on,silent){
+  on=!!on&&!!CAMERA_MODE;
+  if(on===GAME_ON)return;
+  if(on){_gamePrevLines=CAM_LINES;GAME_ON=true;setLines(true);}
+  else{
+    GAME_ON=false;
+    achClose();
+    if(typeof ALIGN!=='undefined'&&ALIGN.cid)endAlignment(false);   /* progres alignment dibatalkan diam-diam */
+    setLines(_gamePrevLines);
+  }
+  document.body.classList.toggle('game-on',GAME_ON);
+  var b=document.getElementById('cg-btn');
+  if(b){b.setAttribute('aria-pressed',GAME_ON?'true':'false');b.setAttribute('data-on',GAME_ON?'1':'0');b.setAttribute('aria-label',T('cam.game.aria'));}
+  if(!silent){
+    haptic(10);
+    if(GAME_ON&&typeof showModeToast==='function')showModeToast(T('toast.game.on'),null,3200);
+  }
+}
+function toggleGame(){setGame(!GAME_ON);}
+/* Tombol 🎮 ngambang tepat di bawah panel radar. Radar punya banyak varian posisi (portrait, compact, landscape), jadi posisinya
+   diambil dari rect-nya (sudah termasuk translate/transform), bukan ditebak lewat CSS. Dipanggil saat radar on/off dan saat layout berubah. */
+function placeGameBtn(){
+  camDock();
+  var b=document.getElementById('cg-btn'),s=SSC&&SSC.el;
+  if(!b||!s)return;
+  if(!SSC.on){b.classList.remove('show');return;}
+  var r=s.getBoundingClientRect();
+  if(!(r.width>0&&r.height>0))return;
+  /* Di bawah radar kalau muat; kalau radar nempel di dasar layar (landscape / compact) pindah ke ATAS radar. */
+  var bh=b.offsetHeight||32,vh=window.innerHeight||document.documentElement.clientHeight||0,top=r.bottom+6;
+  if(vh&&top+bh>vh-8)top=r.top-6-bh;
+  /* Radar bisa nempel tepat di atas panel CAM: kalau tombol di bawah radar jadi ketiban panel CAM yang lagi tampil, pindah ke ATAS radar. */
+  var bw=b.offsetWidth||32,z=document.getElementById('cam-zoom');
+  if(z&&z.classList.contains('on')){
+    var zr=z.getBoundingClientRect();
+    if(zr.height>0&&r.left<zr.right+4&&r.left+bw>zr.left-4&&top<zr.bottom&&top+bh>zr.top-4)top=r.top-6-bh;
+  }
+  if(top<4)top=4;
+  b.style.left=Math.round(r.left)+'px';b.style.top=Math.round(top)+'px';
+  b.classList.add('show');
+}
 function cycleBand(){setBand(BAND_ORDER[(BAND_ORDER.indexOf(BAND)+1)%BAND_ORDER.length]);haptic(8);}
 
 /* Tap bintang non-SFX → pastikan Observation + Camera on, fokus ke rasi, tampilkan whisper/info. */
@@ -660,6 +716,7 @@ function setCameraMode(on){
   if(on&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE))return;
   if(on&&typeof lisBlock==='function'&&lisBlock('cam')){lisDenied('cam');return;}   /* Lost-in-Space */
   CAMERA_MODE=!!on;
+  if(CAMERA_MODE&&typeof ensureCamGrid==='function'){try{ensureCamGrid();}catch(eCG){}}   /* bake grid di momen transisi, bukan di tengah frame */
   if(CAMERA_MODE&&typeof bhTuneClose==='function')bhTuneClose(); /* panel tune BH ketutup otomatis di mode kamera */
   document.body.classList.toggle('camera-mode',CAMERA_MODE);
   var btn=document.getElementById('mode-camera');
@@ -670,12 +727,11 @@ function setCameraMode(on){
     btn.setAttribute('aria-label',CAMERA_MODE?T('mode.camera.exit'):T('mode.camera'));
     btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   }
-  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;_focusHome=null;setSkyZoom(1,false);FOCUS.list=null;}
+  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;_focusHome=null;_zoomOut=false;setSkyZoom(1,false);FOCUS.list=null;gridCanvas=null;}   /* gridCanvas (02-sky-logic.js) dilepas biar memorinya balik; di-bake lagi pas masuk cam */
   else{FOCUS.list=focusList();FOCUS.i=0;}
-  if(!CAMERA_MODE){FFX.id=null;hideWhisper();setBand('vis');setLines(true);}
+  if(!CAMERA_MODE){FFX.id=null;hideWhisper();setGame(false,true);setBand('vis');setLines(true);}
   focusUI();
   updateCamZoomUI();
-  if(!CAMERA_MODE)flushConsPopups();
   if(typeof showModeToast==='function'){
     if(CAMERA_MODE)showModeToast(T('toast.camon'),null,2200);
     else if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)showModeToast(T('toast.camoff'),null,1400);
@@ -782,6 +838,8 @@ function focusCycle(d){
    BEBAS: nggak ada springback, langit bebas digeser. Zoom & posisi nggak diubah sama sekali waktu pindah mode.
    Auto zoom + pusatkan ke rasi tetap cuma dari tombol < >, ketuk bintang, atau pilih bintang di katalog. */
 var _focusBack=-1;
+var _zoomOut=false;   /* true = focusStep menurunkan zoom ke 1x pelan-pelan */
+function camZoomOut(){_zoomOut=true;FOCUS.anim=false;}
 var _focusHome=null;   /* {id,x,y}: posisi pan "rumah" untuk springback; null = pakai titik tengah rasi (perilaku < > / ketuk bintang) */
 /* Target fokus terdekat ke tengah area bebas (tanpa animasi): dipakai saat saklar dinyalakan dari BEBAS biar yang terfokus rasi yang lagi kelihatan. */
 function focusNearest(){
@@ -814,7 +872,8 @@ function focusToggleFree(){
   if(i<0)return;
   FOCUS.i=i;FOCUS.anim=false;_freeReset=false;
   _focusHome={id:FOCUS.list[i].id,x:skyPan.x,y:skyPan.y};
-  focusUI();focusFx(FOCUS.list[i].id);haptic(8);
+  catReset();FFX.id=null;hideWhisper();   /* saklar springback BUKAN pilih rasi: kartu rasi/cluster baru muncul lewat tap < > (focusFx) */
+  focusUI();haptic(8);
 }
 /* Mode katalog (sheet bintang terbuka): < dan > pindah ke bintang sebelumnya / berikutnya di daftar; tombol tengah = lepas kunci (fokus rasi), lalu Free. */
 function camNav(d){
@@ -899,13 +958,6 @@ function showWhisper(id){
   if(!w||!d||!f)return;
   clearTimeout(_whT);w.classList.remove('on');
   var wh=a?a[(Math.random()*a.length)|0]:'';
-  /* Rasi / cluster yang masih terkunci: data & fact ikut terkunci, cuma nama + whisper. */
-  if(id!=='bh'&&!isUnlocked(id)){
-    var hl='<div class="ci-i ci-name" style="--d:.2s">'+f.n+'</div><div class="ci-i ci-wh" style="--d:.55s">“'+wh+'”</div>';
-    w.style.setProperty('--cc','rgb('+(d.rgb||'110,229,255')+')');
-    setTimeout(function(){if(FFX.id!==id)return;w.innerHTML=hl;w.classList.add('on');},260);
-    return;
-  }
   var rows=d.rows.slice(0,3),n=rows.length;
   var h='<div class="ci-i ci-tag" style="--d:.15s">'+d.tag+'</div><div class="ci-i ci-name" style="--d:.3s">'+f.n+'</div><div class="ci-rows">';
   for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+rows[i][0]+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+rows[i][1]+'</span>';
@@ -972,6 +1024,7 @@ function catSheet(){return document.getElementById('cam-cat');}
    - Bintang yang berdekatan (sabuk Orion, Pleiades, atau lensa saling menyentuh, lihat CAT_GROUP_K) = SATU reticle area yang melingkupi semuanya;
      kamera juga memusatkan & men-zoom ke area itu (zoom turun kalau area lebih besar dari layar). */
 var CAT_GROUPS={orion:[['alnitak','alnilam','mintaka']]};   /* kelompok pasti per rasi (kunci bintang di c.stars) */
+var CAT_RET_K=2.1,CAT_RET_GK=2.0,CAT_RET_PAD=24;   /* ukuran retikel kunci: tepi luar = K*(radius lensa terluar) + PAD px; GK untuk kelompok bintang berdekatan (lebih lega) */
 var CAT_GROUP_K=1.15;   /* otomatis satu area bila lensa dua bintang bernama (di zoom kunci) saling menyentuh: jarak <= K*(R1+R2); 0 = matikan, naikkan kalau kurang menyatu */
 var _catRaf=0,_catLastT='',_catLastS=0;
 function catMember(cid,o){return o.pl?{cid:cid,pl:o.pl,r:o.pl.r}:{cid:cid,st:o.st,r:o.st.r};}
@@ -1031,7 +1084,7 @@ function catGroupGeom(L){
   cx=(x0+x1)/2;cy=(y0+y1)/2;
   for(i=0;i<pts.length;i++)md=Math.max(md,Math.hypot(pts[i][0]-cx,pts[i][1]-cy));
   z=CAT_LOCK_Z;
-  if(pts.length>1&&md>1){cb=camBox();fit=Math.min(cb.w||W,cb.h||H)*.5*.8-50;z=Math.max(1,Math.min(CAT_LOCK_Z,fit/md));}
+  if(pts.length>1&&md>1){cb=camBox();fit=Math.min(cb.w||W,cb.h||H)*.5*.7-100;fit=Math.max(60,fit);   /* sisakan ruang buat retikel kelompok yang kini lebih besar */z=Math.max(1,Math.min(CAT_LOCK_Z,fit/md));}
   return {x:cx,y:cy,z:z};
 }
 function catLockLoop(){
@@ -1055,7 +1108,7 @@ function catLockPlace(){
   for(i=0;i<pts.length;i++)R=Math.max(R,Math.hypot(pts[i][0]-cx,pts[i][1]-cy)+pts[i][2]);
   var t='translate('+cx.toFixed(1)+'px,'+cy.toFixed(1)+'px)';
   if(t!==_catLastT){el.style.transform=t;_catLastT=t;}
-  var cs=Math.max(30,2*(R*1.12-7));   /* cincin putus-putus ::before menonjol 7px di luar kotak, jadi tepi terluar = cs/2+7 ~ 1.12*R */
+  var cs=Math.max(36,2*((pts.length>1?CAT_RET_GK:CAT_RET_K)*R+CAT_RET_PAD-7));   /* cincin putus-putus ::before menonjol 7px di luar kotak, jadi tepi terluar = cs/2+7; sekarang jelas lebih besar dari lensa (juga saat zoom) */
   if(Math.abs(cs-_catLastS)>.5){el.style.setProperty('--cs',cs.toFixed(1)+'px');_catLastS=cs;}
   el.classList.add('on');
   if(!_catRaf)_catRaf=requestAnimationFrame(catLockLoop);
@@ -1123,6 +1176,69 @@ function catReset(){
 }
 /* tombol X: tutup + lepas kunci, kamera kembali ke fokus rasi */
 function catClose(){var had=!!CATLOCK;catReset();if(had&&CAMERA_MODE)FOCUS.anim=true;haptic(6);}
+/* ---------- Sheet 🎮 "Constellation Log": dua achievement terpisah per rasi ----------
+   ARCHIVED = semua SFX rasi sudah didengar sampai selesai (cuma rasi ber-SFX); ◆ ALIGNED = game alignment rasi itu selesai.
+   Baris rasi ber-SFX bisa diketuk -> baca ulang Signal Fragment per bintang (yang belum didengar tampil ???). Pola sama dengan sheet katalog. */
+var ACH={open:false,view:'list',cid:null};
+function achSheet(){return document.getElementById('cam-ach');}
+function achHasSfx(cid){var a=CONS_STARS[cid];return !!(a&&a.length);}
+function achRenderList(){
+  var s=achSheet();if(!s)return;
+  var cids=UNLOCK_CONS,i,cid,al,arch,ready,st,tap,na=0,nsfx=0,nal=0,rows='';
+  for(i=0;i<cids.length;i++){
+    cid=cids[i];al=isAligned(cid);if(al)nal++;
+    if(achHasSfx(cid)){
+      nsfx++;arch=StellarMem.isArchived(cid);ready=!arch&&StellarMem.consComplete(cid);if(arch)na++;
+      st=arch?T('sr.archived'):(ready?T('sr.ready'):T('sr.scanning'));tap=true;
+    }else{arch=false;st='\u2014';tap=false;}
+    rows+='<button type="button" class="cc-row'+(arch?' ach-arch':'')+(al?' ach-al':'')+(tap?'':' ach-na')+'" data-c="'+catEsc(cid)+'"'+(tap?'':' disabled')+'><i></i><b>'+catEsc(CONS_LABELS[cid]||cid)+'</b><span>'+st+'</span></button>';
+  }
+  s.innerHTML='<div class="cc-hd"><div><div class="cc-tag">'+T('ach.legend',{a:na,b:nsfx,c:nal,d:cids.length})+'</div><div class="cc-name">'+T('ach.title')+'</div></div><button type="button" class="cc-x" aria-label="'+T('ach.close')+'">\u2715</button></div><div class="cc-body">'+rows+'</div>';
+  ACH.view='list';ACH.cid=null;
+}
+function achRenderDetail(cid){
+  var s=achSheet(),keys=CONS_STARS[cid]||[],i,k,fr,ob,bits,h='';
+  if(!s||!keys.length)return;
+  for(i=0;i<keys.length;i++){
+    k=keys[i];fr=SIGNAL_FRAGMENTS[k];
+    if(fr&&StellarMem.isFragSeen(k)){
+      ob=StellarMem.observed[k];bits=(fr.meta||[]).slice();
+      if(ob&&ob.at)bits.unshift(T('sf.recovered',{s:ob.at}));
+      h+='<div class="af"><div class="af-tag">'+catEsc(fr.tag)+'</div><div class="af-title">'+catEsc(fr.title)+'</div><div class="af-body">'+catEsc(fr.body)+'</div><div class="af-meta">'+bits.map(function(m){return '<span>'+catEsc(m)+'</span>';}).join('')+'</div></div>';
+    }else h+='<div class="af af-lock"><div class="af-tag">???</div><div class="af-body">'+T('ach.unheard')+'</div></div>';
+  }
+  s.innerHTML='<div class="cc-hd"><button type="button" class="cc-back" aria-label="'+T('ach.back')+'">\u2039</button><div class="ach-dn"><div class="cc-tag">'+T('ach.frag')+'</div><div class="cc-name">'+catEsc(CONS_LABELS[cid]||cid)+'</div></div><button type="button" class="cc-x" aria-label="'+T('ach.close')+'">\u2715</button></div><div class="cc-body">'+h+'</div>';
+  ACH.view='detail';ACH.cid=cid;
+  var bd=s.querySelector('.cc-body');if(bd)bd.scrollTop=0;
+}
+function achRefresh(){if(ACH.open&&ACH.view==='list')achRenderList();}
+function achOpen(){
+  var w=document.getElementById('cam-whisper'),s=achSheet();
+  if(!s||!CAMERA_MODE||!GAME_ON)return;
+  catReset();   /* katalog bintang (kalau terbuka) ditutup dulu */
+  var r=w?w.getBoundingClientRect():null;
+  s.style.height=Math.max(170,Math.round(r?r.height:0))+'px';   /* sheet = ukuran kartu rasi */
+  ACH.open=true;achRenderList();
+  s.classList.add('on');document.body.classList.add('ach-open');
+  haptic(8);
+}
+function achClose(){
+  var s=achSheet();
+  ACH.open=false;ACH.view='list';ACH.cid=null;
+  if(s)s.classList.remove('on');
+  document.body.classList.remove('ach-open');
+}
+function achToggle(){if(ACH.open){achClose();haptic(6);}else achOpen();}
+(function(){
+  var s=achSheet();
+  if(s)s.addEventListener('click',function(e){
+    var t=e.target,b;if(!t||!t.closest)return;
+    if(t.closest('.cc-x')){e.stopPropagation();achClose();haptic(6);return;}
+    if(t.closest('.cc-back')){e.stopPropagation();achRenderList();haptic(6);return;}
+    b=t.closest('.cc-row');
+    if(b&&!b.disabled){e.stopPropagation();achRenderDetail(b.getAttribute('data-c'));haptic(6);}
+  });
+})();
 (function(){
   var w=document.getElementById('cam-whisper'),s=catSheet();
   if(w)w.addEventListener('click',function(e){
@@ -1186,8 +1302,7 @@ function drawFocusFx(now){
     }
     g.restore();return;
   }else{
-    var c=cons(id);if(!c||!isUnlocked(c.id)){g.restore();return;} /* rasi terkunci: garis belum boleh muncul */
-    if(!CAM_LINES){g.restore();return;}   /* LINES·OFF: jejak garis fokus (yang tetap menyala redup setelah animasi) ikut mati */
+    var c=cons(id);if(!c||!linesVisible(c)){g.restore();return;} /* garis rasi ini tidak tampil (terkunci di mode 🎮 / GARIS OFF): jejak garis fokus ikut mati */
     for(i=0;i<c.lines.length;i++){
       A=c.stars[c.lines[i][0]];B=c.stars[c.lines[i][1]];if(!A||!B)continue;
       var qa=gSky(A.x+c.ox,A.y+c.oy),qb=gSky(B.x+c.ox,B.y+c.oy);
@@ -1253,6 +1368,15 @@ function focusStep(){
       if(Math.abs(skyZoom-1)<=.004&&fpm<=.09)_freeReset=false;
     }
   }
+  /* Zoom out otomatis ke 1x (dipakai alignDone biar popup ALIGNED kelihatan); berhenti kalau user mulai gerak sendiri */
+  if(want&&_zoomOut){
+    if(skyDrag.on||skyPinch.on||skyRotDrag.on)_zoomOut=false;
+    else{
+      var zdz=1-skyZoom;
+      if(Math.abs(zdz)>.004)setSkyZoom(skyZoom+zdz*.12,false);else{if(skyZoom!==1)setSkyZoom(1,false);_zoomOut=false;}
+      ch=true;
+    }
+  }
   if(want&&id!=='free'){
     var g=focusGeom(id);
     if(g){
@@ -1287,10 +1411,15 @@ function focusStep(){
   var cl=document.getElementById('cl-btn');
   if(cl){cl.addEventListener('pointerdown',function(e){e.stopPropagation();});
     cl.addEventListener('click',function(e){e.stopPropagation();toggleLines();});}
-  setBand(BAND);setLines(CAM_LINES);   /* teks + aria awal sesuai bahasa (HTML cuma fallback Inggris) */
+  bind('cg-btn',toggleGame);bind('ca-btn',achToggle);
+  /* layout berubah (rotasi / resize / varian compact): hitung ulang posisi 🎮 setelah layout selesai */
+  var _gbT=0;
+  function gbSoon(){clearTimeout(_gbT);_gbT=setTimeout(function(){placeGameBtn();setTimeout(placeGameBtn,450);},150);}
+  window.addEventListener('resize',gbSoon);window.addEventListener('orientationchange',gbSoon);
+  setBand(BAND);setLines(CAM_LINES);setGame(false,true);   /* teks + aria awal sesuai bahasa (HTML cuma fallback Inggris) */
   /* Anti tembus: seluruh permukaan panel CAM, kartu rasi, dan sheet katalog (bukan cuma tombolnya) menelan pointerdown/touchstart,
      jadi ketukan di panel nggak ikut kena bintang / Pleiades / asteroid / teleskop / pan langit di bawahnya. */
-  ['cam-zoom','cam-whisper','cam-cat'].forEach(function(pid){
+  ['cam-zoom','cam-whisper','cam-cat','cam-ach'].forEach(function(pid){
     var pe=document.getElementById(pid);if(!pe)return;
     pe.addEventListener('pointerdown',function(e){e.stopPropagation();try{markActivity();}catch(eM){}},{passive:true});
     pe.addEventListener('touchstart',function(e){e.stopPropagation();},{passive:true});
@@ -2264,8 +2393,6 @@ function sfxWireSoon(a){
 function playSfx(a){
   /* Star SFX no longer warms, loads, or auto-resumes constellation music. */
   if(!a)return;
-  /* Gembok: semua jalur (canvas, tombol #xxx-fx, panel musik) berakhir di sini. */
-  var lk=keyFromAudio(a);if(lk&&!isUnlocked(lk))return;
   if(typeof RADIO_SILENCE!=='undefined'&&RADIO_SILENCE)return;
   if(typeof lisBlock==='function'&&lisBlock('sig')){lisDenied('sig');return;}   /* Lost-in-Space: teleskop nggak ada / star tracker belum pulih */
   if(a.preload!=='auto'){a.preload='auto';}

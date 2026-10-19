@@ -69,6 +69,7 @@ var SIGNAL_FRAGMENTS=SKY.SIGNAL_FRAGMENTS;
 var StellarMem={
   observed:{},
   archived:{},
+  seen:{},   /* fragmen sinyal yang sudah pernah muncul sebagai popup (sekali per bintang SFX) */
   storageKey:'obs_stellar_v1',
   load:function(){
     try{
@@ -78,19 +79,24 @@ var StellarMem={
       if(data&&typeof data==='object'){
         this.observed=data.observed&&typeof data.observed==='object'?data.observed:{};
         this.archived=data.archived&&typeof data.archived==='object'?data.archived:{};
+        if(data.seen&&typeof data.seen==='object')this.seen=data.seen;
+        else{this.seen={};for(var sk in this.observed)this.seen[sk]=1;}   /* migrasi: pemain lama dianggap sudah lihat fragmen bintang yang pernah diamati */
       }
-    }catch(e){this.observed={};this.archived={};}
+    }catch(e){this.observed={};this.archived={};this.seen={};}
   },
   save:function(){
     try{
       localStorage.setItem(this.storageKey,JSON.stringify({
         observed:this.observed,
-        archived:this.archived
+        archived:this.archived,
+        seen:this.seen
       }));
     }catch(e){}
   },
   isObserved:function(key){return !!this.observed[key];},
   isArchived:function(cid){return !!this.archived[cid];},
+  isFragSeen:function(key){return !!this.seen[key];},
+  markFragSeen:function(key){if(!key||this.seen[key])return false;this.seen[key]=1;this.save();return true;},
   markObserved:function(key){
     if(!key||this.observed[key])return false;
     var now=new Date();
@@ -123,7 +129,7 @@ StellarMem.load();
 /* Rasi tanpa SFX (CONS_STARS kosong) nggak punya bintang yang bisa "ditangkap", jadi nggak ada progres SCANNING -> READY.
    Status log-nya ikut alignment: sudah di-unlock (alignment selesai) = ARCHIVED. Rasi ber-SFX tetap lewat StellarMem.archived. */
 function consNoSfx(cid){var s=CONS_STARS[cid];return !(s&&s.length);}
-function consArchived(cid){return consNoSfx(cid)?isUnlocked(cid):StellarMem.isArchived(cid);}
+function consArchived(cid){return StellarMem.isArchived(cid);}   /* ARCHIVED = semua SFX rasi sudah didengar sampai selesai; rasi tanpa SFX nggak punya ARCHIVED */
 
 /* ---------- UNLOCK (minigame lock) ----------
    Terpisah dari StellarMem: "pernah didengar" (observed) != "sudah di-unlock".
@@ -144,60 +150,30 @@ var UNLOCK={
 };
 UNLOCK.load();
 var UNLOCK_CONS=SKY.UNLOCK_CONS; /* rasi yang bisa di-unlock/arsip (unlock:true di sky-data.js) */
-/* key = kunci bintang SFX ('betel', 'rigel', ...) atau id rasi ('orion', ...) */
-function isUnlocked(key){
+/* ALIGNED = achievement game alignment (bukan gembok SFX: semua SFX bebas diputar sejak kunjungan pertama).
+   key = kunci bintang SFX ('betel', 'rigel', ...) atau id rasi ('orion', ...) */
+function isAligned(key){
   var cid=STELLAR_CONS[key]||key;
   return !!(UNLOCK&&UNLOCK.set&&UNLOCK.set[cid]);
 }
-/* Kirim pesan ke service worker (sama pola dengan hook ">50% didengar" di index.html, hormati Data Saver / 2G). */
-function swPost(msg){
-  try{
-    if(!('serviceWorker' in navigator))return;
-    var c=navigator.connection;
-    if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return;
-    var ctl=navigator.serviceWorker.controller;
-    if(ctl){ctl.postMessage(msg);return;}
-    navigator.serviceWorker.ready.then(function(reg){if(reg&&reg.active)reg.active.postMessage(msg);}).catch(function(){});
-  }catch(e){}
-}
-/* Pas unlock: file .opus rasi itu ikut disimpan (SW nggak akan unduh ulang kalau sudah ada, dan nggak pernah menghapus). */
-function cacheUnlockedAudio(cid){
-  var keys=CONS_STARS[cid]||[];
-  for(var i=0;i<keys.length;i++){
-    var a=SFX[keys[i]];if(!a)continue;
-    var src=a.currentSrc||a.src;
-    if(src)swPost({type:'CACHE_AUDIO',url:src});
-  }
-}
-function unlock(cid){
+/* Rasi tampil "terkunci" (garis & nama disembunyikan, ada pulse petunjuk) HANYA saat mode 🎮 nyala dan rasinya belum ALIGNED.
+   Di luar game semua rasi tampil normal. */
+function consLocked(cid){return GAME_ON&&UNLOCK_CONS.indexOf(cid)>=0&&!isAligned(cid);}
+function markAligned(cid,noReveal){
   if(UNLOCK_CONS.indexOf(cid)<0||UNLOCK.set[cid])return false;
   UNLOCK.set[cid]={at:Date.now()};
   UNLOCK.save();
-  var c=cons(cid);if(c)c._reveal=performance.now(); /* garis rasi digambar pelan-pelan sebagai reward */
-  cacheUnlockedAudio(cid);
+  var c=cons(cid);if(c&&!noReveal)c._reveal=performance.now(); /* garis rasi digambar pelan-pelan sebagai reward (alignDone menjalankannya sendiri setelah popup) */
   renderStellarRecord();
   return true;
 }
-function unlockAll(){
+/* Cheat Konami: tandai semua rasi ALIGNED (achievement). Nggak ada hubungannya dengan SFX lagi. */
+function alignAll(){
   if(typeof ALIGN!=='undefined'&&ALIGN.cid)endAlignment(true);
   var n=0;
-  for(var i=0;i<UNLOCK_CONS.length;i++)if(unlock(UNLOCK_CONS[i]))n++;
+  for(var i=0;i<UNLOCK_CONS.length;i++)if(markAligned(UNLOCK_CONS[i]))n++;
   return n;
 }
-/* Tap bintang SFX yang masih terkunci: bisu, tapi kasih petunjuk (rate-limit biar nggak spam). */
-var _lockHintAt=0;
-function lockedHint(key){
-  var n=performance.now();
-  if(n-_lockHintAt<4200)return; /* > durasi toast, biar tap berulang nggak mengulang animasinya */
-  _lockHintAt=n;
-  try{UIS.deny();}catch(eUD){}
-  haptic(6);
-  if(typeof showModeToast==='function'){
-    if(key==='pleione')showModeToast(T('toast.lock.ple'),null,4200);
-    else showModeToast(T('toast.lock'),null,4000);
-  }
-}
-
 function pad2(n){return (n<10?'0':'')+n;}
 function formatSrCount(){
   var n=StellarMem.count();
@@ -207,7 +183,6 @@ function renderStellarRecord(){
   var countEl=document.getElementById('sr-count');
   var badge=document.getElementById('sr-badge');
   var musicToggle=document.getElementById('music-toggle');
-  var consEl=document.getElementById('sr-cons');
   var n=StellarMem.count();
   var nn=(n<10?'0':'')+n;
   if(countEl){var ch0='// <em>'+nn+'</em>/'+pad2(STELLAR_KEYS.length);if(countEl._h!==ch0){countEl._h=ch0;countEl.innerHTML=ch0;}}
@@ -221,40 +196,17 @@ function renderStellarRecord(){
   for(var i=0;i<rows.length;i++){
     var row=rows[i],key=row.getAttribute('data-key');
     var on=!!(key&&StellarMem.isObserved(key));
-    var lk=!!(key&&!isUnlocked(key));
-    var st=(lk?'L'+T('mp.locked'):(on?'O'+T('mp.captured'):'U'));   /* sertakan teks title: ganti bahasa tetap ke-refresh */
+    var st=(on?'O'+T('mp.captured'):'U');   /* sertakan teks title: ganti bahasa tetap ke-refresh */
     if(row._st===st)continue;   /* state baris tidak berubah: jangan sentuh DOM */
     row._st=st;
     row.classList.toggle('observed',on);
-    row.classList.toggle('locked',lk);
-    row.disabled=lk;
-    row.setAttribute('aria-disabled',lk?'true':'false');
     var obs=row.querySelector('.mp-obs');
-    if(obs){
-      if(lk){
-        obs.innerHTML='<svg viewBox="0 0 10 12" aria-hidden="true"><rect x="1.2" y="5" width="7.6" height="6" rx="1.2"/><path d="M3 5V3.6a2 2 0 0 1 4 0V5"/></svg>';
-        obs.title=T('mp.locked');
-      }else{obs.textContent=on?'●':'○';obs.title=on?T('mp.captured'):'Unobserved';}
-    }
+    if(obs){obs.textContent=on?'\u25cf':'\u25cb';obs.title=on?T('mp.captured'):'Unobserved';}
   }
-  if(consEl){
-    var cids=UNLOCK_CONS; /* baris Constellation Log = semua rasi unlock:true (urutan per sektor) */
-    var html2='';
-    for(var j=0;j<cids.length;j++){
-      var cid=cids[j];
-      var arch=consArchived(cid);
-      var ready=!arch&&StellarMem.consComplete(cid);
-      var state=arch?T('sr.archived'):(ready?T('sr.ready'):T('sr.scanning'));
-      html2+='<div class="sr-cons-row'+(arch?' archived':'')+'" data-cons="'+cid+'">';
-      html2+='<span class="sr-cons-name">'+CONS_LABELS[cid]+'</span>';
-      html2+='<span class="sr-cons-state">'+state+'</span>';
-      html2+='</div>';
-    }
-    if(consEl._h!==html2){consEl._h=html2;consEl.innerHTML=html2;}
-  }
+  if(typeof achRefresh==='function')achRefresh();   /* log rasi sekarang di sheet 🎮 (cam-ach) */
 }
 
-function showSignalFragment(key){
+function showSignalFragment(key,opt){
   var frag=SIGNAL_FRAGMENTS[key];
   if(!frag)return;
   var el=document.getElementById('signal-fragment');
@@ -269,8 +221,10 @@ function showSignalFragment(key){
   if(body)body.textContent=frag.body;
   if(meta){
     var bits=frag.meta.slice();
-    if(obs&&obs.at)bits.unshift(T('sf.recovered',{s:obs.at}));
+    if(opt&&opt.first)bits.unshift(T('sf.acquired'));
+    else if(obs&&obs.at)bits.unshift(T('sf.recovered',{s:obs.at}));
     else bits.unshift(T('sf.acquired'));
+    if(opt&&opt.archivedCid)bits.push(T('sf.archived',{s:String(CONS_LABELS[opt.archivedCid]||opt.archivedCid).toUpperCase()}));   /* bintang ini yang menuntaskan set rasi */
     meta.innerHTML=bits.map(function(m){return '<span>'+m+'</span>';}).join('');
   }
   el.classList.remove('on');
@@ -287,31 +241,13 @@ function hideSignalFragment(){
   el.setAttribute('aria-hidden','true');
   clearTimeout(el._t);
 }
-/* mode 'unlock' = popup congrats pas alignment selesai; default = popup ARCHIVED (Constellation Log).
-   Dua popup berbagi satu elemen, jadi yang datang pas lagi tampil ditunda sampai yang pertama selesai. */
-var CONS_POP_Q=[];
-/* Popup ditahan selama Constellation Camera aktif (di kamera gampang kelewat / ketimpa panel),
-   lalu dimunculkan berurutan begitu keluar dari mode kamera. */
-function flushConsPopups(){
-  if(CAMERA_MODE||!CONS_POP_Q.length)return;
-  clearTimeout(flushConsPopups._t);
-  flushConsPopups._t=setTimeout(function(){
-    if(CAMERA_MODE)return;
-    var q=CONS_POP_Q.splice(0,CONS_POP_Q.length);
-    for(var i=0;i<q.length;i++)showConsArchive(q[i][0],q[i][1]);
-  },450);
-}
-function showConsArchive(cid,mode){
+/* Popup ALIGNED (glitch pink, #cons-archive): muncul tiap kali game alignment selesai, langsung tampil (tanpa antrean). */
+function showConsArchive(cid){
   var el=document.getElementById('cons-archive');
   if(!el)return;
-  if(CAMERA_MODE){
-    for(var qi=0;qi<CONS_POP_Q.length;qi++)if(CONS_POP_Q[qi][0]===cid&&CONS_POP_Q[qi][1]===mode)return;
-    CONS_POP_Q.push([cid,mode]);
-    return;
-  }
   var t0=performance.now();
   if(showConsArchive._until>t0){
-    setTimeout(function(){showConsArchive(cid,mode);},showConsArchive._until-t0+120);
+    setTimeout(function(){showConsArchive(cid);},showConsArchive._until-t0+120);
     return;
   }
   showConsArchive._until=t0+2900;
@@ -320,14 +256,8 @@ function showConsArchive(cid,mode){
   var line=el.querySelector('.ca-line');
   var lab=(CONS_LABELS[cid]||cid).toUpperCase();
   if(name)name.textContent=lab;
-  if(mode==='unlock'){
-    var ks=CONS_STARS[cid]||[],nm=ks.map(function(k){return (STELLAR_LABELS[k]||k).toUpperCase();});
-    if(line)line.textContent=T('ca.align');
-    if(sub)sub.textContent=T('ca.unlocked',{s:nm.join(' · ')});
-  }else{
-    if(line)line.textContent=T('ca.pattern');
-    if(sub)sub.textContent=T('ca.archived',{s:lab});
-  }
+  if(line)line.textContent=T('ca.align');
+  if(sub)sub.textContent=T('ca.aligned',{s:lab});
   el.classList.remove('on');
   void el.offsetWidth;
   el.classList.add('on');
@@ -353,17 +283,13 @@ function starKeyOf(starId){return Object.prototype.hasOwnProperty.call(SKY.STAR_
 function consIdFromAudio(a){var k=keyFromAudio(a);return k?TRIGGERS[k].cons:null;}
 function onStellarSignal(key){
   if(!key||STELLAR_KEYS.indexOf(key)<0)return;
-  /* Observed status is set on interaction; here we only surface the fragment
-     and finalize constellation archive if the set is complete. */
+  /* Dipanggil saat SFX bintang SELESAI. observed diset saat tap; di sini: tandai ARCHIVED kalau set rasi lengkap,
+     lalu tampilkan Signal Fragment (= popup ARCHIVED) cuma SEKALI per bintang. Baca ulang lewat sheet 🎮. */
   if(!StellarMem.isObserved(key))StellarMem.markObserved(key);
+  var cid=STELLAR_CONS[key],justArchived=false;
+  if(cid&&StellarMem.consComplete(cid)&&!StellarMem.isArchived(cid))justArchived=StellarMem.markArchived(cid);
   renderStellarRecord();
-  showSignalFragment(key);
-  var cid=STELLAR_CONS[key];
-  if(cid&&StellarMem.consComplete(cid)&&!StellarMem.isArchived(cid)){
-    if(StellarMem.markArchived(cid)){
-      setTimeout(function(){showConsArchive(cid);renderStellarRecord();},900);
-    }
-  }
+  if(StellarMem.markFragSeen(key))showSignalFragment(key,{first:true,archivedCid:justArchived?cid:null});
 }
 
 
@@ -559,7 +485,6 @@ function setObserveMode(on){
     }
   }
   updateCamZoomUI();
-  if(!CAMERA_MODE)flushConsPopups();
   /* Close music HUD if open */
   if(OBSERVE_MODE){
     var panel=document.getElementById('music-player');
@@ -683,7 +608,7 @@ cfInit();
 /* ---------- Constellation Alignment (minigame lock) ----------
    - Cuma jalan di Constellation Camera, kamera harus fokus ke rasi itu, dan cuma buat rasi yang MASIH terkunci.
    - Bintang SFX jadi titik terakhir urutan. Langkah sebelumnya cuma dihitung (SFX diam);
-     langkah terakhir: unlock(cid) -> triggerSupernova -> popup.
+     langkah terakhir: markAligned(cid) -> triggerSupernova -> popup.
    - Pleiades nggak punya garis: alignment-nya garis lurus lintas rasi (Sirius -> sabuk Orion -> Aldebaran -> Pleiades), lihat PLE_CHAIN. */
 var ALIGN={cid:null,seq:[],next:0,lit:null,dim:0,toastAt:0,last:0,idle:15000};
 var PLE_CHAIN=[['canis','sirius'],['orion','alnitak'],['orion','alnilam'],['orion','mintaka'],['taurus','aldebaran']];
@@ -755,27 +680,30 @@ function endAlignment(ok){
 function alignDone(cid,viaKey){
   endAlignment(true);
   try{UIS.chime(-1);}catch(eUC){}   /* chord penutup */
-  unlock(cid);
-  tapFlash={until:performance.now()+1500,cons:cid}; /* garis yang baru muncul ikut menyala */
-  /* viaKey ada = langkah terakhir adalah bintang SFX → supernova + audio.
-     viaKey null = rasi tanpa SFX → diam, cuma archive. */
-  if(viaKey&&typeof triggerSupernova==='function')triggerSupernova(viaKey);
-  var hasSfx=!!(SKY.CONS_STARS[cid]&&SKY.CONS_STARS[cid].length);
-  if(!hasSfx){StellarMem.markArchived(cid);renderStellarRecord();} /* no-SFX: alignment selesai = langsung ARCHIVED di Constellation Log */
-  showConsArchive(cid, hasSfx ? 'unlock' : undefined); /* no-SFX → toast ARCHIVED saja */
-  if(CAMERA_MODE&&FFX.id===cid)setTimeout(function(){if(CAMERA_MODE&&FFX.id===cid)showWhisper(cid);},1200);
-  if(typeof haptic==='function')haptic(22);
+  markAligned(cid,true);            /* tanpa reveal dulu: reveal jalan bareng popup */
+  /* Kamera di mode 🎮 zoom out dulu biar popup nggak kelewat / ketimpa panel (tanpa antrean), baru popup + reveal garis + supernova.
+     viaKey ada = langkah terakhir adalah bintang SFX -> supernova + audio. viaKey null = rasi tanpa SFX: diam. */
+  var far=!!(CAMERA_MODE&&skyZoom>1.05);
+  if(CAMERA_MODE&&typeof camZoomOut==='function')camZoomOut();
+  setTimeout(function(){
+    showConsArchive(cid);
+    var c=cons(cid);if(c)c._reveal=performance.now();
+    tapFlash={until:performance.now()+1500,cons:cid}; /* garis yang baru muncul ikut menyala */
+    if(viaKey&&typeof triggerSupernova==='function')triggerSupernova(viaKey);
+    if(CAMERA_MODE&&FFX.id===cid)setTimeout(function(){if(CAMERA_MODE&&FFX.id===cid)showWhisper(cid);},1200);
+    if(typeof haptic==='function')haptic(22);
+  },far?800:150);
 }
 /* Return: false = bukan langkah alignment (caller lanjut seperti biasa),
            'step'  = langkah yang benar tapi belum terakhir (dihitung, SFX DIAM),
            'done'  = langkah terakhir (unlock + SFX + popup sudah ditangani di sini). */
 function alignTapStar(c,starKey){
   if(!c||!starKey||!c.stars||!c.stars[starKey])return false;
-  if(!CAMERA_MODE)return false;                       /* alignment cuma di mode kamera */
+  if(!CAMERA_MODE||!GAME_ON)return false;             /* alignment cuma di mode kamera DAN mode 🎮 nyala */
   var ch=pleChainTap(c,starKey);                      /* chain lintas sektor Pleiades */
   if(ch)return ch;
   if(UNLOCK_CONS.indexOf(c.id)<0)return false;        /* rasi tanpa SFX / belum unlock:true (mis. Gemini) nggak bisa di-alignment */
-  if(isUnlocked(c.id))return false;                   /* sudah unlocked: nggak ada hint kuning / toast / dimming lagi */
+  if(isAligned(c.id))return false;                    /* sudah ALIGNED: nggak ada hint kuning / toast / dimming lagi */
   if(camFocusId()!==c.id)return false;                /* kamera harus lagi fokus di rasi ini */
   var seq=alignmentSequence(c);if(!seq.length)return false;
   if(ALIGN.cid!==c.id){
@@ -871,7 +799,7 @@ function updateAlignmentDim(now){
     var fid=camFocusId();
     if(ALIGN.cid==='pleiades'&&fid!==updateAlignmentDim._f)ALIGN.last=performance.now(); /* pindah sektor = bagian dari chain */
     updateAlignmentDim._f=fid;
-    if(!CAMERA_MODE||(ALIGN.cid!=='pleiades'&&fid!==ALIGN.cid)){
+    if(!CAMERA_MODE||!GAME_ON||(ALIGN.cid!=='pleiades'&&fid!==ALIGN.cid)){
       endAlignment(false);                             /* keluar kamera / pindah fokus: batal diam-diam */
     }else if(performance.now()-ALIGN.last>(ALIGN.idle||ALIGN_IDLE_MS)){
       endAlignment(false);
@@ -1120,11 +1048,13 @@ var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
 /* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
 var AST_SPRITES=null,AST_SPRITE_R=24;
 var bgCanvas=null,bgCtx=null,bgDirty=true,HUD=null;
+/* Grid RA/Dec equatorial: canvas terpisah, di-bake lazy saat cam ON (bukan di bgCanvas) */
+var gridCanvas=null,gridDPR=0,gridRot=0,gridW=0,gridH=0;
 /* Tactical HUD (LAT/LON/AZ/EL): fixed ke layar, nggak ikut geser/zoom canvas. Vektor kecil, murah. */
 function drawHud(){
   if(!HUD)return;
-  /* LAT/LON/AZ/EL cuma di mode observasi (🌠/📡) dan kamera (📷); tampilan biasa bersih. */
-  if(!(OBSERVE_MODE||CAMERA_MODE))return;
+  /* LAT/LON/AZ/EL + reticle cuma di mode kamera (📷); mode observasi tanpa cam dan tampilan biasa bersih. */
+  if(!CAMERA_MODE)return;
   var m=HUD.m,len=HUD.len,t=HUD.top,b=H-HUD.bot;
   g.save();
   g.strokeStyle='rgba(110,229,255,0.22)';g.fillStyle='rgba(110,229,255,0.18)';g.lineWidth=1;
@@ -1614,36 +1544,46 @@ function bakeAstroPlates(){
       HUD={m:m,len:len,top:Math.max(44,Math.min(88,H*.105)),bot:Math.max(42,Math.min(82,H*.105))};
     })();
 
-    /* Equatorial RA/Dec grid — baked into bgCanvas, so it is redrawn only
-       when the static background is rebuilt (boot/resize), never per RAF. */
-    (function(){
-      bgCtx.save();
-      bgCtx.strokeStyle='rgba(110,229,255,.035)';
-      bgCtx.lineWidth=.7;
-      bgCtx.setLineDash([4,8]);
-      /* Landscape ROT: grid digambar di ruang LAYAR (gw x gh, sumbu ditukar) lalu diputar balik, jadi garis deklinasi tetap horizontal di layar */
-      var gw=W,gh=H;
-      if(STG.rot){gw=H;gh=W;bgCtx.translate(W*.5,H*.5);bgCtx.rotate(upAng());bgCtx.translate(-gw*.5,-gh*.5);}
-
-      /* Declination lines. */
-      for(var dec=.2;dec<1;dec+=.2){
-        bgCtx.beginPath();
-        bgCtx.moveTo(0,gh*dec);
-        bgCtx.lineTo(gw,gh*dec);
-        bgCtx.stroke();
-      }
-
-      /* Right Ascension meridians: restrained ellipses give the sky-map feel. */
-      for(var ra=-.2;ra<=1.2;ra+=.35){
-        bgCtx.beginPath();
-        bgCtx.ellipse(gw*ra,gh*.5,gw*.25,gh*.8,.2,0,6.283);
-        bgCtx.stroke();
-      }
-      bgCtx.setLineDash([]);
-      bgCtx.restore();
-    })();
+    /* Grid RA/Dec equatorial: dipindah ke gridCanvas (bakeCamGrid), di-bake lazy saat cam ON.
+       Plate di-bake ulang => grid lama invalid. */
+    gridCanvas=null;
 
   bakeDustLayers(M,EW,EH,nb?NEB.DRIFT:1);
+}
+/* Grid RA/Dec equatorial untuk mode cam: canvas terpisah seukuran plate (EW x EH, transform sama dgn bgCanvas).
+   Lazy: baru di-bake saat cam ON; invalid kalau DPR/rot/ukuran berubah atau plate di-bake ulang (gridCanvas=null). */
+function bakeCamGrid(){
+  if(!bgCanvas)return;
+  var M=plateM,EW=W+2*M,EH=H+2*M;
+  gridCanvas=document.createElement('canvas');
+  gridCanvas.width=Math.max(1,Math.round(EW*DPR));gridCanvas.height=Math.max(1,Math.round(EH*DPR));
+  var gc=gridCanvas.getContext('2d');
+  gc.setTransform(DPR,0,0,DPR,M*DPR,M*DPR);
+  gc.strokeStyle='rgba(110,229,255,.035)';
+  gc.lineWidth=.7;
+  gc.setLineDash([4,8]);
+  /* Landscape ROT: grid digambar di ruang LAYAR (gw x gh, sumbu ditukar) lalu diputar balik, jadi garis deklinasi tetap horizontal di layar */
+  var gw=W,gh=H;
+  if(STG.rot){gw=H;gh=W;gc.translate(W*.5,H*.5);gc.rotate(upAng());gc.translate(-gw*.5,-gh*.5);}
+  /* Declination lines. */
+  for(var dec=.2;dec<1;dec+=.2){
+    gc.beginPath();
+    gc.moveTo(0,gh*dec);
+    gc.lineTo(gw,gh*dec);
+    gc.stroke();
+  }
+  /* Right Ascension meridians: restrained ellipses give the sky-map feel. */
+  for(var ra=-.2;ra<=1.2;ra+=.35){
+    gc.beginPath();
+    gc.ellipse(gw*ra,gh*.5,gw*.25,gh*.8,.2,0,6.283);
+    gc.stroke();
+  }
+  gc.setLineDash([]);
+  gridDPR=DPR;gridRot=STG.rot;gridW=W;gridH=H;
+}
+function ensureCamGrid(){
+  if(!bgCanvas)return;
+  if(!gridCanvas||gridDPR!==DPR||gridRot!==STG.rot||gridW!==W||gridH!==H)bakeCamGrid();
 }
 /* One layer blit: zoom about screen centre (deep layer zooms less => parallax depth) + offset. */
 function plateBlit(c,m,pw,ph,z,ox,oy){

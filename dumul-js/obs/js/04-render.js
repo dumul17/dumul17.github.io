@@ -1237,9 +1237,87 @@ function drawNameBox(id,t1,t2,al,now){
   g.globalAlpha=pa;
   uprEnd(up);
 }
+/* Rasi ini lagi SFX aktif? Cocokkan activeSfx dgn SFX[triggerKey] bintang-bintangnya (triggerKey = starKeyOf, sama persis dgn drawStars).
+   Daftar triggerKey di-cache di c._sfxKeys supaya tidak scan tiap frame. */
+function consSfxOn(c){
+  if(!activeSfx||activeSfx.paused||activeSfx.ended)return false;
+  var ks=c._sfxKeys,i;
+  if(!ks){
+    ks=[];
+    (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(k){var t=starKeyOf(k);if(t&&ks.indexOf(t)<0)ks.push(t);});
+    c._sfxKeys=ks;
+  }
+  for(i=0;i<ks.length;i++)if(SFX[ks[i]]&&activeSfx===SFX[ks[i]])return true;
+  return false;
+}
+/* Fade halus faktor tampil nama (c._nA / PLEIADES._nA) mengejar target nT; pola sama dgn s._la di label bintang. reduce => langsung. */
+function nameFadeStep(o,nT,now){
+  var cur=o._nA||0;
+  if(reduce)cur=nT;
+  else{var dt=Math.min(.1,(now-(o._nAt||now))/1000);cur+=(nT-cur)*Math.min(1,dt*9);if(nT===0&&cur<.004)cur=0;}
+  o._nA=cur;o._nAt=now;
+  return cur;
+}
+/* Garis rasi tampil? (fase 6)
+   - Mode cam: ikut tombol GARIS saja; SFX nyala/mati tidak ngaruh (di mode 🎮 GARIS dipaksa ON).
+   - Di luar cam: rasi yang SFX-nya lagi bunyi, atau semua rasi saat BGM constellation.opus nyala (tanpa SFX).
+   - Pengecualian: reveal lagi jalan (alignment selesai / cheat Konami) supaya animasinya tetap kelihatan.
+   - Rasi yang masih "terkunci" di mode 🎮 nggak punya garis (diganti pulse petunjuk). */
+function linesVisible(c){
+  if(consLocked(c.id))return false;
+  if(c._reveal!=null)return true;
+  return CAMERA_MODE?CAM_LINES:(consSfxOn(c)||(AT.bgm&&!AT.sfx));   /* di luar cam: rasi SFX aktif, atau semua rasi saat constellation.opus (tanpa SFX) */
+}
+/* ================= animTier (fase 6): level animasi per rasi =================
+   FULL = halo bintang + napas rasi (BGM constellation) + kilau garis + pulse PU/spark. IDLE = cuma inti bintang + kedip halus + sway.
+   Mode cam   : fokus/springback ON -> semua rasi tenang (IDLE, sway berhenti); fokus OFF (free) -> semua FULL. SFX nyala/mati tidak ngaruh di cam.
+   Di luar cam: ada SFX bunyi -> cuma rasi SFX itu FULL; tanpa SFX -> semua FULL kalau BGM (constellation / collapsars) nyala, selain itu IDLE.
+   Faktor FULL (c._fK) di-ease 0..1 supaya perubahan tier nggak pop. Sway tetap jalan di semua tier kecuali fokus cam. */
+/* Halo bintang: IDLE / cam free ~1x = tipis & kecil (HALO_IDLE_*), FULL = penuh. Cam fokus / auto-zoom fit = tanpa halo, inti lebih terang. */
+var HALO_IDLE_S=.55,HALO_IDLE_A=.5,CAM_HALO_Z0=1.15,CAM_HALO_Z1=.55,CAM_IDLE_FOCUS=.24;   /* CAM_IDLE_FOCUS = kecerahan rasi di idle (CF idle .24): cam free ~1x harus sama dengan idle, baru naik ke 1 bareng halo hilang */   /* ukuran, alpha halo tipis; halo cam memudar antara zoom 1.15x dan 1.7x */
+var CAM_RET_GAP=1.5,CAM_RET_ARM=16;   /* retikel silang cam: jarak mulai lengan = 1.15x cincin terluar lensa; panjang lengan minimal 12px (atau 45% radius lensa) */
+var AMB_TW=true;   /* kedip halus bintang rasi (pembeda dari bintang latar); pakai s.twinkleSpeed/Depth/Jitter yang sudah ada di data. false = mati */
+var AT={t:-1,calm:false,sfx:false,bgm:false,pK:0,twT:0,swayK:1};   /* bgm = constellation.opus; pK = collapsars.opus (eased 0..1); twT = jam kedip (melambat saat collapsars) */
+function animFrame(now){
+  if(AT.t===now)return;
+  var dt=Math.min(.1,Math.max(0,(now-(AT.t>=0?AT.t:now))/1000)),fi=FOCUS.list&&FOCUS.list[FOCUS.i],tg;
+  AT.t=now;
+  AT.calm=!!(CAMERA_MODE&&fi&&fi.id!=='free');
+  AT.sfx=!!(activeSfx&&!activeSfx.paused&&!activeSfx.ended);
+  AT.bgm=OFX.pC>.25;   /* constellation.opus nyala (eased) dan efek visual diizinkan (bukan potato / reduce / radio silence) */
+  AT.pK=OFX.pK;        /* collapsars.opus: tanpa garis/napas, bintang lebih redup dan kedip lebih lambat (cuma di luar cam) */
+  AT.twT+=dt*1000*(CAMERA_MODE?1:(1-.6*AT.pK));
+  tg=AT.calm?0:1;
+  if(reduce)AT.swayK=tg;else{AT.swayK+=(tg-AT.swayK)*Math.min(1,dt*5);if(Math.abs(tg-AT.swayK)<.003)AT.swayK=tg;}
+}
+function clusterSfxOn(){return !!(activeSfx&&SFX.pleione&&activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended);}
+function consFullTarget(c){
+  if(CAMERA_MODE)return AT.calm?0:1;
+  if(AT.sfx)return (c===PLEIADES?clusterSfxOn():consSfxOn(c))?1:0;
+  return AT.bgm?1:0;
+}
+function consFullK(c,now){
+  animFrame(now);
+  if(c._fKt===now)return c._fK;
+  var t=consFullTarget(c),cur=(c._fK===undefined)?t:c._fK;   /* pertama kali: langsung ke target */
+  if(reduce)cur=t;
+  else{var dt=Math.min(.1,(now-(c._fKt||now))/1000);cur+=(t-cur)*Math.min(1,dt*5);if(Math.abs(t-cur)<.01)cur=t;}
+  c._fK=cur;c._fKt=now;
+  return cur;
+}
+/* Fade halus faktor tampil garis (c._lA) mengejar target; reduce => langsung. Garis nggak pop pas SFX mulai/selesai atau GARIS di-toggle. */
+function lineFadeStep(c,nT,now){
+  var cur=c._lA||0;
+  if(reduce)cur=nT;
+  else{var dt=Math.min(.1,(now-(c._lAt||now))/1000);cur+=(nT-cur)*Math.min(1,dt*7);if(nT===0&&cur<.004)cur=0;}
+  c._lA=cur;c._lAt=now;
+  return cur;
+}
 function drawConsName(c,age,now,ox,oy,focus,locked){
   if(locked||!(c.maxX>-1e8)||!(c.minX<1e8))return;
-  var a0=clamp((age-c.delay-1.6)/1.6)*focus;
+  /* Nama rasi cuma tampil saat cam ON atau SFX rasi ini bunyi; sisanya fade out (bukan pop). */
+  var nA=nameFadeStep(c,(CAMERA_MODE||consSfxOn(c))?1:0,now);
+  var a0=clamp((age-c.delay-1.6)/1.6)*focus*nA;
   if(a0<=.01)return;
   var q1=skyXF(c.minX+ox,c.minY+oy),t1=[q1[0],q1[1]]; /* skyXF() balikin array yang dipakai ulang tiap panggilan: WAJIB disalin, kalau nggak t1===t2 */
   var q2=skyXF(c.maxX+ox,c.maxY+oy),t2=[q2[0],q2[1]];
@@ -1249,15 +1327,16 @@ function drawCons(c,age,now){
   var tn=now-(TD.lag[c.id]||0); /* time-dilated clock */
   var audioFocus=potatoAudioFocus();
   var focus=constellationFocus(c);
-  var sway=(reduce||audioFocus)?0:1;
+  var fK=consFullK(c,now);   /* faktor FULL rasi ini (animTier) */
+  var sway=((reduce||audioFocus)?0:1)*AT.swayK;   /* sway tetap jalan di semua tier; berhenti halus cuma di fokus cam */
   var wildField=(drag.on&&drag.moved)?1:0;
   var ld=c.lead||c,tp=now-(TD.lag[ld.id]||0); /* rasi gabungan (Taurus+Auriga) pakai jam & fase yang sama => titik Elnath nggak lepas */
   var ox=Math.sin(tp*.00031+ld.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(tp*.00027+ld.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;
   if(now<glitchUntil){ox+=(Math.random()-.5)*7;oy+=(Math.random()-.5)*4;}
   if(OFX.pK>.01){ofxPull(ld,now);ox+=OFX.px;oy+=OFX.py;} /* tarikan halus ke Gargantua */
   c.ox=ox;c.oy=oy;
-  var locked=!isUnlocked(c.id);
-  var obr=ofxBreath(ld.phase,now); /* napas rasi: -1..1 x kehadiran BGM Constellation */
+  var locked=consLocked(c.id);
+  var obr=ofxBreath(ld.phase,now)*fK; /* napas rasi: -1..1 x kehadiran BGM Constellation */
   if(c.nebula){
     var na=clamp((age-c.delay-1.2)/1.5);
     if(na>0&&nebulaIn(c.nebula.x+ox,c.nebula.y+oy,c.scale*1.5)){var nt=skyXF(c.nebula.x+ox,c.nebula.y+oy),q0=pull(nt[0],nt[1]),nx=q0[0],ny=q0[1],nr=c.scale*1.5*(1-.7*q0[2]);na*=(1-q0[2]);
@@ -1271,7 +1350,7 @@ function drawCons(c,age,now){
   if(locked)drawLockedSignal(c,age,now,ox,oy,focus);
   /* Adaptive lens samples: few when far from BH; denser only near horizon.
      One sample pass per line — glow (if any) reuses the same points. */
-  var lines=c.lines,nLines=(locked||(CAMERA_MODE&&!CAM_LINES))?0:lines.length;   /* LINES·OFF (kamera) menyembunyikan garis saja */
+  var lines=c.lines,lfa=lineFadeStep(c,linesVisible(c)?1:0,now),nLines=(locked||lfa<.004)?0:lines.length;   /* garis: lihat linesVisible (cam = tombol GARIS, di luar cam = cuma rasi SFX aktif) */
   /* Reward pas unlock: garis digambar satu-satu dari waktu unlock (bukan dari boot). */
   if(c._reveal!=null&&(reduce||now-c._reveal>lines.length*90+1400))c._reveal=null;
   for(var i=0;i<nLines;i++){
@@ -1303,15 +1382,15 @@ function drawCons(c,age,now){
     var doGlow=!IS_POTATO&&!audioFocus&&(lineHot||nearBH);
     var pass,drawing2;
     // Hitung efek dentuman audio bass pada garis rasi
-    var audioPulse = (AV.beat * 0.45 + AV.bass * 0.35) * ((activeSfx && !activeSfx.paused) ? 1 : 0);
+    var audioPulse=0;   /* dulu garis berkedip ngikut bass SFX; sekarang dentuman itu diterapkan ke bintang rasi SFX (drawStars) */
 
     for(pass=doGlow?0:1;pass<2;pass++){
       if(pass===0){
-        g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus*(1+.5*obr))+')';
+        g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus*lfa*(1+.5*obr))+')';
         g.lineWidth=(lineHot?6:4) + audioPulse * 2.0;
       }
       else{
-        g.strokeStyle='rgba(150,212,255,'+Math.min(1,((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*Math.sin(tn*.0014+i)))*focus*(1+.32*obr))+')';
+        g.strokeStyle='rgba(150,212,255,'+Math.min(1,((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*fK*Math.sin(tn*.0014+i)))*focus*lfa*(1+.32*obr))+')';
         g.lineWidth=(lineHot?1.8:1.1) + audioPulse * 1.2 + .4*obr;
       }
       g.globalAlpha=kk;g.beginPath();drawing2=false;
@@ -1433,9 +1512,32 @@ function ringR(){return skyZoom<=1?RING_R:RING_R/(1+.25*Math.log(skyZoom));}   /
    Einstein berseberangan (satu panjang, satu pendek) yang melayang pelan di orbit luar.
    Dipanggil SEBELUM inti digambar (inti tetap kelihatan di tengah). Muncul mulai x2.5, penuh di x5.5.
    Biaya = 1 fill + 5 stroke per bintang terang (bukan semua bintang), tanpa gradient. */
-function camLens(x,y,rc,rgb,a,now){
+/* Grup lensa: bintang bernama yang cincin terluar lensanya (1.42*R) saling menyentuh (jarak <= CAT_GROUP_K*(Ro1+Ro2), single-linkage, sama dengan reticle katalog di 01-core.js)
+   + kelompok pasti (CAT_GROUPS, mis. sabuk Orion) digabung jadi SATU lensa yang melingkupi semuanya. it = [{x,y,o(radius cincin terluar),k}], forced = [[kunci..]].
+   Hasil: tiap anggota grup dapat m.g = {x,y,R,drawn}; bintang tunggal m.g undefined. Dibuat ulang tiap frame (murah: cuma bintang bernama terang). */
+function lensCluster(it,forced){
+  var n=it.length,p=[],i,j,m,K=(typeof CAT_GROUP_K==='number')?CAT_GROUP_K:1.15,by={},ks=[],root,o,x0,x1,y0,y1,cx,cy,Ro,g;
+  if(n<2)return it;
+  function f(a){while(p[a]!==a){p[a]=p[p[a]];a=p[a];}return a;}
+  for(i=0;i<n;i++)p[i]=i;
+  if(K>0)for(i=0;i<n;i++)for(j=i+1;j<n;j++)if(Math.hypot(it[i].x-it[j].x,it[i].y-it[j].y)<=K*(it[i].o+it[j].o))p[f(i)]=f(j);
+  if(forced)forced.forEach(function(l){var first=-1;it.forEach(function(mm,ix){if(l.indexOf(mm.k)>=0){if(first<0)first=ix;else p[f(ix)]=f(first);}});});
+  for(i=0;i<n;i++){root=f(i);(by[root]||(by[root]=[])).push(it[i]);}
+  for(root in by){
+    o=by[root];if(o.length<2)continue;
+    x0=1e9;x1=-1e9;y0=1e9;y1=-1e9;
+    for(i=0;i<o.length;i++){m=o[i];x0=Math.min(x0,m.x-m.o);x1=Math.max(x1,m.x+m.o);y0=Math.min(y0,m.y-m.o);y1=Math.max(y1,m.y+m.o);}
+    cx=(x0+x1)/2;cy=(y0+y1)/2;Ro=0;
+    for(i=0;i<o.length;i++){m=o[i];Ro=Math.max(Ro,Math.hypot(m.x-cx,m.y-cy)+m.o);}
+    g={x:cx,y:cy,R:Ro/1.42,drawn:false};   /* cincin terluar grup (1.42*R) = melingkupi semua cincin terluar anggota */
+    for(i=0;i<o.length;i++)o[i].g=g;
+  }
+  return it;
+}
+function camLens(x,y,rc,rgb,a,now){camLensR(x,y,rc*3+4,rgb,a,now);}
+function camLensR(x,y,R,rgb,a,now){
   var az=clamp((skyZoom-2.5)/3);if(az<=.01)return;
-  var R=rc*3+4,br=reduce?1:.9+.1*Math.sin(now*.0021+x*.013),ang=reduce?.6:now*.00032+x*.01,k=a*az;
+  var st=reduce||AT.calm,br=st?1:.9+.1*Math.sin(now*.0021+x*.013),ang=st?.6:now*.00032+x*.01,k=a*az;   /* fokus cam: lensa diam */
   g.fillStyle='rgba(2,6,12,'+(.36*k)+')';
   g.beginPath();g.arc(x,y,R*.8,0,6.283);g.fill();                                  /* rongga: cahaya yang dibelokkan menjauh dari inti */
   g.lineWidth=.8;
@@ -1457,14 +1559,39 @@ function drawStars(c,age,now){
   var k2=W<500?.95:1.2;
   var audioFocus=potatoAudioFocus();
   var focus=constellationFocus(c);
+  var fK=consFullK(c,now);
+  var hkC=CAMERA_MODE?clamp(1-(skyZoom-CAM_HALO_Z0)/CAM_HALO_Z1):1,focusK=CAMERA_MODE?(CAM_IDLE_FOCUS+(1-CAM_IDLE_FOCUS)*(1-hkC)):1;   /* cam: 1 = tampilan idle (zoom ~1x), 0 = tajam (fokus / zoom) */
+  var sfxR=consSfxOn(c),ap=(reduce||!sfxR)?0:(AV.beat*.45+AV.bass*.35);   /* dentuman bass SFX -> bintang rasi yang SFX-nya bunyi (pengganti kedip garis) */
+  var twn=AT.twT-(TD.lag[c.id]||0),dk=(CAMERA_MODE||sfxR)?0:AT.pK;   /* twn = jam kedip; dk = redup saat collapsars.opus (rasi SFX aktif & mode cam dikecualikan) */
   if(c._topR===undefined){var _mx=0,_kk;for(_kk in c.stars){if(c.stars[_kk].name&&c.stars[_kk].r>_mx)_mx=c.stars[_kk].r;}c._topR=_mx;}   /* r terbesar di antara bintang bernama = bintang paling terang rasi ini (seri ikut) */
+  /* pra-pass lensa: bintang bernama berdekatan (lensa saling menyentuh / kelompok pasti) -> satu lensa grup, bukan satu-satu */
+  var lensOn=false;
+  if(CAMERA_MODE&&skyZoom>2.55){
+    var lensIt=[],lrr=ringR(),lzk=camZK();
+    (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(k){
+      var s=c.stars[k],lq;s._lg=null;
+      if(!s.name||s.r<lrr||clamp((age-s.t0)/.5)<=0)return;
+      lq=gSkyC(s.x+c.ox,s.y+c.oy,72);if(!lq)return;
+      lensIt.push({x:lq[0],y:lq[1],o:1.42*(3*Math.max(.9,s.r*k2*(1-.6*lq[2])*lzk*.62)+4),k:k,s:s});
+    });
+    lensCluster(lensIt,(typeof CAT_GROUPS!=='undefined'&&CAT_GROUPS[c.id])||null);
+    lensIt.forEach(function(m){m.s._lg=m.g||null;});
+    lensOn=true;
+  }
   (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(k){
     var s=c.stars[k],a=clamp((age-s.t0)/.5);s._a=a;if(a<=0)return;
     var triggerKey=starKeyOf(k);
     var tr=triggerKey?TRIGGERS[triggerKey]:null;
     var isPlaying=!!(tr&&activeSfx===SFX[triggerKey]&&!SFX[triggerKey].paused);
     var cheap=audioFocus&&!isPlaying;
-    var q=gSkyC(s.x+c.ox,s.y+c.oy,72);if(!q)return;c._vis++;var tw=cheap?1:(reduce?1:(1+s._tw*(.30+1.8*s.twinkleDepth))),x=q[0],y=q[1],kq=q[2],r=s.r*k2*(1-.6*q[2])*(.97+.10*s._tw);a*=(1-.85*kq)*focus*(1+.40*s._tw);
+    var q=gSkyC(s.x+c.ox,s.y+c.oy,72);if(!q)return;c._vis++;var tw=cheap?1:(reduce?1:(1+s._tw*(.30+1.8*s.twinkleDepth))),x=q[0],y=q[1],kq=q[2],r=s.r*k2*(1-.6*q[2])*(.97+.10*s._tw);a*=(1-.85*kq)*focus*focusK*(1+.40*s._tw);
+    if(!cheap){   /* kedip halus: bintang rasi tetap beda dari bintang latar walau halo mati (idle / fokus cam) */
+      var amb=(AMB_TW&&!reduce)?Math.sin(twn*s.twinkleSpeed+s.x*.0173+s.y*.0131):0;
+      if(amb&&s.twinkleJitter)amb+=.5*Math.sin(twn*s.twinkleSpeed*2.7+s.x*.031);
+      a*=1+s.twinkleDepth*1.5*amb;r*=1+.05*amb;
+    }
+    if(ap>0){a*=1+.5*ap;r*=1+.25*ap;}
+    if(dk>0)a*=1-.4*dk;
     var bandOn=CAMERA_MODE&&BAND!=='vis',bandCol=null,bandCore=null;
     if(bandOn){
       var bf=bandFactor(s,c.id,k);
@@ -1481,12 +1608,19 @@ function drawStars(c,age,now){
     }else if(CAMERA_MODE){
       /* sensor teleskop tajam: tanpa halo. VIS = warna asli bintang (s.rgb) + putih panas di tengah; UV/IR = warna pita (bandCore). Bintang bernama terang dapat lensa pembelok cahaya (camLens). */
       var cc=bandCore||s.rgb,rz=r*camZK();
-      if(s.name&&s.r>=ringR())camLens(x,y,Math.max(.9,rz*.62),cc,a,now);   /* cuma bintang bernama terang (titik anonim seperti ekor Scorpius tidak) */
-      g.fillStyle='rgba('+cc+','+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,rz*.62),0,6.283);g.fill();
-      if(!bandOn){g.fillStyle='rgba(255,255,255,'+(.8*a)+')';g.beginPath();g.arc(x,y,Math.max(.5,rz*.3),0,6.283);g.fill();}
+      /* halo tipis ada saat cam free di zoom ~1x (kayak idle); hilang saat fokus / auto-zoom fit, dan inti jadi lebih terang */
+      var hk=hkC;
+      if(hk>.02){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
+      if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}   /* lensa grup (1 lensa utk bintang berdekatan) atau lensa tunggal; cuma bintang bernama terang (titik anonim seperti ekor Scorpius tidak) */
+      if(hk>.02){g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.95*a*hk)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
+      if(hk<.98){   /* inti tajam sensor (warna asli + putih panas): menggantikan inti idle secara halus saat fokus / zoom, dan lebih terang */
+        var ik=1-hk;
+        g.fillStyle='rgba('+cc+','+(.95*a*ik*1.1)+')';g.beginPath();g.arc(x,y,Math.max(.9,rz*.62),0,6.283);g.fill();
+        if(!bandOn){g.fillStyle='rgba(255,255,255,'+(.8*a*ik)+')';g.beginPath();g.arc(x,y,Math.max(.5,rz*.3),0,6.283);g.fill();}
+      }
     }else{
-      var sb=ofxBreath(c.phase+(s.ph||0)*.35,now);
-      drawStarGlow(x,y,r*(1+.14*sb),bandCol||s.rgb,a*tw*(1+.3*sb));
+      var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
+      drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
       g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
     }
     var am=ALIGN.cid?alignMark(c,k):null;
@@ -1507,9 +1641,9 @@ function drawStars(c,age,now){
       gateZ=CAMERA_MODE&&skyZoom>CAM_LBL_Z;
       gateLbl=CAMERA_MODE&&!CAM_LINES&&(alwaysLbl||gateZ);   /* VIS + zoom lewat gerbang + LINES·OFF = nama + tipe spektral semua bintang bernama. LINES·ON = cuma nama rasi/cluster (drawConsName) */
       if(gateLbl)lblT=.8*(alwaysLbl?1:clamp((skyZoom-CAM_LBL_Z)/1));   /* VIS/UV/IR sama. Garis OFF: bintang SFX / paling terang selalu berlabel; sisanya baru lewat gerbang zoom CAM_LBL_Z. Garis ON = cuma nama rasi/cluster */
-      else if(!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){
-        if(isPlaying)lblT=1;
-        else if(!tr&&s.name&&CAMERA_MODE&&!gateZ&&camFocusId()===c.id)lblT=.34;   /* lewat gerbang zoom + garis ON: label fokus tipis ikut mati, sisa nama rasi saja */
+      else{
+        if(isPlaying)lblT=1;   /* SFX aktif = label tampil, di mode apa pun (observe/normal/cam) */
+        else if(!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)&&!tr&&s.name&&CAMERA_MODE&&!gateZ&&camFocusId()===c.id)lblT=.34;   /* lewat gerbang zoom + garis ON: label fokus tipis ikut mati, sisa nama rasi saja (guard OBSERVE_MODE lama dipertahankan: perilaku cam tidak berubah) */
       }
     }
     var lblA=s._la||0;
@@ -1518,9 +1652,13 @@ function drawStars(c,age,now){
     s._la=lblA;s._lt=now;
     /* Cross reticle only on named bright stars — skips Scorpius tail (Shaula)
        and other anonymous bright points so the sting doesn't show a "+". */
-    if(lblA>.02 && s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath')){
-      g.strokeStyle='rgba('+s.rgb+','+(.4*a*tw*Math.min(1,lblA*1.6))+')';g.lineWidth=.8;
-      g.beginPath();g.moveTo(x-r*2.2,y);g.lineTo(x+r*2.2,y);g.moveTo(x,y-r*2.2);g.lineTo(x,y+r*2.2);g.stroke();
+    if(lblA>.02 && s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath') && !(lensOn&&s._lg&&clamp((skyZoom-2.5)/3)>.01)){   /* anggota grup lensa: tanpa silang sendiri (reticle area katalog yang melingkupi grup) */
+      g.strokeStyle='rgba('+s.rgb+','+(.4*(a/focusK)*tw*Math.min(1,lblA*1.6))+')';g.lineWidth=.8;   /* a/focusK: retikel tetap seterang sebelumnya walau inti bintang cam di zoom ~1x disamakan dengan idle */
+      /* Saat zoom, lensa pembelok cahaya (camLens) membesar ~akar zoom sedangkan retikel dulu tetap r*2.2 -> ketutup lensa. Sekarang lengan retikel
+         menjauh ke LUAR cincin terluar lensa (1.42*(3*rc+4)) mengikuti fade lensa (az); tanpa lensa = silang penuh seperti semula. */
+      var azR=(CAMERA_MODE&&s.name&&s.r>=ringR())?clamp((skyZoom-2.5)/3):0,lensOut=1.42*(3*Math.max(.9,r*camZK()*.62)+4),
+          rG=azR*lensOut*CAM_RET_GAP,rL=r*2.2+azR*(lensOut*CAM_RET_GAP+Math.max(CAM_RET_ARM,lensOut*.45)-r*2.2);
+      g.beginPath();g.moveTo(x-rL,y);g.lineTo(x-rG,y);g.moveTo(x+rG,y);g.lineTo(x+rL,y);g.moveTo(x,y-rL);g.lineTo(x,y-rG);g.moveTo(x,y+rG);g.lineTo(x,y+rL);g.stroke();
     }
     if(lblA>.02){
       /* Audio-trigger labels: each one inherits its own pulse color. */
@@ -1606,8 +1744,10 @@ function drawPleiades(age,now){
   var k2=W<500?.95:1.1;
   var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y;
   var selected=activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended;
-  if(isUnlocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
-    var pS=PLEIADES.scale,pA=clamp((age-1.6)/1.6);
+  var pFK=consFullK(PLEIADES,now),pAP=(selected&&!reduce)?(AV.beat*.45+AV.bass*.35):0,pDK=(CAMERA_MODE||clusterSfxOn())?0:AT.pK;
+  var pNA=nameFadeStep(PLEIADES,(CAMERA_MODE||selected)?1:0,now);   /* nama cluster: cam ON atau Pleione bunyi, fade halus */
+  if(!consLocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
+    var pS=PLEIADES.scale,pA=clamp((age-1.6)/1.6)*pNA;
     var pq1=skyXF(PLEIADES.x+.22*pS+ox,PLEIADES.y+.22*pS+oy),pt1=[pq1[0],pq1[1]];
     var pq2=skyXF(PLEIADES.x+.84*pS+ox,PLEIADES.y+.62*pS+oy),pt2=[pq2[0],pq2[1]];
     drawNameBox('pleiades',pt1,pt2,(CAMERA_MODE&&camFocusId()==='pleiades'?NAME_ALF:NAME_AL)*pA,now);
@@ -1615,6 +1755,18 @@ function drawPleiades(age,now){
   /* Full cluster when Pleione plays (or focus still on pleiades); otherwise dim.
      Sweep-driven _tw gives the same sequential twinkle language as Orion/Virgo/Canis. */
   var clusterFade=selected?1:.30;
+  var plLens=false;   /* pra-pass lensa Pleiades: semua bintang terang klaster yang tampak = satu lensa grup (sama dengan reticle katalog) */
+  if(CAMERA_MODE&&skyZoom>2.55){
+    var pit=[];
+    PLEIADES.bright.forEach(function(st){
+      var gx=PLEIADES.x+st.x*PLEIADES.scale+ox,gy=PLEIADES.y+st.y*PLEIADES.scale+oy,gq;st._lg=null;
+      gq=gSkyC(gx,gy,72);if(!gq||gq[2]>=1)return;
+      pit.push({x:gq[0],y:gq[1],o:1.42*(3*Math.max(.9,((st.r)||1.8)*k2*(1-.45*gq[2])*.7*camZK())+4),k:st,s:st});
+    });
+    lensCluster(pit,[PLEIADES.bright]);
+    pit.forEach(function(m){m.s._lg=m.g||null;});
+    plLens=true;
+  }
   function drawOne(star,dim){
     var x=PLEIADES.x+star.x*PLEIADES.scale+ox;
     var y=PLEIADES.y+star.y*PLEIADES.scale+oy;
@@ -1623,9 +1775,11 @@ function drawPleiades(age,now){
     var a=(dim?.48:.88)*clusterFade*(1+.40*twBoost);
     var rgbc=star.interactive?'145,170,255':(dim?'110,145,205':'190,218,255');
     /* Soft ambient shimmer when not in sweep; sweep _tw is the main flash. */
-    var pulse=star.interactive?1:(1+.045*Math.sin(tn*.0015+star.x*9));
+    var pulse=star.interactive?1:(1+.045*Math.sin((AT.twT-(now-tn))*.0015+star.x*9));
     r*=pulse;
     if(selected&&!reduce)a*=(1+twBoost*(.30+1.4*.12));
+    if(pAP>0){a*=1+.5*pAP;r*=1+.25*pAP;}
+    if(pDK>0)a*=1-.4*pDK;
     var q=gSkyC(x,y,72);
     if(!q||q[2]>=1)return;
     PLEIADES._vis++;
@@ -1640,9 +1794,10 @@ function drawPleiades(age,now){
     /* Reuse constellation star sprite; scale so extent ≈ r*(dim?4.5:5.8).
        drawStarGlow uses extent=r*5, so pass rAdj = r * factor/5. */
     var rAdj=r*((dim?4.5:5.8)/5);
-    if(!CAMERA_MODE)drawStarGlow(x,y,rAdj,rgbc,a*.82);   /* mode kamera: tanpa halo, sama dengan drawStars */
-    if(CAMERA_MODE&&!dim)camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);   /* bintang terang klaster (non-dim): lensa pembelok cahaya di bawah inti */
-    g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94)+')';g.beginPath();g.arc(x,y,CAMERA_MODE?Math.max(.9,r*.7*camZK()):Math.max(.7,r*.58),0,6.283);g.fill();
+    var pHK=CAMERA_MODE?clamp(1-(skyZoom-CAM_HALO_Z0)/CAM_HALO_Z1):1,pHF=CAMERA_MODE?0:pFK;   /* halo: sama dengan drawStars (idle / cam free ~1x tipis, FULL penuh, fokus cam tanpa halo) */
+    if(pHK>.02)drawStarGlow(x,y,rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),rgbc,a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK);   /* mode kamera: tanpa halo, sama dengan drawStars */
+    if(CAMERA_MODE&&!dim){var plg=plLens&&star._lg;if(plg){if(!plg.drawn){plg.drawn=true;camLensR(plg.x,plg.y,plg.R,bandCore||'238,246,255',a,now);}}else camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);}   /* bintang terang klaster (non-dim): lensa pembelok cahaya di bawah inti */
+    g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94*(CAMERA_MODE?(1+.1*(1-pHK)):1))+')';g.beginPath();g.arc(x,y,CAMERA_MODE?(Math.max(.7,r*.58)*pHK+Math.max(.9,r*.7*camZK())*(1-pHK)):Math.max(.7,r*.58),0,6.283);g.fill();
     if(star.interactive){
       var hotP=(hot==='pleione'),tr=TRIGGERS.pleione;
       /* Exact same compact pulse geometry as Betelgeuse/Rigel/Spica/Sirius (TRIGGER_PULSE_BASE). */
@@ -1671,7 +1826,7 @@ function drawPleiades(age,now){
       g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
       g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
       g.restore();
-      if(selected&&age>3.5&&q[2]<.25&&!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)){ /* label Pleione cuma pas SFX-nya main */
+      if(selected&&age>3.5&&q[2]<.25){ /* label Pleione cuma pas SFX-nya main (di mode apa pun) */
         var _upP=uprBegin(x,y);
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
         g.textAlign='left';g.fillStyle='rgba('+tr.rgb+','+(hotP?.95:(selected?.78:.42))+')';
@@ -1786,8 +1941,13 @@ function drawPulses(now,age){
   if(reduce||IS_POTATO||age<4||SW)return;
   if(now>nextPU){nextPU=now+500+Math.random()*900;
     /* Pick any constellation (Orion / Virgo / Canis Major) so every figure gets line pulses */
-    var c=CONS[(Math.random()*CONS.length)|0],l=c.lines[(Math.random()*c.lines.length)|0],f=Math.random()<.5;
-    if(isUnlocked(c.id)&&!SECT.on&&sectShow(c.id)&&!(CAMERA_MODE&&!CAM_LINES))PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});} /* terkunci = nggak ada garis buat dilewati pulse */
+    var cand=[],ci;
+    animFrame(now);
+    if(!SECT.on)for(ci=0;ci<CONS.length;ci++)if(linesVisible(CONS[ci])&&consFullTarget(CONS[ci])&&sectShow(CONS[ci].id))cand.push(CONS[ci]);   /* cuma rasi yang garisnya tampil DAN tier FULL (fokus cam = tenang, tanpa pulse) */
+    if(cand.length){
+      var c=cand[(Math.random()*cand.length)|0],l=c.lines[(Math.random()*c.lines.length)|0],f=Math.random()<.5;
+      PU.push({c:c,a:f?l[1]:l[0],b:f?l[0]:l[1],t:now,d:1100+Math.random()*600});
+    }}
   for(var i=PU.length-1;i>=0;i--){
     var p=PU[i],u=(now-p.t)/p.d;if(u>1){PU.splice(i,1);continue;}
     if(SECT.on||!sectShow(p.shock?TRIGGERS[p.snKey].cons:p.c.id))continue;
@@ -1806,7 +1966,7 @@ function drawPulses(now,age){
       }
       continue;
     }
-    if(CAMERA_MODE&&!CAM_LINES)continue;   /* LINES·OFF: pulse yang sudah terlanjur ada di garis ikut disembunyikan (kedaluwarsa sendiri di atas) */
+    if(!linesVisible(p.c)||!consFullTarget(p.c))continue;   /* garis rasi ini lagi tidak tampil / tier-nya tenang: pulse yang sudah terlanjur ada ikut disembunyikan (kedaluwarsa sendiri di atas) */
     var A=p.c.stars[p.a],B=p.c.stars[p.b],ox=p.c.ox,oy=p.c.oy;
     if(!cullSegAt(A.x+ox,A.y+oy,B.x+ox,B.y+oy))continue;
     var t2=Math.max(0,u-.2),al=Math.sin(u*Math.PI);
@@ -1859,7 +2019,7 @@ function drawPortals(age,now){
        jatuh ke canvas buat chain Pleiades. Cincin sabuk cuma tersisa sebagai petunjuk selama Pleiades masih terkunci. */
     if(CAMERA_MODE){
       p.el.classList.remove('mobile-show');
-      if(UNLOCK.set.pleiades||camFocusId()!==p.cons)return;
+      if(!GAME_ON||UNLOCK.set.pleiades||camFocusId()!==p.cons)return;   /* cincin petunjuk sabuk: cuma di mode 🎮 */
     }
     if(!p.el.classList.contains('on'))p.el.classList.add('on');
 

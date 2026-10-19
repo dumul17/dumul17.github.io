@@ -24,7 +24,7 @@ function updateHover(px,py){
       var s=c.stars[k],q=gSky(s.x+c.ox,s.y+c.oy),d=Math.hypot(px-q[0],py-q[1]);
       if(d<Math.max(10,s.r*3.5)&&d<best){best=d;hit={c:c,star:k};}
     });
-    if(isUnlocked(c.id)&&!(CAMERA_MODE&&!CAM_LINES))c.lines.forEach(function(l,i){   /* LINES·OFF: garis tersembunyi tidak boleh bisa di-tap (nyala/flash) */
+    if(linesVisible(c))c.lines.forEach(function(l,i){   /* garis yang tidak tampil (linesVisible, 04-render.js) tidak boleh bisa di-tap (nyala/flash) */
       var a=c.stars[l[0]],b=c.stars[l[1]];
       var qa=gSky(a.x+c.ox,a.y+c.oy),qb=gSky(b.x+c.ox,b.y+c.oy);
       var ax=qa[0],ay=qa[1],bx=qb[0],by=qb[1];
@@ -38,7 +38,7 @@ function updateHover(px,py){
 }
 document.addEventListener('pointerdown',function(e){
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return;
-  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#sector-scan'))return;
+  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sector-scan'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
   /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
@@ -82,7 +82,7 @@ document.addEventListener('pointerdown',function(e){
 },{passive:true});
 document.addEventListener('pointerdown',function(e){
   if(SW||reduce)return;
-  if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#mode-cluster,#music-player'))return; /* panel (tune / CAM / kartu rasi / katalog): jangan tembus ke asteroid */
+  if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#mode-cluster,#music-player'))return; /* panel (tune / CAM / kartu rasi / katalog): jangan tembus ke asteroid */
   var ai=asteroidScreenAt(e.clientX,e.clientY);
   if(ai>=0&&typeof ALIGN!=='undefined'&&ALIGN.cid&&constellationTargetAt(e.clientX,e.clientY,true))ai=-1;
   if(ai>=0){
@@ -355,7 +355,7 @@ function beginBHDrag(e){
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
-  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -515,7 +515,7 @@ function beginSkyPan(e){
   /* FIX pinch zoom di cam fokus (dalam sektor): dulu SETIAP jari dicek ke hit-test bintang/asteroid/BH, dan di dalam sektor
      hampir seluruh layar = target bintang -> jari ke-2 ditolak -> pinch nggak pernah mulai. Sekarang semua kontak sentuh dicatat,
      dan jari ke-2 cuma ditolak kalau jatuh di UI (panel/tombol), bukan di bintang. */
-  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#title,#footer,#owl-source,#bh-clock,#music-toggle';
+  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#title,#footer,#owl-source,#bh-clock,#music-toggle';
   if(e.target.closest&&e.target.closest(UI_T))return false;
   var multi=false;
   if(e.pointerType!=='mouse'){
@@ -530,7 +530,7 @@ function beginSkyPan(e){
       if(!skyPtrs[ids2[qi]])skyPtrs[ids2[qi]]={x:skyAll[ids2[qi]].x,y:skyAll[ids2[qi]].y};
     }
   }else{
-  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -820,9 +820,9 @@ function triggerKonami(){
   showSecret(T('toast.override'),1800);
   konamiMeteors();
   konamiComet();
-  /* Cheat: buka semua gembok. markObserved sengaja TIDAK disentuh, biar Constellation Log tetap jujur. */
-  unlockAll();
-  showModeToast(T('toast.unlocked'),null,2400);
+  /* Cheat: selesaikan semua alignment (achievement ALIGNED). markObserved sengaja TIDAK disentuh, biar Constellation Log tetap jujur. */
+  alignAll();
+  showModeToast(T('toast.alignall'),null,2400);
   clearTimeout(triggerKonami._t);
   triggerKonami._t=setTimeout(function(){document.body.classList.remove('konami');},(reduce||IS_POTATO||SW)?2100:5200);
 }
@@ -858,7 +858,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
@@ -1309,7 +1309,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
   function reset(){clearTimer();lpPid=null;lpMoved=false;lpFired=false;try{if(window.TXFX)TXFX.holdEnd();}catch(eH){}}
   function teleHitOk(e){
     if(SW||SECT.busy)return false;
-    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-zoom,#cam-whisper,#cam-cat,#lis-ask'))return false;
+    if(e.target&&e.target.closest&&e.target.closest('#bh-panel,#music-player,#mode-cluster,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask'))return false;
     if(typeof telescopeHitAt!=='function'||!telescopeHitAt(e.clientX,e.clientY))return false;
     if(typeof ALIGN!=='undefined'&&ALIGN.cid)return false;
     var _tp=typeof telescopeScreenPos==='function'?telescopeScreenPos():[0,0];
