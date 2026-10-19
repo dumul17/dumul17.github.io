@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=64">
+<link rel="stylesheet" href="index.css?v=65">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -178,7 +178,7 @@
   <div class="sf-meta" id="sf-meta"></div>
 </div>
 <div id="cons-archive" aria-live="polite" aria-hidden="true">
-  <div class="ca-line" data-i18n="ca.pattern">PATTERN RECOGNIZED</div>
+  <div class="ca-line" data-i18n="ca.align">ALIGNMENT COMPLETE</div>
   <div class="ca-name" id="ca-name">ORION</div>
   <div class="ca-rule"></div>
   <div class="ca-sub" id="ca-sub">ARCHIVED</div>
@@ -202,8 +202,6 @@
   <div id="mp-sfx-groups"></div>
   <div class="mp-section-title" data-i18n="mp.bgm">Observatory BGM</div>
   <div class="mp-tracks" id="mp-bgm-tracks"></div>
-  <div class="mp-section-title" data-i18n="mp.conslog">Constellation Log</div>
-  <div class="sr-list" id="sr-cons"></div>
   </div>
   <div class="mp-foot">
     <div class="mp-seek" id="mp-seek-wrap">
@@ -255,16 +253,18 @@
   <div id="cam-zrow"><span class="cz-label">CAM</span><div id="cam-zwrap"><input type="range" id="cam-zslider" min="0" max="1000" step="1" value="0" aria-label="Camera zoom" data-i18n-aria="cam.zoom.aria"></div><span class="cz-val" id="cam-zoom-val">1×</span></div>
   <span class="cz-hint" data-i18n="cam.hint">TAP ‹ › TO ZOOM TO A CONSTELLATION</span>
   <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous constellation" data-i18n-aria="cam.prev.aria">‹</button><button type="button" id="cf-name" aria-pressed="false" data-off="1" aria-label="Toggle springback">SPRINGBACK · OFF</button><button type="button" id="cf-next" aria-label="Next constellation" data-i18n-aria="cam.next.aria">›</button></div>
-  <div id="cam-band"><button type="button" id="cb-btn" data-band="vis" aria-pressed="false" aria-label="Spectral band filter: visible, ultraviolet, infrared">BAND · VIS</button><button type="button" id="cl-btn" data-off="0" aria-pressed="false" aria-label="Toggle constellation lines">LINES · ON</button></div>
+  <div id="cam-band"><button type="button" id="cb-btn" data-band="vis" aria-pressed="false" aria-label="Spectral band filter: visible, ultraviolet, infrared">BAND · VIS</button><button type="button" id="cl-btn" data-off="0" aria-pressed="false" aria-label="Toggle constellation lines">LINES · ON</button><button type="button" id="ca-btn" aria-label="Constellation log" data-i18n="ach.btn">LOG</button></div>
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
 <div id="cam-cat" aria-live="polite"></div>
+<div id="cam-ach" aria-live="polite"></div>
 <div id="sector-scan" aria-hidden="true">
   <div class="ss-head"><span>MAP</span><span class="ss-sec" id="ss-sec">—</span></div>
   <canvas id="sector-radar" width="168" height="168"></canvas>
   <div class="ss-stat" id="ss-draw">DRAW 0/0</div>
   <div class="ss-stat" id="ss-cull">CULL 0%</div>
 </div>
+<button type="button" id="cg-btn" data-on="0" aria-pressed="false" aria-label="Alignment game" title="Alignment"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8h11a3.5 3.5 0 0 1 3.4 4.3l-.9 4a2.2 2.2 0 0 1-3.7 1.1L14.5 15.5h-5l-1.8 1.9a2.2 2.2 0 0 1-3.7-1.1l-.9-4A3.5 3.5 0 0 1 6.5 8z"/><path d="M8 10.4v3M6.5 11.9h3"/><circle cx="15.6" cy="11" r=".7" fill="currentColor" stroke="none"/><circle cx="17.6" cy="12.8" r=".7" fill="currentColor" stroke="none"/></svg></button>
 <div id="mode-toast" aria-live="polite" aria-hidden="true"></div>
 <button id="music-toggle" type="button" aria-label="Buka music player" aria-expanded="false" title="Music">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -287,15 +287,15 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=24"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=19"></script>
+<script defer src="dumul-js/obs/i18n.js?v=20"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=1"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=118"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=117"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=119"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=118"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=101"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=112"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=125"></script>
-<script defer src="dumul-js/obs/js/06-interaction.js?v=112"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=113"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=126"></script>
+<script defer src="dumul-js/obs/js/06-interaction.js?v=113"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=105"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=4"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=6"></script>
