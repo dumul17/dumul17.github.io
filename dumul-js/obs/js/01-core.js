@@ -758,8 +758,15 @@ function catLockName(){
 function focusUI(){
   var b=document.getElementById('cf-name');if(!b||!FOCUS.list)return;
   var f=FOCUS.list[FOCUS.i],ln=(typeof CAT!=='undefined'&&CAT&&CAT.open)?catLockName():null;
-  if(ln!==null){b.textContent=(_catFree?'\u25cb ':'\u25cf ')+String(ln).toUpperCase();return;}
-  b.textContent=f.id==='free'?T('cam.focus.free'):'\u25cf '+f.n.toUpperCase();
+  if(ln!==null){   /* mode katalog: saklar KUNCI bintang (nama bintangnya sudah ada di sheet katalog) */
+    b.textContent=T(_catFree?'cam.lock.off':'cam.lock.on');
+    b.setAttribute('aria-label',T('cam.lock.aria'));b.setAttribute('aria-pressed',_catFree?'false':'true');b.setAttribute('data-off',_catFree?'1':'0');
+    return;
+  }
+  /* Tombol tengah = saklar springback: label nama FUNGSI + status, bukan nama rasi (nama rasi ada di kartu rasi). */
+  var sbOn=f.id!=='free';
+  b.textContent=T(sbOn?'cam.sb.on':'cam.sb.off');
+  b.setAttribute('aria-label',T('cam.sb.aria'));b.setAttribute('aria-pressed',sbOn?'true':'false');b.setAttribute('data-off',sbOn?'0':'1');
 }
 /* Tombol < dan >: rasi sebelumnya / berikutnya (Free dilewati; Free cuma lewat tombol tengah). */
 function focusCycle(d){
