@@ -780,6 +780,7 @@ body.tesseract-running { background:#0a1218 !important; }
 #cam-focus button{font:600 10px/1 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);border-radius:4px;min-height:30px;padding:0 10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 #cam-focus button:active{background:rgba(110,229,255,.22)}
 #cf-name{min-width:132px;color:#eafcff!important}
+#cf-name[data-off="1"]{color:rgba(184,224,238,.5)!important;background:rgba(110,229,255,.02);border-style:dashed}
 /* Filter pita spektral (VIS / UV / IR) — kartu kamera */
 #cam-band{display:flex;justify-content:center;gap:4px;margin-top:5px;pointer-events:auto;touch-action:manipulation}
 #cb-btn{font:600 10px/1 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;min-width:132px;min-height:28px;padding:0 10px;border-radius:4px;cursor:pointer;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);-webkit-tap-highlight-color:transparent}
