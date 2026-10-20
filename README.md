@@ -11,7 +11,7 @@ Live: [dumul17.github.io](https://dumul17.github.io/)
 
 | Page | HTML | Styles | Scripts | Description |
 |---|---|---|---|---|
-| **Observatory** | `index.html` | `index.css` | `dumul-js/obs/js/01-core.js` … `07-boot.js`, plus the data files `dumul-js/obs/sky-data.js` and `dumul-js/obs/texts.js` | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, easter eggs, and the DUMUL portal |
+| **Observatory** | `index.html` | `index.css` | `dumul-js/obs/js/01-core.js` … `11-live-count.js` (+ `05a-glyph-art.js`), plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
 | **DUMUL** | `dumul.html` | `dumul.css` | `dumul.js`, `dumul-app.js` | DUMUL album page with five selectable transmissions, synced lyrics, track notes, spectrum/seek UI, and seamless Gargantua handoff |
 | **PWA / offline** | `manifest.json`, `icons/` | -- | `service-worker.js` | Installable app, offline shell, and opt-in offline audio archive |
 
@@ -52,7 +52,8 @@ DUMUL transition.
 -   Tap/hover/focus feedback, supernova flashes, star chimes,
     constellation highlighting, and a **Last Signal** display
 -   **Music Transmission** HUD with 16 stellar signals (grouped per
-    sector), `constellation` BGM, `collapsars` BGM, observed-state
+    sector), `constellation` BGM, `collapsars` BGM, volume slider, shuffle /
+    repeat buttons, a Gargantua Spectrum visualizer toggle, observed-state
     tracking, signal counter, and live spectrum indicators
 -   **Observation Mode** and **Radio Silence**
 -   **BGM-reactive sky** (visual only, follows whichever BGM is playing):
@@ -83,6 +84,45 @@ DUMUL transition.
 -   **Constellation Camera** with `1×–3×` zoom, pinch/wheel control, and
     two-finger sky rotation
 -   Mobile sky pan and rotation interactions
+-   **Bilingual (EN / ID):** the language is taken from the saved choice
+    (`dumul_lang`), then the browser language, then English. The
+    **Language** chip in the Settings panel switches it (the page reloads
+    so every canvas is redrawn). Telescope messages, terminal log,
+    camera info cards, signal fragments and all UI labels are translated;
+    star / constellation / track names and numbers stay as they are.
+    Anything without a translation falls back to English.
+-   **Sector Gate wormhole:** jumping through a Sector Gate, or holding the
+    mini Gargantua (~0.6 s), plays a warp-tunnel transition (blue-violet-
+    magenta streaks around a dark core) and muffles the audio while you are
+    inside. It is plain Canvas 2D (no WebGL, no external textures) and
+    switches itself off on `prefers-reduced-motion`.
+-   **Drone relay (TX / RX) indicator:** long-press the telescope to send
+    a drone to the target star; a progress ring fills while you hold. Inside
+    a sector the drone flies from the telescope, orbits the target, and a
+    dashed tether carries signal packets back; in the sector overview the
+    Gargantua tunnel draws a line from the source sector through Gargantua to
+    the receiving sector. Colors follow each sector's interlocking indicator.
+-   **UI sound design:** small synthesized Web Audio effects (camera radar
+    sweep, star-tracker noise, UI taps, constellation chime). No audio files;
+    they follow the master volume and go silent in Radio Silence. Stellar
+    Signals duck while the noise bed plays.
+-   **Tune panel** (owl button → Settings): **Gargantua** (size, lensing,
+    bloom, speed), **Sky** (haze, Milky Way band, drift, nebula image,
+    sector sky, portal halo), **Asteroid** (the orbiting ring: on/off, count,
+    size, orbit width, thickness, speed) and **Tele** (bring the telescope
+    along, bubble messages, LED color, hover / spin / size). Every tab has
+    Save / Reset and is kept in `localStorage`.
+-   **Quality chip** (`Perf · HIGH / LOW`): no device auto-detect, the
+    default is HIGH. The visitor's choice is saved (`dumul_quality`); append
+    `?perf=low` or `?perf=high` to the URL to test a tier without saving.
+-   Constellation glyph sprites (128 px WebP art in `05a-glyph-art.js`, tinted
+    per star, with a vector-line fallback) and a nebula backdrop image
+    (`img/nebula-portrait.webp` / `nebula-landscape.webp`)
+-   **Live observer counter:** a small `N observers` readout showing how many
+    unique devices have the Observatory open right now (Firebase Realtime
+    Database presence, one entry per device, removed when the last tab
+    closes). If it can't connect, it stays hidden and nothing else is
+    affected.
 -   Draggable **Gargantua** with an enlarged interaction field and
     audio-reactive ripple rings
 -   DUMUL portal tied to **Orion's belt** stars
@@ -97,7 +137,7 @@ DUMUL transition.
 -   Source-code shortcut from the Observatory UI
 -   Boot sequence with telemetry, matrix-style warm-up, repeat-visit
     shortcut, and **Red / Blue** entry choices
--   Weak-device (`IS_POTATO`) handling, idle rendering savings, and
+-   Low-quality tier (`IS_POTATO`, picked from the Quality chip), idle rendering savings, and
     `prefers-reduced-motion` support. All BGM-reactive visuals switch off
     on hidden tabs, `prefers-reduced-motion`, `IS_POTATO`, Radio Silence,
     the swallow transition and the tesseract; audio keeps playing. BGM
@@ -181,18 +221,21 @@ once its files (and, optionally, its music) have been cached.
 -   **When a track gets saved:**
     1.  Automatically, once it has been played past 50% (the page
         reports it to the service worker).
-    2.  In bulk, when the visitor taps **SAVE ALL** on the *Offline
-        Archive* banner.
--   **Offline Archive banner** (opt-in, styled like the Observatory HUD):
-    asks once whether to save all tracks (23 files, ~70 MB) for offline use,
-    shows `SYNCING n/23` progress, and can be closed while the download
-    continues in the background.
-    -   **NOT NOW** / close: asks again after 14 days. Per-track caching
-        from playback still works.
-    -   Not shown on Data Saver, 2G, or when everything is already saved.
-    -   If a visitor accepted earlier but the download was interrupted,
-        it resumes silently on a later visit (skipped on cellular).
-    -   Hidden automatically during the Gargantua swallow.
+    2.  In bulk, when the visitor taps the **offline button** in the
+        Settings panel.
+-   **Offline button** (opt-in, no popup): in the Observatory it lives in the
+    owl panel (Settings tab) as a chip that shows its own state:
+    `Save offline n/23` → `Saving n/23` (the chip fills as a progress bar)
+    → `Offline ready`. Tapping it downloads all tracks (23 files, ~75 MB).
+    -   `Offline…` while the service worker is still starting; `Offline N/A`
+        if it never becomes ready (e.g. Firefox private mode), tap to retry.
+    -   `Retry n/23` appears if the download stalls for 90 s or finishes
+        partially.
+    -   The choice is remembered (`ofl_choice`). If the download was
+        interrupted, it resumes silently on a later visit (skipped on Data
+        Saver, 2G and cellular).
+    -   The chip is removed if the browser has no service worker / Cache
+        Storage.
 -   **Limits:** at most 24 audio files and 15 MB per file are kept
     (`MAX_AUDIO_FILES`, `MAX_AUDIO_BYTES`); oldest saved goes first.
 -   **`cache-status.html`:** a small diagnostic page (not linked from the
@@ -212,16 +255,27 @@ once its files (and, optionally, its music) have been cached.
 ├── dumul-js/
 │   └── obs/                # Observatory scripts + data (everything the sky runs on)
 │       ├── sky-data.js     # ONE source of truth: sectors, constellations, stars, SFX, panel groups, audio list
-│       ├── texts.js        # All site text (telescope messages, terminal log, greetings) — pure data
+│       ├── texts.js        # All site text (telescope messages, terminal log, greetings) — pure data (English)
+│       ├── i18n.js         # EN/ID layer: UI dictionary, T('key'), language chip (dumul_lang)
+│       ├── i18n-sky.js     # ID translation of sky-data.js (whispers, camera info cards, signal fragments)
+│       ├── i18n-texts.js   # ID translation of texts.js (telescope messages, terminal log)
 │       ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
+│       ├── img/
+│       │   ├── nebula-portrait.webp    # Nebula backdrop (portrait screens)
+│       │   └── nebula-landscape.webp   # Nebula backdrop (landscape screens)
 │       └── js/             # Observatory logic, split from the old index.js (load order matters!)
 │           ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
 │           ├── 02-sky-logic.js     # data wiring, Pleiades, memory, unlock, observation mode, alignment, time dilation, layout, plate
 │           ├── 03-gargantua.js     # black hole, shared neural network, transition spectrum
 │           ├── 04-render.js        # overlays, telescope, SFX, target reticle, constellation drawing, observatory FX
+│           ├── 05a-glyph-art.js    # generated: constellation glyph art (WebP data URIs) — don't edit by hand
 │           ├── 05-sector-ui.js     # sector overview, Gargantua summon/relay, sector gate, tune panel, music player
 │           ├── 06-interaction.js   # interaction, easter eggs, terminal, greeting, clock dilation
-│           └── 07-boot.js          # boot, layout editor, render loop
+│           ├── 07-boot.js          # boot, layout editor, render loop
+│           ├── 08-tx-drone.js      # drone TX/RX animation + hold ring (TXFX)
+│           ├── 09-wormhole.js      # wormhole transition for sector gates / mini Gargantua (WORMHOLE)
+│           ├── 10-ui-sound.js      # synthesized UI sound effects (UIS)
+│           └── 11-live-count.js    # live observer counter (ES module, Firebase presence)
 │
 ├── dumul.html              # DUMUL / album page
 ├── dumul.css               # DUMUL styles
@@ -281,12 +335,16 @@ covers both pages.
 | Text, structure, meta/SEO tags, links | `index.html` / `dumul.html` |
 | Look and layout | `index.css` / `dumul.css` |
 | Add / move a constellation, star, SFX, sector, panel group | `dumul-js/obs/sky-data.js` (then `node dumul-js/obs/check-sky.js`) |
-| Any sentence the Observatory says (telescope, terminal, greeting) | `dumul-js/obs/texts.js` |
-| Observatory behavior, features, bug fixes, animation, audio | `dumul-js/obs/js/01…07-*.js` (see the layout above for which file) |
+| Any sentence the Observatory says (telescope, terminal, greeting) | `dumul-js/obs/texts.js` (English) + `i18n-texts.js` (Indonesian) |
+| UI labels / button text / toasts, either language | `dumul-js/obs/i18n.js` (dictionary) and `data-i18n="key"` in `index.html` |
+| Constellation whispers, camera info cards, signal fragments | `dumul-js/obs/sky-data.js` (English) + `i18n-sky.js` (Indonesian) |
+| Observatory behavior, features, bug fixes, animation, audio | `dumul-js/obs/js/01…10-*.js` (see the layout above for which file) |
+| Drone relay animation / wormhole transition / UI sounds | `08-tx-drone.js` / `09-wormhole.js` / `10-ui-sound.js` |
+| Live observer counter | `11-live-count.js` |
 | DUMUL page behavior | `dumul.js` |
 | Offline behavior, cache rules, track list for "Save all" | `service-worker.js` |
 | Install name, colors, icons, shortcuts | `manifest.json` |
-| Offline Archive banner text, size, re-ask delay | the second PWA `<script>` near the end of `index.html` / `dumul.html` (`TXT`, `SIZE_MB`, `ASK_AGAIN_DAYS`) |
+| Offline button text, size estimate | the second PWA `<script>` near the end of `index.html` (`STR`, `SIZE_MB`) |
 
 Notes:
 
@@ -303,23 +361,41 @@ Notes:
     `service-worker.js`** and bump its `VERSION` so the old precached copy
     is dropped. `node dumul-js/obs/check-sky.js` verifies the `?v=` values
     match.
--   **The 7 files in `dumul-js/obs/js/` are one program, not modules.**
-    They are plain classic scripts loaded in order with `defer`
-    (`01` → `07`) and share one global scope; there is no IIFE anymore, so
+-   **The files in `dumul-js/obs/js/` (`01` … `10`, plus `05a`) are one
+    program, not modules.** They are plain classic scripts loaded in order
+    with `defer` and share one global scope; there is no IIFE anymore, so
     each file starts with `'use strict'`. Don't reorder the `<script>`
-    tags, don't add `type="module"`, and keep top-level names unique
-    across files (`SKY` and `TXT` are already taken by the data files).
+    tags (`05a-glyph-art.js` loads **before** `05-sector-ui.js`; `08`–`10`
+    load after `07-boot.js`), don't add `type="module"`, and keep
+    top-level names unique across files (`SKY`, `TXT`, `I18N`, `T`,
+    `TXFX`, `WORMHOLE`, `UIS` and `GLYPH_ART` are already taken).
     Anything that runs at load time (not inside a function) may only use
-    functions from the same or an earlier file. Bump `?v=` on **all
-    seven** tags + the `SHELL` list together on each deploy.
+    functions from the same or an earlier file. Bump `?v=` on **every**
+    tag (data files, i18n files, all js files, `index.css`) + the `SHELL`
+    list together on each deploy.
+-   **`11-live-count.js` is the exception:** it is an ES module (Firebase is
+    imported from `gstatic.com`), so it has its own scope and needs a
+    network connection. Its `?v=` is still bumped and listed in `SHELL`
+    like the others.
+-   **Load order of the language layer:** `sky-data.js` → `texts.js` →
+    `i18n.js` → `i18n-sky.js` → `i18n-texts.js` → `01-core.js`. The
+    translations overwrite `SKY` / `TXT` in place, so they must run before
+    any script reads them. A tiny inline fallback `T()` in `index.html`
+    keeps boot from stalling if `i18n.js` fails to load.
+-   **Adding a UI string:** add the key to the dictionary in `i18n.js`
+    (`{en, id}`), then use `data-i18n="key"` / `data-i18n-aria="key"` in the
+    HTML or `T('key')` in JS. New telescope / terminal lines go in
+    `texts.js` and get a counterpart in `i18n-texts.js`.
+-   `05a-glyph-art.js` is generated output (inline WebP art keyed by
+    constellation id) — regenerate it rather than editing it.
 -   **Adding, renaming or removing a track:** put the file in `audio/`
     and register it in `sky-data.js` (the service worker's `ALL_AUDIO`
-    is generated from it), then update `SIZE_MB` in the banner script
-    (both HTML files). If you replace an audio file's contents but keep its name,
+    is generated from it), then update `SIZE_MB` in the offline
+    script of `index.html`. If you replace an audio file's contents but keep its name,
     bump `AUDIO_VERSION` in `service-worker.js`; otherwise visitors who
     already saved it keep the old version.
--   The banner script and the "play >50%" hook are duplicated in
-    `index.html` and `dumul.html`. Keep the two copies identical.
+-   The "play >50%" service-worker hook is duplicated in `index.html` and
+    `dumul.html`. Keep the two copies identical.
 
 ------------------------------------------------------------------------
 
@@ -351,9 +427,9 @@ node dumul-js/obs/check-sky.js /path/to/site
 ```
 
 It validates `sky-data.js` (`SKY.check()`), that every audio file exists,
-that the `?v=` of `index.css`, `sky-data.js`, `texts.js` and every
-`js/*.js` in `index.html` matches `SHELL` in `service-worker.js` (and the
-script tags are in folder order), that each `js/` file starts with
+that the `?v=` of `index.css`, `sky-data.js`, `texts.js`, the three `i18n*.js`
+files and every `js/*.js` in `index.html` matches `SHELL` in
+`service-worker.js` (and the script tags are in folder order), that each `js/` file starts with
 `'use strict'`, and that no old hard-coded text/button patterns are left.
 
 Service workers run on `localhost` and HTTPS only. While developing, use
@@ -374,7 +450,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     `https://dumul17.github.io/` and
     `https://dumul17.github.io/dumul.html`.
 4.  Upload the HTML and CSS files, the whole `dumul-js/obs/` folder
-    (`sky-data.js`, `texts.js`, `js/01…07`) and the `dumul.*` files
+    (`sky-data.js`, `texts.js`, `i18n*.js`, `img/`, `js/01…11` incl. `05a`) and the `dumul.*` files
     together, and keep the referenced audio and image assets beside them
     on the same origin. Upload `dumul-js/obs/` **before** the new
     `index.html` / `service-worker.js` so the page never points at scripts
@@ -416,7 +492,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     the boot screen's audio bandwidth on later visits.
 -   **Split assets:** CSS and JavaScript live in external files so
     browsers can cache them separately from the HTML (the Observatory
-    script is split into 7 ordered files plus two data files); a few tiny
+    script is split into 12 ordered files plus the data and language files); a few tiny
     scripts that must run before first paint stay inline in
     `dumul.html`.
 -   **Browser storage:** the Observatory/DUMUL transition uses
@@ -428,9 +504,18 @@ The site is configured for the user site **`dumul17.github.io`**.
     (separate on purpose: *heard* is not *unlocked*). Unlocking asks the
     service worker to save that constellation's `.opus` (`CACHE_AUDIO`); existing
     cached audio is never cleared. The overview Gargantua summoned/recalled state is kept in
-    `dumul_bh_home` (default: summoned). The Offline Archive banner stores the visitor's
-    choice in `localStorage` (`ofl_choice`), and saved tracks and the
-    offline shell live in the browser's Cache Storage.
+    `dumul_bh_home` (default: summoned). The language is stored in
+    `dumul_lang`, the quality tier in `dumul_quality`, tune-panel settings in
+    `dumul_sky_cfg`, `dumul_ast_cfg` and `dumul_tele_cfg`, and the music
+    player's volume / shuffle / repeat in `mp_vol`, `mp_shuffle` and
+    `mp_repeat`. The offline button stores the visitor's choice in
+    `localStorage` (`ofl_choice`), and saved tracks and the offline shell
+    live in the browser's Cache Storage.
+-   **Live counter & third-party hosts:** `11-live-count.js` keeps an
+    anonymous per-device id in `localStorage` (`dumul_dev`) and writes
+    presence entries to Firebase Realtime Database; nothing else is sent.
+    Besides Google Fonts, this is the only third-party network use. Without
+    a connection the counter simply stays hidden.
 
 ------------------------------------------------------------------------
 
@@ -452,9 +537,13 @@ The site is configured for the user site **`dumul17.github.io`**.
 -   DUMUL page --- vanilla audio / lyrics / analyser layer with a small
     bundled React hero
 -   Offline / PWA layer --- vanilla service worker, manifest and a small
-    HUD-styled opt-in banner
+    HUD-styled opt-in button
 -   Neural-network transition --- shared deterministic transition
     implementation between `index.html` and `dumul.html`
+-   Wormhole transition, drone relay animation and UI sound effects ---
+    vanilla Canvas 2D / Web Audio, written for this site
+-   Live observer counter --- Firebase Realtime Database presence
+-   EN / ID language layer --- `i18n.js`, `i18n-sky.js`, `i18n-texts.js`
 -   Gargantua black hole visual --- *"Interstellar Blackhole Gargantua #2 -
     Pure CSS"* by Josetxu
     ([codepen.io/josetxu/pen/rNWgNeq](https://codepen.io/josetxu/pen/rNWgNeq)),
