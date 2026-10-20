@@ -461,16 +461,55 @@ window.__applyLayOV=function(){
     return !!cons(sel);
   }
   function stNum(v){return typeof v==='number'?fmtN(v):'';}
+  /* Saran nama IAU per rasi (dari ingatan, buat autocomplete; cek lagi ke daftar IAU WGSN kalau ragu). Nama yang sudah dipakai di rasi itu otomatis disaring. */
+  var IAU_SUG={
+    orion:['Betelgeuse','Rigel','Bellatrix','Mintaka','Alnilam','Alnitak','Saiph','Meissa','Hatysa','Tabit','Thabit'],
+    virgo:['Spica','Vindemiatrix','Porrima','Zavijava','Zaniah','Heze','Syrma','Auva','Minelauva','Khambalia'],
+    canis:['Sirius','Adhara','Wezen','Mirzam','Aludra','Furud','Muliphein','Unurgunite'],
+    taurus:['Aldebaran','Alnath','Ain','Alcyone','Atlas','Electra','Maia','Merope','Taygeta','Pleione','Celaeno','Asterope','Prima Hyadum','Secunda Hyadum','Tianguan'],
+    bootes:['Arcturus','Izar','Nekkar','Seginus','Muphrid','Princeps','Alkalurops','Merga'],
+    scorpius:['Antares','Shaula','Sargas','Dschubba','Acrab','Lesath','Girtab','Wei','Fang','Alniyat','Larawag','Xamidimura','Paikauhale','Jabbah','Iklil'],
+    gemini:['Castor','Pollux','Alhena','Wasat','Mebsuta','Mekbuda','Tejat','Propus','Alzirr','Jishui'],
+    ursa:['Dubhe','Merak','Phecda','Megrez','Alioth','Mizar','Alkaid','Alcor','Alula Australis','Alula Borealis','Muscida','Talitha','Tania Borealis','Tania Australis'],
+    leo:['Regulus','Denebola','Algieba','Zosma','Chertan','Adhafera','Rasalas','Algenubi','Alterf','Subra'],
+    hydra:['Alphard','Ashlesha','Minchir','Zhang'],
+    sagit:['Kaus Australis','Kaus Media','Kaus Borealis','Nunki','Ascella','Alnasl','Arkab Prior','Arkab Posterior','Albaldah','Polis','Rukbat','Terebellum','Ainalrami'],
+    lyra:['Vega','Sheliak','Sulafat','Aladfar','Alathfar'],
+    cygnus:['Deneb','Sadr','Gienah','Albireo','Fawaris','Azelfafage','Aljanah'],
+    ophiuchus:['Rasalhague','Sabik','Yed Prior','Yed Posterior','Cebalrai','Marfik','Han'],
+    cassiopeia:['Schedar','Caph','Navi','Ruchbah','Segin','Achird','Fulu'],
+    perseus:['Mirfak','Algol','Atik','Menkib','Misam','Miram'],
+    aries:['Hamal','Sheratan','Mesarthim','Botein','Bharani'],
+    aquila:['Altair','Tarazed','Alshain','Okab'],
+    pegasus:['Markab','Scheat','Algenib','Enif','Homam','Matar','Biham','Sadalbari','Salm','Alpheratz'],
+    pisces:['Alrescha','Alpherg','Fumalsamakah','Torcular'],
+    auriga:['Capella','Menkalinan','Mahasim','Hassaleh','Almaaz','Haedus','Saclateni','Prijipati'],
+    canmin:['Procyon','Gomeisa']
+  };
+  function stIauOpts(){
+    var c=cons(stCid),used={},sug=IAU_SUG[stCid]||[],h='';
+    if(c)Object.keys(c.stars).forEach(function(k){var n=c.stars[k].name;if(n)used[String(n).toLowerCase()]=1;});
+    sug.forEach(function(n){if(!used[n.toLowerCase()])h+='<option value="'+stEsc(n)+'">';});
+    return h;
+  }
+  /* urutan ??? : paling terang (r terbesar) dulu — bintang terang paling mungkin punya nama IAU */
+  function stUnkOrder(c){
+    var ks=Object.keys(c.stars),idx={};ks.forEach(function(k,i){idx[k]=i;});
+    var u=ks.filter(function(k){return !c.stars[k].name;});
+    u.sort(function(a,b){return (c.stars[b].r-c.stars[a].r)||(idx[a]-idx[b]);});
+    return u;
+  }
   function stUnkN(c){var n=0,k;for(k in c.stars)if(!c.stars[k].name)n++;return n;}
-  function stCount(){var c=cons(stCid),el=document.getElementById('lay-sc');if(!c||!el)return;el.textContent=stUnkN(c)+'/'+Object.keys(c.stars).length+' ???';}
+  function stCount(){var c=cons(stCid),el=document.getElementById('lay-sc');if(!c||!el)return;el.textContent=stUnkN(c)+'/'+Object.keys(c.stars).length+' ???';var dl=document.getElementById('lay-iau');if(dl)dl.innerHTML=stIauOpts();}
   function stRender(){
     var c=cons(stCid);if(!c||!stPanel)return;
     var ks=Object.keys(c.stars),rows='',h;
+    if(stOnly){var uo=stUnkOrder(c);if(stKey&&c.stars[stKey]&&c.stars[stKey].name)uo.unshift(stKey);ks=uo;}
     ks.forEach(function(k){
       var s=c.stars[k];
       if(stOnly&&s.name&&k!==stKey)return;
       rows+='<div class="sr'+(k===stKey?' on':'')+(stChanged(stCid,k,s)?' ch':'')+'" data-k="'+stEsc(k)+'"><div class="sk">'+stEsc(k)+'</div>'
-        +'<input class="sn" data-f="name" placeholder="???" autocomplete="off" autocapitalize="words" enterkeyhint="next" value="'+stEsc(s.name||'')+'">'
+        +'<input class="sn" data-f="name" list="lay-iau" placeholder="???" autocomplete="off" autocapitalize="words" enterkeyhint="next" value="'+stEsc(s.name||'')+'">'
         +'<input data-f="fx" type="number" step="1" inputmode="decimal" value="'+stNum(s.fx)+'">'
         +'<input data-f="fy" type="number" step="1" inputmode="decimal" value="'+stNum(s.fy)+'">'
         +'<input data-f="r" type="number" step="0.1" inputmode="decimal" value="'+stNum(s.r)+'"></div>';
@@ -482,22 +521,17 @@ window.__applyLayOV=function(){
       +'<button data-sa="copy" title="Copy semua bintang rasi ini">COPY</button>'
       +'<button data-sa="copyd" title="Copy hanya baris yang berubah">\u0394</button>'
       +'<button data-sa="rstc" title="Kembalikan rasi ini ke data sky-data.js">RST</button>'
-      +'<button data-sa="x" title="Tutup">\u2715</button></div><div class="sl">'+rows+'</div>';
+      +'<button data-sa="x" title="Tutup">\u2715</button></div><div class="sl">'+rows+'</div><datalist id="lay-iau"></datalist>';
     stPanel.innerHTML=h;stCount();
   }
   function stNextUnk(focus){
     var c=cons(stCid);if(!c)return;
-    var ks=Object.keys(c.stars),n=ks.length,i0=ks.indexOf(stKey),i,k;
-    for(i=1;i<=n;i++){
-      k=ks[((i0+i)%n+n)%n];
-      if(!c.stars[k].name){
-        if(stOnly)stRender();
-        stSelect(k,true);
-        if(focus){var row=stRow(k),inp=row&&row.querySelector('.sn');if(inp)inp.focus();}
-        return;
-      }
-    }
-    toast('SEMUA BINTANG SUDAH BERNAMA');
+    var u=stUnkOrder(c);
+    if(!u.length){toast('SEMUA BINTANG SUDAH BERNAMA');return;}
+    var i0=u.indexOf(stKey),k=u[(i0+1)%u.length];   /* i0=-1 -> yang paling terang */
+    if(stOnly)stRender();
+    stSelect(k,true);
+    if(focus){var row=stRow(k),inp=row&&row.querySelector('.sn');if(inp)inp.focus();}
   }
   function stRow(k){return stPanel&&stPanel.querySelector('.sr[data-k="'+k+'"]');}
   function stSync(k){   /* perbarui kolom satu baris tanpa merusak fokus */

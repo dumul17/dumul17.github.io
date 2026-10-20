@@ -1264,6 +1264,7 @@ function nameFadeStep(o,nT,now){
    - Pengecualian: reveal lagi jalan (alignment selesai / cheat Konami) supaya animasinya tetap kelihatan.
    - Rasi yang masih "terkunci" di mode 🎮 nggak punya garis (diganti pulse petunjuk). */
 function linesVisible(c){
+  if(typeof isLayoutEdit==='function'&&isLayoutEdit())return true;   /* editor layout (?layout=1): garis SELALU tampil (preview = perilaku live) */
   if(consLocked(c.id))return false;
   if(c._reveal!=null)return true;
   return CAMERA_MODE?CAM_LINES:(consSfxOn(c)||(AT.bgm&&!AT.sfx));   /* di luar cam: rasi SFX aktif, atau semua rasi saat constellation.opus (tanpa SFX) */
@@ -1335,7 +1336,7 @@ function drawCons(c,age,now){
   if(now<glitchUntil){ox+=(Math.random()-.5)*7;oy+=(Math.random()-.5)*4;}
   if(OFX.pK>.01){ofxPull(ld,now);ox+=OFX.px;oy+=OFX.py;} /* tarikan halus ke Gargantua */
   c.ox=ox;c.oy=oy;
-  var locked=consLocked(c.id);
+  var locked=(typeof isLayoutEdit==='function'&&isLayoutEdit())?false:consLocked(c.id);
   var obr=ofxBreath(ld.phase,now)*fK; /* napas rasi: -1..1 x kehadiran BGM Constellation */
   if(c.nebula){
     var na=clamp((age-c.delay-1.2)/1.5);
