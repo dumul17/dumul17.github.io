@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v140'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v141'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -16,7 +16,7 @@ const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, se
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
 
 /* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
-importScripts('dumul-js/obs/sky-data.js?v=24');
+importScripts('dumul-js/obs/sky-data.js?v=25');
 const ALL_AUDIO = SKY.audioFiles();
 
 /* Harus sama persis dengan yang dipanggil HTML (termasuk ?v=) */
@@ -26,18 +26,18 @@ const SHELL = [
   'dumul.html',
   'index.css?v=65',
   /* harus sama persis dengan <script src> di index.html */
-  'dumul-js/obs/sky-data.js?v=24',
+  'dumul-js/obs/sky-data.js?v=25',
   'dumul-js/obs/texts.js?v=1',
   'dumul-js/obs/i18n.js?v=20',
   'dumul-js/obs/i18n-sky.js?v=1',
   'dumul-js/obs/i18n-texts.js?v=1',
-  'dumul-js/obs/js/01-core.js?v=119',
-  'dumul-js/obs/js/02-sky-logic.js?v=118',
+  'dumul-js/obs/js/01-core.js?v=120',
+  'dumul-js/obs/js/02-sky-logic.js?v=119',
   'dumul-js/obs/js/03-gargantua.js?v=101',
   'dumul-js/obs/js/04-render.js?v=114',
   'dumul-js/obs/js/05-sector-ui.js?v=126',
   'dumul-js/obs/js/06-interaction.js?v=113',
-  'dumul-js/obs/js/07-boot.js?v=109',
+  'dumul-js/obs/js/07-boot.js?v=110',
   'dumul-js/obs/js/08-tx-drone.js?v=4',
   'dumul-js/obs/js/09-wormhole.js?v=6',
   'dumul-js/obs/js/10-ui-sound.js?v=4',
