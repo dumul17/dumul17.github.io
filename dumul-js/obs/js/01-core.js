@@ -983,6 +983,9 @@ var CAT={open:false,cid:null,view:'list',sel:null};
 var CAT_LOCK_Z=6;                         /* zoom saat bintang dikunci (label & koronagraf sudah penuh di atas x5.5) */
 var CAT_SFX=null;
 function catEsc(s){return String(s).replace(/[&<>"]/g,function(c){return c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':'&quot;';});}
+/* nama dengan huruf Yunani (mis. \u03bb Boo): text-transform:uppercase di CSS mengubah \u03bb jadi \u039b (mirip 'A' tanpa palang), jadi dimatikan khusus nama begini */
+var CAT_UNOBS='unobserved';   /* pengganti '???' di sheet katalog untuk data/nama yang belum ada */
+function catNm(n){if(!n)return CAT_UNOBS;var h=catEsc(n);return /[\u0370-\u03ff]/.test(n)?'<span class="cc-gr">'+h+'</span>':h;}
 function catSfxMap(){if(!CAT_SFX){CAT_SFX={};SKY.sfx.forEach(function(x){CAT_SFX[x.cons+'.'+x.star]=x;});}return CAT_SFX;}
 /* daftar titik rasi/cluster: yang bernama dulu (terang -> redup), lalu yang anonim */
 function catEntries(cid){
@@ -994,7 +997,8 @@ function catEntries(cid){
     c=cons(cid);if(!c)return out;
     for(k in c.stars){st=c.stars[k];out.push({key:k,name:st.name||null,r:st.r,st:st,sfx:m[cid+'.'+k]});}
   }
-  out.forEach(function(e,i){var p=SKY.physOf(cid,e.key);e.spt=p.known?p.spt:null;e.teff=p.known?p.teff:null;e.dist=p.known?p.dist:null;e.mag=p.known?p.mag:null;e.ra=p.known?p.ra:null;e.dec=p.known?p.dec:null;e.i=i;});
+  out.forEach(function(e,i){var p=SKY.physOf(cid,e.key),q=!p.known&&cid==='pleiades'&&SKY.PL_PHYS&&SKY.PL_PHYS[e.key];if(q)p={spt:q.spt,teff:q.teff,dist:null,mag:null,ra:null,dec:null,known:true};   /* bintang terang Pleiades: kelas+suhu dari PL_PHYS (belum ada jarak/mag/RA-Dec -> unobserved) */
+    e.spt=p.known?p.spt:null;e.teff=p.known?p.teff:null;e.dist=p.known?p.dist:null;e.mag=p.known?p.mag:null;e.ra=p.known?p.ra:null;e.dec=p.known?p.dec:null;e.i=i;});
   out.sort(function(a,b){return (b.name?1:0)-(a.name?1:0)||b.r-a.r||a.i-b.i;});
   return out;
 }
@@ -1119,7 +1123,7 @@ function catRenderList(){
   h='<div class="cc-hd"><div><div class="cc-tag">'+T('cat.title')+' \u00b7 '+ents.length+'</div><div class="cc-name">'+catEsc(catConsName())+'</div></div><button type="button" class="cc-x" aria-label="'+T('cat.close')+'">\u2715</button></div><div class="cc-body">';
   for(i=0;i<ents.length;i++){
     e=ents[i];
-    h+='<button type="button" class="cc-row'+(CAT.sel===e.key?' on':'')+(e.name?'':' cc-anon')+'" data-k="'+catEsc(e.key)+'"><i style="background:rgb('+catTc(e.teff)+')"></i><b>'+(e.name?catEsc(e.name):'???')+'</b><span>'+(e.spt?catEsc(e.spt):'')+'</span></button>';
+    h+='<button type="button" class="cc-row'+(CAT.sel===e.key?' on':'')+(e.name?'':' cc-anon')+'" data-k="'+catEsc(e.key)+'"><i style="background:rgb('+catTc(e.teff)+')"></i><b>'+catNm(e.name)+'</b><span>'+(e.spt?catEsc(e.spt):'')+'</span></button>';
   }
   s.innerHTML=h+'</div>';CAT.view='list';
   on=s.querySelector('.cc-row.on');var bd=s.querySelector('.cc-body');
@@ -1128,14 +1132,14 @@ function catRenderList(){
 function catRenderDetail(e){
   var s=catSheet(),f=FOCUS.list&&FOCUS.list[FOCUS.i],d=e.sfx&&e.sfx.data,h,rows=[];
   if(!s)return;
-  rows.push([T('cat.class'),e.spt||'???']);
-  rows.push([T('cat.temp'),e.teff?e.teff+' K':'???']);
-  rows.push([T('cat.uvir'),e.teff?catShift(SKY.bandShift(e.teff,'uv'))+' / '+catShift(SKY.bandShift(e.teff,'ir')):'???']);
-  rows.push([T('cat.dist'),e.dist?e.dist+' LY':'???']);
-  rows.push([T('cat.mag'),e.mag!=null?e.mag.toFixed(2):'???']);
+  rows.push([T('cat.class'),e.spt||CAT_UNOBS]);
+  rows.push([T('cat.temp'),e.teff?e.teff+' K':CAT_UNOBS]);
+  rows.push([T('cat.uvir'),e.teff?catShift(SKY.bandShift(e.teff,'uv'))+' / '+catShift(SKY.bandShift(e.teff,'ir')):CAT_UNOBS]);
+  rows.push([T('cat.dist'),e.dist?e.dist+' LY':CAT_UNOBS]);
+  rows.push([T('cat.mag'),e.mag!=null?e.mag.toFixed(2):CAT_UNOBS]);
   if(e.ra)rows.push([T('cat.radec'),catEsc(e.ra)+' \u00b7 '+catEsc(e.dec||'')]);
   h='<div class="cc-hd"><button type="button" class="cc-back">\u2039 '+T('cat.back')+'</button><button type="button" class="cc-x" aria-label="'+T('cat.close')+'">\u2715</button></div><div class="cc-body">'
-   +'<div class="cc-tag">'+catEsc(catConsName())+' \u00b7 '+T('cat.locked')+'</div><div class="cc-name">'+(e.name?catEsc(e.name):'???')+'</div><div class="cc-rows">';
+   +'<div class="cc-tag">'+catEsc(catConsName())+' \u00b7 '+T('cat.locked')+'</div><div class="cc-name">'+catNm(e.name)+'</div><div class="cc-rows">';
   for(var i=0;i<rows.length;i++)h+='<b>'+rows[i][0]+'</b><span>'+rows[i][1]+'</span>';
   h+='</div>';
   if(e.spt&&e.teff){var sv=specSvg(e.spt,e.teff);if(sv)h+='<div class="cc-spec">'+sv+'<i>'+T('cam.spec')+' \u00b7 '+catEsc(e.spt)+'</i></div>';}
