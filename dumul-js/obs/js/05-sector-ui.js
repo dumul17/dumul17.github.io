@@ -56,13 +56,33 @@ function sectFrameSprite(k){
 }
 ['winter','spring','summer','autumn'].forEach(sectFrameSprite);
 /* Glyph rasi di-render SEKALI ke canvas kecil (sprite), lalu tinggal drawImage per frame. */
-var GLYPH_SPR={},GLYPH_URL={},GLYPH_PX=96;
-function glyphSprite(id){
-  var c=GLYPH_SPR[id];if(c)return c;
+var GLYPH_SPR={},GLYPH_URL={},GLYPH_PX=128;
+var GLYPH_CYCLE_MS=4500; /* lama tiap rasi tampil di portal saat idle */
+/* Warna art per bintang SFX: key bintang -> putar hue (derajat). Art Orion dasarnya merah (Betelgeuse), Rigel diputar jadi biru. Tambah baris di sini kalau bintang lain mau beda warna. */
+var GLYPH_TINT={rigel:190};
+function glyphHue(c,deg){
+  try{
+    var x=c.getContext('2d'),im=x.getImageData(0,0,c.width,c.height),d=im.data,a=deg*Math.PI/180,co=Math.cos(a),si=Math.sin(a),n,r,gg,b,
+        m0=.213+co*.787-si*.213,m1=.715-co*.715-si*.715,m2=.072-co*.072+si*.928,
+        m3=.213-co*.213+si*.143,m4=.715+co*.285+si*.140,m5=.072-co*.072-si*.283,
+        m6=.213-co*.213-si*.787,m7=.715-co*.715+si*.715,m8=.072+co*.928+si*.072;
+    for(n=0;n<d.length;n+=4){r=d[n];gg=d[n+1];b=d[n+2];
+      d[n]=Math.min(255,(r*m0+gg*m1+b*m2)*1.15);d[n+1]=Math.min(255,(r*m3+gg*m4+b*m5)*1.15);d[n+2]=Math.min(255,(r*m6+gg*m7+b*m8)*1.15);}
+    x.putImageData(im,0,0);
+  }catch(e){}
+}
+/* key sprite: 'orion' atau 'orion@rigel' (rasi + varian warna bintang yang lagi diputar) */
+function glyphSprite(key){
+  var c=GLYPH_SPR[key];if(c)return c;
+  var pp=key.split('@'),id=pp[0],tint=pp[1]&&GLYPH_TINT[pp[1]];
   c=document.createElement('canvas');c.width=c.height=GLYPH_PX;
   var og=g;g=c.getContext('2d');
-  try{sectGlyphAny(id,GLYPH_PX/2,GLYPH_PX/2,GLYPH_PX*.78,1);}catch(e){}
-  g=og;GLYPH_SPR[id]=c;return c;
+  try{sectGlyphAny(id,GLYPH_PX/2,GLYPH_PX/2,GLYPH_PX*.78,1);}catch(e){} /* cadangan: garis vektor */
+  g=og;GLYPH_SPR[key]=c;
+  /* art dari 05a-glyph-art.js: timpa gambar garis begitu gambar siap */
+  var src=window.GLYPH_ART&&window.GLYPH_ART[id];
+  if(src){var im=new Image();im.onload=function(){var x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);if(tint)glyphHue(c,tint);};im.src=src;}
+  return c;
 }
 function drawGlyphSprite(id,cx,cy,box,al){
   if(al<=.01)return;
@@ -70,6 +90,13 @@ function drawGlyphSprite(id,cx,cy,box,al){
   g.save();g.globalAlpha*=al;g.drawImage(c,cx-box*.64,cy-box*.64,box*1.28,box*1.28);g.restore();
 }
 /* Rasi dari track yang lagi "dimuat" (main ATAU pause) sampai track habis / diganti / distop. */
+/* Key bintang SFX yang lagi diputar (cocokkan nama file audio ke SKY.sfx), null kalau nggak ada. */
+function trackStarKey(){
+  if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.ended)return null;
+  var u=String(activeSfx.currentSrc||activeSfx.src||'').split('?')[0],l=(typeof SKY!=='undefined'&&SKY.sfx)||[],i,t;
+  for(i=0;i<l.length;i++){t='/'+l[i].audio;if(u.slice(-t.length)===t)return l[i].key;}
+  return null;
+}
 function trackConsId(){
   if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.ended)return null;
   return consIdFromAudio(activeSfx);
@@ -478,7 +505,11 @@ function drawSectorOverview(now,age){
     }else{
       /* Ikon ngikut track yang lagi diputar: Aldebaran -> Taurus, Antares -> Scorpius, dst. Berhenti -> balik ke ikon utama. */
       var want=s.ids[0],pid=trackConsId();
-      if(pid&&s.ids.indexOf(pid)>=0)want=pid;
+      if(pid&&s.ids.indexOf(pid)>=0){want=pid;var sk=trackStarKey();if(sk&&GLYPH_TINT[sk])want=pid+'@'+sk;}
+      else if(!reduce&&s.ids.length>1){
+        /* idle: ikon gantian ganti ke semua rasi sektor (tiap GLYPH_CYCLE_MS), tiap sektor digeser biar nggak ganti bareng */
+        want=s.ids[Math.floor((now+i*1300)/GLYPH_CYCLE_MS)%s.ids.length];
+      }
       if(s.gid==null)s.gid=want;
       if(want!==s.gid){s.gprev=reduce?null:s.gid;s.gid=want;s.gt=now;}
       var gp=s.gprev!=null?clamp((now-s.gt)/320):1;
