@@ -1229,6 +1229,7 @@ var EXITP=(function(){
     build();
     E.open=true;E.leaving=false;E.i=0;
     try{teleGreetHide();}catch(e){}
+    try{UIS.pop('ask');}catch(eUP){}
     document.body.classList.add('owl-block');
     CH.classList.remove('on');BD.classList.add('on');P.classList.add('on');
     try{haptic(10);}catch(e2){}

@@ -508,7 +508,7 @@ function drawSectorOverview(now,age){
       if(pid&&s.ids.indexOf(pid)>=0){want=pid;var sk=trackStarKey();if(sk&&GLYPH_TINT[sk])want=pid+'@'+sk;}
       else if(!reduce&&s.ids.length>1){
         /* idle: ikon gantian ganti ke semua rasi sektor (tiap GLYPH_CYCLE_MS), tiap sektor digeser biar nggak ganti bareng */
-        want=s.ids[Math.floor((now+i*1300)/GLYPH_CYCLE_MS)%s.ids.length];
+        want=s.ids[Math.floor((now+i*3000)/GLYPH_CYCLE_MS)%s.ids.length];
       }
       if(s.gid==null)s.gid=want;
       if(want!==s.gid){s.gprev=reduce?null:s.gid;s.gid=want;s.gt=now;}
@@ -864,7 +864,7 @@ function lisAsk(cb,gate){
   a.querySelector('.la-q').textContent=T('lis.ask.q');
   a.querySelector('[data-a=bring]').textContent=T('lis.ask.bring');
   a.querySelector('[data-a=leave]').textContent=T('lis.ask.leave');
-  LIS.cb={fn:cb,gate:!!gate,sfx:sfxOn};a.hidden=false;document.body.classList.add('lis-asking');
+  LIS.cb={fn:cb,gate:!!gate,sfx:sfxOn};a.hidden=false;document.body.classList.add('lis-asking');try{UIS.pop('ask');}catch(eUP){}
 }
 function lisChoose(carry){
   var c=LIS.cb;LIS.cb=null;if(LIS.ui)LIS.ui.hidden=true;document.body.classList.remove('lis-asking');if(!c)return;

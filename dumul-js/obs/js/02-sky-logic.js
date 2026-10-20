@@ -232,6 +232,7 @@ function showSignalFragment(key,opt){
   void el.offsetWidth;
   el.classList.add('on');
   el.setAttribute('aria-hidden','false');
+  try{UIS.pop('frag');}catch(eUP){}
   clearTimeout(el._t);
   el._t=setTimeout(function(){hideSignalFragment();},7200);
 }
@@ -361,6 +362,7 @@ function showLastSignalBanner(key){
   void el.offsetWidth;
   el.classList.add('on');
   el.setAttribute('aria-hidden','false');
+  try{UIS.pop('frag');}catch(eUP){}
   applyLastSignalTrackGlow(key);
   lastSignalGlowUntil=performance.now()+14000;
   clearTimeout(el._t);
@@ -405,6 +407,7 @@ function toastShow(it){
   var el=document.getElementById('mode-toast');
   if(!el){TQ.cur=null;return;}
   TQ.cur=it;it.t0=performance.now();it.cut=false;
+  try{UIS.pop(it.tip?'tip':'toast');}catch(eUP){}
   el.textContent=it.text;
   el.classList.toggle('silence',it.kind==='silence');
   el.classList.toggle('tip',!!it.tip);

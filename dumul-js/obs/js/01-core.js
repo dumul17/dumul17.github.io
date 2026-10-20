@@ -956,6 +956,7 @@ function specRow(id,delay){
 function showWhisper(id){
   var w=document.getElementById('cam-whisper'),a=FOCUS_WHISPER[id],d=FOCUS_INFO[id],f=FOCUS.list&&FOCUS.list[FOCUS.i];
   if(!w||!d||!f)return;
+  try{UIS.pop('open');}catch(eUP){}
   clearTimeout(_whT);w.classList.remove('on');
   var wh=a?a[(Math.random()*a.length)|0]:'';
   var rows=d.rows.slice(0,3),n=rows.length;
@@ -1152,6 +1153,7 @@ function catOpen(cid){
   var r=w.getBoundingClientRect(),d=FOCUS_INFO[cid];
   s.style.height=Math.max(170,Math.round(r.height))+'px';   /* sheet = ukuran kartu rasi */
   s.style.setProperty('--cc','rgb('+((d&&d.rgb)||'110,229,255')+')');
+  try{UIS.pop('open');}catch(eUP){}
   CAT.open=true;CAT.cid=cid;CAT.sel=null;
   catRenderList();
   s.classList.add('on');document.body.classList.add('cat-open');
@@ -1222,6 +1224,7 @@ function achOpen(){
   catReset();   /* katalog bintang (kalau terbuka) ditutup dulu */
   var r=w?w.getBoundingClientRect():null;
   s.style.height=Math.max(170,Math.round(r?r.height:0))+'px';   /* sheet = ukuran kartu rasi */
+  try{UIS.pop('open');}catch(eUP){}
   ACH.open=true;achRenderList();
   s.classList.add('on');document.body.classList.add('ach-open');
   haptic(8);

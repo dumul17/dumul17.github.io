@@ -117,11 +117,38 @@ var UIS=(function(){
     tone(c,t,fr,fr,.5,.1);tone(c,t,fr*2,fr*2,.3,.025); /* + harmonik tipis */
   }
 
+  /* ---- pop: bunyi muncul toast / popup / sheet (satu timbre dgn tap & chime; debounce per jenis) ---- */
+  var popLast={};
+  function pop(kind){
+    var n=performance.now(),gap=kind==='toast'||kind==='tip'?260:120;
+    if(n-(popLast[kind]||0)<gap)return;popLast[kind]=n;
+    var c=ctx();if(!c||!vol()||document.hidden)return;
+    var t=c.currentTime,src,bp,g;
+    if(kind==='toast'){tone(c,t,880,1180,.09,.05,'triangle');return;}
+    if(kind==='tip'){tone(c,t,660,780,.14,.035,'sine');return;}
+    if(kind==='frag'){ /* fragment / last signal: dua nada naik pentatonik + harmonik tipis */
+      var a=261.63*Math.pow(2,PENTA[2]/12)*2,b=261.63*Math.pow(2,PENTA[4]/12)*2;
+      tone(c,t,a,a,.35,.06);tone(c,t+.14,b,b,.5,.06);tone(c,t+.14,b*2,b*2,.3,.02);return;
+    }
+    if(kind==='ask'){tone(c,t,700,700,.1,.05,'triangle');tone(c,t+.11,930,930,.14,.05,'triangle');return;}
+    if(kind==='open'){ /* sheet / kartu: swoosh noise tipis naik + blip */
+      src=c.createBufferSource();src.buffer=noiseBuf(c);
+      bp=c.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.2;
+      bp.frequency.setValueAtTime(500,t);bp.frequency.exponentialRampToValueAtTime(2200,t+.18);
+      g=c.createGain();g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(.03,t+.06);g.gain.exponentialRampToValueAtTime(0.0001,t+.2);
+      src.connect(bp);bp.connect(g);g.connect(out(c));
+      src.start(t);src.stop(t+.22);
+      src.onended=function(){try{src.disconnect();bp.disconnect();g.disconnect();}catch(e){}};
+      tone(c,t+.05,1000,1400,.08,.03,'triangle');
+    }
+  }
+
   /* delegasi tap: ikon HUD, owl (+ isi panelnya), music, portal, tombol fokus cam, panel exit teleskop, kartu pilihan teleskop, panel tuning, kontrol music player (prev/next/shuffle/repeat/mute/visualizer/accordion), tombol CAM (band/lines/log/game), katalog + log rasi, tutup fragment, capsule boot (tap teleskop sendiri: UIS.tap() manual di 06) */
   document.addEventListener('pointerdown',function(e){
     var t=e.target;
     if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#music-close,#exit-panel button,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,.owl-chip,.owl-tab,#lis-ask button,#bh-panel button,#owl-perf-save,#owl-perf-reset,#mode-silence,#mp-av-toggle,.mp-grp-head,.mp-ctrl,#cam-band button,#cg-btn,.ci-catbtn,#cam-cat button,#cam-ach button,#sf-close,.boot-cap'))tap();
   },true);
 
-  return {noise:noise,radar:radar,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul};
+  return {noise:noise,radar:radar,pop:pop,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul};
 })();
