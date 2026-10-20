@@ -28,6 +28,10 @@
      3. Pastikan rasinya unlock:true (kalau belum, tambahkan).
      4. Jalankan  node check-sky.js
 
+   NAMA BINTANG di GEOMETRY:  name:'Betelgeuse' = nama PROPER (IAU). bayer:'χ² Ori' = sebutan Bayer/Flamsteed (singkat).
+     Bintang yang cuma punya bayer tetap tampil berlabel bayer-nya (runtime: name = name||bayer, lihat 02-sky-logic.js), tapi di editor ?layout=1 dihitung masih '???'
+     (belum punya nama proper). Begitu name proper diisi, label berganti ke nama itu dan bayer tetap tersimpan.
+
    FISIK BINTANG (filter UV/IR): STAR_PHYS + CONS_REF di bagian 5; fungsi SKY.physOf / SKY.consPhys / SKY.bandShift. Titik baru = tambah satu baris di STAR_PHYS.
 
    YANG MASIH DI index.js (bukan data):  posisi cluster (Pleiades), logika alignment khusus (PLE_CHAIN).
@@ -285,23 +289,23 @@ var GEOMETRY=[
  {id:'orion',ra0:84.5,delay:.3,phase:0,
   /* Orion FIX V6 dari orion.html (viewBox 1000×1000). Betelgeuse + Rigel SFX. */
   stars:{
-   o1:{fx:328,fy:60,r:2.6,c:'#eaf6ff'},
-   o2:{fx:263,fy:75,r:2.6,c:'#eaf6ff'},
-   o3:{fx:233,fy:221,r:2.3,c:'#dcefff'},
-   o4:{fx:203,fy:236,r:2.3,c:'#dcefff'},
-   o5:{fx:268,fy:371,r:2.9,c:'#eaf6ff'},
+   o1:{fx:328,fy:60,r:2.6,c:'#eaf6ff',bayer:'χ¹ Ori'},
+   o2:{fx:263,fy:75,r:2.6,c:'#eaf6ff',bayer:'χ² Ori'},
+   o3:{fx:233,fy:221,r:2.3,c:'#dcefff',bayer:'ν Ori'},
+   o4:{fx:203,fy:236,r:2.3,c:'#dcefff',bayer:'ξ Ori'},
+   o5:{fx:268,fy:371,r:2.9,c:'#eaf6ff',bayer:'μ Ori'},
    betel:{fx:315,fy:435,r:4.2,c:'#ff8e66',name:'Betelgeuse',nx:1,dy:-10},
-   o7:{fx:464,fy:363,r:2.9,c:'#eaf6ff'},
-   o8:{fx:538,fy:465,r:2.9,c:'#eaf6ff'},
-   o9:{fx:753,fy:349,r:2.3,c:'#dcefff'},
-   o10:{fx:785,fy:385,r:2.3,c:'#dcefff'},
-   o11:{fx:793,fy:440,r:2.6,c:'#eaf6ff'},
-   o12:{fx:783,fy:482,r:2.3,c:'#dcefff'},
-   o13:{fx:772,fy:574,r:2.3,c:'#dcefff'},
-   o14:{fx:733,fy:597,r:2.3,c:'#dcefff'},
-   alnitak:{fx:490,fy:658,r:3.1,c:'#cfeeff',name:'Alnitak'},
+   o7:{fx:464,fy:363,r:2.9,c:'#eaf6ff',name:'Meissa'},
+   o8:{fx:538,fy:465,r:2.9,c:'#eaf6ff',name:'Bellatrix'},
+   o9:{fx:753,fy:349,r:2.3,c:'#dcefff',bayer:'π¹ Ori'},
+   o10:{fx:785,fy:385,r:2.3,c:'#dcefff',bayer:'π² Ori'},
+   o11:{fx:793,fy:440,r:2.6,c:'#eaf6ff',name:'Tabit'},
+   o12:{fx:783,fy:482,r:2.3,c:'#dcefff',bayer:'π⁴ Ori'},
+   o13:{fx:772,fy:574,r:2.3,c:'#dcefff',bayer:'π⁵ Ori'},
+   o14:{fx:733,fy:597,r:2.3,c:'#dcefff',bayer:'π⁶ Ori'},
+   alnitak:{fx:490,fy:658,r:3.1,c:'#cfeeff',name:'Mintaka'},
    alnilam:{fx:460,fy:688,r:3.1,c:'#cfeeff',name:'Alnilam'},
-   mintaka:{fx:428,fy:708,r:3.1,c:'#cfeeff',name:'Mintaka'},
+   mintaka:{fx:428,fy:708,r:3.1,c:'#cfeeff',name:'Alnitak'},
    rigel:{fx:674,fy:875,r:4.2,c:'#bfe0ff',name:'Rigel',nx:-1,dy:2},
    saiph:{fx:378,fy:936,r:3.1,c:'#cde6ff',name:'Saiph'}
   },
@@ -316,15 +320,15 @@ var GEOMETRY=[
  {id:'virgo',ra0:190.7,delay:1.4,phase:2.1,
   /* Virgo dari virgo.html (viewBox 720×860 → ×1000/720). Spica SFX. */
   stars:{
-   v1:{fx:820,fy:102,r:2.2,c:'#eaf6ff'},
-   v2:{fx:799,fy:383,r:2.5,c:'#eaf6ff'},
-   v3:{fx:716,fy:493,r:2.4,c:'#eaf6ff'},
-   v4:{fx:594,fy:463,r:2.5,c:'#eaf6ff'},
-   v5:{fx:461,fy:350,r:2.5,c:'#eaf6ff'},
-   v6:{fx:498,fy:695,r:2.7,c:'#eaf6ff'},
-   v7:{fx:361,fy:758,r:2.3,c:'#eaf6ff'},
-   v8:{fx:179,fy:960,r:2.3,c:'#eaf6ff'},
-   spica:{fx:685,fy:860,r:4.5,c:'#bfe0ff',name:'Spica',nx:-1},
+   v1:{fx:820,fy:102,r:2.2,c:'#eaf6ff',name:'Vindemiatrix',bayer:'ε Vir'},
+   v2:{fx:799,fy:383,r:2.5,c:'#eaf6ff',name:'Auva',bayer:'δ Vir'},
+   v3:{fx:716,fy:493,r:2.4,c:'#eaf6ff',name:'Porrima',bayer:'γ Vir'},
+   v4:{fx:594,fy:463,r:2.5,c:'#eaf6ff',name:'Zaniah',bayer:'η Vir'},
+   v5:{fx:461,fy:350,r:2.5,c:'#eaf6ff',name:'Zavijava',bayer:'β Vir'},
+   v6:{fx:498,fy:695,r:2.7,c:'#eaf6ff',name:'Heze',bayer:'ζ Vir'},
+   v7:{fx:361,fy:758,r:2.3,c:'#eaf6ff',bayer:'ι Vir'}, /* Syrma */
+   v8:{fx:179,fy:960,r:2.3,c:'#eaf6ff',bayer:'μ Vir'}, /* Rijl al Awwa */
+   spica:{fx:685,fy:860,r:4.5,c:'#bfe0ff',name:'Spica',bayer:'α Vir',nx:-1},
    v10:{fx:489,fy:1044,r:2.5,c:'#eaf6ff'},
    v11:{fx:413,fy:981,r:2.5,c:'#eaf6ff'},
    v12:{fx:304,fy:1088,r:2.5,c:'#eaf6ff'}
@@ -338,22 +342,22 @@ var GEOMETRY=[
  {id:'canis',ra0:103.5,delay:2.2,phase:4.0,
   /* Canis Major dari canis major.html (viewBox 720×720 → ×1000/720). Sirius SFX. */
   stars:{
-   cm1:{fx:639,fy:111,r:2.2,c:'#eaf6ff'},
-   cm2:{fx:839,fy:72,r:2.2,c:'#eaf6ff'},
-   cm3:{fx:639,fy:221,r:2.2,c:'#eaf6ff'},
+   cm1:{fx:639,fy:111,r:2.2,c:'#eaf6ff',name:'Muliphein'},
+   cm2:{fx:839,fy:72,r:2.2,c:'#eaf6ff',bayer:'θ CMa'},
+   cm3:{fx:639,fy:221,r:2.2,c:'#eaf6ff',bayer:'ι CMa'},
    sirius:{fx:729,fy:312,r:4.5,c:'#e8f4ff',name:'Sirius',nx:1,dy:-10},
-   cm5:{fx:722,fy:417,r:2.7,c:'#eaf6ff'},
-   cm6:{fx:72,fy:421,r:2.4,c:'#eaf6ff'},
-   cm7:{fx:229,fy:403,r:2.4,c:'#eaf6ff'},
+   cm5:{fx:722,fy:417,r:2.7,c:'#eaf6ff',bayer:'ν² CMa'},
+   cm6:{fx:72,fy:421,r:2.4,c:'#eaf6ff',name:'Aludra'},
+   cm7:{fx:229,fy:403,r:2.4,c:'#eaf6ff',bayer:'ω CMa'},
    wezen:{fx:288,fy:435,r:2.9,c:'#eaf6ff',name:'Wezen',nx:-1,dy:-8},
-   cm9:{fx:415,fy:390,r:2.4,c:'#eaf6ff'},
-   cm10:{fx:286,fy:536,r:2.1,c:'#eaf6ff'},
-   cm11:{fx:469,fy:471,r:2.1,c:'#eaf6ff'},
-   cm12:{fx:274,fy:594,r:2.6,c:'#eaf6ff'},
-   cm13:{fx:654,fy:583,r:2.4,c:'#eaf6ff'},
-   cm14:{fx:922,fy:529,r:2.6,c:'#eaf6ff'},
-   cm15:{fx:214,fy:776,r:2.1,c:'#eaf6ff'},
-   cm16:{fx:500,fy:924,r:2.6,c:'#eaf6ff'}
+   cm9:{fx:415,fy:390,r:2.4,c:'#eaf6ff',bayer:'ο² CMa'},
+   cm10:{fx:286,fy:536,r:2.1,c:'#eaf6ff',name:'Unurgunite'},
+   cm11:{fx:469,fy:471,r:2.1,c:'#eaf6ff',bayer:'ο¹ CMa'},
+   cm12:{fx:274,fy:594,r:2.6,c:'#eaf6ff',name:'Adhara'},
+   cm13:{fx:654,fy:583,r:2.4,c:'#eaf6ff',bayer:'ξ¹ CMa'},
+   cm14:{fx:922,fy:529,r:2.6,c:'#eaf6ff',name:'Mirzam'},
+   cm15:{fx:214,fy:776,r:2.1,c:'#eaf6ff',bayer:'κ CMa'},
+   cm16:{fx:500,fy:924,r:2.6,c:'#eaf6ff',name:'Furud'}
   },
   lines:[
    ["cm1","cm2"],["cm1","cm3"],["cm3","cm2"],
@@ -367,20 +371,20 @@ var GEOMETRY=[
  {id:'taurus',ra0:68.9,delay:1.0,phase:1.2,
   /* Taurus dari taurus.html (viewBox 720×860 → ×1000/720). Aldebaran SFX. */
   stars:{
-   elnath:{fx:218,fy:180,r:3.4,c:'#eaf6ff',name:'Alnath',nx:-1,dy:-8},
-   t2:{fx:424,fy:399,r:2.9,c:'#eaf6ff'},
-   t3:{fx:145,fy:438,r:2.5,c:'#eaf6ff'},
-   t4:{fx:495,fy:539,r:2.2,c:'#eaf6ff'},
-   t5:{fx:522,fy:588,r:2.2,c:'#eaf6ff'},
+   elnath:{fx:218,fy:180,r:3.4,c:'#eaf6ff',name:'Elnath',nx:-1,dy:-8},
+   t2:{fx:424,fy:399,r:2.9,c:'#eaf6ff',name:'Gaja',bayer:'τ Tau'},
+   t3:{fx:145,fy:438,r:2.5,c:'#eaf6ff',name:'Tianguan'},
+   t4:{fx:495,fy:539,r:2.2,c:'#eaf6ff',name:'Ain'},
+   t5:{fx:522,fy:588,r:2.2,c:'#eaf6ff',name:'Secunda Hyadum'},
    aldebaran:{fx:453,fy:627,r:4.5,c:'#ffb450',name:'Aldebaran',nx:1,dy:-8},
-   t7:{fx:507,fy:653,r:2.1,c:'#eaf6ff'},
-   t8:{fx:545,fy:661,r:2.1,c:'#eaf6ff'},
-   t9:{fx:648,fy:788,r:2.6,c:'#eaf6ff'},
+   t7:{fx:507,fy:653,r:2.1,c:'#eaf6ff',name:'Chamukuy'},
+   t8:{fx:545,fy:661,r:2.1,c:'#eaf6ff',name:'Prima Hyadum'},
+   t9:{fx:648,fy:788,r:2.6,c:'#eaf6ff',name:'Bibing',bayer:'λ Tau'},
    t10:{fx:800,fy:756,r:2.5,c:'#eaf6ff'},
    t11:{fx:823,fy:843,r:2.1,c:'#eaf6ff'},
    t12:{fx:847,fy:880,r:2.0,c:'#eaf6ff'},
-   t13:{fx:568,fy:916,r:2.4,c:'#eaf6ff'},
-   t14:{fx:636,fy:1005,r:2.5,c:'#eaf6ff'}
+   t13:{fx:568,fy:916,r:2.4,c:'#eaf6ff',bayer:'μ Tau'},
+   t14:{fx:636,fy:1005,r:2.5,c:'#eaf6ff',bayer:'ν Tau'}
   },
   lines:[
    ["elnath","t2"],["t3","aldebaran"],
@@ -392,17 +396,17 @@ var GEOMETRY=[
  {id:'bootes',ra0:0,delay:1.0,phase:1.2,
   /* Boötes dari bootes.html (viewBox 720×480 → ×1000/720). Arcturus α Boo. */
   stars:{
-   b1:{fx:536,fy:88,r:2.2,c:'#eaf6ff'},
-   b2:{fx:556,fy:88,r:2.2,c:'#eaf6ff'},
-   b3:{fx:549,fy:147,r:2.2,c:'#eaf6ff'},
-   nekkar:{fx:407,fy:233,r:2.5,c:'#eaf6ff',name:'Nekkar'},
-   seginus:{fx:501,fy:268,r:2.5,c:'#eaf6ff',name:'Seginus'},
-   princeps:{fx:362,fy:336,r:2.5,c:'#eaf6ff',name:'Princeps'},
-   b7:{fx:511,fy:361,r:2.7,c:'#eaf6ff'},
-   izar:{fx:456,fy:418,r:3.0,c:'#eaf6ff',name:'Izar'},
-   arcturus:{fx:550,fy:501,r:4.5,c:'#ffb450',name:'Arcturus',nx:-1,dy:12},
-   muphrid:{fx:615,fy:508,r:2.7,c:'#eaf6ff',name:'Muphrid'},
-   b11:{fx:492,fy:590,r:2.4,c:'#eaf6ff'}
+   b1:{fx:536,fy:88,r:2.2,c:'#eaf6ff',bayer:'θ Boo'},
+   b2:{fx:556,fy:88,r:2.2,c:'#eaf6ff',bayer:'λ Boo'},
+   b3:{fx:549,fy:147,r:2.2,c:'#eaf6ff',bayer:'μ Boo'},
+   nekkar:{fx:407,fy:233,r:2.5,c:'#eaf6ff',name:'Nekkar',bayer:'β Boo'},
+   seginus:{fx:501,fy:268,r:2.5,c:'#eaf6ff',name:'Seginus',bayer:'γ Boo'},
+   princeps:{fx:362,fy:336,r:2.5,c:'#eaf6ff',name:'Princeps',bayer:'δ Boo'},
+   b7:{fx:511,fy:361,r:2.7,c:'#eaf6ff',bayer:'ρ Boo'},
+   izar:{fx:456,fy:418,r:3.0,c:'#eaf6ff',name:'Izar',bayer:'ε Boo'},
+   arcturus:{fx:550,fy:501,r:4.5,c:'#ffb450',name:'Arcturus',bayer:'α Boo',nx:-1,dy:12},
+   muphrid:{fx:615,fy:508,r:2.7,c:'#eaf6ff',name:'Muphrid',bayer:'η Boo'},
+   b11:{fx:492,fy:590,r:2.4,c:'#eaf6ff',bayer:'ζ Boo'}
   },
   lines:[
    /* top double → neck */
@@ -419,20 +423,20 @@ var GEOMETRY=[
  {id:'scorpius',ra0:0,delay:1.1,phase:1.4,
   /* Geometry LOCKED to scorpius-map.html — 1000×1000 reference coordinates. */
   stars:{
-   topmost:{fx:875,fy:115,r:2.2,c:'#eaf6ff'},
-   midRight:{fx:875,fy:260,r:2.0,c:'#eaf6ff'},
-   rightmost:{fx:925,fy:395,r:1.8,c:'#dcefff'},
-   antares:{fx:625,fy:345,r:4.0,c:'#ff4500',name:'Antares',nx:-1,dy:-11,specAfter:1},
-   belowAntares:{fx:575,fy:435,r:2.0,c:'#eaf6ff'},
-   midBody:{fx:515,fy:610,r:2.2,c:'#dcefff'},
-   lowerMid:{fx:530,fy:705,r:2.1,c:'#ffe9c7'},
-   bottomBody:{fx:550,fy:835,r:2.0,c:'#eaf6ff'},
-   bm1:{fx:450,fy:875,r:1.8,c:'#ffe9c7'},
-   bm2:{fx:380,fy:890,r:1.8,c:'#eaf6ff'},
-   bottomLeft:{fx:235,fy:905,r:2.2,c:'#fff2cc'},
-   tiny:{fx:145,fy:810,r:1.5,c:'#eaf6ff'},
-   small:{fx:185,fy:745,r:1.6,c:'#dcefff'},
-   shaula:{fx:285,fy:665,r:3.2,c:'#7dd8e0',name:'Shaula'}
+   topmost:{fx:875,fy:115,r:2.2,c:'#eaf6ff',name:'Acrab',bayer:'β Sco'},
+   midRight:{fx:875,fy:260,r:2.0,c:'#eaf6ff',name:'Dschubba',bayer:'δ Sco'},
+   rightmost:{fx:925,fy:395,r:1.8,c:'#dcefff',bayer:'π Sco'},
+   antares:{fx:625,fy:345,r:4.0,c:'#ff4500',name:'Antares',bayer:'α Sco',nx:-1,dy:-11,specAfter:1},
+   belowAntares:{fx:575,fy:435,r:2.0,c:'#eaf6ff',bayer:'τ Sco'},
+   midBody:{fx:515,fy:610,r:2.2,c:'#dcefff',bayer:'ε Sco'}, /* Larawag */
+   lowerMid:{fx:530,fy:705,r:2.1,c:'#ffe9c7',bayer:'μ Sco'},
+   bottomBody:{fx:550,fy:835,r:2.0,c:'#eaf6ff',bayer:'ζ Sco'},
+   bm1:{fx:450,fy:875,r:1.8,c:'#ffe9c7',bayer:'η Sco'},
+   bm2:{fx:380,fy:890,r:1.8,c:'#eaf6ff',name:'Sargas',bayer:'θ Sco'},
+   bottomLeft:{fx:235,fy:905,r:2.2,c:'#fff2cc',bayer:'ι Sco'},
+   tiny:{fx:145,fy:810,r:1.5,c:'#eaf6ff',name:'Girtab',bayer:'κ Sco'},
+   small:{fx:185,fy:745,r:1.6,c:'#dcefff',name:'Lesath',bayer:'υ Sco'},
+   shaula:{fx:285,fy:665,r:3.2,c:'#7dd8e0',name:'Shaula',bayer:'λ Sco'}
   },
   lines:[
    ["antares","topmost"],["antares","midRight"],["antares","rightmost"],["antares","belowAntares"],
@@ -443,23 +447,23 @@ var GEOMETRY=[
  {id:'gemini',ra0:0,delay:1.0,phase:.8,
   /* Geometry dari gemini-constellation.html: 17 titik, viewBox 713×430 (Castor = g2, Pollux = g9). Belum ada SFX -> slot terkunci, tidak interaktif. */
   stars:{
-   g1:{fx:314,fy:51,r:2.6,c:'#eaf6ff'},
+   g1:{fx:314,fy:51,r:2.6,c:'#eaf6ff',bayer:'θ Gem'},
    g2:{fx:205,fy:121,r:3.1,c:'#eaf6ff',name:'Castor',nx:-1,dy:-8},
-   g3:{fx:283,fy:127,r:2.23,c:'#eaf6ff'},
-   g4:{fx:560,fy:127,r:2.11,c:'#eaf6ff'},
-   g5:{fx:529,fy:158,r:1.86,c:'#eaf6ff'},
-   g6:{fx:410,fy:164,r:3.1,c:'#eaf6ff'},
-   g7:{fx:504,fy:171,r:2.17,c:'#eaf6ff'},
-   g8:{fx:258,fy:185,r:2.11,c:'#eaf6ff'},
+   g3:{fx:283,fy:127,r:2.23,c:'#eaf6ff',bayer:'τ Gem'},
+   g4:{fx:560,fy:127,r:2.11,c:'#eaf6ff',bayer:'1 Gem'},
+   g5:{fx:529,fy:158,r:1.86,c:'#eaf6ff',name:'Propus'},
+   g6:{fx:410,fy:164,r:3.1,c:'#eaf6ff',name:'Mebsuta'},
+   g7:{fx:504,fy:171,r:2.17,c:'#eaf6ff',name:'Tejat'},
+   g8:{fx:258,fy:185,r:2.11,c:'#eaf6ff',bayer:'ι Gem'},
    g9:{fx:181,fy:196,r:3.3,c:'#ffd9a8',name:'Pollux',nx:-1,dy:7},
-   g10:{fx:229,fy:210,r:2.36,c:'#eaf6ff'},
-   g11:{fx:485,fy:217,r:2.05,c:'#eaf6ff'},
-   g12:{fx:214,fy:263,r:2.17,c:'#eaf6ff'},
-   g13:{fx:364,fy:269,r:2.11,c:'#eaf6ff'},
-   g14:{fx:306,fy:270,r:2.23,c:'#eaf6ff'},
-   g15:{fx:482,fy:308,r:2.85,c:'#eaf6ff'},
-   g16:{fx:333,fy:364,r:2.29,c:'#eaf6ff'},
-   g17:{fx:453,fy:371,r:2.23,c:'#eaf6ff'}
+   g10:{fx:229,fy:210,r:2.36,c:'#eaf6ff',bayer:'υ Gem'},
+   g11:{fx:485,fy:217,r:2.05,c:'#eaf6ff',bayer:'ν Gem'},
+   g12:{fx:214,fy:263,r:2.17,c:'#eaf6ff',bayer:'κ Gem'},
+   g13:{fx:364,fy:269,r:2.11,c:'#eaf6ff',name:'Mekbuda'},
+   g14:{fx:306,fy:270,r:2.23,c:'#eaf6ff',name:'Wasat'},
+   g15:{fx:482,fy:308,r:2.85,c:'#eaf6ff',name:'Alhena'},
+   g16:{fx:333,fy:364,r:2.29,c:'#eaf6ff',bayer:'λ Gem'},
+   g17:{fx:453,fy:371,r:2.23,c:'#eaf6ff',name:'Alzirr'}
   },
   lines:[["g1","g3"],["g2","g3"],["g3","g6"],["g6","g7"],["g7","g5"],["g5","g4"],["g6","g11"],["g3","g8"],["g8","g10"],["g9","g10"],["g10","g12"],["g10","g14"],["g14","g13"],["g13","g15"],["g14","g16"],["g16","g17"]]},
  /* Ursa Major / Big Dipper: 18 titik dari bigdipper-ursa-major.html
@@ -467,13 +471,13 @@ var GEOMETRY=[
  {id:'ursa',ra0:0,delay:1.2,phase:1.0,
   /* Ursa Major dari ursa major.html (viewBox 1000×1000). Alioth SFX. */
   stars:{
-   alkaid:{fx:80,fy:55,r:3.2,c:'#eaf6ff',name:'Alkaid'},
-   mizar:{fx:215,fy:83,r:3.2,c:'#eaf6ff',name:'Mizar'},
-   alioth:{fx:284,fy:173,r:4.2,c:'#ffe9a0',name:'Alioth',nx:-1,dy:-10},
-   megrez:{fx:370,fy:274,r:2.9,c:'#eaf6ff',name:'Megrez'},
-   u5:{fx:360,fy:399,r:2.9,c:'#eaf6ff'},
-   u6:{fx:517,fy:472,r:2.9,c:'#eaf6ff'},
-   u7:{fx:576,fy:348,r:2.9,c:'#eaf6ff'},
+   alkaid:{fx:80,fy:55,r:3.2,c:'#eaf6ff',name:'Alkaid',bayer:'η UMa'},
+   mizar:{fx:215,fy:83,r:3.2,c:'#eaf6ff',name:'Mizar',bayer:'ζ UMa'},
+   alioth:{fx:284,fy:173,r:4.2,c:'#ffe9a0',name:'Alioth',bayer:'ε UMa',nx:-1,dy:-10},
+   megrez:{fx:370,fy:274,r:2.9,c:'#eaf6ff',name:'Megrez',bayer:'δ UMa'},
+   u5:{fx:360,fy:399,r:2.9,c:'#eaf6ff',name:'Phecda',bayer:'γ UMa'},
+   u6:{fx:517,fy:472,r:2.9,c:'#eaf6ff',name:'Merak',bayer:'β UMa'},
+   u7:{fx:576,fy:348,r:2.9,c:'#eaf6ff',name:'Dubhe',bayer:'α UMa'},
    u8:{fx:780,fy:441,r:2.9,c:'#eaf6ff'},
    u9:{fx:918,fy:541,r:3.2,c:'#eaf6ff'},
    u10:{fx:708,fy:531,r:2.6,c:'#dcefff'},
@@ -496,17 +500,17 @@ var GEOMETRY=[
   ]},
  {id:'leo',ra0:0,delay:1.3,phase:1.1,
   stars:{
-   l1:{fx:774,fy:167,r:3.4,c:'#eaf6ff'},
-   l2:{fx:833,fy:208,r:2.7,c:'#dcefff'},
-   l3:{fx:656,fy:267,r:2.9,c:'#eaf6ff'},
+   l1:{fx:774,fy:167,r:3.4,c:'#eaf6ff',name:'Algenubi',bayer:'ε Leo'},
+   l2:{fx:833,fy:208,r:2.7,c:'#dcefff',name:'Rasalas',bayer:'μ Leo'},
+   l3:{fx:656,fy:267,r:2.9,c:'#eaf6ff',name:'Adhafera',bayer:'ζ Leo'},
    /* l4 = Algieba (junction sickle/badan) — BUKAN Regulus */
-   l4:{fx:662,fy:368,r:3.3,c:'#eaf6ff',name:'Algieba',nx:-1,dy:-8},
-   l5:{fx:336,fy:425,r:3.2,c:'#eaf6ff',name:'Denebola',nx:-1,dy:-9},
-   l6:{fx:762,fy:425,r:2.8,c:'#dcefff'},
+   l4:{fx:662,fy:368,r:3.3,c:'#eaf6ff',name:'Algieba',bayer:'γ Leo',nx:-1,dy:-8},
+   l5:{fx:336,fy:425,r:3.2,c:'#eaf6ff',name:'Denebola',bayer:'β Leo',nx:-1,dy:-9},
+   l6:{fx:762,fy:425,r:2.8,c:'#dcefff',bayer:'η Leo'},
    /* Regulus = ujung BAWAH sickle / batang kanan (α Leo), sesuai diagram */
-   regulus:{fx:790,fy:544,r:4.0,c:'#ffe9a0',name:'Regulus',nx:1,dy:10},
-   l8:{fx:358,fy:556,r:2.9,c:'#dcefff'},
-   l9:{fx:145,fy:613,r:3.5,c:'#eaf6ff'}
+   regulus:{fx:790,fy:544,r:4.0,c:'#ffe9a0',name:'Regulus',bayer:'α Leo',nx:1,dy:10},
+   l8:{fx:358,fy:556,r:2.9,c:'#dcefff',name:'Chertan',bayer:'θ Leo'},
+   l9:{fx:145,fy:613,r:3.5,c:'#eaf6ff',name:'Zosma',bayer:'δ Leo'}
   },
   lines:[
    /* sickle / kepala → Algieba */
@@ -521,22 +525,22 @@ var GEOMETRY=[
  {id:'hydra',ra0:0,delay:1.4,phase:1.2,
   /* Hydra V2 dari hydra.html (viewBox 1000×1000). Alphard utama (belum SFX). */
   stars:{
-   h1:{fx:140,fy:725,r:2.9,c:'#eaf6ff'},
-   h2:{fx:236,fy:624,r:3.2,c:'#eaf6ff'},
-   h3:{fx:480,fy:631,r:2.9,c:'#eaf6ff'},
+   h1:{fx:140,fy:725,r:2.9,c:'#eaf6ff',bayer:'β Hya'},
+   h2:{fx:236,fy:624,r:3.2,c:'#eaf6ff',bayer:'γ Hya'},
+   h3:{fx:480,fy:631,r:2.9,c:'#eaf6ff',bayer:'π Hya'},
    h4:{fx:515,fy:595,r:2.9,c:'#eaf6ff'},
    h5:{fx:566,fy:446,r:2.9,c:'#eaf6ff'},
    h6:{fx:629,fy:431,r:2.9,c:'#eaf6ff'},
    h7:{fx:656,fy:386,r:2.9,c:'#eaf6ff'},
    h8:{fx:707,fy:402,r:2.9,c:'#eaf6ff'},
-   alphard:{fx:795,fy:320,r:4.2,c:'#ffe9a0',name:'Alphard',nx:-1,dy:-10},
+   alphard:{fx:795,fy:320,r:4.2,c:'#ffe9a0',name:'Alphard',bayer:'α Hya',nx:-1,dy:-10},
    h10:{fx:711,fy:247,r:2.6,c:'#eaf6ff'},
    h11:{fx:770,fy:197,r:2.6,c:'#eaf6ff'},
-   h12:{fx:809,fy:137,r:2.6,c:'#eaf6ff'},
-   h13:{fx:839,fy:129,r:2.6,c:'#eaf6ff'},
-   h14:{fx:862,fy:136,r:2.6,c:'#eaf6ff'},
-   h15:{fx:859,fy:161,r:2.6,c:'#eaf6ff'},
-   h16:{fx:820,fy:151,r:2.6,c:'#eaf6ff'}
+   h12:{fx:809,fy:137,r:2.6,c:'#eaf6ff',bayer:'ζ Hya'},
+   h13:{fx:839,fy:129,r:2.6,c:'#eaf6ff',bayer:'ε Hya'},
+   h14:{fx:862,fy:136,r:2.6,c:'#eaf6ff',bayer:'δ Hya'},
+   h15:{fx:859,fy:161,r:2.6,c:'#eaf6ff',bayer:'σ Hya'},
+   h16:{fx:820,fy:151,r:2.6,c:'#eaf6ff',bayer:'η Hya'}
   },
   lines:[
    ["h1","h2"],["h2","h3"],["h3","h4"],["h4","h5"],["h5","h6"],
@@ -553,17 +557,17 @@ var GEOMETRY=[
    s5:{fx:433,fy:221,r:2.8,c:'#eaf6ff'},
    s6:{fx:235,fy:320,r:2.8,c:'#eaf6ff'},
    s7:{fx:673,fy:326,r:2.8,c:'#eaf6ff'},
-   s8:{fx:498,fy:349,r:3.4,c:'#eaf6ff'},
-   s9:{fx:558,fy:367,r:2.8,c:'#eaf6ff'},
-   s10:{fx:427,fy:391,r:2.8,c:'#eaf6ff'},
+   s8:{fx:498,fy:349,r:3.4,c:'#eaf6ff',bayer:'φ Sgr'},
+   s9:{fx:558,fy:367,r:2.8,c:'#eaf6ff',name:'Kaus Media',bayer:'δ Sgr'},
+   s10:{fx:427,fy:391,r:2.8,c:'#eaf6ff',name:'Kaus Borealis',bayer:'λ Sgr'},
    s11:{fx:926,fy:416,r:2.5,c:'#dcefff'},
    s12:{fx:76,fy:427,r:2.8,c:'#eaf6ff'},
-   s13:{fx:455,fy:451,r:3.1,c:'#eaf6ff'},
-   s14:{fx:710,fy:453,r:3.5,c:'#ffe9a0',name:'Nunki',nx:1,dy:-10},
-   s15:{fx:803,fy:478,r:2.8,c:'#eaf6ff'},
-   s16:{fx:684,fy:583,r:4.0,c:'#eaf6ff'},
+   s13:{fx:455,fy:451,r:3.1,c:'#eaf6ff',name:'Alnasl',bayer:'γ Sgr'},
+   s14:{fx:710,fy:453,r:3.5,c:'#ffe9a0',name:'Nunki',bayer:'σ Sgr',nx:1,dy:-10},
+   s15:{fx:803,fy:478,r:2.8,c:'#eaf6ff',bayer:'τ Sgr'},
+   s16:{fx:684,fy:583,r:4.0,c:'#eaf6ff',name:'Kaus Australis',bayer:'ε Sgr'},
    s17:{fx:129,fy:637,r:2.8,c:'#eaf6ff'},
-   s18:{fx:717,fy:652,r:2.8,c:'#eaf6ff'},
+   s18:{fx:717,fy:652,r:2.8,c:'#eaf6ff',name:'Ascella',bayer:'ζ Sgr'},
    s19:{fx:349,fy:763,r:2.8,c:'#eaf6ff'},
    s20:{fx:184,fy:819,r:2.8,c:'#eaf6ff'},
    s21:{fx:363,fy:883,r:2.8,c:'#eaf6ff'}
@@ -585,12 +589,12 @@ var GEOMETRY=[
  /* Lyra: 6 titik dari lyra.html (viewBox 540×360 → ×1000/540). off. Utama: Vega. */
  {id:'lyra',ra0:0,delay:1.1,phase:0.9,
   stars:{
-   y1:{fx:552,fy:150,r:2.6,c:'#eaf6ff'},
-   y2:{fx:617,fy:176,r:4.2,c:'#ffe9a0',name:'Vega',nx:1,dy:-10},
-   y3:{fx:546,fy:237,r:2.9,c:'#eaf6ff'},
-   y4:{fx:431,fy:276,r:2.6,c:'#dcefff'},
-   y5:{fx:494,fy:481,r:3.1,c:'#eaf6ff'},
-   y6:{fx:370,fy:515,r:2.9,c:'#eaf6ff'}
+   y1:{fx:552,fy:150,r:2.6,c:'#eaf6ff',bayer:'ζ Lyr'},
+   y2:{fx:617,fy:176,r:4.2,c:'#ffe9a0',name:'Vega',bayer:'α Lyr',nx:1,dy:-10},
+   y3:{fx:546,fy:237,r:2.9,c:'#eaf6ff',bayer:'ε Lyr'}, /* Double Double */
+   y4:{fx:431,fy:276,r:2.6,c:'#dcefff',bayer:'δ Lyr'},
+   y5:{fx:494,fy:481,r:3.1,c:'#eaf6ff',name:'Sheliak',bayer:'β Lyr'},
+   y6:{fx:370,fy:515,r:2.9,c:'#eaf6ff',name:'Sulafat',bayer:'γ Lyr'}
   },
   lines:[
    ["y1","y2"],["y2","y3"],["y1","y3"],
@@ -599,16 +603,16 @@ var GEOMETRY=[
  /* Cygnus: 10 titik dari cygnus.html (viewBox 860×860 → ×1000/860). off. Utama: Deneb. Northern Cross. */
  {id:'cygnus',ra0:0,delay:1.2,phase:1.0,
   stars:{
-   c1:{fx:530,fy:330,r:4.5,c:'#ffe9a0',name:'Deneb',nx:1,dy:-12},
-   c2:{fx:924,fy:130,r:2.6,c:'#dcefff'},
-   c3:{fx:876,fy:180,r:2.8,c:'#eaf6ff'},
-   c4:{fx:806,fy:365,r:3.1,c:'#eaf6ff'},
-   c5:{fx:610,fy:472,r:3.4,c:'#eaf6ff'},
-   c6:{fx:451,fy:652,r:3.2,c:'#eaf6ff'},
-   c7:{fx:740,fy:653,r:2.9,c:'#eaf6ff'},
-   c8:{fx:72,fy:714,r:2.6,c:'#dcefff'},
-   c9:{fx:272,fy:723,r:2.9,c:'#eaf6ff'},
-   c10:{fx:895,fy:853,r:3.4,c:'#eaf6ff'}
+   c1:{fx:530,fy:330,r:4.5,c:'#ffe9a0',name:'Deneb',bayer:'α Cyg',nx:1,dy:-12},
+   c2:{fx:924,fy:130,r:2.6,c:'#dcefff',bayer:'κ Cyg'},
+   c3:{fx:876,fy:180,r:2.8,c:'#eaf6ff',bayer:'ι Cyg'},
+   c4:{fx:806,fy:365,r:3.1,c:'#eaf6ff',bayer:'δ Cyg'},
+   c5:{fx:610,fy:472,r:3.4,c:'#eaf6ff',name:'Sadr',bayer:'γ Cyg'},
+   c6:{fx:451,fy:652,r:3.2,c:'#eaf6ff',name:'Gienah',bayer:'ε Cyg'},
+   c7:{fx:740,fy:653,r:2.9,c:'#eaf6ff',bayer:'ζ Cyg'},
+   c8:{fx:72,fy:714,r:2.6,c:'#dcefff',bayer:'θ Cyg'},
+   c9:{fx:272,fy:723,r:2.9,c:'#eaf6ff',bayer:'η Cyg'},
+   c10:{fx:895,fy:853,r:3.4,c:'#eaf6ff',name:'Albireo',bayer:'β Cyg'}
   },
   lines:[
    /* neck / upper wing */
@@ -628,19 +632,19 @@ var GEOMETRY=[
    o1:{fx:756,fy:131,r:2.2,c:'#dcefff'},
    o2:{fx:789,fy:183,r:2.2,c:'#dcefff'},
    o3:{fx:757,fy:230,r:2.4,c:'#eaf6ff'},
-   o4:{fx:415,fy:141,r:3.3,c:'#ffe9a0',name:'Rasalhague',nx:-1,dy:-10},
-   o5:{fx:526,fy:194,r:2.4,c:'#eaf6ff'},
-   o6:{fx:374,fy:241,r:3.4,c:'#eaf6ff'},
+   o4:{fx:415,fy:141,r:3.3,c:'#ffe9a0',name:'Rasalhague',bayer:'α Oph',nx:-1,dy:-10},
+   o5:{fx:526,fy:194,r:2.4,c:'#eaf6ff',bayer:'κ Oph'},
+   o6:{fx:374,fy:241,r:3.4,c:'#eaf6ff',name:'Cebalrai',bayer:'β Oph'},
    o7:{fx:622,fy:285,r:2.3,c:'#eaf6ff'},
-   o8:{fx:185,fy:309,r:2.6,c:'#eaf6ff'},
+   o8:{fx:185,fy:309,r:2.6,c:'#eaf6ff',name:'Yed Prior',bayer:'δ Oph'},
    o9:{fx:754,fy:319,r:2.2,c:'#eaf6ff'},
-   o10:{fx:672,fy:333,r:3.5,c:'#eaf6ff'},
-   o12:{fx:307,fy:385,r:2.4,c:'#eaf6ff'},
-   o13:{fx:598,fy:431,r:3.3,c:'#eaf6ff'},
+   o10:{fx:672,fy:333,r:3.5,c:'#eaf6ff',bayer:'ζ Oph'},
+   o12:{fx:307,fy:385,r:2.4,c:'#eaf6ff',name:'Yed Posterior',bayer:'ε Oph'},
+   o13:{fx:598,fy:431,r:3.3,c:'#eaf6ff',name:'Sabik',bayer:'η Oph'},
    o14:{fx:378,fy:450,r:2.4,c:'#eaf6ff'},
    o15:{fx:494,fy:456,r:2.2,c:'#eaf6ff'},
    o16:{fx:424,fy:476,r:2.2,c:'#dcefff'},
-   o17:{fx:513,fy:485,r:3.7,c:'#eaf6ff'},
+   o17:{fx:513,fy:485,r:3.7,c:'#eaf6ff',bayer:'θ Oph'},
    o18:{fx:624,fy:494,r:2.6,c:'#eaf6ff'},
    o19:{fx:656,fy:533,r:2.2,c:'#eaf6ff'},
    o20:{fx:515,fy:580,r:2.9,c:'#eaf6ff'}
@@ -656,11 +660,11 @@ var GEOMETRY=[
  /* Cassiopeia: 5 titik dari Cassiopeia.html (viewBox 540×360 → ×1000/540). UI NONAKTIF (off). Bintang utama nanti: Schedar (k4; di HTML ditulis "Shedar"). Bentuk W. */
  {id:'cassiopeia',ra0:0,delay:1.0,phase:.7,
   stars:{
-   k1:{fx:222,fy:204,r:2.7,c:'#eaf6ff'},
-   k2:{fx:361,fy:361,r:2.6,c:'#eaf6ff'},
-   k3:{fx:500,fy:287,r:2.9,c:'#eaf6ff'},
-   k4:{fx:630,fy:426,r:3.4,c:'#ffe9a0',name:'Schedar',nx:-1,dy:12},
-   k5:{fx:778,fy:259,r:2.7,c:'#eaf6ff'}
+   k1:{fx:222,fy:204,r:2.7,c:'#eaf6ff',name:'Caph',bayer:'β Cas'},
+   k2:{fx:361,fy:361,r:2.6,c:'#eaf6ff',name:'Ruchbah',bayer:'δ Cas'},
+   k3:{fx:500,fy:287,r:2.9,c:'#eaf6ff',name:'Navi',bayer:'γ Cas'},
+   k4:{fx:630,fy:426,r:3.4,c:'#ffe9a0',name:'Schedar',bayer:'α Cas',nx:-1,dy:12},
+   k5:{fx:778,fy:259,r:2.7,c:'#eaf6ff',name:'Segin',bayer:'ε Cas'}
   },
   lines:[
    ["k1","k2"],["k2","k3"],["k3","k4"],["k4","k5"]
@@ -670,13 +674,13 @@ var GEOMETRY=[
   stars:{
    p1:{fx:639,fy:74,r:2.2,c:'#dcefff'},
    p2:{fx:583,fy:157,r:2.4,c:'#eaf6ff'},
-   p3:{fx:509,fy:241,r:3.9,c:'#eaf6ff'},
+   p3:{fx:509,fy:241,r:3.9,c:'#eaf6ff',name:'Mirfak',bayer:'α Per'},
    p4:{fx:444,fy:287,r:2.6,c:'#eaf6ff'},
    p5:{fx:380,fy:407,r:2.4,c:'#eaf6ff'},
    p6:{fx:370,fy:491,r:2.2,c:'#eaf6ff'},
    p7:{fx:370,fy:565,r:1.9,c:'#dcefff'},
    p8:{fx:426,fy:556,r:1.8,c:'#dcefff'},
-   p9:{fx:574,fy:389,r:2.5,c:'#ffe9a0',name:'Algol',nx:1,dy:-8},
+   p9:{fx:574,fy:389,r:2.5,c:'#ffe9a0',name:'Algol',bayer:'β Per',nx:1,dy:-8},
    p10:{fx:602,fy:463,r:2.2,c:'#dcefff'},
    p11:{fx:657,fy:472,r:1.8,c:'#dcefff'}
   },
@@ -688,9 +692,9 @@ var GEOMETRY=[
  /* Aries: 4 titik dari aries.html (viewBox 540×360 → ×1000/540). UI NONAKTIF (off). Bintang utama nanti: Hamal (a2). */
  {id:'aries',ra0:0,delay:1.1,phase:.6,
   stars:{
-   a1:{fx:361,fy:102,r:2.2,c:'#dcefff'},
-   a2:{fx:528,fy:324,r:3.7,c:'#ffe9a0',name:'Hamal',nx:1,dy:-8},
-   a3:{fx:583,fy:472,r:2.6,c:'#eaf6ff'},
+   a1:{fx:361,fy:102,r:2.2,c:'#dcefff',bayer:'γ Ari'}, /* Mesarthim */
+   a2:{fx:528,fy:324,r:3.7,c:'#ffe9a0',name:'Hamal',bayer:'α Ari',nx:1,dy:-8},
+   a3:{fx:583,fy:472,r:2.6,c:'#eaf6ff',name:'Sheratan',bayer:'β Ari'},
    a4:{fx:556,fy:565,r:2.0,c:'#dcefff'}
   },
   lines:[
@@ -699,18 +703,18 @@ var GEOMETRY=[
  /* Aquila: 11 titik dari Aquila.html (viewBox 540×360 → ×1000/540). UI NONAKTIF (off). Bintang utama: Altair (aq2 — tengah trio kepala). Subtitle HTML bilang "10 bintang" tapi SVG-nya 11 titik (nomor 1–11) — data ikut SVG. Nomor kunci = nomor di HTML (urutan 8 → 11 → 9 → 10 di SVG, bukan numerik). */
  {id:'aquila',ra0:0,delay:1.4,phase:.8,
   stars:{
-   aq1:{fx:415,fy:185,r:2.6,c:'#eaf6ff'},
+   aq1:{fx:415,fy:185,r:2.6,c:'#eaf6ff',name:'Tarazed',bayer:'γ Aql'},
    /* Altair = tengah trio kepala (aq1—aq2—aq3), bukan ujung */
-   aq2:{fx:393,fy:226,r:3.9,c:'#ffe9a0',name:'Altair',nx:-1,dy:-8},
-   aq3:{fx:365,fy:283,r:2.6,c:'#eaf6ff'},
-   aq4:{fx:537,fy:357,r:3.4,c:'#eaf6ff'},
-   aq5:{fx:270,fy:446,r:2.5,c:'#eaf6ff'},
-   aq6:{fx:385,fy:406,r:2.1,c:'#dcefff'},
+   aq2:{fx:393,fy:226,r:3.9,c:'#ffe9a0',name:'Altair',bayer:'α Aql',nx:-1,dy:-8},
+   aq3:{fx:365,fy:283,r:2.6,c:'#eaf6ff',name:'Alshain',bayer:'β Aql'},
+   aq4:{fx:537,fy:357,r:3.4,c:'#eaf6ff',bayer:'δ Aql'},
+   aq5:{fx:270,fy:446,r:2.5,c:'#eaf6ff',name:'Okab',bayer:'ζ Aql'},
+   aq6:{fx:385,fy:406,r:2.1,c:'#dcefff',bayer:'η Aql'},
    aq7:{fx:476,fy:463,r:1.8,c:'#dcefff'},
-   aq8:{fx:650,fy:550,r:2.3,c:'#eaf6ff'},
+   aq8:{fx:650,fy:550,r:2.3,c:'#eaf6ff',bayer:'θ Aql'},
    aq11:{fx:694,fy:576,r:1.7,c:'#dcefff'},
-   aq9:{fx:650,fy:111,r:3.5,c:'#eaf6ff'},
-   aq10:{fx:689,fy:78,r:2.6,c:'#eaf6ff'}
+   aq9:{fx:650,fy:111,r:3.5,c:'#eaf6ff',bayer:'λ Aql'},
+   aq10:{fx:689,fy:78,r:2.6,c:'#eaf6ff',bayer:'ι Aql'}
   },
   lines:[
    ["aq1","aq2"],["aq2","aq3"],["aq1","aq4"],["aq5","aq6"],
@@ -720,10 +724,10 @@ var GEOMETRY=[
  /* Pegasus: 14 titik dari pegasus.html (viewBox 860×860 → ×1000/860). UI NONAKTIF (off). Bintang utama nanti: Alpheratz (pg1 = pojok kiri-atas Great Square; secara resmi α Andromedae, dulu juga δ Pegasi). Enif = pg14 (satu-satunya yang dilabeli di HTML) sengaja tidak dinamai karena bukan bintang SFX. */
  {id:'pegasus',ra0:0,delay:1.2,phase:1.0,
   stars:{
-   pg1:{fx:164,fy:301,r:2.8,c:'#ffe9a0',name:'Alpheratz',nx:1,dy:-10},
-   pg2:{fx:461,fy:330,r:3.4,c:'#eaf6ff'},
-   pg3:{fx:110,fy:594,r:2.8,c:'#eaf6ff'},
-   pg4:{fx:466,fy:615,r:2.8,c:'#eaf6ff'},
+   pg1:{fx:164,fy:301,r:2.8,c:'#ffe9a0',name:'Alpheratz',bayer:'α And',nx:1,dy:-10},
+   pg2:{fx:461,fy:330,r:3.4,c:'#eaf6ff',name:'Scheat',bayer:'β Peg'},
+   pg3:{fx:110,fy:594,r:2.8,c:'#eaf6ff',name:'Algenib',bayer:'γ Peg'},
+   pg4:{fx:466,fy:615,r:2.8,c:'#eaf6ff',name:'Markab',bayer:'α Peg'},
    pg5:{fx:554,fy:282,r:2.8,c:'#eaf6ff'},
    pg6:{fx:700,fy:210,r:2.8,c:'#eaf6ff'},
    pg7:{fx:532,fy:414,r:2.8,c:'#eaf6ff'},
@@ -733,7 +737,7 @@ var GEOMETRY=[
    pg11:{fx:560,fy:675,r:2.8,c:'#eaf6ff'},
    pg12:{fx:587,fy:700,r:2.8,c:'#eaf6ff'},
    pg13:{fx:758,fy:790,r:2.8,c:'#eaf6ff'},
-   pg14:{fx:889,fy:696,r:4.0,c:'#eaf6ff'}
+   pg14:{fx:889,fy:696,r:4.0,c:'#eaf6ff',name:'Enif',bayer:'ε Peg'}
   },
   lines:[
    ["pg1","pg2"],["pg1","pg3"],["pg3","pg4"],["pg2","pg4"],
@@ -748,9 +752,9 @@ var GEOMETRY=[
    ps1:{fx:852,fy:50,r:2.6,c:'#eaf6ff'},
    ps2:{fx:770,fy:68,r:2.6,c:'#eaf6ff'},
    ps3:{fx:747,fy:133,r:2.6,c:'#eaf6ff'},
-   alpherg:{fx:420,fy:260,r:4.2,c:'#ffe9a0',name:'Alpherg',nx:-1,dy:-10},
+   alpherg:{fx:420,fy:260,r:4.2,c:'#ffe9a0',name:'Alpherg',bayer:'η Psc',nx:-1,dy:-10},
    ps5:{fx:290,fy:300,r:2.6,c:'#eaf6ff'},
-   ps6:{fx:135,fy:350,r:2.9,c:'#eaf6ff'},
+   ps6:{fx:135,fy:350,r:2.9,c:'#eaf6ff',bayer:'β Psc'},
    ps7:{fx:170,fy:365,r:2.2,c:'#dcefff'},
    ps8:{fx:250,fy:375,r:2.4,c:'#dcefff'},
    ps9:{fx:285,fy:400,r:2.4,c:'#dcefff'},
@@ -758,7 +762,7 @@ var GEOMETRY=[
    ps11:{fx:480,fy:570,r:2.6,c:'#eaf6ff'},
    ps12:{fx:580,fy:670,r:2.4,c:'#dcefff'},
    ps13:{fx:620,fy:750,r:2.4,c:'#dcefff'},
-   ps14:{fx:712,fy:855,r:3.2,c:'#eaf6ff'},
+   ps14:{fx:712,fy:855,r:3.2,c:'#eaf6ff',name:'Alrescha',bayer:'α Psc'},
    ps15:{fx:778,fy:886,r:3.0,c:'#eaf6ff'},
    ps16:{fx:780,fy:986,r:3.2,c:'#eaf6ff'},
    ps17:{fx:704,fy:984,r:3.2,c:'#eaf6ff'},
@@ -776,15 +780,15 @@ var GEOMETRY=[
      Label Capella dipindah ke bintang kanan (ex-mahassim) sesuai chart referensi.
      Koordinat SEMUA bintang tetap — posisi rasi + join Elnath↔Taurus utuh. */
   stars:{
-   au1:{fx:315,fy:113,r:3.2,c:'#eaf6ff'},
+   au1:{fx:315,fy:113,r:3.2,c:'#eaf6ff',name:'Prijipati'},
    menkalinan:{fx:306,fy:404,r:3.2,c:'#eaf6ff',name:'Menkalinan'},
    capella:{fx:490,fy:365,r:4.5,c:'#ffe9a0',name:'Capella',nx:1,dy:-12},
-   au4:{fx:557,fy:407,r:2.8,c:'#eaf6ff'},
-   au5:{fx:542,fy:501,r:2.8,c:'#eaf6ff'},
-   au6:{fx:570,fy:492,r:2.8,c:'#eaf6ff'},
-   almaaz:{fx:299,fy:646,r:3.2,c:'#eaf6ff',name:'Almaaz'},
-   haedus:{fx:609,fy:749,r:3.2,c:'#eaf6ff',name:'Haedus'},
-   elnath:{fx:469,fy:915,r:3.4,c:'#eaf6ff'}
+   au4:{fx:557,fy:407,r:2.8,c:'#eaf6ff',name:'Almaaz'},
+   au5:{fx:542,fy:501,r:2.8,c:'#eaf6ff',name:'Haedus'},
+   au6:{fx:570,fy:492,r:2.8,c:'#eaf6ff',name:'Saclateni'},
+   almaaz:{fx:299,fy:646,r:3.2,c:'#eaf6ff',name:'Mahasim'},
+   haedus:{fx:609,fy:749,r:3.2,c:'#eaf6ff',name:'Hassaleh'},
+   elnath:{fx:469,fy:915,r:3.4,c:'#eaf6ff',name:'Elnath'}
   },
   lines:[
    ["au1","menkalinan"],["au1","capella"],["menkalinan","capella"],
@@ -796,8 +800,8 @@ var GEOMETRY=[
   stars:{
    procyon:{fx:263,fy:620,r:4.5,c:'#e8f0ff',name:'Procyon',nx:1,dy:12},
    gomeisa:{fx:705,fy:227,r:3.8,c:'#eaf6ff',name:'Gomeisa'},
-   cm3:{fx:673,fy:143,r:2.6,c:'#dcefff'},
-   cm4:{fx:799,fy:80,r:2.6,c:'#dcefff'}
+   cm3:{fx:673,fy:143,r:2.6,c:'#dcefff',bayer:'γ CMi'},
+   cm4:{fx:799,fy:80,r:2.6,c:'#dcefff',bayer:'ε CMi'}
   },
   lines:[["procyon","gomeisa"]]},
 ];
@@ -869,63 +873,135 @@ function audioFiles(){
 var PHYS={VIS:550e-9,UV:300e-9,IR:2.2e-6,VEGA_T:9600,NEUTRAL_T:9500};
 var STAR_PHYS={
   /* WINTER */
-  'taurus.aldebaran':{spt:'K5 III',teff:3900},
-  'orion.betel':{spt:'M1-2 Ia-ab',teff:3600},
-  'orion.rigel':{spt:'B8 Ia',teff:12100},
-  'gemini.g2':{spt:'A1 V',teff:10300},
-  'gemini.g9':{spt:'K0 III',teff:4700},
-  'pleiades.pleione':{spt:'B8 Vne',teff:12000},
-  'canis.sirius':{spt:'A1 V',teff:9900},
-  'auriga.capella':{spt:'G3 III',teff:5200},
-  'canmin.procyon':{spt:'F5 IV-V',teff:6500},
+  'taurus.aldebaran':{spt:'K5 III',teff:3900,dist:65,mag:0.85,ra:'04h 35m',dec:'+16°30′'},
+  'orion.betel':{spt:'M1-2 Ia-ab',teff:3600,dist:642,mag:0.5,ra:'05h 55m',dec:'+07°24′'},
+  'orion.rigel':{spt:'B8 Ia',teff:12100,dist:860,mag:0.13,ra:'05h 14m',dec:'−08°12′'},
+  'gemini.g2':{spt:'A1 V',teff:10300,dist:51,mag:1.58,ra:'07h 34m',dec:'+31°53′'},
+  'gemini.g9':{spt:'K0 III',teff:4700,dist:34,mag:1.14,ra:'07h 45m',dec:'+28°01′'},
+  'pleiades.pleione':{spt:'B8 Vne',teff:12000,dist:380,mag:5.05,ra:'03h 49m',dec:'+24°08′'},
+  'canis.sirius':{spt:'A1 V',teff:9900,dist:8.6,mag:-1.46,ra:'06h 45m',dec:'−16°42′'},
+  'auriga.capella':{spt:'G3 III',teff:5200,dist:43,mag:0.08,ra:'05h 16m',dec:'+45°59′'},
+  'canmin.procyon':{spt:'F5 IV-V',teff:6500,dist:11.5,mag:0.34,ra:'07h 39m',dec:'+05°13′'},
   /* SPRING */
-  'ursa.alioth':{spt:'A0p (Cr)',teff:9400},
-  'hydra.alphard':{spt:'K3 II-III',teff:4100},
-  'bootes.arcturus':{spt:'K1.5 III',teff:4300},
-  'leo.l5':{spt:'A3 V',teff:8500},
-  'virgo.spica':{spt:'B1 III-IV',teff:22400},
-  'leo.regulus':{spt:'B8 IVn',teff:12500},
+  'ursa.alioth':{spt:'A0p (Cr)',teff:9400,dist:83,mag:1.77,ra:'12h 54m',dec:'+55°57′'},
+  'hydra.alphard':{spt:'K3 II-III',teff:4100,dist:177,mag:1.98,ra:'09h 27m',dec:'−08°39′'},
+  'bootes.arcturus':{spt:'K1.5 III',teff:4300,dist:37,mag:-0.05,ra:'14h 15m',dec:'+19°10′'},
+  'leo.l5':{spt:'A3 V',teff:8500,dist:36,mag:2.14,ra:'11h 49m',dec:'+14°34′'},
+  'virgo.spica':{spt:'B1 III-IV',teff:22400,dist:250,mag:0.98,ra:'13h 25m',dec:'−11°09′'},
+  'leo.regulus':{spt:'B8 IVn',teff:12500,dist:79,mag:1.4,ra:'10h 08m',dec:'+11°58′'},
   /* SUMMER */
-  'aquila.aq2':{spt:'A7 V',teff:7700},
-  'lyra.y2':{spt:'A0 V',teff:9600},
-  'cygnus.c1':{spt:'A2 Ia',teff:8500},
-  'scorpius.antares':{spt:'M1.5 Iab-Ib',teff:3600},
-  'sagit.s14':{spt:'B2.5 V',teff:18800},
-  'ophiuchus.o4':{spt:'A5 III',teff:8000},
+  'aquila.aq2':{spt:'A7 V',teff:7700,dist:16.7,mag:0.76,ra:'19h 50m',dec:'+08°52′'},
+  'lyra.y2':{spt:'A0 V',teff:9600,dist:25,mag:0.03,ra:'18h 36m',dec:'+38°47′'},
+  'cygnus.c1':{spt:'A2 Ia',teff:8500,dist:2615,mag:1.25,ra:'20h 41m',dec:'+45°16′'},
+  'scorpius.antares':{spt:'M1.5 Iab-Ib',teff:3600,dist:550,mag:1.06,ra:'16h 29m',dec:'−26°25′'},
+  'sagit.s14':{spt:'B2.5 V',teff:18800,dist:228,mag:2.05,ra:'18h 55m',dec:'−26°17′'},
+  'ophiuchus.o4':{spt:'A5 III',teff:8000,dist:47,mag:2.08,ra:'17h 34m',dec:'+12°33′'},
   /* AUTUMN */
-  'pegasus.pg1':{spt:'B8 IVp',teff:13800},
-  'cassiopeia.k4':{spt:'K0 II-III',teff:4500},
-  'pisces.alpherg':{spt:'G7 IIIa',teff:4900},
-  'aries.a2':{spt:'K2 III',teff:4500},
-  'perseus.p9':{spt:'B8 V',teff:12600},
+  'pegasus.pg1':{spt:'B8 IVp',teff:13800,dist:97,mag:2.06,ra:'00h 08m',dec:'+29°05′'},
+  'cassiopeia.k4':{spt:'K0 II-III',teff:4500,dist:228,mag:2.24,ra:'00h 40m',dec:'+56°32′'},
+  'pisces.alpherg':{spt:'G7 IIIa',teff:4900,dist:350,mag:3.62,ra:'01h 31m',dec:'+15°20′'},
+  'aries.a2':{spt:'K2 III',teff:4500,dist:66,mag:2.01,ra:'02h 07m',dec:'+23°27′'},
+  'perseus.p9':{spt:'B8 V',teff:12600,dist:90,mag:2.12,ra:'03h 08m',dec:'+40°57′'},
   /* Tabel B: bintang bernama di canvas (belum di katalog) */
-  'orion.alnitak':{spt:'O9.5 Ib',teff:29500},
-  'orion.alnilam':{spt:'B0 Ia',teff:27000},
-  'orion.mintaka':{spt:'O9.5 II',teff:29500},
-  'orion.saiph':{spt:'B0.5 Ia',teff:26500},
-  'canis.wezen':{spt:'F8 Ia',teff:6000},
-  'taurus.elnath':{spt:'B7 III',teff:13600},  /* bintang yang sama dengan auriga.elnath */
-  'auriga.elnath':{spt:'B7 III',teff:13600},
-  'scorpius.shaula':{spt:'B2 IV',teff:25000},
-  'canmin.gomeisa':{spt:'B8 Ve',teff:12000},
-  'auriga.menkalinan':{spt:'A2 IV',teff:9200},
-  'auriga.almaaz':{spt:'F0 Iab',teff:7000},
-  'auriga.haedus':{spt:'B3 V',teff:17000},
-  'bootes.nekkar':{spt:'G8 III',teff:4900},
-  'bootes.seginus':{spt:'A7 III',teff:7700},
-  'bootes.princeps':{spt:'G8 III',teff:4900},
-  'bootes.izar':{spt:'K0 II-III',teff:4700},
-  'bootes.muphrid':{spt:'G0 IV',teff:6000},
-  'ursa.alkaid':{spt:'B3 V',teff:16000},
-  'ursa.mizar':{spt:'A2 V',teff:9000},
-  'ursa.megrez':{spt:'A3 V',teff:9000},
-  'leo.l4':{spt:'K1 III',teff:4500}
+  'orion.alnitak':{spt:'O9.5 II',teff:29500,dist:1200,mag:2.2,ra:'05h 32m',dec:'−00°18′'},   /* key alnitak = posisi BARAT sabuk = Mintaka (nama ditukar mengikuti posisi; key dibiarkan) */
+  'orion.alnilam':{spt:'B0 Ia',teff:27000,dist:2000,mag:1.69,ra:'05h 36m',dec:'−01°12′'},
+  'orion.mintaka':{spt:'O9.5 Ib',teff:29500,dist:1260,mag:1.77,ra:'05h 40m',dec:'−01°56′'},   /* key mintaka = posisi TIMUR sabuk = Alnitak */
+  'orion.saiph':{spt:'B0.5 Ia',teff:26500,dist:720,mag:2.06,ra:'05h 47m',dec:'−09°40′'},
+  'canis.wezen':{spt:'F8 Ia',teff:6000,dist:1800,mag:1.83,ra:'07h 08m',dec:'−26°23′'},
+  'taurus.elnath':{spt:'B7 III',teff:13600,dist:134,mag:1.65,ra:'05h 26m',dec:'+28°36′'},  /* bintang yang sama dengan auriga.elnath */
+  'auriga.elnath':{spt:'B7 III',teff:13600,dist:134,mag:1.65,ra:'05h 26m',dec:'+28°36′'},
+  'scorpius.shaula':{spt:'B2 IV',teff:25000,dist:570,mag:1.62,ra:'17h 33m',dec:'−37°06′'},
+  'canmin.gomeisa':{spt:'B8 Ve',teff:12000,dist:160,mag:2.89,ra:'07h 27m',dec:'+08°17′'},
+  'auriga.menkalinan':{spt:'A2 IV',teff:9200,dist:81,mag:1.9,ra:'05h 59m',dec:'+44°56′'},
+  'auriga.au4':{spt:'F0 Iab',teff:7000,dist:2000,mag:3,ra:'05h 01m',dec:'+43°49′'},       /* Almaaz (epsilon Aur); key 'almaaz' sekarang = Mahasim, belum ada data */
+  'auriga.au5':{spt:'B3 V',teff:17000,dist:243,mag:3.18,ra:'05h 06m',dec:'+41°14′'},         /* Haedus (eta Aur); key 'haedus' sekarang = Hassaleh, belum ada data */
+  'bootes.nekkar':{spt:'G8 III',teff:4900,dist:225,mag:3.5,ra:'15h 01m',dec:'+40°23′'},
+  'bootes.seginus':{spt:'A7 III',teff:7700,dist:87,mag:3.04,ra:'14h 32m',dec:'+38°18′'},
+  'bootes.princeps':{spt:'G8 III',teff:4900,dist:121,mag:3.46,ra:'15h 15m',dec:'+33°18′'},
+  'bootes.izar':{spt:'K0 II-III',teff:4700,dist:210,mag:2.37,ra:'14h 44m',dec:'+27°04′'},
+  'bootes.muphrid':{spt:'G0 IV',teff:6000,dist:37,mag:2.68,ra:'13h 54m',dec:'+18°23′'},
+  'ursa.alkaid':{spt:'B3 V',teff:16000,dist:104,mag:1.86,ra:'13h 47m',dec:'+49°18′'},
+  'ursa.mizar':{spt:'A2 V',teff:9000,dist:83,mag:2.23,ra:'13h 23m',dec:'+54°55′'},
+  'ursa.megrez':{spt:'A3 V',teff:9000,dist:81,mag:3.3,ra:'12h 15m',dec:'+57°01′'},
+  'leo.l4':{spt:'K1 III',teff:4500,dist:130,mag:2.08,ra:'10h 19m',dec:'+19°50′'},
+  /* --- tambahan bintang bernama (SIMBAD/Wikipedia) --- */
+  'orion.o7':{spt:'O9 III',teff:36000,dist:1100,mag:3.39,ra:'05h 35m',dec:'+09°56′'},       /* Meissa */
+  'orion.o8':{spt:'B2 III',teff:22000,dist:250,mag:1.64,ra:'05h 25m',dec:'+06°20′'},       /* Bellatrix */
+  'orion.o11':{spt:'F6 V',teff:6500,dist:26,mag:3.19,ra:'04h 49m',dec:'+06°57′'},         /* Tabit */
+  'canis.cm1':{spt:'B2.5 V',teff:18000,dist:500,mag:4.11,ra:'07h 03m',dec:'−15°37′'},      /* Muliphein */
+  'canis.cm6':{spt:'B5 Ia',teff:14000,dist:2000,mag:2.45,ra:'07h 24m',dec:'−29°18′'},       /* Aludra */
+  'canis.cm10':{spt:'B5 V',teff:15500,dist:1210,mag:3.49,ra:'07h 01m',dec:'−27°56′'},       /* Unurgunite */
+  'canis.cm12':{spt:'B2 II',teff:22900,dist:430,mag:1.5,ra:'06h 58m',dec:'−28°58′'},      /* Adhara */
+  'canis.cm14':{spt:'B1 II-III',teff:25500,dist:490,mag:1.98,ra:'06h 22m',dec:'−17°57′'},  /* Mirzam */
+  'canis.cm16':{spt:'B5 V',teff:16000,dist:360,mag:3.02,ra:'06h 20m',dec:'−30°03′'},       /* Furud */
+  'taurus.t2':{spt:'B3 V',teff:18000,dist:400,mag:4.27,ra:'04h 42m',dec:'+22°57′'},        /* Gaja (τ Tau) */
+  'taurus.t3':{spt:'B2 III',teff:21000,dist:417,mag:2.97,ra:'05h 37m',dec:'+21°08′'},      /* Tianguan (ζ Tau) */
+  'taurus.t4':{spt:'K3 III',teff:4500,dist:155,mag:3.53,ra:'04h 28m',dec:'+19°10′'},       /* Ain (ε Tau) */
+  'taurus.t5':{spt:'A7 III',teff:7800,dist:153,mag:3.76,ra:'04h 22m',dec:'+17°32′'},       /* Secunda Hyadum */
+  'taurus.t7':{spt:'A7 V',teff:7800,dist:149,mag:3.4,ra:'04h 28m',dec:'+15°52′'},         /* Chamukuy */
+  'taurus.t8':{spt:'G9.5 III',teff:4800,dist:154,mag:3.65,ra:'04h 19m',dec:'+15°37′'},     /* Prima Hyadum */
+  'taurus.t9':{spt:'B3 V',teff:18000,dist:370,mag:3.41,ra:'04h 00m',dec:'+12°29′'},        /* Bibing (λ Tau) */
+  'gemini.g5':{spt:'M2 III',teff:3500,dist:60,mag:3.31,ra:'06h 14m',dec:'+22°30′'},       /* Propus */
+  'gemini.g6':{spt:'G8 Ib',teff:4600,dist:900,mag:3.06,ra:'06h 43m',dec:'+25°07′'},        /* Mebsuta */
+  'gemini.g7':{spt:'M3 III',teff:3600,dist:190,mag:2.87,ra:'06h 22m',dec:'+22°30′'},       /* Tejat */
+  'gemini.g13':{spt:'G0 Ib',teff:5500,dist:1200,mag:3.79,ra:'07h 04m',dec:'+20°34′'},    /* Mekbuda */
+  'gemini.g14':{spt:'F2 V',teff:6900,dist:59,mag:3.5,ra:'07h 20m',dec:'+21°58′'},        /* Wasat */
+  'gemini.g15':{spt:'A1 IV',teff:9200,dist:109,mag:1.93,ra:'06h 37m',dec:'+16°23′'},       /* Alhena */
+  'gemini.g17':{spt:'F5 IV-V',teff:6480,dist:57,mag:3.35,ra:'06h 45m',dec:'+12°53′'},     /* Alzirr */
+  'auriga.au1':{spt:'K0 IIIb',teff:4780,dist:141,mag:3.72,ra:'05h 59m',dec:'+54°17′'},     /* Prijipati */
+  'auriga.au6':{spt:'K5 II',teff:3960,dist:790,mag:3.69,ra:'05h 02m',dec:'+41°04′'},       /* Saclateni */
+  'auriga.almaaz':{spt:'A0pSi',teff:10300,dist:166,mag:2.69,ra:'05h 59m',dec:'+37°12′'},   /* Mahasim */
+  'auriga.haedus':{spt:'K3 II',teff:4160,dist:350,mag:3.75,ra:'05h 05m',dec:'+41°14′'},    /* Hassaleh */
+  /* Named stars batch — kelas + suhu (katalog standar) */
+  'virgo.v1':{spt:'G8 III',teff:5080,dist:102,mag:2.85,ra:'13h 02m',dec:'+10°57′'},       /* Vindemiatrix */
+  'virgo.v2':{spt:'M3 III',teff:3600,dist:198,mag:3.39,ra:'12h 55m',dec:'+03°23′'},        /* Auva */
+  'virgo.v3':{spt:'F0 V',teff:6750,dist:38,mag:2.74,ra:'12h 41m',dec:'−01°26′'},          /* Porrima */
+  'virgo.v4':{spt:'A2 V',teff:8900,dist:250,mag:3.89,ra:'12h 19m',dec:'−00°40′'},          /* Zaniah */
+  'virgo.v5':{spt:'F9 V',teff:6050,dist:36,mag:3.59,ra:'11h 50m',dec:'+01°45′'},          /* Zavijava */
+  'virgo.v6':{spt:'A3 V',teff:8500,dist:74,mag:3.38,ra:'13h 34m',dec:'−00°35′'},          /* Heze */
+  'scorpius.topmost':{spt:'B0.5 V',teff:25000,dist:404,mag:2.56,ra:'16h 05m',dec:'−19°48′'}, /* Acrab */
+  'scorpius.midRight':{spt:'B0.3 IV',teff:27000,dist:400,mag:2.29,ra:'16h 00m',dec:'−22°37′'}, /* Dschubba */
+  'scorpius.bm2':{spt:'F0 II',teff:7200,dist:300,mag:1.86,ra:'17h 37m',dec:'−42°59′'},     /* Sargas */
+  'scorpius.tiny':{spt:'B1.5 III',teff:23000,dist:460,mag:2.39,ra:'17h 42m',dec:'−39°01′'}, /* Girtab */
+  'scorpius.small':{spt:'B2 IV',teff:22000,dist:580,mag:2.7,ra:'17h 30m',dec:'−37°17′'},  /* Lesath */
+  'ursa.u5':{spt:'A0 Ve',teff:9500,dist:83,mag:2.41,ra:'11h 53m',dec:'+53°41′'},          /* Phecda */
+  'ursa.u6':{spt:'A1 V',teff:9500,dist:79,mag:2.34,ra:'11h 01m',dec:'+56°22′'},           /* Merak */
+  'ursa.u7':{spt:'K0 III',teff:4700,dist:123,mag:1.79,ra:'11h 03m',dec:'+61°45′'},         /* Dubhe */
+  'leo.l1':{spt:'G1 II',teff:5400,dist:247,mag:2.97,ra:'09h 45m',dec:'+23°46′'},           /* Algenubi */
+  'leo.l2':{spt:'K2 III',teff:4500,dist:124,mag:3.88,ra:'09h 52m',dec:'+26°00′'},          /* Rasalas */
+  'leo.l3':{spt:'F0 III',teff:7000,dist:274,mag:3.43,ra:'10h 16m',dec:'+23°25′'},          /* Adhafera */
+  'leo.l8':{spt:'A4 V',teff:8400,dist:165,mag:3.33,ra:'11h 14m',dec:'+15°25′'},            /* Chertan */
+  'leo.l9':{spt:'A4 V',teff:8400,dist:58,mag:2.56,ra:'11h 14m',dec:'+20°31′'},            /* Zosma */
+  'sagit.s9':{spt:'K3 III',teff:4200,dist:306,mag:2.72,ra:'18h 20m',dec:'−29°49′'},        /* Kaus Media */
+  'sagit.s10':{spt:'K1 III',teff:4500,dist:77,mag:2.82,ra:'18h 27m',dec:'−25°25′'},       /* Kaus Borealis */
+  'sagit.s13':{spt:'K0 III',teff:4700,dist:96,mag:2.98,ra:'18h 05m',dec:'−30°25′'},       /* Alnasl */
+  'sagit.s16':{spt:'B9.5 III',teff:10000,dist:143,mag:1.79,ra:'18h 24m',dec:'−34°23′'},    /* Kaus Australis */
+  'sagit.s18':{spt:'A2.5 Va',teff:8900,dist:89,mag:2.6,ra:'19h 02m',dec:'−29°52′'},      /* Ascella */
+  'lyra.y5':{spt:'B7 V',teff:13000,dist:960,mag:3.52,ra:'18h 50m',dec:'+33°21′'},          /* Sheliak */
+  'lyra.y6':{spt:'B9 III',teff:10500,dist:620,mag:3.25,ra:'18h 58m',dec:'+32°41′'},        /* Sulafat */
+  'cygnus.c5':{spt:'F8 Ib',teff:6100,dist:1800,mag:2.23,ra:'20h 22m',dec:'+40°15′'},        /* Sadr */
+  'cygnus.c6':{spt:'K0 III',teff:4700,dist:72,mag:2.48,ra:'20h 46m',dec:'+33°58′'},       /* Gienah */
+  'cygnus.c10':{spt:'K3 II',teff:4100,dist:430,mag:3.08,ra:'19h 30m',dec:'+27°57′'},       /* Albireo A */
+  'ophiuchus.o6':{spt:'K2 III',teff:4500,dist:82,mag:2.76,ra:'17h 43m',dec:'+04°34′'},    /* Cebalrai */
+  'ophiuchus.o8':{spt:'M0.5 III',teff:3700,dist:171,mag:2.73,ra:'16h 14m',dec:'−03°41′'},  /* Yed Prior */
+  'ophiuchus.o12':{spt:'G9.5 III',teff:4800,dist:108,mag:3.23,ra:'16h 18m',dec:'−04°41′'}, /* Yed Posterior */
+  'ophiuchus.o13':{spt:'A2.5 Va',teff:8900,dist:88,mag:2.43,ra:'17h 10m',dec:'−15°43′'},  /* Sabik */
+  'cassiopeia.k1':{spt:'F2 III-IV',teff:6700,dist:54,mag:2.28,ra:'00h 09m',dec:'+59°08′'}, /* Caph */
+  'cassiopeia.k2':{spt:'A5 V',teff:8300,dist:99,mag:2.66,ra:'01h 25m',dec:'+60°14′'},     /* Ruchbah */
+  'cassiopeia.k3':{spt:'B0.5 IVe',teff:25000,dist:550,mag:2.15,ra:'00h 56m',dec:'+60°43′'}, /* Navi */
+  'cassiopeia.k5':{spt:'B3 III',teff:18000,dist:440,mag:3.35,ra:'01h 54m',dec:'+63°40′'},  /* Segin */
+  'perseus.p3':{spt:'F5 Ib',teff:6350,dist:510,mag:1.79,ra:'03h 24m',dec:'+49°51′'},       /* Mirfak */
+  'aries.a3':{spt:'A5 V',teff:8300,dist:60,mag:2.64,ra:'01h 54m',dec:'+20°48′'},          /* Sheratan */
+  'aquila.aq1':{spt:'K3 II',teff:4100,dist:395,mag:2.72,ra:'19h 46m',dec:'+10°36′'},       /* Tarazed */
+  'aquila.aq3':{spt:'G8 IV',teff:5100,dist:45,mag:3.71,ra:'19h 55m',dec:'+06°24′'},       /* Alshain */
+  'aquila.aq5':{spt:'B9 Vn',teff:10500,dist:83,mag:2.99,ra:'19h 05m',dec:'+13°51′'},      /* Okab */
+  'pegasus.pg2':{spt:'M2.5 II-III',teff:3700,dist:196,mag:2.44,ra:'23h 03m',dec:'+28°04′'}, /* Scheat */
+  'pegasus.pg3':{spt:'B2 IV',teff:21000,dist:390,mag:2.83,ra:'00h 13m',dec:'+15°11′'},     /* Algenib */
+  'pegasus.pg4':{spt:'A0 IV',teff:9700,dist:133,mag:2.49,ra:'23h 04m',dec:'+15°12′'},      /* Markab */
+  'pegasus.pg14':{spt:'K2 Ib',teff:4400,dist:690,mag:2.38,ra:'21h 44m',dec:'+09°52′'},     /* Enif */
+  'pisces.ps14':{spt:'A0p SiSrHg',teff:9500,dist:139,mag:3.82,ra:'02h 02m',dec:'+02°45′'}  /* Alrescha */
 };
-  /* BELUM bisa dipakai (titik belum dinamai di GEOMETRY / rasi belum ada) — isi key-nya setelah bintangnya dinamai (Tahap 2, langkah 8):
-       Cor Caroli: spt 'A0p', teff 11500
-       Markab: spt 'B9 III', teff 10000
-       Scheat: spt 'M2.5 II-III', teff 3700
-       Algenib: spt 'B2 IV', teff 21000 */
+  /* BELUM: Cor Caroli (rasi Canes Venatici belum di GEOMETRY) */
 /* PL_PHYS: bintang bernama klaster Pleiades (selain Pleione, yang tetap di STAR_PHYS). Key = nama huruf kecil.
    Dipisah dari STAR_PHYS karena titik klaster non-SFX tidak ada di GEOMETRY (check-sky akan menolak). Tipe spektral dicek ke SIMBAD (Alcyone, Electra, Atlas, Maia, Merope, Taygeta); Teff perkiraan. */
 var PL_PHYS={
@@ -949,7 +1025,7 @@ function bandShift(T,band){
 /* fisik satu titik: {spt,teff,known}. Tanpa entri -> Teff netral, known:false. */
 function physOf(cons,key){
   var p=STAR_PHYS[cons+'.'+key];
-  return p?{spt:p.spt,teff:p.teff,known:true}:{spt:null,teff:PHYS.NEUTRAL_T,known:false};
+  return p?{spt:p.spt,teff:p.teff,dist:p.dist||null,mag:p.mag!=null?p.mag:null,ra:p.ra||null,dec:p.dec||null,known:true}:{spt:null,teff:PHYS.NEUTRAL_T,dist:null,mag:null,ra:null,dec:null,known:false};
 }
 /* fisik bintang acuan sebuah rasi (null kalau rasi tidak punya acuan) */
 function consPhys(id){var k=CONS_REF[id],p=k&&STAR_PHYS[k];return p?{spt:p.spt,teff:p.teff,key:k}:null;}
