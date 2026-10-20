@@ -327,7 +327,7 @@ window.__applyLayOV=function(){
   document.body.classList.add('layout-edit');
 
   var LS_KEY='obs_layout_v3';
-  var sel=null,drag=null,rs=null,hud=null,info=null,ring=null,preview=false,collapsed=false,stepI=1,rq=0,dropped=false,grp=false;
+  var sel=null,drag=null,rs=null,hud=null,info=null,ring=null,preview=false,collapsed=false,stepI=1,rq=0,dropped=false,grp=false,HIS=[],hi=-1,hFlag=false;
   var ST=[6,16,40],RT=[.5,2,5],SCF=[.01,.03,.08];
   window.__layOV=window.__layOV||{};
   try{localStorage.removeItem('obs_layout_v2');}catch(e0){}
@@ -378,7 +378,7 @@ window.__applyLayOV=function(){
      Catatan: kotak batas rasi (c.minx/miny/bw/bh) DIKUNCI selama edit supaya bintang lain tidak ikut bergeser; setelah data ditempel ke sky-data.js
      dan dimuat ulang, kotak batas dihitung ulang dari data baru. fx/fy itu koordinat peta referensi (bukan 0..1). */
   var STAR_LS='obs_layout_stars_v1',STAR_ORIG={},STAR_BASE='';
-  var stOpen=false,stKey=null,stCid=null,stDrag=null,stPanel=null,stRing=null;
+  var stOnly=false,stOpen=false,stKey=null,stCid=null,stDrag=null,stPanel=null,stRing=null;
   function rnd1(n){return Math.round(n*10)/10;}
   function fmtN(v){return String(Math.round(v*100)/100);}   /* fx/fy: apa adanya sampai 2 desimal (data asli bisa 283 atau 283.5) */
   function fmtR(v){return (Math.round(v*100)/100).toFixed(2).replace(/0$/,'');}   /* r: 2.23 / 2.2 / 2.0 seperti di sky-data.js */
@@ -461,18 +461,43 @@ window.__applyLayOV=function(){
     return !!cons(sel);
   }
   function stNum(v){return typeof v==='number'?fmtN(v):'';}
+  function stUnkN(c){var n=0,k;for(k in c.stars)if(!c.stars[k].name)n++;return n;}
+  function stCount(){var c=cons(stCid),el=document.getElementById('lay-sc');if(!c||!el)return;el.textContent=stUnkN(c)+'/'+Object.keys(c.stars).length+' ???';}
   function stRender(){
     var c=cons(stCid);if(!c||!stPanel)return;
-    var ks=Object.keys(c.stars),h='<div class="sh"><b>BINTANG · '+stEsc(stCid.toUpperCase())+' · '+ks.length+'</b><span class="g"></span><button data-sa="copy">COPY RASI</button><button data-sa="copyd">COPY UBAHAN</button><button data-sa="rstc">RESET</button><button data-sa="x">✕</button></div><div class="sl">';
+    var ks=Object.keys(c.stars),rows='',h;
     ks.forEach(function(k){
       var s=c.stars[k];
-      h+='<div class="sr'+(k===stKey?' on':'')+(stChanged(stCid,k,s)?' ch':'')+'" data-k="'+stEsc(k)+'"><div class="sk">'+stEsc(k)+'</div>'
-        +'<input class="sn" data-f="name" placeholder="???" value="'+stEsc(s.name||'')+'">'
+      if(stOnly&&s.name&&k!==stKey)return;
+      rows+='<div class="sr'+(k===stKey?' on':'')+(stChanged(stCid,k,s)?' ch':'')+'" data-k="'+stEsc(k)+'"><div class="sk">'+stEsc(k)+'</div>'
+        +'<input class="sn" data-f="name" placeholder="???" autocomplete="off" autocapitalize="words" enterkeyhint="next" value="'+stEsc(s.name||'')+'">'
         +'<input data-f="fx" type="number" step="1" inputmode="decimal" value="'+stNum(s.fx)+'">'
         +'<input data-f="fy" type="number" step="1" inputmode="decimal" value="'+stNum(s.fy)+'">'
         +'<input data-f="r" type="number" step="0.1" inputmode="decimal" value="'+stNum(s.r)+'"></div>';
     });
-    stPanel.innerHTML=h+'</div>';
+    if(!rows)rows='<div class="se">semua bintang rasi ini sudah bernama \u2713</div>';
+    h='<div class="sh"><b>\u2605 '+stEsc(stCid.toUpperCase())+'</b><span class="sc" id="lay-sc"></span><span class="g"></span>'
+      +'<button data-sa="only" class="'+(stOnly?'on':'')+'" title="Tampilkan hanya bintang tanpa nama">???</button>'
+      +'<button data-sa="unk" title="Lompat ke bintang ??? berikutnya">\u203a???</button>'
+      +'<button data-sa="copy" title="Copy semua bintang rasi ini">COPY</button>'
+      +'<button data-sa="copyd" title="Copy hanya baris yang berubah">\u0394</button>'
+      +'<button data-sa="rstc" title="Kembalikan rasi ini ke data sky-data.js">RST</button>'
+      +'<button data-sa="x" title="Tutup">\u2715</button></div><div class="sl">'+rows+'</div>';
+    stPanel.innerHTML=h;stCount();
+  }
+  function stNextUnk(focus){
+    var c=cons(stCid);if(!c)return;
+    var ks=Object.keys(c.stars),n=ks.length,i0=ks.indexOf(stKey),i,k;
+    for(i=1;i<=n;i++){
+      k=ks[((i0+i)%n+n)%n];
+      if(!c.stars[k].name){
+        if(stOnly)stRender();
+        stSelect(k,true);
+        if(focus){var row=stRow(k),inp=row&&row.querySelector('.sn');if(inp)inp.focus();}
+        return;
+      }
+    }
+    toast('SEMUA BINTANG SUDAH BERNAMA');
   }
   function stRow(k){return stPanel&&stPanel.querySelector('.sr[data-k="'+k+'"]');}
   function stSync(k){   /* perbarui kolom satu baris tanpa merusak fokus */
@@ -499,12 +524,12 @@ window.__applyLayOV=function(){
       else if(f==='fx'){s.fx=rnd1(v);s.rx=s.fx;}
       else{s.fy=rnd1(v);s.ry=s.fy;}
     }
-    refresh();stSync(k);
+    hMark();refresh();stSync(k);stCount();
   }
   function stNudge(a){
     var c=cons(stCid),s=c&&c.stars[stKey];if(!s)return;
     var st=ST[stepI]/3,d=screenStep(a==='l'?-st:a==='r'?st:0,a==='u'?-st:a==='d'?st:0);
-    stMove(s,stDelta(c,d[0],d[1]));refresh();stSync(stKey);
+    stMove(s,stDelta(c,d[0],d[1]));hMark();refresh();stSync(stKey);
   }
   function stHit(cx,cy){
     var c=cons(stCid);if(!c)return null;
@@ -512,7 +537,7 @@ window.__applyLayOV=function(){
     for(k in c.stars){s=c.stars[k];p=w2c(s.x,s.y);dx=p[0]-cx;dy=p[1]-cy;dd=dx*dx+dy*dy;if(dd<bd){bd=dd;best=k;}}
     return best;
   }
-  function stPos(){if(!stPanel||!hud)return;var r=hud.getBoundingClientRect();stPanel.style.bottom=Math.round(innerHeight-r.top+6)+'px';}
+  function stPos(){if(!stPanel||!hud)return;var r=hud.getBoundingClientRect();stPanel.style.bottom=Math.round(innerHeight-r.top+4)+'px';}
   function paintStarRing(){
     if(!stRing)return;
     if(stOpen&&stCid!==sel){
@@ -541,13 +566,15 @@ window.__applyLayOV=function(){
   }
   function stAct(a){
     if(a==='x'){stClose();updateInfo();return;}
+    if(a==='only'){stOnly=!stOnly;stRender();return;}
+    if(a==='unk'){stNextUnk(true);return;}
     if(a==='copy'){stCopy(stExport(false),'COPIED ✓ blok bintang '+stCid);return;}
     if(a==='copyd'){stCopy(stExport(true),'COPIED ✓ ubahan bintang');return;}
     if(a==='rstc'){
       if(!confirm('Kembalikan semua bintang rasi '+stCid+' ke data sky-data.js?'))return;
       var c=cons(stCid);if(!c)return;
       Object.keys(c.stars).forEach(function(k){var o=STAR_ORIG[stCid]&&STAR_ORIG[stCid][k];if(o)stApply(c.stars[k],o);});
-      stRender();refresh();toast('RASI '+stCid+' DIKEMBALIKAN');
+      stRender();hMark();refresh();toast('RASI '+stCid+' DIKEMBALIKAN');
     }
   }
   function buildStars(){
@@ -560,6 +587,12 @@ window.__applyLayOV=function(){
       stSet(row.getAttribute('data-k'),f,t.value);
     });
     stPanel.addEventListener('focusin',function(e){var row=e.target.closest&&e.target.closest('.sr');if(row&&row.getAttribute('data-k')!==stKey)stSelect(row.getAttribute('data-k'),false);});
+    stPanel.addEventListener('keydown',function(e){
+      if(e.key!=='Enter')return;
+      var t=e.target,row=t&&t.closest&&t.closest('.sr');
+      if(!t||!row||t.getAttribute('data-f')!=='name')return;
+      e.preventDefault();stSet(row.getAttribute('data-k'),'name',t.value);stNextUnk(true);
+    });
     stPanel.addEventListener('click',function(e){
       var b=e.target.closest&&e.target.closest('[data-sa]');
       if(b){e.stopPropagation();stAct(b.getAttribute('data-sa'));return;}
@@ -578,6 +611,49 @@ window.__applyLayOV=function(){
   }
   function autosave(){try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));}catch(e){}saveStars();}
   function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));toast('SAVED ✓');}catch(e){toast('SAVE GAGAL');}}
+
+  /* ---- UNDO / REDO: tiap aksi edit (geser, ukuran, putar, grup, bintang) = satu langkah ---- */
+  function hMark(){hFlag=true;}
+  function hState(){return JSON.stringify({s:snapshot(),t:stEdits().ed});}
+  function hCommit(){
+    var t=hState();
+    if(hi>=0&&HIS[hi]===t)return;
+    HIS.length=hi+1;HIS.push(t);
+    if(HIS.length>120){HIS.shift();}
+    hi=HIS.length-1;hBtn();
+  }
+  function hBtn(){
+    if(!hud)return;
+    var u=hud.querySelector('[data-a=undo]'),r=hud.querySelector('[data-a=redo]');
+    if(u)u.disabled=hi<=0;if(r)r.disabled=hi>=HIS.length-1;
+  }
+  function applySnap(d){
+    window.__layOV=d.ov?JSON.parse(JSON.stringify(d.ov)):{};
+    if(d.fit&&d.fit.length===4)window.__scnBounds=d.fit.slice();
+    SKY.rasi.forEach(function(r){
+      var s=d.scene&&d.scene[r.id];if(!s)return;
+      if(s.scene&&r.scene){r.scene.k=s.scene.k;r.scene.th=s.scene.th;r.scene.at=s.scene.at.slice();if(s.scene.pv)r.scene.pv=s.scene.pv.slice();}
+      if(s.ple&&r.ple){r.ple.at=s.ple.at.slice();if(typeof s.ple.ps==='number')r.ple.ps=s.ple.ps;}
+    });
+  }
+  function applyStars(ed){
+    CONS.forEach(function(c){var o=STAR_ORIG[c.id];if(!o)return;Object.keys(c.stars).forEach(function(k){if(o[k])stApply(c.stars[k],o[k]);});});
+    Object.keys(ed||{}).forEach(function(cid){var c=cons(cid);if(!c)return;Object.keys(ed[cid]).forEach(function(k){var s=c.stars[k];if(s)stApply(s,ed[cid][k]);});});
+  }
+  function hGo(d){
+    var j=hi+d;
+    if(j<0||j>=HIS.length){toast(d<0?'TIDAK ADA YANG DI-UNDO':'TIDAK ADA YANG DI-REDO');return;}
+    hi=j;
+    var o=JSON.parse(HIS[hi]);
+    applySnap(o.s);applyStars(o.t);
+    if(stOpen){var c=cons(stCid);if(stKey&&!(c&&c.stars[stKey]))stKey=null;stRender();}
+    hBtn();hFlag=false;refresh();toast((d<0?'UNDO':'REDO')+' \u2713  '+(hi)+'/'+(HIS.length-1));
+  }
+  function closeMenu(){var m=document.getElementById('lay-menu');if(m)m.classList.remove('open');}
+  function goHome(){   /* keluar mode layout -> situs live (draft tetap tersimpan) */
+    try{autosave();localStorage.removeItem('obs_layout_on');}catch(e){}
+    location.href=location.pathname;
+  }
 
   function exportText(){
     var L=[],b=window.__scnBounds;
@@ -598,21 +674,22 @@ window.__applyLayOV=function(){
 
   function toast(msg){
     if(!info)return;
-    info.textContent=msg;info.style.color='#fff';
-    clearTimeout(toast._t);toast._t=setTimeout(function(){if(info)info.style.color='';updateInfo();},1500);
+    info.textContent=msg;info.style.color='#fff';toast._u=Date.now()+1500;
+    clearTimeout(toast._t);toast._t=setTimeout(function(){toast._u=0;if(info)info.style.color='';updateInfo();},1500);
   }
   function updateInfo(){
     if(!info)return;
-    if(stOpen&&stKey&&sel&&sel!=='*'){var sc=cons(stCid),ss=sc&&sc.stars[stKey];if(ss){info.textContent=stCid+' · '+stKey+(ss.name?' '+ss.name:' ???')+' · fx='+stNum(ss.fx)+' fy='+stNum(ss.fy)+' r='+stNum(ss.r)+' · ←↑↓→ geser bintang';return;}}
+    if(Date.now()<(toast._u||0))return;   /* toast lagi tampil: jangan ditimpa */
+    if(stOpen&&stKey&&sel&&sel!=='*'){var sc=cons(stCid),ss=sc&&sc.stars[stKey];if(ss){info.textContent=stCid+' \u00b7 '+stKey+' '+(ss.name||'???')+' \u00b7 fx'+stNum(ss.fx)+' fy'+stNum(ss.fy)+' r'+stNum(ss.r);return;}}
     var sec=SECT.cur?SECT.cur.k.toUpperCase():'OVERVIEW';
-    if(!SECT.cur){info.textContent='OVERVIEW · tap ikon sektor buat masuk';return;}
-    if(sel==='*'){info.textContent='GRUP '+sec+' · '+sectorIds().length+' rasi · geser = pindah semua · ◢ = ukuran · ↺↻ −+';return;}
-    if(!sel){info.textContent=sec+' · tap rasi lalu geser · tarik ◢ = ukuran'+(dropped?' · draft lama dibuang (sky-data berubah)':'');return;}
+    if(!SECT.cur){info.textContent='OVERVIEW \u00b7 tap sektor untuk masuk';return;}
+    if(sel==='*'){info.textContent='GRUP '+sec+' \u00b7 '+sectorIds().length+' rasi \u00b7 geser = semua';return;}
+    if(!sel){info.textContent=sec+' \u00b7 tap rasi'+(dropped?' \u00b7 draft lama dibuang':'');return;}
     var r=SKY.rasiBy[sel],t;
-    if(r.scene)t='k='+rnd(r.scene.k)+' th='+rnd(r.scene.th)+' at='+r.scene.at.map(rnd);
-    else if(r.ple)t='ps='+rnd(r.ple.ps)+' at='+r.ple.at.map(rnd);
-    else{var o=getOV(sel);t='ox='+rnd(o.ox)+' oy='+rnd(o.oy)+' k='+rnd(o.k)+' th='+rnd(o.th);}
-    info.textContent=sec+' · '+sel+' · '+t;
+    if(r.scene)t='k'+rnd(r.scene.k)+' \u03b8'+rnd(r.scene.th)+' @'+r.scene.at.map(rnd);
+    else if(r.ple)t='ps'+rnd(r.ple.ps)+' @'+r.ple.at.map(rnd);
+    else{var o=getOV(sel);t='x'+rnd(o.ox)+' y'+rnd(o.oy)+' k'+rnd(o.k)+' \u03b8'+rnd(o.th);}
+    info.textContent=sec+' \u00b7 '+sel+' \u00b7 '+t;
   }
 
   /* ---- koordinat: client (layar) <-> world (ruang layout) — ikut stage-rotate, zoom sektor, pan ---- */
@@ -719,7 +796,7 @@ window.__applyLayOV=function(){
   }
   function refresh(){
     if(rq)return;
-    rq=requestAnimationFrame(function(){rq=0;try{layout();}catch(e){console.warn(e);}updateInfo();paintSel();autosave();});
+    rq=requestAnimationFrame(function(){rq=0;try{layout();}catch(e){console.warn(e);}updateInfo();paintSel();autosave();if(hFlag){hFlag=false;hCommit();}});
   }
   function screenStep(dcx,dcy){ /* geser sebesar (dcx,dcy) px LAYAR, diterjemahkan ke world */
     var a=v2w(innerWidth/2,innerHeight/2),b=v2w(innerWidth/2+dcx,innerHeight/2+dcy);
@@ -739,6 +816,11 @@ window.__applyLayOV=function(){
   }
 
   function act(a){
+    if(a!=='menu')closeMenu();
+    if(a==='home'){goHome();return;}
+    if(a==='menu'){var mn=document.getElementById('lay-menu');if(mn)mn.classList.toggle('open');return;}
+    if(a==='undo'){hGo(-1);return;}
+    if(a==='redo'){hGo(1);return;}
     if(a==='edit'||a==='preview'){setPreview(a==='preview'?true:false);return;}
     if(a==='save'){save();return;}
     if(a==='stars'){stToggle();return;}
@@ -748,14 +830,14 @@ window.__applyLayOV=function(){
       else prompt('Copy:',t);
       console.log('[layout export]\n'+t);return;
     }
-    if(a==='fit'){window.__scnRefit=true;refresh();toast('FIT ULANG dari anchor');return;}
+    if(a==='fit'){window.__scnRefit=true;hMark();refresh();toast('FIT ULANG dari anchor');return;}
     if(a==='rst'){
       if(!confirm('Buang draft layout & muat ulang dari sky-data.js?'))return;
       try{localStorage.removeItem(LS_KEY);localStorage.removeItem(STAR_LS);}catch(e){}
       window.__layOV={};window.__scnBounds=null;location.reload();return;
     }
     if(a==='collapse'){collapsed=!collapsed;hud.classList.toggle('col',collapsed);stPos();return;}
-    if(a==='step'){stepI=(stepI+1)%3;var sb=hud.querySelector('[data-a=step]');if(sb)sb.textContent='STEP '+(stepI+1);return;}
+    if(a==='step'){stepI=(stepI+1)%3;var sb=hud.querySelector('[data-a=step]');if(sb)sb.textContent='S'+(stepI+1);return;}
     if(a==='ovw'){if(SECT.cur&&!SECT.busy){sel=null;sectToggle();}else toast(SECT.cur?'TUNGGU ANIMASI':'SUDAH DI OVERVIEW');return;}
     if(a==='grp'){
       grp=!grp;sel=grp?'*':null;
@@ -773,7 +855,7 @@ window.__applyLayOV=function(){
     if(stOpen&&stKey&&(a==='l'||a==='r'||a==='u'||a==='d')){stNudge(a);return;}   /* panel bintang terbuka + bintang terpilih: panah menggeser bintang */
     if(a==='l'||a==='r'||a==='u'||a==='d'){
       var s=ST[stepI],d=screenStep(a==='l'?-s:a==='r'?s:0,a==='u'?-s:a==='d'?s:0);
-      moveW(sel,d[0],d[1]);refresh();return;
+      moveW(sel,d[0],d[1]);hMark();refresh();return;
     }
     if(sel==='*'){
       var sn0=gSnap();
@@ -781,61 +863,111 @@ window.__applyLayOV=function(){
       else if(a==='rotr')gApply(sn0,1,RT[stepI],0,0);
       else if(a==='zoout')gApply(sn0,1-SCF[stepI]*2,0,0,0);
       else if(a==='zoin')gApply(sn0,1+SCF[stepI]*2,0,0,0);
-      refresh();return;
+      hMark();refresh();return;
     }
-    if(a==='rotl'){rotateBy(sel,-RT[stepI]);refresh();return;}
-    if(a==='rotr'){rotateBy(sel,RT[stepI]);refresh();return;}
-    if(a==='zoout'){setScale(sel,getScale(sel)*(1-SCF[stepI]*2));refresh();return;}
-    if(a==='zoin'){setScale(sel,getScale(sel)*(1+SCF[stepI]*2));refresh();return;}
+    if(a==='rotl'){rotateBy(sel,-RT[stepI]);hMark();refresh();return;}
+    if(a==='rotr'){rotateBy(sel,RT[stepI]);hMark();refresh();return;}
+    if(a==='zoout'){setScale(sel,getScale(sel)*(1-SCF[stepI]*2));hMark();refresh();return;}
+    if(a==='zoin'){setScale(sel,getScale(sel)*(1+SCF[stepI]*2));hMark();refresh();return;}
   }
 
+  window.__layBack=function(){if(SECT.cur&&!SECT.busy){sel=null;try{updateInfo();paintSel();}catch(e){}sectToggle();}};
   function inUI(e){return e.target&&e.target.closest&&e.target.closest('#lay-hud,#lay-fab,#lay-stars');}
 
   function build(){
     if(hud)return;
     var css=[
-      '#lay-hud{position:fixed;left:6px;right:6px;bottom:calc(6px + env(safe-area-inset-bottom,0px));z-index:99999;font:11px/1.3 "Courier New",monospace;color:#cfeffa;background:rgba(2,8,13,.94);border:1px solid rgba(110,229,255,.35);border-radius:8px;padding:6px;box-shadow:0 0 14px rgba(0,0,0,.55);touch-action:manipulation}',
-      '#lay-hud .r{display:flex;gap:4px;margin-top:4px;align-items:stretch}',
-      '#lay-hud .r:first-child{margin-top:0}',
-      '#lay-hud #lay-info{flex:1;min-height:28px;font-size:10px;color:rgba(207,239,250,.9);overflow:hidden;word-break:break-all;display:flex;align-items:center}',
-      '#lay-hud button,#lay-fab{min-height:34px;padding:2px 8px;border:1px solid rgba(110,229,255,.4);border-radius:5px;background:rgba(110,229,255,.08);color:#6ee5ff;font:700 12px "Courier New",monospace;-webkit-tap-highlight-color:transparent}',
+      /* ===== dock: 2 baris ikon, transparan, nggak menutupi langit ===== */
+      '#lay-hud{position:fixed;left:0;right:0;margin:0 auto;bottom:calc(6px + env(safe-area-inset-bottom,0px));width:min(calc(100vw - 12px),348px);box-sizing:border-box;z-index:99999;font:10px/1.2 Courier New,monospace;color:#cfeffa;background:rgba(2,8,13,.8);border:1px solid rgba(110,229,255,.28);border-radius:8px;padding:3px;touch-action:manipulation}',
+      '#lay-hud #lay-info{font-size:9px;height:12px;line-height:12px;color:rgba(207,239,250,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px 2px}',
+      '#lay-hud .rw{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}',
+      '#lay-hud .rw+.rw{margin-top:3px}',
+      '#lay-hud button,#lay-fab{height:30px;min-width:0;padding:0;display:grid;place-items:center;border:1px solid rgba(110,229,255,.32);border-radius:5px;background:rgba(110,229,255,.07);color:#6ee5ff;font:700 10px Courier New,monospace;-webkit-tap-highlight-color:transparent}',
+      '#lay-hud button svg,#lay-fab svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}',
       '#lay-hud button:active,#lay-fab:active{background:rgba(110,229,255,.3)}',
-      '#lay-hud .g{flex:1}',
-      '#lay-hud .a{border-color:rgba(255,154,217,.6);color:#ff9ad9}',
+      '#lay-hud button:disabled{opacity:.28}',
+      '#lay-hud .a{border-color:rgba(255,154,217,.55);color:#ff9ad9}',
+      '#lay-hud .p{border-color:rgba(130,255,170,.55);color:#8dffb0}',
       '#lay-hud .on{background:rgba(255,154,217,.35);color:#fff}',
-      '#lay-hud .p{border-color:rgba(130,255,170,.6);color:#8dffb0}',
-      '#lay-hud.col .r:not(:first-child){display:none}',
-      '#lay-fab{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;z-index:99999;display:none;background:rgba(2,8,13,.85);min-height:32px}',
+      '#lay-hud.col [data-a=collapse] svg{transform:rotate(180deg)}',
+      '#lay-menu{display:none;position:absolute;right:0;bottom:calc(100% + 4px);flex-direction:column;gap:3px;padding:4px;background:rgba(2,8,13,.96);border:1px solid rgba(110,229,255,.3);border-radius:8px}',
+      '#lay-menu.open{display:flex}',
+      '#lay-hud #lay-menu button{height:28px;padding:0 14px;display:block;text-align:left;white-space:nowrap}',
+      /* ciut: sisa ikon penting saja */
+      '#lay-hud.col{width:fit-content;max-width:calc(100vw - 12px)}',
+      '#lay-hud.col #lay-info,#lay-hud.col .ra{display:none}',
+      '#lay-hud.col .rn{display:flex}',
+      '#lay-hud.col .rn button:not(.k){display:none}',
+      '#lay-hud.col .rn button.k{width:30px}',
+      '#lay-fab{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;z-index:99999;display:none;width:auto;padding:0 9px;line-height:28px;background:rgba(2,8,13,.85)}',
       '#lay-sel{position:fixed;pointer-events:none;z-index:99990;border:1.5px dashed rgba(110,229,255,.85);border-radius:4px;box-shadow:0 0 10px rgba(110,229,255,.25);display:none}',
       '#lay-hdl{position:absolute;right:-14px;bottom:-14px;width:32px;height:32px;pointer-events:auto;touch-action:none;display:flex;align-items:flex-end;justify-content:flex-end;color:#6ee5ff;font-size:20px;line-height:1}',
       '#lay-hdl i{display:block;width:22px;height:22px;background:rgba(2,8,13,.9);border:1.5px solid #6ee5ff;border-radius:5px;text-align:center;font-style:normal;font-size:14px;line-height:21px}',
-      '#lay-stars{position:fixed;left:6px;right:6px;bottom:150px;z-index:99998;max-height:min(44vh,330px);display:none;flex-direction:column;font:11px/1.3 \"Courier New\",monospace;color:#cfeffa;background:rgba(2,8,13,.96);border:1px solid rgba(110,229,255,.35);border-radius:8px;padding:6px}',
-      '#lay-stars .sh{display:flex;gap:4px;align-items:center;flex:0 0 auto;margin-bottom:5px}',
-      '#lay-stars .sh b{font-size:10px;color:#6ee5ff;letter-spacing:.06em;white-space:nowrap}',
+      /* ===== panel bintang: kompak, daftar bisa discroll ===== */
+      '#lay-stars{position:fixed;left:0;right:0;margin:0 auto;width:min(calc(100vw - 12px),348px);box-sizing:border-box;bottom:110px;z-index:99998;max-height:min(30vh,200px);display:none;flex-direction:column;font:10px/1.2 Courier New,monospace;color:#cfeffa;background:rgba(2,8,13,.88);border:1px solid rgba(110,229,255,.3);border-radius:8px;padding:3px}',
+      '#lay-stars .sh{display:flex;gap:3px;align-items:center;flex:0 0 auto;margin-bottom:3px}',
+      '#lay-stars .sh b{font-size:10px;color:#6ee5ff;letter-spacing:.05em;white-space:nowrap}',
+      '#lay-stars .sh .sc{font-size:9px;color:#ff9ad9;white-space:nowrap;margin-left:2px}',
       '#lay-stars .sh .g{flex:1}',
-      '#lay-stars .sh button{min-height:28px;padding:2px 7px;border:1px solid rgba(255,154,217,.55);border-radius:5px;background:rgba(255,154,217,.08);color:#ff9ad9;font:700 10px \"Courier New\",monospace;-webkit-tap-highlight-color:transparent}',
+      '#lay-stars .sh button{height:22px;min-width:22px;padding:0 5px;border:1px solid rgba(255,154,217,.5);border-radius:4px;background:rgba(255,154,217,.07);color:#ff9ad9;font:700 9px Courier New,monospace;-webkit-tap-highlight-color:transparent}',
+      '#lay-stars .sh button.on{background:rgba(255,154,217,.35);color:#fff}',
       '#lay-stars .sl{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}',
-      '#lay-stars .sr{display:grid;grid-template-columns:34px 1fr 54px 54px 40px;gap:4px;align-items:center;padding:3px 2px;border-bottom:1px solid rgba(110,229,255,.08)}',
+      '#lay-stars .se{padding:8px 4px;font-size:9px;color:rgba(207,239,250,.6)}',
+      '#lay-stars .sr{display:grid;grid-template-columns:30px minmax(0,1fr) 44px 44px 32px;gap:3px;align-items:center;padding:2px 1px;border-bottom:1px solid rgba(110,229,255,.07)}',
       '#lay-stars .sr.on{background:rgba(255,154,217,.18)}',
       '#lay-stars .sr.ch .sk{color:#8dffb0}',
-      '#lay-stars .sk{font-size:10px;color:rgba(207,239,250,.7);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '#lay-stars input{width:100%;min-width:0;box-sizing:border-box;height:28px;padding:0 4px;border:1px solid rgba(110,229,255,.3);border-radius:4px;background:rgba(110,229,255,.06);color:#eafcff;font:11px \"Courier New\",monospace;-webkit-appearance:none;appearance:none}',
-      '#lay-stars input.sn{text-transform:none}',
+      '#lay-stars .sk{font-size:9px;color:rgba(207,239,250,.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '#lay-stars input{width:100%;min-width:0;box-sizing:border-box;height:24px;padding:0 3px;border:1px solid rgba(110,229,255,.28);border-radius:4px;background:rgba(110,229,255,.06);color:#eafcff;font:10px Courier New,monospace;-webkit-appearance:none;appearance:none;-moz-appearance:textfield}',
+      '#lay-stars input::-webkit-inner-spin-button,#lay-stars input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}',
+      '#lay-stars input.sn::placeholder{color:#ff9ad9;opacity:.75}',
       '#lay-stars input:focus{outline:1px solid #ff9ad9}',
       '#lay-star-ring{position:fixed;width:28px;height:28px;box-sizing:border-box;border:2px solid #ff9ad9;border-radius:50%;pointer-events:none;z-index:99991;display:none;box-shadow:0 0 10px rgba(255,154,217,.6)}',
+      /* ===== HP landscape: dock jadi kolom di tepi kanan, panel bintang di kiri ===== */
+      '@media (orientation:landscape) and (max-height:560px){',
+      '#lay-hud{left:auto;right:calc(6px + env(safe-area-inset-right,0px));bottom:6px;margin:0;width:auto;display:grid;grid-template-columns:repeat(4,30px);gap:3px;max-height:calc(100vh - 12px)}',
+      '#lay-hud .rw{display:contents}',
+      '#lay-hud .rw+.rw{margin:0}',
+      '#lay-hud #lay-info{position:fixed;left:8px;bottom:6px;right:auto;max-width:48vw;height:auto;padding:2px 6px;background:rgba(2,8,13,.7);border-radius:4px;pointer-events:none}',
+      '#lay-hud #lay-menu{right:calc(100% + 4px);bottom:0}',
+      '#lay-hud.col{display:flex}',
+      '#lay-stars{left:6px;right:auto;margin:0;width:min(52vw,340px);bottom:30px!important;max-height:calc(100vh - 60px)}',
+      '}',
       'body.layout-edit,body.layout-edit canvas{touch-action:none}',
-      /* sembunyikan fitur yang bentrok, TAPI biarkan 🛰️ (kembali ke overview) tetap ada */
-      'body.layout-edit #mode-observe,body.layout-edit #mode-camera,body.layout-edit #mode-bh,body.layout-edit #cam-cluster,body.layout-edit #obs-btn,body.layout-edit #cam-btn,body.layout-edit #music-player,body.layout-edit #zoom-cluster,body.layout-edit .mp-wrap,body.layout-edit #owl-source,body.layout-edit #cf-bar,body.layout-edit #cam-whisper,body.layout-edit [id$="-fx"]{display:none!important;pointer-events:none!important}',
-      'body.layout-edit #bh,body.layout-edit #cap-bh{pointer-events:none!important}',
-      'body.layout-edit #mode-sectors{display:flex!important;pointer-events:auto!important}'
+      /* sembunyikan panel/tombol live yang nggak relevan buat edit (header, portal sektor, langit tetap sama seperti live) */
+      'body.layout-edit #mode-cluster,body.layout-edit #mode-sectors,body.layout-edit #mode-observe,body.layout-edit #mode-camera,body.layout-edit #mode-bh,body.layout-edit #cam-cluster,body.layout-edit #obs-btn,body.layout-edit #cam-btn,body.layout-edit #music-player,body.layout-edit #zoom-cluster,body.layout-edit .mp-wrap,body.layout-edit #owl-source,body.layout-edit #cf-bar,body.layout-edit #cam-whisper,body.layout-edit [id$="-fx"]{display:none!important;pointer-events:none!important}',
+      'body.layout-edit #bh,body.layout-edit #cap-bh{pointer-events:none!important}'
     ].join('');
     var st=document.createElement('style');st.id='lay-style';st.textContent=css;document.head.appendChild(st);
     hud=document.createElement('div');hud.id='lay-hud';
+    function ic(d,w){return '<svg viewBox="0 0 24 24" aria-hidden="true"'+(w?' style="stroke-width:'+w+'"':'')+'><path d="'+d+'"/></svg>';}
+    function B(a,d,cls,title,w){return '<button type="button" data-a="'+a+'"'+(cls?' class="'+cls+'"':'')+' title="'+title+'" aria-label="'+title+'">'+ic(d,w)+'</button>';}
     hud.innerHTML=
-      '<div class="r"><div id="lay-info"></div><button data-a="collapse" title="ciutkan">▾</button></div>'+
-      '<div class="r"><button class="p g" data-a="preview"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M2 12 C5 6.5 8.5 5 12 5 s7 1.5 10 7 c-3 5.5 -6.5 7 -10 7 S5 17.5 2 12 Z"/><circle cx="12" cy="12" r="3"/></svg>PREVIEW</button><button class="g" data-a="ovw"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="3.6" transform="rotate(-25 12 12)"/></svg>OVERVIEW</button><button data-a="grp" title="Edit semua rasi di sektor sekaligus">◫ GRUP</button><button data-a="prev">‹</button><button data-a="next">›</button></div>'+
-      '<div class="r"><button data-a="l">←</button><button data-a="u">↑</button><button data-a="d">↓</button><button data-a="r">→</button><button data-a="rotl">↺</button><button data-a="rotr">↻</button><button data-a="zoout">−</button><button data-a="zoin">+</button><button data-a="step">STEP 2</button></div>'+
-      '<div class="r"><button class="a g" data-a="save">SAVE</button><button class="a g" data-a="copy">COPY</button><button class="g" data-a="fit">FIT</button><button class="g" data-a="rst">RST</button><button class="p g" data-a="stars">★ BINTANG</button></div>';
+      '<div id="lay-info"></div>'+
+      '<div class="rw rn">'+
+        B('home','M3.5 11 L12 4 L20.5 11 M5.5 9.5 V20 H10 V14 H14 V20 H18.5 V9.5','','Home: keluar mode layout (draft tersimpan)')+
+        B('ovw','M8 12 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 M2 12 C2 9.5 6.5 7.5 12 7.5 S22 9.5 22 12 S17.5 16.5 12 16.5 S2 14.5 2 12','k','Overview (keluar sektor)')+
+        B('prev','M15 5 L8 12 L15 19','','Rasi sebelumnya')+
+        B('next','M9 5 L16 12 L9 19','','Rasi berikutnya')+
+        B('grp','M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z','','Edit grup: semua rasi di sektor')+
+        B('stars','M12 3.5 L14.6 9.3 L21 10 L16.2 14.3 L17.6 20.6 L12 17.4 L6.4 20.6 L7.8 14.3 L3 10 L9.4 9.3 Z','p','Editor bintang')+
+        B('preview','M2 12 C5 6.5 8.5 5 12 5 s7 1.5 10 7 c-3 5.5 -6.5 7 -10 7 S5 17.5 2 12 Z M9.2 12 a2.8 2.8 0 1 0 5.6 0 a2.8 2.8 0 1 0 -5.6 0','p k','Preview tanpa panel')+
+        B('undo','M9 14 L4 9 L9 4 M4 9 H15 a5 5 0 0 1 0 10 H8','k','Undo')+
+        B('redo','M15 14 L20 9 L15 4 M20 9 H9 a5 5 0 0 0 0 10 H16','k','Redo')+
+        B('collapse','M6 9 L12 15 L18 9','k','Ciutkan / buka dock')+
+      '</div>'+
+      '<div class="rw ra">'+
+        B('l','M19 12 H5 M11 6 L5 12 L11 18','','Geser kiri')+
+        B('u','M12 19 V5 M6 11 L12 5 L18 11','','Geser atas')+
+        B('d','M12 5 V19 M6 13 L12 19 L18 13','','Geser bawah')+
+        B('r','M5 12 H19 M13 6 L19 12 L13 18','','Geser kanan')+
+        B('rotl','M4 12 a8 8 0 1 0 3 -6 M4 4 V9 H9','','Putar kiri')+
+        B('rotr','M20 12 a8 8 0 1 1 -3 -6 M20 4 V9 H15','','Putar kanan')+
+        B('zoout','M5 12 H19','','Perkecil')+
+        B('zoin','M5 12 H19 M12 5 V19','','Perbesar')+
+        '<button type="button" data-a="step" title="Besar langkah (S1 kecil, S3 besar)">S2</button>'+
+        B('menu','M5 12 h.01 M12 12 h.01 M19 12 h.01','a','Menu: save / copy / fit / reset',3.4)+
+      '</div>'+
+      '<div id="lay-menu"><button type="button" data-a="save" class="a">SAVE</button><button type="button" data-a="copy" class="a">COPY</button><button type="button" data-a="fit">FIT ULANG</button><button type="button" data-a="rst">RESET DRAFT</button></div>';
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
     var fab=document.createElement('button');fab.id='lay-fab';fab.type='button';fab.setAttribute('data-a','edit');fab.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M4 20 l1 -4.5 L16.5 4 a2 2 0 0 1 3 3 L8 18.5 Z"/><path d="M14.5 6 l3 3"/></svg>EDIT';document.body.appendChild(fab);
@@ -890,7 +1022,7 @@ window.__applyLayOV=function(){
       e.stopImmediatePropagation();e.preventDefault();
     },opt());
     function end(e){
-      if(rs||drag||stDrag){autosave();updateInfo();e&&e.stopImmediatePropagation&&e.stopImmediatePropagation();}
+      if(rs||drag||stDrag){hMark();refresh();autosave();updateInfo();e&&e.stopImmediatePropagation&&e.stopImmediatePropagation();}
       rs=null;drag=null;stDrag=null;
     }
     window.addEventListener('pointerup',end,opt());
@@ -898,8 +1030,8 @@ window.__applyLayOV=function(){
     window.addEventListener('beforeunload',autosave);
     window.addEventListener('resize',function(){setTimeout(paintSel,200);});
     setInterval(function(){if(sel&&!preview&&!drag&&!rs)paintSel();},500);
-    updateInfo();
-    console.log('[layout editor v4] preview + overview + handle resize');
+    hCommit();hBtn();updateInfo();
+    console.log('[layout editor v5] dock ringkas + undo/redo + bantu isi bintang ???');
   }
 
   function waitReady(){
@@ -1083,7 +1215,10 @@ var EXITP=(function(){
   function has(id,c){var e=el(id);return !!(e&&e.classList.contains(c));}
   function layers(){   /* semua lapisan aktif, paling atas dulu: {f:penutup, w:jumlah guard yang dimiliki} */
     var L=[];
-    if(typeof isLayoutEdit==='function'&&isLayoutEdit())return L;   /* layout editor (dev): jangan ikut campur */
+    if(typeof isLayoutEdit==='function'&&isLayoutEdit()){   /* layout editor: back = keluar sektor ke overview (sama seperti live), selain itu jangan ikut campur */
+      try{if(SECT.busy)L.push({f:function(){},w:1});else if(SECT.cur)L.push({f:function(){if(typeof window.__layBack==='function')window.__layBack();else sectToggle();},w:1});}catch(eL){}
+      return L;
+    }
     try{
       if(EXITP.isOpen())L.push({f:EXITP.stay,w:0});   /* panel pamitan: back = tutup (tinggal); guard-nya milik layer root di bawah */
       if(LIS&&LIS.ui&&!LIS.ui.hidden)L.push({f:lisCancel,w:(SECT.cur||SECT.busy)?0:1});   /* kartu ajak/tinggal: di dalam sektor muncul DARI back (sektor→overview) jadi nggak punya guard sendiri (guard sektor dipakai ulang); di overview (tap portal) dia lapisan sendiri */
