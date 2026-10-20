@@ -994,7 +994,7 @@ function catEntries(cid){
     c=cons(cid);if(!c)return out;
     for(k in c.stars){st=c.stars[k];out.push({key:k,name:st.name||null,r:st.r,st:st,sfx:m[cid+'.'+k]});}
   }
-  out.forEach(function(e,i){var p=SKY.physOf(cid,e.key);e.spt=p.known?p.spt:null;e.teff=p.known?p.teff:null;e.i=i;});
+  out.forEach(function(e,i){var p=SKY.physOf(cid,e.key);e.spt=p.known?p.spt:null;e.teff=p.known?p.teff:null;e.dist=p.known?p.dist:null;e.mag=p.known?p.mag:null;e.ra=p.known?p.ra:null;e.dec=p.known?p.dec:null;e.i=i;});
   out.sort(function(a,b){return (b.name?1:0)-(a.name?1:0)||b.r-a.r||a.i-b.i;});
   return out;
 }
@@ -1131,9 +1131,9 @@ function catRenderDetail(e){
   rows.push([T('cat.class'),e.spt||'???']);
   rows.push([T('cat.temp'),e.teff?e.teff+' K':'???']);
   rows.push([T('cat.uvir'),e.teff?catShift(SKY.bandShift(e.teff,'uv'))+' / '+catShift(SKY.bandShift(e.teff,'ir')):'???']);
-  rows.push([T('cat.dist'),d&&d.dist?catEsc(d.dist):'???']);
-  rows.push([T('cat.mag'),d&&d.mag?catEsc(d.mag):'???']);
-  if(d&&d.ra)rows.push([T('cat.radec'),catEsc(d.ra)+' \u00b7 '+catEsc(d.dec||'')]);
+  rows.push([T('cat.dist'),e.dist?e.dist+' LY':'???']);
+  rows.push([T('cat.mag'),e.mag!=null?e.mag.toFixed(2):'???']);
+  if(e.ra)rows.push([T('cat.radec'),catEsc(e.ra)+' \u00b7 '+catEsc(e.dec||'')]);
   h='<div class="cc-hd"><button type="button" class="cc-back">\u2039 '+T('cat.back')+'</button><button type="button" class="cc-x" aria-label="'+T('cat.close')+'">\u2715</button></div><div class="cc-body">'
    +'<div class="cc-tag">'+catEsc(catConsName())+' \u00b7 '+T('cat.locked')+'</div><div class="cc-name">'+(e.name?catEsc(e.name):'???')+'</div><div class="cc-rows">';
   for(var i=0;i<rows.length;i++)h+='<b>'+rows[i][0]+'</b><span>'+rows[i][1]+'</span>';

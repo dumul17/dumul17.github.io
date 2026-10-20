@@ -387,11 +387,14 @@ window.__applyLayOV=function(){
     if(typeof e.fx==='number'){s.fx=e.fx;s.rx=e.fx;}
     if(typeof e.fy==='number'){s.fy=e.fy;s.ry=e.fy;}
     if(typeof e.r==='number')s.r=e.r;
-    if('name' in e){if(e.name)s.name=e.name;else delete s.name;}
+    if('name' in e)stSetName(s,e.name);
   }
+  /* nama PROPER vs sebutan Bayer: s.name = label tampil (proper || bayer); s._bo=1 kalau label-nya masih bayer */
+  function stPn(s){return s._bo?'':(s.name||'');}
+  function stSetName(s,nv){nv=nv||'';if(nv){s.name=nv;s._bo=0;}else if(s.bayer){s.name=s.bayer;s._bo=1;}else{delete s.name;s._bo=0;}}
   (function(){
     var h=[];
-    SKY.cons.forEach(function(c){STAR_ORIG[c.id]={};Object.keys(c.stars).forEach(function(k){var s=c.stars[k];STAR_ORIG[c.id][k]={fx:s.fx,fy:s.fy,r:s.r,name:s.name||''};h.push(c.id+'.'+k+'='+s.fx+','+s.fy+','+s.r+','+(s.name||''));});});
+    SKY.cons.forEach(function(c){STAR_ORIG[c.id]={};Object.keys(c.stars).forEach(function(k){var s=c.stars[k];STAR_ORIG[c.id][k]={fx:s.fx,fy:s.fy,r:s.r,name:stPn(s)};h.push(c.id+'.'+k+'='+s.fx+','+s.fy+','+s.r+','+(s.name||''));});});
     STAR_BASE=hash(h.join('|'));
     try{
       var raw=localStorage.getItem(STAR_LS);if(!raw)return;
@@ -400,10 +403,10 @@ window.__applyLayOV=function(){
       Object.keys(d.ed||{}).forEach(function(cid){var c=cons(cid);if(!c)return;Object.keys(d.ed[cid]).forEach(function(k){var s=c.stars[k];if(s)stApply(s,d.ed[cid][k]);});});
     }catch(e){console.warn('stars load',e);}
   })();
-  function stChanged(cid,k,s){var o=STAR_ORIG[cid]&&STAR_ORIG[cid][k];return !o||o.fx!==s.fx||o.fy!==s.fy||o.r!==s.r||o.name!==(s.name||'');}
+  function stChanged(cid,k,s){var o=STAR_ORIG[cid]&&STAR_ORIG[cid][k];return !o||o.fx!==s.fx||o.fy!==s.fy||o.r!==s.r||o.name!==stPn(s);}
   function stEdits(){
     var ed={},n=0;
-    CONS.forEach(function(c){Object.keys(c.stars).forEach(function(k){var s=c.stars[k];if(!stChanged(c.id,k,s))return;(ed[c.id]=ed[c.id]||{})[k]={fx:s.fx,fy:s.fy,r:s.r,name:s.name||''};n++;});});
+    CONS.forEach(function(c){Object.keys(c.stars).forEach(function(k){var s=c.stars[k];if(!stChanged(c.id,k,s))return;(ed[c.id]=ed[c.id]||{})[k]={fx:s.fx,fy:s.fy,r:s.r,name:stPn(s)};n++;});});
     return {ed:ed,n:n};
   }
   function saveStars(){
@@ -412,7 +415,8 @@ window.__applyLayOV=function(){
   function stFmt(k,s,mark){
     var o=['fx:'+fmtN(s.fx),'fy:'+fmtN(s.fy),'r:'+fmtR(s.r)];
     if(s.c!==undefined)o.push("c:'"+s.c+"'");
-    if(s.name)o.push("name:'"+String(s.name).replace(/'/g,"\\'")+"'");
+    if(stPn(s))o.push("name:'"+String(stPn(s)).replace(/'/g,"\\'")+"'");
+    if(s.bayer)o.push("bayer:'"+String(s.bayer).replace(/'/g,"\\'")+"'");
     if(typeof s.nx==='number')o.push('nx:'+s.nx);
     if(typeof s.dy==='number')o.push('dy:'+s.dy);
     if(s.specAfter!==undefined)o.push('specAfter:'+JSON.stringify(s.specAfter));
@@ -488,28 +492,28 @@ window.__applyLayOV=function(){
   };
   function stIauOpts(){
     var c=cons(stCid),used={},sug=IAU_SUG[stCid]||[],h='';
-    if(c)Object.keys(c.stars).forEach(function(k){var n=c.stars[k].name;if(n)used[String(n).toLowerCase()]=1;});
+    if(c)Object.keys(c.stars).forEach(function(k){var n=stPn(c.stars[k]);if(n)used[String(n).toLowerCase()]=1;});
     sug.forEach(function(n){if(!used[n.toLowerCase()])h+='<option value="'+stEsc(n)+'">';});
     return h;
   }
   /* urutan ??? : paling terang (r terbesar) dulu — bintang terang paling mungkin punya nama IAU */
   function stUnkOrder(c){
     var ks=Object.keys(c.stars),idx={};ks.forEach(function(k,i){idx[k]=i;});
-    var u=ks.filter(function(k){return !c.stars[k].name;});
+    var u=ks.filter(function(k){return !stPn(c.stars[k]);});
     u.sort(function(a,b){return (c.stars[b].r-c.stars[a].r)||(idx[a]-idx[b]);});
     return u;
   }
-  function stUnkN(c){var n=0,k;for(k in c.stars)if(!c.stars[k].name)n++;return n;}
+  function stUnkN(c){var n=0,k;for(k in c.stars)if(!stPn(c.stars[k]))n++;return n;}
   function stCount(){var c=cons(stCid),el=document.getElementById('lay-sc');if(!c||!el)return;el.textContent=stUnkN(c)+'/'+Object.keys(c.stars).length+' ???';var dl=document.getElementById('lay-iau');if(dl)dl.innerHTML=stIauOpts();}
   function stRender(){
     var c=cons(stCid);if(!c||!stPanel)return;
     var ks=Object.keys(c.stars),rows='',h;
-    if(stOnly){var uo=stUnkOrder(c);if(stKey&&c.stars[stKey]&&c.stars[stKey].name)uo.unshift(stKey);ks=uo;}
+    if(stOnly){var uo=stUnkOrder(c);if(stKey&&c.stars[stKey]&&stPn(c.stars[stKey]))uo.unshift(stKey);ks=uo;}
     ks.forEach(function(k){
       var s=c.stars[k];
-      if(stOnly&&s.name&&k!==stKey)return;
+      if(stOnly&&stPn(s)&&k!==stKey)return;
       rows+='<div class="sr'+(k===stKey?' on':'')+(stChanged(stCid,k,s)?' ch':'')+'" data-k="'+stEsc(k)+'"><div class="sk">'+stEsc(k)+'</div>'
-        +'<input class="sn" data-f="name" list="lay-iau" placeholder="???" autocomplete="off" autocapitalize="words" enterkeyhint="next" value="'+stEsc(s.name||'')+'">'
+        +'<input class="sn" data-f="name" list="lay-iau" placeholder="'+stEsc(s.bayer||'???')+'" autocomplete="off" autocapitalize="words" enterkeyhint="next" value="'+stEsc(stPn(s))+'">'
         +'<input data-f="fx" type="number" step="1" inputmode="decimal" value="'+stNum(s.fx)+'">'
         +'<input data-f="fy" type="number" step="1" inputmode="decimal" value="'+stNum(s.fy)+'">'
         +'<input data-f="r" type="number" step="0.1" inputmode="decimal" value="'+stNum(s.r)+'"></div>';
@@ -539,7 +543,7 @@ window.__applyLayOV=function(){
     var f,inp,v;
     ['name','fx','fy','r'].forEach(function(f2){
       inp=row.querySelector('[data-f='+f2+']');if(!inp||document.activeElement===inp)return;
-      v=f2==='name'?(s.name||''):stNum(s[f2]);if(inp.value!==v)inp.value=v;
+      v=f2==='name'?stPn(s):stNum(s[f2]);if(inp.value!==v)inp.value=v;
     });
     row.classList.toggle('ch',stChanged(stCid,k,s));
   }
@@ -550,7 +554,7 @@ window.__applyLayOV=function(){
   }
   function stSet(k,f,val){
     var c=cons(stCid),s=c&&c.stars[k];if(!s)return;
-    if(f==='name'){var nv=String(val).replace(/^\s+|\s+$/g,'');if(nv)s.name=nv;else delete s.name;}
+    if(f==='name'){var nv=String(val).replace(/^\s+|\s+$/g,'');stSetName(s,nv);}
     else{
       var v=parseFloat(val);
       if(!isFinite(v)){stSync(k);return;}
@@ -728,7 +732,7 @@ window.__applyLayOV=function(){
   function updateInfo(){
     if(!info)return;
     if(Date.now()<(toast._u||0))return;   /* toast lagi tampil: jangan ditimpa */
-    if(stOpen&&stKey&&sel&&sel!=='*'){var sc=cons(stCid),ss=sc&&sc.stars[stKey];if(ss){info.textContent=stCid+' \u00b7 '+stKey+' '+(ss.name||'???')+' \u00b7 fx'+stNum(ss.fx)+' fy'+stNum(ss.fy)+' r'+stNum(ss.r);return;}}
+    if(stOpen&&stKey&&sel&&sel!=='*'){var sc=cons(stCid),ss=sc&&sc.stars[stKey];if(ss){info.textContent=stCid+' \u00b7 '+stKey+' '+(stPn(ss)||(ss.bayer?'('+ss.bayer+')':'???'))+' \u00b7 fx'+stNum(ss.fx)+' fy'+stNum(ss.fy)+' r'+stNum(ss.r);return;}}
     var sec=SECT.cur?SECT.cur.k.toUpperCase():'OVERVIEW';
     if(!SECT.cur){info.textContent='OVERVIEW \u00b7 tap sektor untuk masuk';return;}
     if(sel==='*'){info.textContent='GRUP '+sec+' \u00b7 '+sectorIds().length+' rasi \u00b7 geser = semua';return;}

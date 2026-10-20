@@ -13,6 +13,7 @@ CONS.forEach(function(c,ci){
   Object.keys(c.stars).forEach(function(k,i){
     var s=c.stars[k];
     if(typeof s.fx==='number'&&typeof s.fy==='number'){s.rx=s.fx;s.ry=s.fy;}else{s.rx=-(s.ra-c.ra0)*Math.cos(s.dec*Math.PI/180);s.ry=-s.dec;}
+    if(!s.name&&s.bayer){s.name=s.bayer;s._bo=1;}   /* cuma punya sebutan Bayer: label = bayer, tapi _bo=1 menandai 'belum bernama proper' (editor ?layout=1) */
     s.rgb=rgb(s.c);s.ph=Math.random()*6.28;s.t0=c.delay+.2;
     s.twinkleSpeed=.00125+Math.random()*.00165;
     s.twinkleDepth=.07+Math.random()*.12;
