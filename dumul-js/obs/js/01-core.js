@@ -997,7 +997,7 @@ function catEntries(cid){
     c=cons(cid);if(!c)return out;
     for(k in c.stars){st=c.stars[k];out.push({key:k,name:st.name||null,r:st.r,st:st,sfx:m[cid+'.'+k]});}
   }
-  out.forEach(function(e,i){var p=SKY.physOf(cid,e.key),q=!p.known&&cid==='pleiades'&&SKY.PL_PHYS&&SKY.PL_PHYS[e.key];if(q)p={spt:q.spt,teff:q.teff,dist:null,mag:null,ra:null,dec:null,known:true};   /* bintang terang Pleiades: kelas+suhu dari PL_PHYS (belum ada jarak/mag/RA-Dec -> unobserved) */
+  out.forEach(function(e,i){var p=SKY.physOf(cid,e.key),q=!p.known&&cid==='pleiades'&&SKY.PL_PHYS&&SKY.PL_PHYS[e.key];if(q)p={spt:q.spt,teff:q.teff,dist:q.dist||null,mag:q.mag!=null?q.mag:null,ra:q.ra||null,dec:q.dec||null,known:true};   /* bintang terang Pleiades: data dari PL_PHYS (kalau field-nya kosong -> unobserved) */
     e.spt=p.known?p.spt:null;e.teff=p.known?p.teff:null;e.dist=p.known?p.dist:null;e.mag=p.known?p.mag:null;e.ra=p.known?p.ra:null;e.dec=p.known?p.dec:null;e.i=i;});
   out.sort(function(a,b){return (b.name?1:0)-(a.name?1:0)||b.r-a.r||a.i-b.i;});
   return out;
