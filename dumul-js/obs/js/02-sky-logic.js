@@ -30,7 +30,7 @@ var CAPS={bh:$('#cap-bh')};SKY.rasi.forEach(function(r){if(r.cap)CAPS[r.id]=$('#
 CONS.forEach(function(c){if(JOIN_LEAD[c.id])c.lead=cons(JOIN_LEAD[c.id]);}); /* rasi gabungan: goyangan ikut rasi 'lead' */
 
 var PORTALS=[
- {id:'band',cons:'orion',stars:['mintaka','alnilam','alnitak'],from:'mintaka',hit:'alnilam',href:'dumul.html',title:'DUMUL',sub:'music \u00b7 Limerence album',col:'110,229,255',place:'fig-right'}
+ {id:'band',cons:'orion',stars:['mintaka','alnilam','alnitak'],from:'mintaka',hit:'alnilam',href:'dumul.html',title:'DUMUL',sub:'music \u00b7 Limerence album',subKey:'portal.sub.band',col:'110,229,255',place:'fig-right'}
 ];
 var TRIGGERS=SKY.TRIGGERS; /* key -> {id,cons,star,rgb}; hanya rasi yang punya SFX */
 
@@ -202,7 +202,7 @@ function renderStellarRecord(){
     row._st=st;
     row.classList.toggle('observed',on);
     var obs=row.querySelector('.mp-obs');
-    if(obs){obs.textContent=on?'\u25cf':'\u25cb';obs.title=on?T('mp.captured'):'Unobserved';}
+    if(obs){obs.textContent=on?'\u25cf':'\u25cb';obs.title=on?T('mp.captured'):T('mp.unobserved');}
   }
   if(typeof achRefresh==='function')achRefresh();   /* log rasi sekarang di sheet 🎮 (cam-ach) */
 }
@@ -524,8 +524,8 @@ function setRadioSilence(on){
     btn.classList.toggle('on',RADIO_SILENCE);
     btn.setAttribute('aria-pressed',RADIO_SILENCE?'true':'false');
     (function(){var on=btn.querySelector('.ico-vol-on'),off=btn.querySelector('.ico-vol-off');if(on)on.hidden=!!RADIO_SILENCE;if(off)off.hidden=!RADIO_SILENCE;})();
-    btn.title=RADIO_SILENCE?'Unmute — restore volume':'Mute — fade audio out';
-    btn.setAttribute('aria-label',RADIO_SILENCE?'Unmute audio':'Mute audio');
+    btn.title=RADIO_SILENCE?T('mp.unmute.title'):T('mp.mute.title');
+    btn.setAttribute('aria-label',RADIO_SILENCE?T('mp.unmute.aria'):T('mp.mute.aria'));
   }
   try{
     var list=silenceTargets(),i,a;
@@ -562,8 +562,8 @@ function setRadioSilence(on){
       showModeToast(T('toast.restored'),null,1800);
     }
   }catch(e){
-    if(RADIO_SILENCE)showModeToast('RADIO SILENCE','silence',1800);
-    else showModeToast('SIGNAL RESTORED',null,1600);
+    if(RADIO_SILENCE)showModeToast(T('toast.silence.on'),'silence',1800);
+    else showModeToast(T('toast.restored'),null,1600);
   }
 }
 
@@ -985,8 +985,8 @@ function tickClock(force){
   if(!el)return;
   if(!force&&typeof CLKD!=='undefined'&&CLKD&&CLKD.active)return;
   var now=new Date();
-  var days=['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  var months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var days=T('clock.days').split('|');
+  var months=T('clock.months').split('|');
   var day=days[now.getUTCDay()],date=now.getUTCDate(),mon=months[now.getUTCMonth()];
   var time=clockText();
   el.innerHTML='<span>'+day+' '+date+' '+mon+' UTC</span><span class="clock-sep">·</span><span class="clock-time">'+time+'</span>';
@@ -994,12 +994,13 @@ function tickClock(force){
 PORTALS.forEach(function(p){
   p.c=cons(p.cons);p.h=0;
   var a=document.createElement('a');a.className='portal';a.href=p.href;
-  a.innerHTML='<span class="lab"><b></b><small></small><em class="lab-open">OPEN →</em></span>';
-  a.querySelector('b').textContent=p.title;a.querySelector('small').textContent=p.sub;
+  a.innerHTML='<span class="lab"><b></b><small></small><em class="lab-open"></em></span>';
+  a.querySelector('.lab-open').textContent=T('portal.open');
+  a.querySelector('b').textContent=p.title;a.querySelector('small').textContent=p.subKey?T(p.subKey):p.sub;
   var h=document.createElement('button');
   h.type='button';
   h.className='hit portal-hit';
-  h.setAttribute('aria-label','Toggle portal '+p.title);
+  h.setAttribute('aria-label',T('portal.toggle',{s:p.title}));
   if(p.ext){a.target='_blank';a.rel='noopener';}
   [a,h].forEach(function(el){
     el.addEventListener('mouseenter',function(){hot=p.id;a.classList.add('hot');});

@@ -71,7 +71,7 @@ var FXBTN={};
     if(!el){
       el=document.createElement('button');el.type='button';el.id=key+'-fx';
       el.className='hit fx'+(SKY.rasiBy[d.cons].cluster?' fx-cluster':'');
-      el.setAttribute('aria-label','Putar suara '+d.label);
+      el.setAttribute('aria-label',T('fx.aria',{s:d.label}));
       el.style.width=el.style.height='52px';el.style.marginLeft=el.style.marginTop='-26px';
       prev.parentNode.insertBefore(el,prev.nextSibling);prev=el;
     }
@@ -1586,7 +1586,7 @@ function teleTypeText(el,text,done,msPerChar){
 function showUltraLoveSequence(el){
   /* Ultra-rare: original memory sequence — telescope remembers you. */
   el.classList.remove('tele-short');
-  var first='Hello, I love You...',finalText='Hello, Friend...';
+  var first=T('tele.love1'),finalText=T('tele.love2');
   var i=0;
   function typeFirst(){
     if(i<first.length){el.textContent+=first.charAt(i++);el._type=setTimeout(typeFirst,58);return;}

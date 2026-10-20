@@ -966,13 +966,13 @@ function termPick(k,st,c){
   return out;
 }
 function termHeader(n,last){
-  var h=[],s='SESSION #'+termPad(n,3),lt=last?new Date(last).toISOString().substr(11,8)+' UTC':'UNKNOWN';
-  if(n>=30&&(n===30||Math.random()<.25))return ['> SESSION #???','> DATE: UNKNOWN','> TIME: UNKNOWN','> ...','> THIS IS NOT YOUR FIRST SESSION.'];
-  if(n===20)return ['> OBSERVER RETURNING','> ...','> ...','> WE WERE NOT EXPECTING YOU THIS EARLY.'];
-  if(n===1)return ['> ACCESSING SYSTEM...','> SESSION INITIALIZED','> FIRST CONTACT','> OBSERVER NOT RECOGNIZED','> LOGGING...'];
-  if(n<5)return ['> ACCESSING SYSTEM...','> ACCESS GRANTED','> PREVIOUS SESSION FOUND',s,'LAST OBSERVATION: '+lt,'OBSERVER: RETURNING'];
-  h=['> OBSERVER RETURNING','> MEMORY FRAGMENT FOUND',s];
-  if(n>=12)h.push('> MEMORY FRAGMENT: "you were here"');
+  var h=[],s=T('term.session',{n:termPad(n,3)}),lt=last?new Date(last).toISOString().substr(11,8)+' UTC':T('term.unknown');
+  if(n>=30&&(n===30||Math.random()<.25))return [T('term.sess.unk'),T('term.date.unk'),T('term.time.unk'),'> ...',T('term.notfirst')];
+  if(n===20)return [T('term.returning'),'> ...','> ...',T('term.notexp')];
+  if(n===1)return [T('term.access'),T('term.sess.init'),T('term.first'),T('term.notrec'),T('term.logging')];
+  if(n<5)return [T('term.access'),T('term.granted'),T('term.prevfound'),s,T('term.lastobs',{t:lt}),T('term.obsret')];
+  h=[T('term.returning'),T('term.memfound'),s];
+  if(n>=12)h.push(T('term.memfrag'));
   return h;
 }
 function termFmtLY(d){return String(d).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
@@ -980,25 +980,25 @@ function termContext(){
   var now=performance.now();
   /* '!' di depan = baris peringatan (merah muda) */
   if(typeof CLKD!=='undefined'&&CLKD&&(CLKD.k>.2||(CLKD.touchAt&&Date.now()-CLKD.touchAt<90000)))
-    return ['!> CAUTION','!> TEMPORAL REFERENCE UNSTABLE','> ...',
-      '!> LOCAL TIME .......... [ERROR]','!> EXTERNAL TIME ........ [ERROR]','!> OBSERVER TIME ......... [UNKNOWN]'];
+    return [T('term.caution'),T('term.tempunst'),'> ...',
+      T('term.localtime'),T('term.exttime'),T('term.obstime')];
   if(TERM_FOCUS&&now-TERM_FOCUS.at<90000){
     var fid=TERM_FOCUS.id;
     if(fid==='bh')return [
-      '!> CAUTION','!> TEMPORAL REFERENCE UNSTABLE','> ...',
-      '!> LOCAL TIME .......... [ERROR]','!> EXTERNAL TIME ........ [ERROR]','!> OBSERVER TIME ......... [UNKNOWN]'
+      T('term.caution'),T('term.tempunst'),'> ...',
+      T('term.localtime'),T('term.exttime'),T('term.obstime')
     ];
     return termTarget(fid);
   }
   if(OBSERVE_MODE||(TERM_OBS_AT&&now-TERM_OBS_AT<90000))
-    return ['!> OBSERVATION MODE: RESIDUAL TRACE','> ...','!> YOU SHOULD NOT HAVE ACCESS TO THIS.'];
+    return [T('term.resid'),'> ...',T('term.noaccess')];
   if(typeof ALIGN!=='undefined'&&ALIGN.cid)return termTarget(ALIGN.cid);
   return null;
 }
 function termTarget(id){
-  var nm=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[id]||id).toUpperCase(),d=TERM_DIST[id],o=['> TARGET: '+nm];
-  if(d){var ds=termFmtLY(d);o.push('> DISTANCE: ~'+ds+' LY','> SIGNAL AGE: ~'+ds+' YEARS');}
-  o.push('> OBSERVER: PRESENT','> TARGET: ABSENT');
+  var nm=(typeof CONS_LABELS!=='undefined'&&CONS_LABELS[id]||id).toUpperCase(),d=TERM_DIST[id],o=[T('term.target',{s:nm})];
+  if(d){var ds=termFmtLY(d);o.push(T('term.dist',{d:ds}),T('term.age',{d:ds}));}
+  o.push(T('term.present'),T('term.absent'));
   return o;
 }
 var TERM_AT=0,TERM_TAIL=0,TERM_BODY=null,TERM_CUR=null,TERM_END=0,TERM_ASK=null,TERM_NOIN=0,TERM_TAPS=0,TERM_EXC=false,TERM_NOCLOSE=false;
@@ -1023,18 +1023,18 @@ function termClose(){
   TERM_RUN=false;TERM_ASK=null;clearTimeout(TERM_NOIN);
   TERM_T.forEach(clearTimeout);TERM_T=[];
 }
-function termTail(){termEmit('> PROCESS COMPLETE',420);termEmit('> RETURNING TO IDLE...',380);}
+function termTail(){termEmit(T('term.done'),420);termEmit(T('term.idle'),380);}
 function termOwl(n){
   if(Math.random()<.5){
-    termEmit('> SYSTEM PROCESS ........ ACTIVE',1900);termEmit('> OBSERVER .............. ACTIVE',500);termEmit('> OWL ................... ACTIVE',700,'term-owl',3400);
+    termEmit(T('term.sysact'),1900);termEmit(T('term.obsact'),500);termEmit(T('term.owlact'),700,'term-owl',3400);
     return;
   }
-  termEmit('> ...',1700);termEmit('> ...',650);termEmit('> owl.sys has entered the session.',700,'term-owl');
-  termEmit('OWL :: why are you reading system logs',900,'term-owl');
-  termEmit('SYSTEM :: unauthorized process',800);
-  termEmit('OWL :: i live here',800,'term-owl');
+  termEmit('> ...',1700);termEmit('> ...',650);termEmit(T('term.owlenter'),700,'term-owl');
+  termEmit(T('term.owl1'),900,'term-owl');
+  termEmit(T('term.sys1'),800);
+  termEmit(T('term.owl2'),800,'term-owl');
   termEmit('SYSTEM :: ...',900);
-  termEmit('OWL :: skill issue',700,'term-owl',3600);
+  termEmit(T('term.owl3'),700,'term-owl',3600);
 }
 function termTap(){
   if(!TERM_RUN)return;
@@ -1066,15 +1066,15 @@ function termOpen(){
   term.classList.add('on');term.setAttribute('aria-hidden','false');
   TERM_T.forEach(clearTimeout);TERM_T=[];clearTimeout(TERM_END);
   TERM_AT=performance.now();TERM_TAIL=0;
-  var i,hd=mile?['> OBSERVER RETURNING','SESSION #'+termPad(n,3)]:termHeader(n,prevLast),base=Date.now()%60000;
+  var i,hd=mile?[T('term.returning'),T('term.session',{n:termPad(n,3)})]:termHeader(n,prevLast),base=Date.now()%60000;
   for(i=0;i<hd.length;i++)termEmit(hd[i],hd[i]==='> ...'?650:260);
   if(mile){
     var W='term-warn';
-    termEmit('> SYSTEM STATUS: NOMINAL',420);termEmit('> ...',700);termEmit('> ...',700);
-    termEmit('> SYSTEM STATUS: OBSERVED',520,W);termEmit('> correcting...',620);
-    termEmit('> SYSTEM STATUS: OBSERVED',520,W);termEmit('> correcting...',620);
-    termEmit('> SYSTEM STATUS: OBSERVED',520,W);
-    termEmit('> ERROR: OBSERVER CANNOT BE EXCLUDED',950,W,3800);
+    termEmit(T('term.st.nom'),420);termEmit('> ...',700);termEmit('> ...',700);
+    termEmit(T('term.st.obs'),520,W);termEmit(T('term.correct'),620);
+    termEmit(T('term.st.obs'),520,W);termEmit(T('term.correct'),620);
+    termEmit(T('term.st.obs'),520,W);
+    termEmit(T('term.err.excl'),950,W,3800);
     TERM_NOCLOSE=true;
     return;
   }
