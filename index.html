@@ -282,7 +282,7 @@
   </nav>
   <p class="quote" data-i18n="footer.quote">Keep creating, even without the applause.</p>
 </footer>
-<!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (7 file, urutan JANGAN diubah) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
+<!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (urutan JANGAN diubah; 11-live-count.js dimuat lewat import() di script inline) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
 <div id="live-count" hidden aria-hidden="true"><i></i><b>0</b><span>observer</span></div>
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=28"></script>
@@ -291,17 +291,24 @@
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=124"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=121"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=122"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=101"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=114"></script>
-<script defer src="dumul-js/obs/js/05a-glyph-art.js?v=1"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=130"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=131"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=114"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=111"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=4"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=6"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=6"></script>
-<script type="module" src="dumul-js/obs/js/11-live-count.js?v=3"></script>
+<script>
+/* Live counter: dimuat BELAKANGAN (setelah window load + idle) supaya Firebase dari gstatic nggak rebutan bandwidth dengan boot & audio.
+   Path + ?v= di import() harus sama persis dengan SHELL service-worker.js (check-sky.js memeriksa). Gagal muat = counter tetap tersembunyi. */
+(function () {
+  function go() { try { import('./dumul-js/obs/js/11-live-count.js?v=3').catch(function () {}); } catch (e) {} }
+  function idle() { if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 6000 }); else setTimeout(go, 3000); }
+  if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
+})();
+</script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">

@@ -11,7 +11,7 @@ Live: [dumul17.github.io](https://dumul17.github.io/)
 
 | Page | HTML | Styles | Scripts | Description |
 |---|---|---|---|---|
-| **Observatory** | `index.html` | `index.css` | `dumul-js/obs/js/01-core.js` … `11-live-count.js` (+ `05a-glyph-art.js`), plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
+| **Observatory** | `index.html` | `index.css` | `dumul-js/obs/js/01-core.js` … `11-live-count.js`, plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
 | **DUMUL** | `dumul.html` | `dumul.css` | `dumul.js`, `dumul-app.js` | DUMUL album page with five selectable transmissions, synced lyrics, track notes, spectrum/seek UI, and seamless Gargantua handoff |
 | **PWA / offline** | `manifest.json`, `icons/` | -- | `service-worker.js` | Installable app, offline shell, and opt-in offline audio archive |
 
@@ -115,10 +115,11 @@ DUMUL transition.
 -   **Quality chip** (`Perf · HIGH / LOW`): no device auto-detect, the
     default is HIGH. The visitor's choice is saved (`dumul_quality`); append
     `?perf=low` or `?perf=high` to the URL to test a tier without saving.
--   Constellation glyph sprites (128 px WebP art in `05a-glyph-art.js`, tinted
-    per star, with a vector-line fallback) and a nebula backdrop image
-    (`img/nebula-portrait.webp` / `nebula-landscape.webp`)
--   **Live observer counter:** a small `N observers` readout showing how many
+-   Constellation glyph sprites (128 px WebP art in `img/glyph/<id>.webp`,
+    loaded per constellation the first time it is shown, tinted per star,
+    with a vector-line fallback) and a nebula backdrop image
+    (`img/nebula-portrait.webp`, one image cover-fitted for both portrait and landscape)
+-   **Live observer counter:** loaded after the page has finished loading (on idle), so Firebase never competes with boot and audio for bandwidth. A small `N observers` readout showing how many
     unique devices have the Observatory open right now (Firebase Realtime
     Database presence, one entry per device, removed when the last tab
     closes). If it can't connect, it stays hidden and nothing else is
@@ -261,21 +262,20 @@ once its files (and, optionally, its music) have been cached.
 │       ├── i18n-texts.js   # ID translation of texts.js (telescope messages, terminal log)
 │       ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
 │       ├── img/
-│       │   ├── nebula-portrait.webp    # Nebula backdrop (portrait screens)
-│       │   └── nebula-landscape.webp   # Nebula backdrop (landscape screens)
+│       │   ├── nebula-portrait.webp    # Nebula backdrop (single image, used for portrait AND landscape)
+│       │   └── glyph/                  # 23 constellation glyph arts, <id>.webp (128 px)
 │       └── js/             # Observatory logic, split from the old index.js (load order matters!)
 │           ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
 │           ├── 02-sky-logic.js     # data wiring, Pleiades, memory, unlock, observation mode, alignment, time dilation, layout, plate
 │           ├── 03-gargantua.js     # black hole, shared neural network, transition spectrum
 │           ├── 04-render.js        # overlays, telescope, SFX, target reticle, constellation drawing, observatory FX
-│           ├── 05a-glyph-art.js    # generated: constellation glyph art (WebP data URIs) — don't edit by hand
 │           ├── 05-sector-ui.js     # sector overview, Gargantua summon/relay, sector gate, tune panel, music player
 │           ├── 06-interaction.js   # interaction, easter eggs, terminal, greeting, clock dilation
 │           ├── 07-boot.js          # boot, layout editor, render loop
 │           ├── 08-tx-drone.js      # drone TX/RX animation + hold ring (TXFX)
 │           ├── 09-wormhole.js      # wormhole transition for sector gates / mini Gargantua (WORMHOLE)
 │           ├── 10-ui-sound.js      # synthesized UI sound effects (UIS)
-│           └── 11-live-count.js    # live observer counter (ES module, Firebase presence)
+│           └── 11-live-count.js    # live observer counter (ES module, loaded lazily via import(); Firebase presence)
 │
 ├── dumul.html              # DUMUL / album page
 ├── dumul.css               # DUMUL styles
@@ -361,22 +361,23 @@ Notes:
     `service-worker.js`** and bump its `VERSION` so the old precached copy
     is dropped. `node dumul-js/obs/check-sky.js` verifies the `?v=` values
     match.
--   **The files in `dumul-js/obs/js/` (`01` … `10`, plus `05a`) are one
+-   **The files in `dumul-js/obs/js/` (`01` … `10`) are one
     program, not modules.** They are plain classic scripts loaded in order
     with `defer` and share one global scope; there is no IIFE anymore, so
     each file starts with `'use strict'`. Don't reorder the `<script>`
-    tags (`05a-glyph-art.js` loads **before** `05-sector-ui.js`; `08`–`10`
-    load after `07-boot.js`), don't add `type="module"`, and keep
+    tags (`08`–`10` load after `07-boot.js`), don't add `type="module"`, and keep
     top-level names unique across files (`SKY`, `TXT`, `I18N`, `T`,
-    `TXFX`, `WORMHOLE`, `UIS` and `GLYPH_ART` are already taken).
+    `TXFX`, `WORMHOLE` and `UIS` are already taken).
     Anything that runs at load time (not inside a function) may only use
     functions from the same or an earlier file. Bump `?v=` on **every**
     tag (data files, i18n files, all js files, `index.css`) + the `SHELL`
     list together on each deploy.
 -   **`11-live-count.js` is the exception:** it is an ES module (Firebase is
     imported from `gstatic.com`), so it has its own scope and needs a
-    network connection. Its `?v=` is still bumped and listed in `SHELL`
-    like the others.
+    network connection. It has no `<script>` tag: a small inline script near
+    the end of `index.html` loads it with `import()` after `window.load` (on
+    idle, 6 s at the latest). Its `?v=` is still bumped, must match the
+    `import()` path, and is listed in `SHELL` like the others.
 -   **Load order of the language layer:** `sky-data.js` → `texts.js` →
     `i18n.js` → `i18n-sky.js` → `i18n-texts.js` → `01-core.js`. The
     translations overwrite `SKY` / `TXT` in place, so they must run before
@@ -386,8 +387,11 @@ Notes:
     (`{en, id}`), then use `data-i18n="key"` / `data-i18n-aria="key"` in the
     HTML or `T('key')` in JS. New telescope / terminal lines go in
     `texts.js` and get a counterpart in `i18n-texts.js`.
--   `05a-glyph-art.js` is generated output (inline WebP art keyed by
-    constellation id) — regenerate it rather than editing it.
+-   **Glyph art:** one `img/glyph/<id>.webp` per constellation. To add or
+    replace one, put the file there, add the id to `GLYPH_ART_IDS` in
+    `05-sector-ui.js`, add it to `SHELL` in `service-worker.js`, and bump
+    `GLYPH_ART_V` (and the `?v=` in `SHELL`) if you replaced an existing image.
+    `check-sky.js` verifies the id list, the files and the `SHELL` entries.
 -   **Adding, renaming or removing a track:** put the file in `audio/`
     and register it in `sky-data.js` (the service worker's `ALL_AUDIO`
     is generated from it), then update `SIZE_MB` in the offline
@@ -450,7 +454,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     `https://dumul17.github.io/` and
     `https://dumul17.github.io/dumul.html`.
 4.  Upload the HTML and CSS files, the whole `dumul-js/obs/` folder
-    (`sky-data.js`, `texts.js`, `i18n*.js`, `img/`, `js/01…11` incl. `05a`) and the `dumul.*` files
+    (`sky-data.js`, `texts.js`, `i18n*.js`, `img/` incl. `img/glyph/`, `js/01…11`) and the `dumul.*` files
     together, and keep the referenced audio and image assets beside them
     on the same origin. Upload `dumul-js/obs/` **before** the new
     `index.html` / `service-worker.js` so the page never points at scripts
@@ -492,7 +496,8 @@ The site is configured for the user site **`dumul17.github.io`**.
     the boot screen's audio bandwidth on later visits.
 -   **Split assets:** CSS and JavaScript live in external files so
     browsers can cache them separately from the HTML (the Observatory
-    script is split into 12 ordered files plus the data and language files); a few tiny
+    script is split into 10 ordered files plus the data and language files, with
+    the live counter as a separate lazily loaded module); a few tiny
     scripts that must run before first paint stay inline in
     `dumul.html`.
 -   **Browser storage:** the Observatory/DUMUL transition uses
