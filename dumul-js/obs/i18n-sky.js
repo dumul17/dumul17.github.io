@@ -106,6 +106,13 @@
 
   I18N.applySky({rasi:rasi,sfx:sfx});
 
+  /* Sektor: nama (label kanvas / toast / kartu LIS) dan judul (header akordeon music player) */
+  (function(){
+    var SEC={winter:['Dingin','Panteon Para Pahlawan Berpendar','Musim Dingin'],spring:['Semi','Para Penjaga Keseimbangan Kosmik','Musim Semi'],
+             summer:['Panas','Majelis Makhluk Langit','Musim Panas'],autumn:['Gugur','Istana Kerajaan Dinasti yang Runtuh','Musim Gugur']};
+    (SKY.sectors||[]).forEach(function(s){var m=SEC[s.k];if(!m)return;s.name=m[0];s.title=m[1];s.season=m[2];});
+  })();
+
   /* Gargantua (kartu info kamera) */
   if(SKY.bh){
     SKY.bh.whisper[0]='Semua yang ada di sini adalah pertanyaan yang tak pernah terjawab.';
