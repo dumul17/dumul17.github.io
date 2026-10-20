@@ -878,7 +878,7 @@ var STAR_PHYS={
   'orion.rigel':{spt:'B8 Ia',teff:12100,dist:860,mag:0.13,ra:'05h 14m',dec:'−08°12′'},
   'gemini.g2':{spt:'A1 V',teff:10300,dist:51,mag:1.58,ra:'07h 34m',dec:'+31°53′'},
   'gemini.g9':{spt:'K0 III',teff:4700,dist:34,mag:1.14,ra:'07h 45m',dec:'+28°01′'},
-  'pleiades.pleione':{spt:'B8 Vne',teff:12000,dist:380,mag:5.05,ra:'03h 49m',dec:'+24°08′'},
+  'pleiades.pleione':{spt:'B8 Vne',teff:12000,dist:444,mag:5.05,ra:'03h 49m',dec:'+24°08′'},
   'canis.sirius':{spt:'A1 V',teff:9900,dist:8.6,mag:-1.46,ra:'06h 45m',dec:'−16°42′'},
   'auriga.capella':{spt:'G3 III',teff:5200,dist:43,mag:0.08,ra:'05h 16m',dec:'+45°59′'},
   'canmin.procyon':{spt:'F5 IV-V',teff:6500,dist:11.5,mag:0.34,ra:'07h 39m',dec:'+05°13′'},
@@ -1005,12 +1005,12 @@ var STAR_PHYS={
 /* PL_PHYS: bintang bernama klaster Pleiades (selain Pleione, yang tetap di STAR_PHYS). Key = nama huruf kecil.
    Dipisah dari STAR_PHYS karena titik klaster non-SFX tidak ada di GEOMETRY (check-sky akan menolak). Tipe spektral dicek ke SIMBAD (Alcyone, Electra, Atlas, Maia, Merope, Taygeta); Teff perkiraan. */
 var PL_PHYS={
-  alcyone:{spt:'B7 IIIe',teff:12300},
-  atlas:{spt:'B8 III',teff:13000},
-  electra:{spt:'B6 IIIe',teff:14000},
-  maia:{spt:'B7 III',teff:12500},
-  merope:{spt:'B6 IV(e)',teff:14000},
-  taygeta:{spt:'B6 IV',teff:13000}
+  alcyone:{spt:'B7 IIIe',teff:12300,dist:444,mag:2.87,ra:'03h 47m',dec:'+24°06′'},
+  atlas:{spt:'B8 III',teff:13000,dist:444,mag:3.62,ra:'03h 49m',dec:'+24°03′'},
+  electra:{spt:'B6 IIIe',teff:14000,dist:444,mag:3.72,ra:'03h 44m',dec:'+24°06′'},
+  maia:{spt:'B7 III',teff:12500,dist:444,mag:3.87,ra:'03h 45m',dec:'+24°22′'},
+  merope:{spt:'B6 IV(e)',teff:14000,dist:444,mag:4.14,ra:'03h 46m',dec:'+23°56′'},
+  taygeta:{spt:'B6 IV',teff:13000,dist:444,mag:4.30,ra:'03h 45m',dec:'+24°28′'}
 };
 var CONS_REF={orion:'orion.rigel',taurus:'taurus.aldebaran',canis:'canis.sirius',pleiades:'pleiades.pleione',gemini:'gemini.g9',auriga:'auriga.capella',canmin:'canmin.procyon',virgo:'virgo.spica',bootes:'bootes.arcturus',ursa:'ursa.alioth',leo:'leo.regulus',hydra:'hydra.alphard',scorpius:'scorpius.antares',sagit:'sagit.s14',lyra:'lyra.y2',cygnus:'cygnus.c1',ophiuchus:'ophiuchus.o4',aquila:'aquila.aq2',cassiopeia:'cassiopeia.k4',perseus:'perseus.p9',aries:'aries.a2',pegasus:'pegasus.pg1',pisces:'pisces.alpherg'};
 
