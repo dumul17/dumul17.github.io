@@ -18,11 +18,11 @@ var shell=sw.slice(sw.indexOf('const SHELL'));shell=shell.slice(0,shell.indexOf(
 /* index.js dipecah jadi js/*.js (script klasik berurutan, satu scope global): tiap file harus ada di index.html + SHELL, urutannya sama */
 var jsDir=path.join(dir,'js'),jsFiles=fs.existsSync(jsDir)?fs.readdirSync(jsDir).filter(function(f){return /\.js$/.test(f);}).sort():[];
 if(!jsFiles.length)P.push('folder js/ kosong / tidak ada');
-var jsTags=[],jsRe=/<script[^>]*src="dumul-js\/obs\/(js\/[^"?]+\.js)\?v=\d+"/g,jm;
+var jsTags=[],jsRe=/(?:<script[^>]*src="|import\('\.\/)dumul-js\/obs\/(js\/[^"'?]+\.js)\?v=\d+["']/g,jm; /* 11-live-count.js dimuat lewat import('./dumul-js/obs/js/...?v=N') di script inline, bukan tag <script src>: dua bentuk dikenali */
 while((jm=jsRe.exec(html)))jsTags.push(jm[1]);
 if(jsTags.join('|')!==jsFiles.map(function(f){return 'js/'+f;}).join('|'))P.push('urutan/daftar <script src="js/..."> di index.html tidak sama dengan isi folder js/ (urut nama): html=['+jsTags.join(', ')+'] folder=['+jsFiles.join(', ')+']');
 jsFiles.forEach(function(f){
-  var n='js/'+f,m=html.match(new RegExp('src="('+(OBS+n).replace(/[.\/]/g,'\\$&')+'\\?v=\\d+)"'));
+  var n='js/'+f,m=html.match(new RegExp('(?:src="|import\\(\'\\./)('+(OBS+n).replace(/[.\/]/g,'\\$&')+'\\?v=\\d+)["\']'));
   if(m&&shell.indexOf("'"+m[1]+"'")<0)P.push('SHELL service-worker belum memuat \''+m[1]+'\' (harus sama persis dengan index.html)');
   if(!/^\s*(?:\/\*[\s\S]*?\*\/\s*)*'use strict';/.test(rd(n)))P.push(n+": tidak diawali 'use strict'");
 });
@@ -35,6 +35,13 @@ jsFiles.forEach(function(f){
 var tctx={};try{vm.runInNewContext(rd('texts.js')+';this.TXT=TXT',tctx);}catch(e){P.push('texts.js error: '+e.message);}
 if(tctx.TXT)['TELE_SCOPE_MESSAGES','TERM_POOL','TERM_W','TERM_PROMPTS','TG_POOL'].forEach(function(k){
   var v=tctx.TXT[k];if(!v||(Array.isArray(v)?!v.length:!Object.keys(v).length))P.push('texts.js: TXT.'+k+' kosong / hilang');
+});
+/* art glyph rasi: tiap id di GLYPH_ART_IDS (05-sector-ui.js) harus punya img/glyph/<id>.webp dan masuk SHELL service worker */
+var gm=rd('js/05-sector-ui.js').match(/var GLYPH_ART_IDS=\{([^}]*)\}/);
+if(!gm)P.push('js/05-sector-ui.js: GLYPH_ART_IDS tidak ketemu');
+else gm[1].split(',').map(function(x){return x.split(':')[0].trim();}).filter(Boolean).forEach(function(id){
+  if(!fs.existsSync(path.join(dir,'img','glyph',id+'.webp')))P.push('art glyph hilang: '+OBS+'img/glyph/'+id+'.webp');
+  if(shell.indexOf("'"+OBS+'img/glyph/'+id+".webp?v=")<0)P.push('SHELL service-worker belum memuat art glyph: '+id);
 });
 /* sisa pola lama */
 var js=jsFiles.map(function(f){return rd('js/'+f);}).join('\n');
