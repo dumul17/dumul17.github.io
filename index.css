@@ -831,6 +831,7 @@ body.cat-open #cam-whisper,body.ach-open #cam-whisper{opacity:0!important;visibi
 #cam-cat .cc-spec,#cam-ach .cc-spec{margin-top:8px}
 #cam-cat .cc-spec svg,#cam-ach .cc-spec svg{display:block;width:100%;height:16px;border-radius:2px;box-shadow:0 0 0 1px rgba(110,229,255,.14)}
 #cam-cat .cc-spec i,#cam-ach .cc-spec i{display:block;margin-top:3px;font:500 7px/1 'Courier New',monospace;font-style:normal;letter-spacing:.14em;text-transform:uppercase;color:rgba(184,224,238,.5)}
+#cam-cat .cc-gr,#cam-ach .cc-gr{text-transform:none;letter-spacing:.06em;font-family:system-ui,'Segoe UI',Roboto,sans-serif;font-size:1.08em}   /* nama berhuruf Yunani (\u03bb Boo): jangan di-uppercase (\u03bb jadi \u039b), font sistem karena Space Grotesk tak punya glyph Yunani */
 #cam-cat .cc-note,#cam-ach .cc-note{margin-top:8px;font:italic 400 9.5px/1.35 'Space Grotesk',system-ui,sans-serif;color:rgba(214,238,250,.55)}
 /* reticle kunci bintang (di dalam #stage, posisinya diset JS lewat skyHitXY) */
 #cat-lock{position:fixed;left:0;top:0;width:var(--cs,30px);height:var(--cs,30px);margin:calc(var(--cs,30px)/-2) 0 0 calc(var(--cs,30px)/-2);box-sizing:border-box;border:1px solid rgba(110,229,255,.85);border-radius:50%;pointer-events:none;z-index:4;opacity:0;transition:opacity .25s ease;will-change:transform}
