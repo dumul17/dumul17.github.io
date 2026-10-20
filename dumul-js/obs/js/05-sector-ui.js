@@ -57,7 +57,7 @@ function sectFrameSprite(k){
 ['winter','spring','summer','autumn'].forEach(sectFrameSprite);
 /* Glyph rasi di-render SEKALI ke canvas kecil (sprite), lalu tinggal drawImage per frame. */
 var GLYPH_SPR={},GLYPH_URL={},GLYPH_PX=128;
-var GLYPH_CYCLE_MS=9000; /* lama tiap rasi tampil di portal saat idle */
+var GLYPH_CYCLE_MS=12000; /* lama tiap rasi tampil di portal saat idle */
 /* Warna art per bintang SFX: key bintang -> putar hue (derajat). Art Orion dasarnya merah (Betelgeuse), Rigel diputar jadi biru. Tambah baris di sini kalau bintang lain mau beda warna. */
 var GLYPH_TINT={rigel:190};
 function glyphHue(c,deg){
