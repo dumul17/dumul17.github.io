@@ -117,10 +117,10 @@ var UIS=(function(){
     tone(c,t,fr,fr,.5,.1);tone(c,t,fr*2,fr*2,.3,.025); /* + harmonik tipis */
   }
 
-  /* delegasi tap: ikon HUD, owl (+ isi panelnya), music, portal, tombol fokus cam, panel exit teleskop, kartu pilihan teleskop (tap teleskop sendiri: UIS.tap() manual di 06) */
+  /* delegasi tap: ikon HUD, owl (+ isi panelnya), music, portal, tombol fokus cam, panel exit teleskop, kartu pilihan teleskop, panel tuning, kontrol music player (prev/next/shuffle/repeat/mute/visualizer/accordion), tombol CAM (band/lines/log/game), katalog + log rasi, tutup fragment, capsule boot (tap teleskop sendiri: UIS.tap() manual di 06) */
   document.addEventListener('pointerdown',function(e){
     var t=e.target;
-    if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#bp-close,#music-close,#exit-panel button,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,.owl-chip,.owl-tab,#lis-ask button'))tap();
+    if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#music-close,#exit-panel button,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,.owl-chip,.owl-tab,#lis-ask button,#bh-panel button,#owl-perf-save,#owl-perf-reset,#mode-silence,#mp-av-toggle,.mp-grp-head,.mp-ctrl,#cam-band button,#cg-btn,.ci-catbtn,#cam-cat button,#cam-ach button,#sf-close,.boot-cap'))tap();
   },true);
 
   return {noise:noise,radar:radar,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul};
