@@ -57,6 +57,10 @@ function sectFrameSprite(k){
 ['winter','spring','summer','autumn'].forEach(sectFrameSprite);
 /* Glyph rasi di-render SEKALI ke canvas kecil (sprite), lalu tinggal drawImage per frame. */
 var GLYPH_SPR={},GLYPH_URL={},GLYPH_PX=128;
+/* Art glyph rasi: file WebP 128px di img/glyph/<id>.webp, dimuat per rasi saat pertama dipakai (dulu base64 di 05a-glyph-art.js).
+   Tambah rasi baru: taruh <id>.webp di folder itu + masukkan id ke GLYPH_ART_IDS + tambah ke SHELL service-worker.js. Naikkan GLYPH_ART_V kalau gambarnya diganti. */
+var GLYPH_ART_DIR='dumul-js/obs/img/glyph/',GLYPH_ART_V=1;
+var GLYPH_ART_IDS={orion:1,taurus:1,canis:1,pleiades:1,gemini:1,auriga:1,canmin:1,virgo:1,bootes:1,ursa:1,leo:1,hydra:1,scorpius:1,sagit:1,lyra:1,cygnus:1,ophiuchus:1,aquila:1,cassiopeia:1,perseus:1,aries:1,pegasus:1,pisces:1};
 var GLYPH_CYCLE_MS=12000; /* lama tiap rasi tampil di portal saat idle */
 /* Warna art per bintang SFX: key bintang -> putar hue (derajat). Art Orion dasarnya merah (Betelgeuse), Rigel diputar jadi biru. Tambah baris di sini kalau bintang lain mau beda warna. */
 var GLYPH_TINT={rigel:190};
@@ -79,8 +83,8 @@ function glyphSprite(key){
   var og=g;g=c.getContext('2d');
   try{sectGlyphAny(id,GLYPH_PX/2,GLYPH_PX/2,GLYPH_PX*.78,1);}catch(e){} /* cadangan: garis vektor */
   g=og;GLYPH_SPR[key]=c;
-  /* art dari 05a-glyph-art.js: timpa gambar garis begitu gambar siap */
-  var src=window.GLYPH_ART&&window.GLYPH_ART[id];
+  /* art dari img/glyph/<id>.webp: timpa gambar garis begitu file selesai dimuat (gagal muat = tetap garis vektor) */
+  var src=GLYPH_ART_IDS[id]?GLYPH_ART_DIR+id+'.webp?v='+GLYPH_ART_V:null;
   if(src){var im=new Image();im.onload=function(){var x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);if(tint)glyphHue(c,tint);};im.src=src;}
   return c;
 }

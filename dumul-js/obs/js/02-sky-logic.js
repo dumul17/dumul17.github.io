@@ -1299,18 +1299,18 @@ function txToggleFromTele(){return false;}
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
    Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],HALO:.55,THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:{p:'dumul-js/obs/img/nebula-portrait.webp?v=1',l:'dumul-js/obs/img/nebula-landscape.webp?v=1'},img:{},base:null,key:'',tint:{}};
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],HALO:.55,THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'dumul-js/obs/img/nebula-portrait.webp?v=1',img:null,base:null,key:'',tint:{}};
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
-  var k=W<H*1.05?'p':'l',im=NEB.img[k];
+  var im=NEB.img;   /* satu gambar untuk portrait & landscape (cover-fit di bawah); yang berubah cuma staging-nya */
   if(!im){
-    im=NEB.img[k]=new Image();
+    im=NEB.img=new Image();
     im.onload=function(){im._ok=1;try{bakeAstroPlates();}catch(e){}};
     im.onerror=function(){NEB.on=false;NEB.base=null;NEB.tint={};};
-    im.src=NEB.src[k];return null;
+    im.src=NEB.src;return null;
   }
   if(!im._ok){NEB.base=null;return null;}
-  var cw=Math.max(1,Math.round(EW*ds)),ch=Math.max(1,Math.round(EH*ds)),hy=Math.round(BH.hy||H*.45),key=k+'|'+cw+'x'+ch+'|'+hy;
+  var cw=Math.max(1,Math.round(EW*ds)),ch=Math.max(1,Math.round(EH*ds)),hy=Math.round(BH.hy||H*.45),key=cw+'x'+ch+'|'+hy;
   if(NEB.base&&NEB.key===key)return NEB.base;
   var c=document.createElement('canvas');c.width=cw;c.height=ch;
   var x=c.getContext('2d'),sc=Math.max(cw/im.naturalWidth,ch/im.naturalHeight),dw=im.naturalWidth*sc,dh=im.naturalHeight*sc;
