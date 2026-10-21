@@ -391,7 +391,7 @@ function beginBHDrag(e){
      lepas jari = swallow ke dumul.html. Tap singkat TIDAK lagi masuk (cegah kepencet); keyboard/AT tetap lewat link #bh. */
   else if(!SECT.cur&&!SECT.busy&&drag.tapEligible){
     drag.ov=true;
-    try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580);}catch(eO0){}
+    try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580,true);}catch(eO0){}
     drag.lpTimer=setTimeout(function(){
       drag.lpTimer=null;
       if(!drag.on||drag.moved||SECT.cur||SECT.busy||SW){try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCancel();}catch(eO1){}return;}

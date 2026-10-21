@@ -986,12 +986,12 @@ function sgToggle(){
 function sgJump(s){
   if(!SGATE.open||SECT.busy||!SECT.cur||s===SECT.cur)return;
   /* Tujuan harus pernah summon BH mini; kalau belum → toast, portal tetap tampil */
-  if(!s.summed){
+  if(!s.sum){   /* BH mini sektor tujuan harus sedang ada (pernah di-summon DAN belum di-recall) */
     try{if(typeof showModeToast==='function')showModeToast(T('toast.nosum'),null,3200);}catch(e){}
     return;
   }
   lisAsk(function(){
-    if(SECT.busy||!SECT.cur||s===SECT.cur||!s.summed)return;
+    if(SECT.busy||!SECT.cur||s===SECT.cur||!s.sum)return;
     SGATE.pend=s;sgClose();
     /* Tunnel side-effect: selalu muffle 2 dtk; lanjut muffle jika tujuan belum dock/summon siap */
     SGATE.tunnelUntil=performance.now()+2000;

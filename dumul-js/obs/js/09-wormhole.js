@@ -151,11 +151,11 @@ function startClose(now,ms,shrink){
   if(state==='close'||state==='idle')return;
   S.hp0=hp;S.c0=[S.cx,S.cy];S.r0=S.r;S.a0=S.a;S.e0=env;S.rate0=S.rate;S.tc=now;S.cms=ms;S.shrink=!!shrink;state='close';kick();
 }
-function holdStart(x,y,ms){
+function holdStart(x,y,ms,pl){
   if(!usable()||state!=='idle'&&state!=='close')return;
   if(!init())return;
   var sp=toScr(x,y);x=sp[0];y=sp[1];
-  state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1};
+  state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1,pl:!!pl};   /* pl: objek ikut ditarik ke mulut portal selama hold (hanya BH overview -> dumul.html; di sektor TIDAK) */
   dens=1;show();setUnder(true);fresh=Math.min(winW(),winH())*R_HOLD;kick();   /* mulut portal di BAWAH sky (sky dilubangi lewat hole()) */
 }
 function holdArm(){if(state==='charge'){S.p=1;state='armed';S.ta=performance.now();}}   /* hold selesai: portal siaga, TIDAK masuk dulu */
@@ -507,7 +507,7 @@ function tick(now){
 function muffle(){return state==='idle'?0:.88*clamp(env,0,1);}
 
 window.WORMHOLE={
-  holdStart:function(x,y,ms){try{holdStart(x,y,ms);}catch(e){}},
+  holdStart:function(x,y,ms,pl){try{holdStart(x,y,ms,pl);}catch(e){}},
   holdArm:function(){try{holdArm();}catch(e){}},
   holdMove:function(x,y){try{holdMove(x,y);}catch(e){}},
   holdCommit:function(){try{holdCommit();}catch(e){}},
@@ -516,7 +516,7 @@ window.WORMHOLE={
   gate:function(s,pos){try{go(s,pos);}catch(e){}},          /* lompat antar sektor: BH mini -> tengah -> BH mini sektor tujuan s */
   overview:function(pos){try{go(null,pos);}catch(e){}},     /* sektor -> overview: BH mini -> tengah -> BH overview; jadwal & durasi sama dengan gate */
   hole:function(){try{return hole();}catch(e){return null;}},
-  pull:function(){return state==='idle'||state==='exit'||(state==='travel'&&!S.go)?0:hp;},
+  pull:function(){return !S.pl||state==='idle'||state==='exit'||(state==='travel'&&!S.go)?0:hp;},
   arrive:function(){if(state==='exit')return .08+.92*eo(clamp(S.u/.6,0,1));if(state==='travel'&&S.go&&S.cov)return .08;return 1;},
   muffle:function(){return muffle();},
   get on(){return state!=='idle';},
