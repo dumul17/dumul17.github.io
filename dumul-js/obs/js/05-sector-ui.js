@@ -1109,6 +1109,7 @@ function frame(now){
     if(PX.all){resetCanvasState();g.clearRect(0,0,W,H);pmk('kosong');lastFrameOK=now;pEnd(now);return;}   /* diagnosa: loop jalan, tidak ada gambar sama sekali */
     var age=reduce?99:(now-START)/1000;
     if(SW)swP=clamp((now-SW.t0)/SW.dur);
+    if(SP){var spU=clamp((now-SP.t0)/SP.dur);if(spU>=1){SP=null;SPT=0;}else SPT=1-ease(spU);}else SPT=0;   /* dimuntahkan dari BH setelah swallow sektor */
     HPV=0;if(!SW){try{if(typeof WORMHOLE!=='undefined')HPV=WORMHOLE.pull()||0;}catch(eHP){}}   /* tarikan hold portal (09) */
     mouse.x+=(mouse.tx-mouse.x)*.05;mouse.y+=(mouse.ty-mouse.y)*.05;
     updateAudioViz(now);pmk('audioViz');

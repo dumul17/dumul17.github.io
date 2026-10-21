@@ -177,7 +177,7 @@ function swallow(pos,ms,sec){
   kick();
 }
 /* Swallow sektor: terowongan sudah menutup layar -> naik ke ATAS sky (z 13) supaya zoom-out sektor di belakangnya tersembunyi, lalu menutup sendiri. */
-function coverUp(){if(cv&&state==='travel'&&S.sec){setUnder(false);S.cov=1;}}
+function coverUp(){if(cv&&state==='travel'&&S.sec){setUnder(false);S.cov=1;S.covT=performance.now();}}
 /* Lubang di plate sky (koordinat virtual stage, sama dengan canvas #sky) supaya terowongan di bawahnya kelihatan. null = tidak ada. */
 function hole(){
   if(!under||state==='idle'||S.cov)return null;
@@ -186,6 +186,11 @@ function hole(){
       k=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
   if(!isFinite(c[0])||!isFinite(c[1])||!isFinite(S.r))return null;
   return {x:c[0],y:c[1],r:S.r/k,a:clamp(S.a,0,1)};
+}
+/* posisi BH overview (layar) -> tujuan akhir terowongan swallow sektor, supaya isi overview 'dimuntahkan' dari lubang yang sama */
+function bhScr(){
+  try{if(typeof camBH==='function'){var b=camBH(),c=toScr(b[0],b[1]);if(c&&isFinite(c[0])&&isFinite(c[1]))return c;}}catch(e){}
+  return [winW()*.5,winH()*.5];
 }
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
 function gatePending(){return typeof SGATE!=='undefined'&&!!SGATE.pend;}
@@ -402,10 +407,11 @@ function tick(now){
     hp=0;q=now-S.tt;
     if(S.sw){   /* swallow overview: buka mengikuti tarikan swallow, lalu terus melesat sampai veil/tesseract */
       S.r=lerp(S.r1,cvr,eo(q/(S.sw*.72)));
-      p=sm(q/(S.sw*.6));S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
+      p=S.sec?(S.cov?sm((now-S.covT)/700):0):sm(q/(S.sw*.6));   /* sektor: lubang tetap di BH mini (objek menyedot ke sana) sampai layar tertutup, baru geser ke tengah */
+      if(S.sec){var bt=bhScr();S.cx=lerp(S.cx1,bt[0],p);S.cy=lerp(S.cy1,bt[1],p);}else{S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);}
       S.a=lerp(S.a1,1,sm(q/380));S.rate=lerp(S.rate1,1.35,sm(q/(S.sw*.8)));S.rim=1-sm(q/(S.sw*.4));
       env=0;
-      if(S.sec&&S.cov&&q>S.sw+400&&!secBusy()&&!gatePending())startClose(now,T_CLOSE,false);   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
+      if(S.sec&&S.cov&&q>S.sw+400&&!secBusy()&&!gatePending()){try{if(typeof startSpit==='function')startSpit();}catch(eSp){}startClose(now,T_CLOSE,false);}   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
       else if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
     }else{
     S.r=lerp(S.r1,cvr,eo(q/T_OPEN));

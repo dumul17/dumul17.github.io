@@ -3,13 +3,14 @@
 /* ---------- lubang hitam Gargantua ---------- */
 function ease(u){return u*u*(3-2*u);}
 function pull(x,y){                       /* posisi benda saat disedot: berputar spiral ke lubang hitam */
-  var P;
+  var P,spit=false;
   if(SW){P=clamp((swP-.05)/.82);var h0=SW.h0||0;if(h0>0)P=h0+(1-h0)*P;}   /* h0: tarikan hold yang sudah berjalan -> swallow lanjut mulus, tanpa lompat balik */
+  else if(SPT>.002){P=SPT;spit=true;}                                       /* dimuntahkan: kebalikan swallow, yang dekat lubang keluar duluan */
   else if(HPV>.002)P=HPV*HP_K;                                              /* hold portal: objek di atas mulut wormhole ditarik pelan ke tengah */
   else return [x,y,0];
   var bp=camBH(),bx=bp[0],by=bp[1];
   var dx=x-bx,dy=y-by,r=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
-  var rmax=Math.sqrt(W*W+H*H)*.6,delay=.4*Math.min(1,r/rmax);
+  var rmax=Math.sqrt(W*W+H*H)*.6,rr=Math.min(1,r/rmax),delay=.4*(spit?1-rr:rr);
   var k=clamp((P-delay)/(1-delay));k=k*k;
   var r2=r*Math.pow(1-k,1.5),t2=th+k*3.4;
   return [bx+Math.cos(t2)*r2,by+Math.sin(t2)*r2,k];
@@ -48,7 +49,7 @@ function gravityPos(x,y){
      keep the existing spiral pull animation. Saat hold portal (HPV>0): lensing tetap jalan, lalu hasilnya ikut ditarik ke tengah. */
   if(SW)return pull(x,y);
   var q=lens(x,y);
-  if(HPV>.002){
+  if(HPV>.002||SPT>.002){
     if(!q)return [x,y,1];
     return pull(q[0],q[1]);
   }
@@ -280,6 +281,7 @@ function drawHoleFallback(now,age){
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
      primitives so one unsupported effect cannot make the whole scene vanish. */
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
+  if(SW&&SW.sec)sc*=1-ease(clamp(swP/.3));
   var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ*BHSC);
   if(R<.5)return;
   var bp=camBH();
@@ -317,6 +319,7 @@ function drawHoleSafe(now,age){
 var BH_DISK_DY=.20,BH_LENS_DY=0;
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
+  if(SW&&SW.sec)sc*=1-ease(clamp(swP/.3));   /* swallow sektor: BH mini mengecil & hilang ke dalam terowongan (yang jadi lubang hitamnya), bukan jadi 2 wormhole */
   BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*bhSizeMul();
   if(BH.Rr<1||!BH.sprite)return;
 
