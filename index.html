@@ -282,7 +282,7 @@
   </nav>
   <p class="quote" data-i18n="footer.quote">Keep creating, even without the applause.</p>
 </footer>
-<!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (urutan JANGAN diubah; 11-live-count.js dimuat lewat import() di script inline) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
+<!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (urutan JANGAN diubah; 11-live-count.js dimuat lewat import() di script inline; 12-ast3d.js ada SETELAH script inline itu; three.min.js dimuat lazy oleh 12-ast3d.js dan harus ada di SHELL) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
 <div id="live-count" hidden aria-hidden="true"><i></i><b>0</b><span>observer</span></div>
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=28"></script>
@@ -293,7 +293,7 @@
 <script defer src="dumul-js/obs/js/01-core.js?v=128"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=122"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=107"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=123"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=124"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=137"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=117"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=111"></script>
@@ -309,6 +309,7 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=1"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
