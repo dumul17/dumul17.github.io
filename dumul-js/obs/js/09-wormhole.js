@@ -11,6 +11,7 @@
    Titik sambung (semua lewat window.WORMHOLE, selalu dibungkus try/catch + cek keberadaan) — TIDAK BERUBAH dari v3:
      - 05-sector-ui.js  sgJump()         -> WORMHOLE.gate(s,camBH())        gate antar sektor
      - 06-interaction.js beginBHDrag()   -> holdStart / holdCommit / holdCancel   hold BH mini (long-press 580ms)
+     - 04-render.js     startSwallow()   -> WORMHOLE.swallow(camBH(),ms)    swallow BH overview -> dumul.html (sebelum tesseract)
      - 01-core.js       spatialTarget()  -> WORMHOLE.muffle()               redam audio selama di dalam wormhole
    Efek mati sendiri (no-op) kalau prefers-reduced-motion atau canvas 2D tidak ada. */
 (function(){
@@ -50,6 +51,12 @@ function eo(t){t=clamp(t,0,1);return 1-Math.pow(1-t,3);}
 function winW(){return window.innerWidth||document.documentElement.clientWidth;}
 function winH(){return window.innerHeight||document.documentElement.clientHeight;}
 function cover(){return Math.hypot(winW(),winH())*1.08;}
+/* Koordinat dari camBH()/pointer ada di ruang VIRTUAL stage (landscape HP: stage diputar 90°; desktop/tablet: portrait di-letterbox),
+   sedangkan canvas ini menggambar di koordinat LAYAR asli. v2c() (01-core.js) menyamakan keduanya; portrait = identitas. */
+function toScr(x,y){
+  try{if(typeof v2c==='function'&&typeof STG!=='undefined'&&STG.on){var c=v2c(x,y);if(c&&isFinite(c[0])&&isFinite(c[1]))return c;}}catch(e){}
+  return [x,y];
+}
 
 /* ---------- sprite titik lembut (di-bake sekali: satu baris per warna bintang + warna dinding) ---------- */
 function buildSprites(){
@@ -134,21 +141,33 @@ function startClose(now,ms,shrink){
 function holdStart(x,y,ms){
   if(!usable()||state!=='idle'&&state!=='close')return;
   if(!init())return;
+  var sp=toScr(x,y);x=sp[0];y=sp[1];
   state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1};
   dens=1;show();fresh=Math.min(winW(),winH())*R_HOLD;kick();
 }
 function holdArm(){if(state==='charge'){S.p=1;state='armed';S.ta=performance.now();}}   /* hold selesai: portal siaga, TIDAK masuk dulu */
-function holdMove(x,y){if(state==='armed'||state==='charge'){S.x=x;S.y=y;}}            /* geser mulut portal (jari masih menahan) */
+function holdMove(x,y){if(state==='armed'||state==='charge'){var sp=toScr(x,y);S.x=sp[0];S.y=sp[1];}}            /* geser mulut portal (jari masih menahan) */
 function holdCommit(){if(state==='charge'||state==='armed'){S.p=1;state='held';S.th=performance.now();}}   /* jari dilepas -> lanjut masuk */
 function holdCancel(){if(state==='charge'||state==='armed')startClose(performance.now(),240,true);}
 function gate(s,pos){
   if(!usable()||!init())return;
-  var now=performance.now(),x=pos&&pos[0]!=null?pos[0]:winW()*.5,y=pos&&pos[1]!=null?pos[1]:winH()*.5;
+  var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
   if(state==='idle'||state==='close'){dens=1;S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.5,a:.4,rate:.7,rim:1};}
   engage(now);show();fresh=Math.hypot(winW(),winH())*.56;kick();
 }
 function engage(now){
   state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=S.a;S.rate1=S.rate;
+}
+/* Swallow BH overview (tap BH -> dumul.html): terowongan tumbuh dari BH selama animasi swallow (ms ~ 2800), penuh sebelum veil hitam
+   menutup dan tesseract mengambil alih. Tidak menutup sendiri (halaman pindah); pengaman 14 dtk kalau navigasi gagal.
+   Tanpa teleskop (di-swallow oleh sky canvas) dan tanpa muffle audio (GARG = BGM transisi, bukan stellar signal). */
+function swallow(pos,ms){
+  if(!usable()||!init())return;
+  var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,
+      x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
+  dens=1;
+  S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.45,a:.4,rate:.7,rim:1,sw:ms||2800};
+  engage(now);show();fresh=Math.min(winW(),winH())*R_HOLD;kick();
 }
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
 function gatePending(){return typeof SGATE!=='undefined'&&!!SGATE.pend;}
@@ -328,7 +347,7 @@ function drawFrame(dt,cx,cy,r,cvr){
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
   }
-  if(!small)drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
+  if(!small&&!S.sw)drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
   if(small&&RIM_GLOW>0&&S.rim>.02){   /* kilau lembut di sekitar mulut (bukan garis): halo tipis yang memudar ke dua arah */
@@ -363,12 +382,20 @@ function tick(now){
   }
   if(state==='travel'){
     q=now-S.tt;
+    if(S.sw){   /* swallow overview: buka mengikuti tarikan swallow, lalu terus melesat sampai veil/tesseract */
+      S.r=lerp(S.r1,cvr,eo(q/(S.sw*.72)));
+      p=sm(q/(S.sw*.6));S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
+      S.a=lerp(S.a1,1,sm(q/380));S.rate=lerp(S.rate1,1.35,sm(q/(S.sw*.8)));S.rim=1-sm(q/(S.sw*.4));
+      env=0;
+      if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
+    }else{
     S.r=lerp(S.r1,cvr,eo(q/T_OPEN));
     p=sm(q/T_MOVE);S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
     S.a=lerp(S.a1,1,sm(q/T_FADE));S.rate=lerp(S.rate1,1.1,sm(q/T_MOVE));S.rim=1-sm(q/T_OPEN);
     env=Math.max(env,0);env+=(1-env)*Math.min(1,dt*5);
     if(q>MIN_TRAVEL&&!secBusy()&&!gatePending())startClose(now,T_CLOSE,false);
     else if(q>9000)startClose(now,T_CLOSE,false);   /* pengaman: transisi macet */
+    }
   }
   if(state==='close'){
     q=clamp((now-S.tc)/S.cms,0,1);eT=sm(q);
@@ -396,6 +423,7 @@ window.WORMHOLE={
   holdCommit:function(){try{holdCommit();}catch(e){}},
   holdCancel:function(){try{holdCancel();}catch(e){}},
   gate:function(s,pos){try{gate(s,pos);}catch(e){}},
+  swallow:function(pos,ms){try{swallow(pos,ms);}catch(e){}},
   muffle:function(){return muffle();},
   get on(){return state!=='idle';},
   get supported(){return usable();}

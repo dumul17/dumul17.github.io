@@ -216,6 +216,7 @@ function startSwallow(href){
   var SWALLOW_MS=2800;
   var TESS_MS=5600;
   SW={t0:performance.now(),dur:SWALLOW_MS};
+  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SWALLOW_MS);}catch(eW){}   /* wormhole (09): terowongan tumbuh dari BH overview selama swallow; veil hitam + tesseract menyusul */
   /* BGM starts on the same user gesture (autoplay). Tesseract starts AFTER swallow. */
   setTimeout(function(){startTesseractWarp(href);},SWALLOW_MS);
   document.body.classList.add('sw');
