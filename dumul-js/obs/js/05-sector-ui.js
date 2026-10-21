@@ -161,6 +161,11 @@ function sectToggle(){
   if(SECT.busy)return;
   if(SECT.phase==='sec')lisAsk(sectZoomOut,false);   /* ada teleskop di sini? tanya ajak / tinggal dulu */
 }
+/* Keluar sektor lewat tekan & tahan BH mini: sama dengan sectToggle, tapi pakai swallow (04-render.js) sebelum zoom-out */
+function sectSwallowToggle(){
+  if(SECT.busy||SW)return;
+  if(SECT.phase==='sec')lisAsk(startSectorSwallow,false);
+}
 /* ---- Gargantua = sektor 0. Di dalam sektor dia disembunyikan; tombol 🕳️ memanggilnya kecil (seukuran pulse) & bebas di-parkir ---- */
 /* Soft proximity of summoned mini-BH to rasi/cluster mass. Continuous field, no hard edge. */
 function bhNearFactor(){
@@ -201,7 +206,7 @@ function bhNearAt(bx,by){
   return f*f*(3-2*f);
 }
 function bhScaleTarget(){
-  if(SW)return 1;
+  if(SW&&!SW.sec)return 1;   /* swallow sektor: BH mini tetap seukuran parkir (jatuh ke cabang SECT.cur di bawah) */
   if(SECT.cur){
     if(!SUM.on)return 0;
     if(CAMERA_MODE&&SUM.on&&camFocusId()==='bh')return 1; /* fokus kamera ke BH mini (cam 1x): seukuran BH overview; keluar fokus/kamera -> balik ke ukuran parkir */
@@ -1155,6 +1160,18 @@ function frame(now){
       }
       sectDrawSky();   /* warna langit per sektor (data: SECTORS[].sky di sky-data.js) */
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      /* Swallow BH overview: terowongan wormhole (09) ada DI BAWAH canvas ini. Plate dilubangi lembut di mulut terowongan (tepi sama dengan mask 09),
+         jadi terowongan kelihatan tumbuh dari BH tapi bintang/rasi/BH/asteroid yang ke-swallow digambar di atasnya, nggak ketimpa. Biaya: 1 gradien/frame, hanya saat SW. */
+      if(SW&&typeof WORMHOLE!=='undefined'&&WORMHOLE.hole){
+        var wh=WORMHOLE.hole();
+        if(wh&&wh.a>.01&&wh.r>1){
+          g.save();g.globalCompositeOperation='destination-out';
+          var whg=g.createRadialGradient(wh.x,wh.y,0,wh.x,wh.y,wh.r),wa=wh.a,ws=.5;
+          whg.addColorStop(0,'rgba(0,0,0,'+wa+')');whg.addColorStop(ws,'rgba(0,0,0,'+wa+')');
+          whg.addColorStop(ws+(1-ws)*.36,'rgba(0,0,0,'+(wa*.72).toFixed(3)+')');whg.addColorStop(ws+(1-ws)*.68,'rgba(0,0,0,'+(wa*.26).toFixed(3)+')');whg.addColorStop(1,'rgba(0,0,0,0)');
+          g.fillStyle=whg;g.fillRect(0,0,W,H);g.restore();
+        }
+      }
       /* Grid RA/Dec: canvas terpisah, cuma di mode cam; param blit persis sama dgn bgCanvas */
       if(CAMERA_MODE){
         ensureCamGrid();

@@ -509,7 +509,7 @@ function drawHole(now,age){
     g.restore();
   }
 
-  if(SW){
+  if(SW&&!SW.sec){   /* flash cyan akhir: cuma swallow overview (sektor langsung disambung terowongan) */
     var f=clamp((swP-.80)/.18);
     if(f>0){
       var fr=Math.sqrt(W*W+H*H)*(.12+.75*f),

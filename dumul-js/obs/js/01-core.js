@@ -43,7 +43,7 @@ var mouse={x:0,y:0,tx:0,ty:0,px:null,py:null},glitchUntil=0,hot=null;
    the pointer actually moved, throttled ~30Hz — never every render frame. */
 var hoverDirty=false,lastHoverAt=0,HOVER_MIN_MS=33;
 var touchMode=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-var drag={on:false,moved:false,pid:null,x0:0,y0:0,bx:0,by:0,tapEligible:false,lpTimer:null,lpFired:false};
+var drag={on:false,moved:false,pid:null,x0:0,y0:0,bx:0,by:0,tapEligible:false,lpTimer:null,lpFired:false,armed:false,ov:false};
 /* Mobile sky-pan + rotate: swipe to slide, 2-finger twist ±180°, both spring back. */
 var skyPan={x:0,y:0};
 /* ---- Landscape stage ----

@@ -187,6 +187,22 @@ function startTesseractWarp(targetUrl) {
   requestAnimationFrame(render);
 }
 
+/* Swallow BH MINI di sektor (tekan & tahan lalu lepas): isi sektor disedot spiral ke BH mini (pull() lewat state SW, ditandai SW.sec) sambil
+   terowongan wormhole (09) tumbuh DI BAWAH canvas sky. Setelah SECTOR_SW_MS terowongan sudah menutup layar: dia naik ke atas sky (WORMHOLE.cover),
+   SW dilepas (isi sky balik tanpa kelihatan), lalu zoom-out ke overview jalan di bawah terowongan, dan terowongan menutup sendiri begitu SECT.busy selesai.
+   Beda dengan startSwallow: tanpa redirect, tanpa matiin audio, tanpa swirl HUD. */
+var SECTOR_SW_MS=2000;
+function startSectorSwallow(){
+  if(SW||SECT.busy||!SECT.cur||!SECT.target)return;
+  SW={t0:performance.now(),dur:SECTOR_SW_MS,sec:true};
+  document.body.classList.add('sw');
+  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SECTOR_SW_MS,true);}catch(eW){}
+  setTimeout(function(){
+    try{if(typeof WORMHOLE!=='undefined')WORMHOLE.cover();}catch(eC){}
+    SW=null;swP=0;document.body.classList.remove('sw');
+    try{sectZoomOut();}catch(eZ){}
+  },SECTOR_SW_MS);
+}
 function startSwallow(href){
   if(SW)return;
   if(typeof markWentToDumul==='function')markWentToDumul();
@@ -216,7 +232,7 @@ function startSwallow(href){
   var SWALLOW_MS=2800;
   var TESS_MS=5600;
   SW={t0:performance.now(),dur:SWALLOW_MS};
-  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SWALLOW_MS);}catch(eW){}   /* wormhole (09): terowongan tumbuh dari BH overview selama swallow; veil hitam + tesseract menyusul */
+  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SWALLOW_MS);}catch(eW){}   /* wormhole (09): terowongan tumbuh bareng swallow, digambar DI BAWAH canvas sky (lihat hole() di 05-sector-ui.js); veil hitam + tesseract menyusul */
   /* BGM starts on the same user gesture (autoplay). Tesseract starts AFTER swallow. */
   setTimeout(function(){startTesseractWarp(href);},SWALLOW_MS);
   document.body.classList.add('sw');

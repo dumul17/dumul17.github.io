@@ -366,7 +366,7 @@ function beginBHDrag(e){
   if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;
   drag.tapEligible=(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
-  drag.lpFired=false;drag.armed=false;clearBHlp();
+  drag.lpFired=false;drag.armed=false;drag.ov=false;clearBHlp();
   /* Fase 2: long-press BH mini di sektor → kembali ke overview (ganti tombol #mode-sectors). */
   if(SECT.cur&&SUM.on&&drag.tapEligible){
     try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580);}catch(eW0){}   /* wormhole (09): mulut portal tumbuh di BH mini selama hold */
@@ -385,6 +385,27 @@ function beginBHDrag(e){
       try{cv.releasePointerCapture(drag.pid);}catch(err){}
       haptic(18);
       try{if(typeof sectToggle==='function')sectToggle();}catch(e){}
+    },580);
+  }
+  /* Overview (Gargantua): tekan & tahan = SAMA seperti BH mini. Portal tumbuh di BH selama hold, terbuka penuh (armed, boleh di-drag),
+     lepas jari = swallow ke dumul.html. Tap singkat TIDAK lagi masuk (cegah kepencet); keyboard/AT tetap lewat link #bh. */
+  else if(!SECT.cur&&!SECT.busy&&drag.tapEligible){
+    drag.ov=true;
+    try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580);}catch(eO0){}
+    drag.lpTimer=setTimeout(function(){
+      drag.lpTimer=null;
+      if(!drag.on||drag.moved||SECT.cur||SECT.busy||SW){try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCancel();}catch(eO1){}return;}
+      if(typeof WORMHOLE!=='undefined'&&WORMHOLE.supported){
+        drag.armed=true;drag.lpFired=false;
+        haptic(18);
+        try{WORMHOLE.holdArm();}catch(eO2){}
+        return;
+      }
+      /* fallback (reduced-motion / tanpa canvas 2D): swallow langsung saat hold selesai */
+      drag.lpFired=true;drag.on=false;
+      try{cv.releasePointerCapture(drag.pid);}catch(err){}
+      haptic(18);
+      try{startSwallow(bhA.getAttribute('href'));}catch(eO3){}
     },580);
   }
   try{cv.setPointerCapture(e.pointerId);}catch(err){}
@@ -411,12 +432,19 @@ function moveBHDrag(e){
 function endBHDrag(e){
   if(!drag.on||e.pointerId!==drag.pid)return;
   if(drag.armed){   /* hold selesai & portal terbuka: lepas jari = masuk wormhole; pointercancel / keadaan berubah = batal */
+    var wasOv=drag.ov;drag.ov=false;
     drag.armed=false;drag.on=false;drag.moved=false;drag.lpFired=false;
     try{cv.releasePointerCapture(e.pointerId);}catch(err){}
+    if(wasOv){   /* overview: lepas jari = swallow (portal yang sudah terbuka diteruskan, bukan mulai ulang) */
+      if(e.type==='pointercancel'||SECT.cur||SECT.busy||SW){try{WORMHOLE.holdCancel();}catch(eO4){}return;}
+      haptic(18);
+      startSwallow(bhA.getAttribute('href'));
+      return;
+    }
     if(e.type==='pointercancel'||!SECT.cur||!SUM.on||SECT.busy){try{WORMHOLE.holdCancel();}catch(eW4){}return;}
     haptic(18);
     try{WORMHOLE.holdCommit();}catch(eW5){}
-    try{if(typeof sectToggle==='function')sectToggle();}catch(er){}
+    try{if(typeof sectSwallowToggle==='function')sectSwallowToggle();else if(typeof sectToggle==='function')sectToggle();}catch(er){}   /* swallow BH mini -> overview (fallback: zoom-out biasa) */
     return;
   }
   var was=drag.moved,lp=drag.lpFired;
@@ -429,7 +457,7 @@ function endBHDrag(e){
   }else if(drag.tapEligible){
     e.preventDefault();
     if(SECT.cur&&SUM.on)sgToggle();   /* short tap: shortcut gate antar sektor */
-    else startSwallow(bhA.getAttribute('href'));   /* overview: portal ke dumul.html */
+    /* overview: tap singkat tidak masuk lagi; masuk dumul.html = tekan & tahan (lihat blok hold overview di beginBHDrag) */
   }
 }
 document.addEventListener('pointerdown',function(e){
