@@ -3,11 +3,14 @@
 /* ---------- lubang hitam Gargantua ---------- */
 function ease(u){return u*u*(3-2*u);}
 function pull(x,y){                       /* posisi benda saat disedot: berputar spiral ke lubang hitam */
-  if(!SW)return [x,y,0];
+  var P;
+  if(SW){P=clamp((swP-.05)/.82);var h0=SW.h0||0;if(h0>0)P=h0+(1-h0)*P;}   /* h0: tarikan hold yang sudah berjalan -> swallow lanjut mulus, tanpa lompat balik */
+  else if(HPV>.002)P=HPV*HP_K;                                              /* hold portal: objek di atas mulut wormhole ditarik pelan ke tengah */
+  else return [x,y,0];
   var bp=camBH(),bx=bp[0],by=bp[1];
   var dx=x-bx,dy=y-by,r=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
   var rmax=Math.sqrt(W*W+H*H)*.6,delay=.4*Math.min(1,r/rmax);
-  var P=clamp((swP-.05)/.82),k=clamp((P-delay)/(1-delay));k=k*k;
+  var k=clamp((P-delay)/(1-delay));k=k*k;
   var r2=r*Math.pow(1-k,1.5),t2=th+k*3.4;
   return [bx+Math.cos(t2)*r2,by+Math.sin(t2)*r2,k];
 }
@@ -42,9 +45,13 @@ function lens(x,y){                       /* smooth gravitational lens: bounded,
 }
 function gravityPos(x,y){
   /* Gargantua continuously lenses the galaxy; during the swallow transition,
-     keep the existing spiral pull animation. */
+     keep the existing spiral pull animation. Saat hold portal (HPV>0): lensing tetap jalan, lalu hasilnya ikut ditarik ke tengah. */
   if(SW)return pull(x,y);
   var q=lens(x,y);
+  if(HPV>.002){
+    if(!q)return [x,y,1];
+    return pull(q[0],q[1]);
+  }
   return q ? [q[0],q[1],0] : [x,y,1];
 }
 /* ===== Visual Gargantua: "Interstellar Blackhole Gargantua #2 - Pure CSS" =====

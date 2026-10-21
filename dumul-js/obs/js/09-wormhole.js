@@ -1,5 +1,6 @@
 'use strict';
 /* ===== 09-wormhole.js — wormhole transisi (gate Sector Gate + hold Gargantua mini) + muffle audio =====
+   v5: hold/swallow di BAWAH sky (hole() di 05), tarikan hold (pull()), fix cover() ganda (NaN), frame error aman.
    v4: terowongan "warp" biru-ungu-magenta dengan kilau hangat di tepi lubang, streak bintang melesat radial + berputar pelan
    (referensi: foto wormhole berkilau). Canvas 2D biasa: tanpa WebGL, tanpa shader, tanpa tekstur eksternal.
    Cara kerjanya (ringan): 2 buffer kecil (setengah resolusi layar) dipakai ping-pong sebagai "feedback zoom" — tiap frame isi buffer
@@ -39,7 +40,7 @@ var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / 
 
 var ZN=.05, BG='#02050d', WARM=16;
 var cv=null,g=null,spr=null,SC=48,dpr=1,RGB=[],NP=STAR_PAL.length,NN=NEB_PAL.length,
-    ST=[],inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
+    ST=[],under=false,hp=0,inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
     W=0,H=0,bw=0,bh=0,bq=.5,bA=null,bB=null,gA=null,gB=null,fresh=0,nebAcc=0,dustAcc=0;
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
@@ -131,19 +132,20 @@ function init(){
    idle -> charge (hold berjalan) -> armed (portal terbuka penuh, jari masih menahan; boleh di-drag via holdMove) -> held (jari dilepas: nunggu kartu teleskop / sectZoomOut) -> travel -> close -> idle
    gate() langsung ke travel. holdCancel() / hold gagal -> close (mengecil). */
 function show(){if(cv&&cv.style.display!=='block'){resize();cv.style.display='block';}}
-function hide(){if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
-function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}state='idle';env=0;hide();}
+function setUnder(b){under=!!b;if(cv)cv.style.zIndex=b?'-1':'13';}   /* true = DI BAWAH canvas #sky (hold + swallow); false = di atas (gate, penutup layar) */
+function hide(){under=false;hp=0;if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
+function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}state='idle';env=0;hp=0;hide();}
 function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);}}
 function startClose(now,ms,shrink){
   if(state==='close'||state==='idle')return;
-  S.c0=[S.cx,S.cy];S.r0=S.r;S.a0=S.a;S.e0=env;S.rate0=S.rate;S.tc=now;S.cms=ms;S.shrink=!!shrink;state='close';kick();
+  S.hp0=hp;S.c0=[S.cx,S.cy];S.r0=S.r;S.a0=S.a;S.e0=env;S.rate0=S.rate;S.tc=now;S.cms=ms;S.shrink=!!shrink;state='close';kick();
 }
 function holdStart(x,y,ms){
   if(!usable()||state!=='idle'&&state!=='close')return;
   if(!init())return;
   var sp=toScr(x,y);x=sp[0];y=sp[1];
   state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1};
-  dens=1;show();fresh=Math.min(winW(),winH())*R_HOLD;kick();
+  dens=1;show();setUnder(true);fresh=Math.min(winW(),winH())*R_HOLD;kick();   /* mulut portal di BAWAH sky (sky dilubangi lewat hole()) */
 }
 function holdArm(){if(state==='charge'){S.p=1;state='armed';S.ta=performance.now();}}   /* hold selesai: portal siaga, TIDAK masuk dulu */
 function holdMove(x,y){if(state==='armed'||state==='charge'){var sp=toScr(x,y);S.x=sp[0];S.y=sp[1];}}            /* geser mulut portal (jari masih menahan) */
@@ -153,7 +155,7 @@ function gate(s,pos){
   if(!usable()||!init())return;
   var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
   if(state==='idle'||state==='close'){dens=1;S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.5,a:.4,rate:.7,rim:1};}
-  engage(now);show();fresh=Math.hypot(winW(),winH())*.56;kick();
+  engage(now);show();setUnder(false);fresh=Math.hypot(winW(),winH())*.56;kick();
 }
 function engage(now){
   state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=S.a;S.rate1=S.rate;
@@ -171,16 +173,18 @@ function swallow(pos,ms,sec){
   if(hold){x=S.cx;y=S.cy;r0=Math.max(S.r,r0);a0=Math.max(S.a,a0);rate0=S.rate;}   /* teruskan portal yang ada: nggak mengecil lalu tumbuh lagi */
   S={x:x,y:y,cx:x,cy:y,r:r0,a:a0,rate:rate0,rim:1,sw:ms||2800,sec:!!sec};   /* sec: swallow BH mini di sektor (lihat startSectorSwallow di 04-render.js) */
   engage(now);show();fresh=hold?0:Math.min(winW(),winH())*R_HOLD;
-  cv.style.zIndex='-1';   /* DI BAWAH #sky: bintang/rasi/BH/HUD yang ke-swallow tetap di depan terowongan. Sky "melubangi" platenya sendiri lewat hole() */
+  setUnder(true);   /* DI BAWAH #sky: bintang/rasi/BH/HUD yang ke-swallow tetap di depan terowongan. Sky "melubangi" platenya sendiri lewat hole() */
   kick();
 }
 /* Swallow sektor: terowongan sudah menutup layar -> naik ke ATAS sky (z 13) supaya zoom-out sektor di belakangnya tersembunyi, lalu menutup sendiri. */
-function cover(){if(cv&&state==='travel'&&S.sec){cv.style.zIndex='13';S.cov=1;}}
+function coverUp(){if(cv&&state==='travel'&&S.sec){setUnder(false);S.cov=1;}}
 /* Lubang di plate sky (koordinat virtual stage, sama dengan canvas #sky) supaya terowongan di bawahnya kelihatan. null = tidak ada. */
 function hole(){
-  if(state!=='travel'||!S.sw)return null;
+  if(!under||state==='idle'||S.cov)return null;
+  if(state==='travel'&&!S.sw)return null;
   var c=(typeof c2v==='function'&&typeof STG!=='undefined'&&STG.on)?c2v(S.cx,S.cy):[S.cx,S.cy],
       k=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
+  if(!isFinite(c[0])||!isFinite(c[1])||!isFinite(S.r))return null;
   return {x:c[0],y:c[1],r:S.r/k,a:clamp(S.a,0,1)};
 }
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
@@ -381,12 +385,12 @@ function tick(now){
   last=now;ema+=(dt-ema)*.08;
   if(state==='charge'){
     p=clamp((now-S.t0)/S.ms,0,1);
-    S.r=rh*eo(p);S.a=Math.min(1,p*1.7);S.rate=lerp(.5,.9,p);S.cx=S.x;S.cy=S.y;S.rim=1;env=.5*sm(p);
+    S.r=rh*eo(p);S.a=Math.min(1,p*1.7);S.rate=lerp(.5,.9,p);S.cx=S.x;S.cy=S.y;S.rim=1;env=.5*sm(p);hp=.4*sm(p);
     if(now>S.t0+S.ms+220)startClose(now,240,true);   /* timer long-press batal di tengah jalan tanpa lapor */
   }else if(state==='armed'){
     /* siaga: mulut sedikit lebih besar & berdenyut, ikut jari dengan easing halus; tanpa batas waktu singkat (pengaman 30 dtk) */
     p=Math.min(1,dt*16);S.cx+=(S.x-S.cx)*p;S.cy+=(S.y-S.cy)*p;
-    S.r=rh*(1.05+.03*Math.sin(now*.008));S.a=1;S.rate=lerp(S.rate,1,Math.min(1,dt*4));S.rim=1;env=.5;
+    S.r=rh*(1.05+.03*Math.sin(now*.008));S.a=1;S.rate=lerp(S.rate,1,Math.min(1,dt*4));S.rim=1;env=.5;hp=lerp(.4,1,sm((now-S.ta)/1400));
     if(now-S.ta>30000)startClose(now,260,true);
   }else if(state==='held'){
     S.r=rh*(1+.03*Math.sin(now*.008));S.a=1;S.rate=.9;S.rim=1;env=.5;
@@ -395,7 +399,7 @@ function tick(now){
     else if(now-S.th>20000)startClose(now,260,true);
   }
   if(state==='travel'){
-    q=now-S.tt;
+    hp=0;q=now-S.tt;
     if(S.sw){   /* swallow overview: buka mengikuti tarikan swallow, lalu terus melesat sampai veil/tesseract */
       S.r=lerp(S.r1,cvr,eo(q/(S.sw*.72)));
       p=sm(q/(S.sw*.6));S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
@@ -416,14 +420,20 @@ function tick(now){
     q=clamp((now-S.tc)/S.cms,0,1);eT=sm(q);
     S.cx=S.c0[0];S.cy=S.c0[1];
     S.r=S.shrink?S.r0*(1-.55*eT):S.r0;
-    S.a=S.a0*(1-eT);S.rate=lerp(S.rate0,.6,eT);S.rim=S.shrink?1:0;env=S.e0*(1-eT);
-    if(q>=1){state='idle';env=0;hide();return;}
+    S.a=S.a0*(1-eT);S.rate=lerp(S.rate0,.6,eT);S.rim=S.shrink?1:0;env=S.e0*(1-eT);hp=(S.hp0||0)*(1-eT);
+    if(q>=1){state='idle';env=0;hp=0;hide();return;}
   }
   /* kalau frame berat: kurangi jumlah stream (maks sampai 45%), resolusi tetap tajam */
   if(ema>.034&&dens>.46){dens-=.18;ema=.016;}
   if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr))resize();
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
-  drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);
+  if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
+  if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*R_HOLD;S.cx=W*.5;S.cy=H*.5;}
+  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);}
+  catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
+    try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
+    hardStop();return;
+  }
   raf=requestAnimationFrame(tick);
 }
 
@@ -440,7 +450,8 @@ window.WORMHOLE={
   gate:function(s,pos){try{gate(s,pos);}catch(e){}},
   swallow:function(pos,ms){try{swallow(pos,ms);}catch(e){}},
   hole:function(){try{return hole();}catch(e){return null;}},
-  cover:function(){try{cover();}catch(e){}},
+  cover:function(){try{coverUp();}catch(e){}},
+  pull:function(){return state==='idle'||state==='travel'?0:hp;},
   muffle:function(){return muffle();},
   get on(){return state!=='idle';},
   get supported(){return usable();}

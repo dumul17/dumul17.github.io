@@ -415,7 +415,14 @@ function beginBHDrag(e){
 function moveBHDrag(e){
   if(!drag.on||e.pointerId!==drag.pid)return;
   var dx=e.clientX-drag.x0,dy=e.clientY-drag.y0;
-  if(Math.hypot(dx,dy)>7){drag.moved=true;clearBHlp();}
+  var mv=Math.hypot(dx,dy);
+  /* Overview: portal sudah terbuka (armed) lalu di-drag = batalkan swallow. BH overview punya springback, jadi nggak boleh nabrak swallow. Toleransi 12px biar jari goyang nggak membatalkan. */
+  if(drag.ov&&drag.armed&&!drag.moved){
+    if(mv<=12)return;
+    drag.armed=false;
+    try{WORMHOLE.holdCancel();}catch(eOc){}
+  }
+  if(mv>7){drag.moved=true;clearBHlp();}
   if(drag.moved){
     var dz=(SECT.cur&&SUM.on)?Math.max(1,skyZoom):1;dx/=dz;dy/=dz;
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);

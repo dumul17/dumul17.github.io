@@ -1435,6 +1435,7 @@ function focusStep(){
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
 var SW=null,swP=0;
+var HPV=0,HP_K=.5;   /* HPV: tarikan portal saat hold (0..1, dari WORMHOLE.pull() tiap frame); HP_K: porsi tarikan penuh swallow yang dipakai saat hold */
 var AMB=mkAudio('constellation.opus',.5,true,'auto');
 var GARG=mkAudio('glitch-instrumental.opus',0,true,'auto');
 var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');

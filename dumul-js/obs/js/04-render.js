@@ -194,7 +194,7 @@ function startTesseractWarp(targetUrl) {
 var SECTOR_SW_MS=2000;
 function startSectorSwallow(){
   if(SW||SECT.busy||!SECT.cur||!SECT.target)return;
-  SW={t0:performance.now(),dur:SECTOR_SW_MS,sec:true};
+  SW={t0:performance.now(),dur:SECTOR_SW_MS,sec:true,h0:HPV*HP_K};
   document.body.classList.add('sw');
   try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SECTOR_SW_MS,true);}catch(eW){}
   setTimeout(function(){
@@ -231,7 +231,7 @@ function startSwallow(href){
      SW.dur tracks the sky pull only; redirect is owned by startTesseractWarp. */
   var SWALLOW_MS=2800;
   var TESS_MS=5600;
-  SW={t0:performance.now(),dur:SWALLOW_MS};
+  SW={t0:performance.now(),dur:SWALLOW_MS,h0:HPV*HP_K};
   try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SWALLOW_MS);}catch(eW){}   /* wormhole (09): terowongan tumbuh bareng swallow, digambar DI BAWAH canvas sky (lihat hole() di 05-sector-ui.js); veil hitam + tesseract menyusul */
   /* BGM starts on the same user gesture (autoplay). Tesseract starts AFTER swallow. */
   setTimeout(function(){startTesseractWarp(href);},SWALLOW_MS);

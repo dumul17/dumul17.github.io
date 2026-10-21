@@ -1109,6 +1109,7 @@ function frame(now){
     if(PX.all){resetCanvasState();g.clearRect(0,0,W,H);pmk('kosong');lastFrameOK=now;pEnd(now);return;}   /* diagnosa: loop jalan, tidak ada gambar sama sekali */
     var age=reduce?99:(now-START)/1000;
     if(SW)swP=clamp((now-SW.t0)/SW.dur);
+    HPV=0;if(!SW){try{if(typeof WORMHOLE!=='undefined')HPV=WORMHOLE.pull()||0;}catch(eHP){}}   /* tarikan hold portal (09) */
     mouse.x+=(mouse.tx-mouse.x)*.05;mouse.y+=(mouse.ty-mouse.y)*.05;
     updateAudioViz(now);pmk('audioViz');
     ofxSafe(ofxUpdate,now);
@@ -1162,7 +1163,7 @@ function frame(now){
       plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
       /* Swallow BH overview: terowongan wormhole (09) ada DI BAWAH canvas ini. Plate dilubangi lembut di mulut terowongan (tepi sama dengan mask 09),
          jadi terowongan kelihatan tumbuh dari BH tapi bintang/rasi/BH/asteroid yang ke-swallow digambar di atasnya, nggak ketimpa. Biaya: 1 gradien/frame, hanya saat SW. */
-      if(SW&&typeof WORMHOLE!=='undefined'&&WORMHOLE.hole){
+      if(typeof WORMHOLE!=='undefined'&&WORMHOLE.hole){   /* hold + swallow: mulut portal di bawah sky */
         var wh=WORMHOLE.hole();
         if(wh&&wh.a>.01&&wh.r>1){
           g.save();g.globalCompositeOperation='destination-out';
