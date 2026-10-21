@@ -203,11 +203,6 @@ function startSectorSwallow(){
     try{sectZoomOut();}catch(eZ){}
   },SECTOR_SW_MS);
 }
-/* Dimuntahkan: tepat saat terowongan swallow sektor mulai menutup, isi overview menyembur keluar spiral dari BH overview (kebalikan swallow). Dipanggil dari 09-wormhole.js. */
-function startSpit(delay){
-  if(reduce||SW)return;
-  SP={t0:performance.now()+(delay||0),dur:1400};   /* delay: tunggu terowongan mulai pudar supaya semburannya kelihatan */
-}
 function startSwallow(href){
   if(SW)return;
   if(typeof markWentToDumul==='function')markWentToDumul();

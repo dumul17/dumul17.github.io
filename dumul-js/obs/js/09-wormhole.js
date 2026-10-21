@@ -36,7 +36,7 @@ var RIM_GLOW=.09;     /* kilau tipis di luar mulut portal mini (0 = tanpa kilau)
 var R_HOLD=.22;       /* radius mulut portal saat hold, x min(W,H) */
 var CHARGE_MS=580;    /* harus sama dengan setTimeout long-press di beginBHDrag */
 var MIN_TRAVEL=2200;  /* ms minimal di dalam wormhole supaya efeknya kebaca */
-var T_CLOSE_SEC=650;   /* tutup terowongan swallow sektor: lebih singkat, dan mulai sebelum zoom-out selesai */
+var T_EXIT=1400;   /* keluar terowongan (swallow sektor -> overview): BH overview mendekat dari ujung, dinding memudar dari tengah ke pinggir */
 var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / geser ke tengah / fade-in / tutup */
 
 var ZN=.05, BG='#02050d', WARM=16;
@@ -137,6 +137,10 @@ function setUnder(b){under=!!b;if(cv)cv.style.zIndex=b?'-1':'13';}   /* true = D
 function hide(){under=false;hp=0;if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
 function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}state='idle';env=0;hp=0;hide();}
 function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);}}
+function startExit(now){
+  if(state!=='travel')return;
+  S.r0=S.r;S.rate0=S.rate;S.e0=env;S.tx=now;S.u=0;state='exit';kick();
+}
 function startClose(now,ms,shrink){
   if(state==='close'||state==='idle')return;
   S.hp0=hp;S.c0=[S.cx,S.cy];S.r0=S.r;S.a0=S.a;S.e0=env;S.rate0=S.rate;S.tc=now;S.cms=ms;S.shrink=!!shrink;state='close';kick();
@@ -155,7 +159,7 @@ function holdCancel(){if(state==='charge'||state==='armed')startClose(performanc
 function gate(s,pos){
   if(!usable()||!init())return;
   var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
-  if(state==='idle'||state==='close'){dens=1;S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.5,a:.4,rate:.7,rim:1};}
+  if(state==='idle'||state==='close'||state==='exit'){dens=1;S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.5,a:.4,rate:.7,rim:1};}
   engage(now);show();setUnder(false);fresh=Math.hypot(winW(),winH())*.56;kick();
 }
 function engage(now){
@@ -372,7 +376,14 @@ function drawFrame(dt,cx,cy,r,cvr){
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
   }
-  if(!small&&(!S.sw||S.cov))drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
+  if(state==='exit'){   /* dinding terowongan memudar dari tengah ke pinggir: BH overview + isi overview muncul di bawahnya */
+    var re=Math.hypot(W,H)*1.1*sm((S.u-.08)/.92),ff=Math.max(36,re*.5);
+    g.globalCompositeOperation='destination-out';
+    gr=g.createRadialGradient(cx,cy,0,cx,cy,re+ff);
+    gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(Math.min(.98,re/(re+ff)),'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gr;g.fillRect(0,0,W,H);
+    g.globalCompositeOperation='source-over';
+  }else if(!small&&(!S.sw||S.cov))drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
   if(small&&RIM_GLOW>0&&S.rim>.02){   /* kilau lembut di sekitar mulut (bukan garis): halo tipis yang memudar ke dua arah */
@@ -413,7 +424,7 @@ function tick(now){
       if(S.sec){var bt=bhScr();S.cx=lerp(S.cx1,bt[0],p);S.cy=lerp(S.cy1,bt[1],p);}else{S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);}
       S.a=lerp(S.a1,1,sm(q/380));S.rate=lerp(S.rate1,1.35,sm(q/(S.sw*.8)));S.rim=1-sm(q/(S.sw*.4));
       env=0;
-      if(S.sec&&S.cov&&q>S.sw+250&&!gatePending()&&(!secBusy()||zoomMostlyDone())){try{if(typeof startSpit==='function')startSpit(120);}catch(eSp){}startClose(now,T_CLOSE_SEC,false);}   /* tutup begitu zoom-out ~60% (tanpa nunggu selesai) + semburan isi overview */   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
+      if(S.sec&&S.cov&&q>S.sw+250&&!gatePending()&&(!secBusy()||zoomMostlyDone()))startExit(now);   /* zoom-out ~60% -> mulai keluar dari terowongan (tanpa nunggu zoom selesai) */   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
       else if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
     }else{
     S.r=lerp(S.r1,cvr,eo(q/T_OPEN));
@@ -423,6 +434,11 @@ function tick(now){
     if(q>MIN_TRAVEL&&!secBusy()&&!gatePending())startClose(now,T_CLOSE,false);
     else if(q>9000)startClose(now,T_CLOSE,false);   /* pengaman: transisi macet */
     }
+  }
+  if(state==='exit'){
+    var ue=clamp((now-S.tx)/T_EXIT,0,1),bt=bhScr();
+    S.u=ue;S.cx=bt[0];S.cy=bt[1];S.r=S.r0;S.a=1;S.rate=lerp(S.rate0,.7,sm(ue));S.rim=0;env=S.e0*(1-sm(ue));hp=0;
+    if(ue>=1){state='idle';env=0;hp=0;hide();return;}
   }
   if(state==='close'){
     q=clamp((now-S.tc)/S.cms,0,1);eT=sm(q);
@@ -456,10 +472,11 @@ window.WORMHOLE={
   holdCommit:function(){try{holdCommit();}catch(e){}},
   holdCancel:function(){try{holdCancel();}catch(e){}},
   gate:function(s,pos){try{gate(s,pos);}catch(e){}},
-  swallow:function(pos,ms){try{swallow(pos,ms);}catch(e){}},
+  swallow:function(pos,ms,sec){try{swallow(pos,ms,sec);}catch(e){}},   /* sec harus diteruskan: tanpa itu swallow sektor dianggap swallow overview & terowongan nggak pernah menutup (sampai pengaman 14 dtk) */
   hole:function(){try{return hole();}catch(e){return null;}},
   cover:function(){try{coverUp();}catch(e){}},
-  pull:function(){return state==='idle'||state==='travel'?0:hp;},
+  pull:function(){return state==='idle'||state==='travel'||state==='exit'?0:hp;},
+  arrive:function(){if(state==='exit')return .08+.92*eo(clamp(S.u/.6,0,1));if(state==='travel'&&S.sec&&S.cov)return .08;return 1;},
   muffle:function(){return muffle();},
   get on(){return state!=='idle';},
   get supported(){return usable();}
