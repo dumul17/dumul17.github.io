@@ -718,6 +718,31 @@ function hudPlace(sx,sy,R,pw,ph,vb,mobile,labelRight){
   return best;
 }
 
+/* Panel HUD LOCK/DIST/SPEC: teksnya statis selama bintang yang dikunci sama. Dirender sekali ke sprite
+   (set g.font + fillText tiap frame ternyata jadi baris termahal drawTargetLock di profil); tiap frame tinggal drawImage. */
+var TL_HUD={key:null,c:null,pw:0,ph:34};
+function tlHudSprite(l1,l2,l3,rgb){
+  var key=l1+'|'+l2+'|'+l3+'|'+rgb+'|'+DPR;
+  if(TL_HUD.key===key)return TL_HUD;
+  var c=TL_HUD.c||(TL_HUD.c=document.createElement('canvas')),sg=c.getContext('2d');
+  sg.font='600 8.5px "Courier New", monospace';
+  var wMax=sg.measureText(l1).width;
+  sg.font='500 7.5px "Courier New", monospace';
+  wMax=Math.max(wMax,sg.measureText(l2).width,sg.measureText(l3).width);
+  var pw=Math.ceil(wMax)+16,ph=34;
+  c.width=Math.ceil(pw*DPR);c.height=Math.ceil(ph*DPR);   /* ganti ukuran = reset state ctx */
+  sg.scale(DPR,DPR);
+  sg.fillStyle='rgba(2, 8, 13, 0.55)';sg.fillRect(0,0,pw,ph);
+  sg.strokeStyle='rgba('+rgb+', 0.45)';sg.lineWidth=0.8;
+  sg.beginPath();sg.moveTo(0.5,0);sg.lineTo(0.5,ph);sg.stroke();
+  sg.textAlign='left';sg.textBaseline='alphabetic';
+  sg.font='600 8.5px "Courier New", monospace';
+  sg.fillStyle='rgba('+rgb+', 0.95)';sg.fillText(l1,8,12);
+  sg.font='500 7.5px "Courier New", monospace';
+  sg.fillStyle='rgba(184, 224, 238, 0.8)';sg.fillText(l2,8,22);sg.fillText(l3,8,31);
+  TL_HUD.key=key;TL_HUD.pw=pw;TL_HUD.ph=ph;
+  return TL_HUD;
+}
 function drawTargetLock(now){
   if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)return;
   if(reduce || SW) return;
@@ -786,11 +811,8 @@ function drawTargetLock(now){
   var l1 = 'LOCK: ' + d.name;
   var l2 = 'DIST: ' + d.dist;
   var l3 = 'SPEC: ' + d.spec + ' (MAG ' + d.mag + ')';
-  g.font = '600 8.5px "Courier New", monospace';
-  var wMax = g.measureText(l1).width;
-  g.font = '500 7.5px "Courier New", monospace';
-  wMax = Math.max(wMax, g.measureText(l2).width, g.measureText(l3).width);
-  var pw = Math.ceil(wMax) + 16, ph = 34;
+  var hs = tlHudSprite(l1, l2, l3, tr.rgb);
+  var pw = hs.pw, ph = hs.ph;
   /* Batas area kelihatan di ruang tempat teks digambar (layar tegak). Landscape HP (stage diputar):
      petakan kotak virtual [margin..W-margin]x[margin..H-footer] ke koordinat layar. */
   var sp0 = [x, y], vb = [8, 8, W - 8, H - 35];
@@ -802,20 +824,7 @@ function drawTargetLock(now){
   var pos = hudPlace(sp0[0], sp0[1], sz * 1.45 + 6, pw, ph, vb, isMobile, !!(s.nx && s.nx > 0));
   var tx = x + pos[0], ty = y + pos[1];   /* pojok kiri-atas panel */
 
-  g.fillStyle = 'rgba(2, 8, 13, 0.55)';
-  g.fillRect(tx, ty, pw, ph);
-  g.strokeStyle = 'rgba(' + tr.rgb + ', 0.45)';
-  g.lineWidth = 0.8;
-  g.beginPath();g.moveTo(tx + 0.5, ty);g.lineTo(tx + 0.5, ty + ph);g.stroke();
-
-  g.font = '600 8.5px "Courier New", monospace';
-  g.fillStyle = 'rgba(' + tr.rgb + ', 0.95)';
-  g.fillText(l1, tx + 8, ty + 12);
-
-  g.font = '500 7.5px "Courier New", monospace';
-  g.fillStyle = 'rgba(184, 224, 238, 0.8)';
-  g.fillText(l2, tx + 8, ty + 22);
-  g.fillText(l3, tx + 8, ty + 31);
+  g.drawImage(hs.c, tx, ty, hs.c.width / DPR, hs.c.height / DPR);
 
   g.restore();
   uprEnd(_upT);
