@@ -1555,6 +1555,13 @@ function camLensR(x,y,R,rgb,a,now){
   g.beginPath();g.arc(x,y,R*1.42,ang+3.1416+.2,ang+3.1416+.65);g.stroke();         /* busur kedua (gambar kecil, berseberangan) */
   g.lineCap='butt';
 }
+/* fillStyle inti bintang dari tabel (alpha dibulatkan ke 1/64, selisih maks .008): nggak rakit + parse string rgba baru tiap bintang tiap frame.
+   Hasil profil: baris inti bintang (fillStyle + arc + fill) = ~60% waktu JS drawStars. */
+var CORE_STY=Object.create(null);
+function coreStyle(col,al){
+  var b=al>=1?64:(al<=0?0:(al*64+.5)|0),t=CORE_STY[col]||(CORE_STY[col]=[]);
+  return t[b]||(t[b]='rgba('+col+','+(b/64)+')');
+}
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   c._vis=0;
@@ -1582,7 +1589,7 @@ function drawStars(c,age,now){
   }
   (c._keys||(c._keys=Object.keys(c.stars))).forEach(function(k){
     var s=c.stars[k],a=clamp((age-s.t0)/.5);s._a=a;if(a<=0)return;
-    var triggerKey=starKeyOf(k);
+    var triggerKey=(s._tk!==undefined)?s._tk:(s._tk=starKeyOf(k));   /* dicari sekali per bintang (dulu hasOwnProperty tiap frame) */
     var tr=triggerKey?TRIGGERS[triggerKey]:null;
     var isPlaying=!!(tr&&activeSfx===SFX[triggerKey]&&!SFX[triggerKey].paused);
     var cheap=audioFocus&&!isPlaying;
@@ -1605,7 +1612,7 @@ function drawStars(c,age,now){
       /* During potato audio-focus, keep the star visible but replace its
          animated halo with one tiny core draw. This removes a radial-gradient
          allocation per star while the audio star is doing the heavy work. */
-      g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.82*a)+')';
+      g.fillStyle=coreStyle(bandCore||'255,255,255',.82*a);
       g.beginPath();g.arc(x,y,Math.max(.72,r*.56),0,6.283);g.fill();
     }else if(CAMERA_MODE){
       /* sensor teleskop tajam: tanpa halo. VIS = warna asli bintang (s.rgb) + putih panas di tengah; UV/IR = warna pita (bandCore). Bintang bernama terang dapat lensa pembelok cahaya (camLens). */
@@ -1614,7 +1621,7 @@ function drawStars(c,age,now){
       var hk=hkC;
       if(hk>.02){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
       if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}   /* lensa grup (1 lensa utk bintang berdekatan) atau lensa tunggal; cuma bintang bernama terang (titik anonim seperti ekor Scorpius tidak) */
-      if(hk>.02){g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.95*a*hk)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
+      if(hk>.02){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a*hk);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
       if(hk<.98){   /* inti tajam sensor (warna asli + putih panas): menggantikan inti idle secara halus saat fokus / zoom, dan lebih terang */
         var ik=1-hk;
         g.fillStyle='rgba('+cc+','+(.95*a*ik*1.1)+')';g.beginPath();g.arc(x,y,Math.max(.9,rz*.62),0,6.283);g.fill();
@@ -1623,7 +1630,7 @@ function drawStars(c,age,now){
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
       drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
-      g.fillStyle='rgba('+(bandCore||'255,255,255')+','+(.95*a)+')';g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
+      g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
     }
     var am=ALIGN.cid?alignMark(c,k):null;
     if(am==='lit'){
