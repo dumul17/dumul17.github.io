@@ -1069,6 +1069,7 @@ function drawAsteroids(now,half){
   if(!AST.length||!AST_CFG.on||(typeof PX!=='undefined'&&PX.ast))return;
   half=half|0;
   if(half<=0||AST._stamp!==now)astStep(now);
+  if(typeof ast3dDraw==='function'&&ast3dDraw(now,half))return;   /* batu 3D (12-ast3d.js, lazy); false = sprite 2D di bawah */
   var sprites=ensureAsteroidSprites(),bsp=sprites.back;
   /* Hemat panggilan canvas: 300 batu x (save+alpha+translate+rotate+drawImage+restore) = 1800 call/pass di WebView lemah.
      Sekarang satu save/restore untuk seluruh loop, lalu per batu cuma setTransform (= translate+rotate digabung, matriks dasar M dibaca sekali) + alpha + drawImage.
