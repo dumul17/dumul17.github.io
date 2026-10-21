@@ -10,7 +10,8 @@
    Biaya per frame: 1 drawImage kecil (feedback) + ~120 sprite + 1 drawImage ke layar + ~110 garis.
 
    Titik sambung (semua lewat window.WORMHOLE, selalu dibungkus try/catch + cek keberadaan) — TIDAK BERUBAH dari v3:
-     - 05-sector-ui.js  sgJump()         -> WORMHOLE.gate(s,camBH())        gate antar sektor
+     - 05-sector-ui.js  sgJump()         -> WORMHOLE.gate(s,camBH())        lompat antar sektor (BH mini -> tengah -> BH mini sektor tujuan)
+     - 05-sector-ui.js  sectWormholeOut()-> WORMHOLE.overview(camBH())      sektor -> overview (BH mini -> tengah -> BH overview); jadwal & durasi SAMA dengan gate(), tanpa swallow
      - 06-interaction.js beginBHDrag()   -> holdStart / holdCommit / holdCancel   hold BH mini (long-press 580ms)
      - 04-render.js     startSwallow()   -> WORMHOLE.swallow(camBH(),ms)    swallow BH overview -> dumul.html (sebelum tesseract); dipicu tekan & tahan BH overview (06-interaction.js, sama seperti BH mini)
      - 01-core.js       spatialTarget()  -> WORMHOLE.muffle()               redam audio selama di dalam wormhole
@@ -35,9 +36,14 @@ var EDGE_SOLID=.5;    /* mulut portal mini: bagian tengah (x radius) yang tetap 
 var RIM_GLOW=.09;     /* kilau tipis di luar mulut portal mini (0 = tanpa kilau). Pengganti garis cincin cyan yang dulu */
 var R_HOLD=.22;       /* radius mulut portal saat hold, x min(W,H) */
 var CHARGE_MS=580;    /* harus sama dengan setTimeout long-press di beginBHDrag */
-var MIN_TRAVEL=2200;  /* ms minimal di dalam wormhole supaya efeknya kebaca */
-var T_EXIT=1400;   /* keluar terowongan (swallow sektor -> overview): BH overview mendekat dari ujung, dinding memudar dari tengah ke pinggir */
-var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / geser ke tengah / fade-in / tutup */
+/* Transisi sektor -> overview DAN lompat antar sektor memakai satu jadwal yang sama (go()), jadi durasinya identik:
+     0 .. T_OPEN      dinding terowongan tumbuh dari tengah lubang hitam sampai memenuhi layar
+     0 .. T_MOVE      lubang hitam terowongan bergeser dari posisi BH mini ke tengah layar (kesan masuk terowongan)
+     T_SEEK..T_TRAVEL lubang hitam meluncur dari tengah layar ke tujuan: BH overview (ke overview) / BH mini sektor tujuan (lompat)
+     T_TRAVEL..+T_EXIT dinding memudar dari tengah lubang hitam ke pinggir layar, lubang hitam yang pekat memudar jadi transparan
+   Total = T_TRAVEL + T_EXIT. Underlying sektor (zoom-out, dan zoom-in untuk lompat) jalan di bawah terowongan; T_TRAVEL cukup panjang untuk keduanya. */
+var T_TRAVEL=2200, T_EXIT=1000, T_SEEK=1300;
+var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / geser ke tengah / fade-in / tutup (batal / pengaman) */
 
 var ZN=.05, BG='#02050d', WARM=16;
 var cv=null,g=null,spr=null,SC=48,dpr=1,RGB=[],NP=STAR_PAL.length,NN=NEB_PAL.length,
@@ -156,19 +162,45 @@ function holdArm(){if(state==='charge'){S.p=1;state='armed';S.ta=performance.now
 function holdMove(x,y){if(state==='armed'||state==='charge'){var sp=toScr(x,y);S.x=sp[0];S.y=sp[1];}}            /* geser mulut portal (jari masih menahan) */
 function holdCommit(){if(state==='charge'||state==='armed'){S.p=1;state='held';S.th=performance.now();}}   /* jari dilepas -> lanjut masuk */
 function holdCancel(){if(state==='charge'||state==='armed')startClose(performance.now(),240,true);}
-function gate(s,pos){
-  if(!usable()||!init())return;
-  var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
-  if(state==='idle'||state==='close'||state==='exit'){dens=1;S={x:x,y:y,cx:x,cy:y,r:Math.min(winW(),winH())*R_HOLD*.5,a:.4,rate:.7,rim:1};}
-  engage(now);show();setUnder(false);fresh=Math.hypot(winW(),winH())*.56;kick();
+/* go(dest,pos): SATU transisi untuk "sektor -> overview" (dest=null) dan "lompat antar sektor" (dest=objek sektor tujuan).
+   Dimulai dari mulut portal hold yang sudah terbuka (lepas jari) kalau ada, kalau tidak (tap portal gate) dari mulut kecil di posisi BH mini.
+   Tanpa swallow: isi sektor tidak disedot, terowongan menutup layar dari atas sky (z 13). */
+function go(dest,pos){
+  if(!usable()||!init()||state==='travel')return;
+  var now=performance.now(),m=Math.min(winW(),winH()),
+      holdOpen=(state==='charge'||state==='armed'||state==='held')&&cv&&cv.style.display==='block',
+      sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
+  dens=1;
+  if(holdOpen){S.rim=1;}   /* teruskan portal yang sudah terbuka: nggak mengecil lalu tumbuh lagi */
+  else S={x:x,y:y,cx:x,cy:y,r:m*R_HOLD*.5,a:.4,rate:.7,rim:1};
+  beginGo(now,dest,holdOpen);
+  show();setUnder(false);fresh=holdOpen?0:Math.hypot(winW(),winH())*.56;kick();
+}
+function beginGo(now,dest,holdOpen){
+  S.go=1;S.dest=dest||null;S.hp1=holdOpen?hp:0;S.cov=0;S.tgi=0;
+  engage(now);
 }
 function engage(now){
   state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=S.a;S.rate1=S.rate;
 }
+/* Titik tujuan lubang hitam terowongan (layar): BH overview (dest=null) atau BH mini sektor tujuan. Diperhalus supaya
+   perpindahan prediksi -> posisi asli (begitu sektor tujuan selesai di-zoom) tidak melompat. */
+function seekTarget(dt){
+  var t=null,b;
+  try{
+    if(S.dest){if(typeof sumDestPos==='function'){b=sumDestPos(S.dest);if(b&&isFinite(b[0])&&isFinite(b[1]))t=toScr(b[0],b[1]);}}
+    else t=bhScr();
+  }catch(e){}
+  if(!t)t=[winW()*.5,winH()*.5];
+  if(!S.tgi){S.tgx=t[0];S.tgy=t[1];S.tgi=1;}
+  else{var k=1-Math.exp(-dt*8);S.tgx+=(t[0]-S.tgx)*k;S.tgy+=(t[1]-S.tgy)*k;}
+  return [S.tgx,S.tgy];
+}
 /* Swallow BH overview (tap BH -> dumul.html): terowongan tumbuh dari BH BARENG swallow (ms ~ 2800) tapi digambar DI BAWAH canvas sky (z-index -1), penuh sebelum veil hitam
    menutup dan tesseract mengambil alih. Tidak menutup sendiri (halaman pindah); pengaman 14 dtk kalau navigasi gagal.
-   Tanpa teleskop (di-swallow oleh sky canvas) dan tanpa muffle audio (GARG = BGM transisi, bukan stellar signal). */
-function swallow(pos,ms,sec){
+   Tanpa teleskop (di-swallow oleh sky canvas) dan tanpa muffle audio (GARG = BGM transisi, bukan stellar signal).
+   Hanya untuk BH overview -> dumul.html. Sektor -> overview dan lompat antar sektor TIDAK swallow: lihat go(). */
+function swallow(pos,ms){
   if(!usable()||!init())return;
   var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,
       x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5,
@@ -176,16 +208,14 @@ function swallow(pos,ms,sec){
       hold=(state==='charge'||state==='armed'||state==='held')&&cv&&cv.style.display==='block';   /* portal hold sudah terbuka (overview: tekan & tahan) */
   dens=1;
   if(hold){x=S.cx;y=S.cy;r0=Math.max(S.r,r0);a0=Math.max(S.a,a0);rate0=S.rate;}   /* teruskan portal yang ada: nggak mengecil lalu tumbuh lagi */
-  S={x:x,y:y,cx:x,cy:y,r:r0,a:a0,rate:rate0,rim:1,sw:ms||2800,sec:!!sec};   /* sec: swallow BH mini di sektor (lihat startSectorSwallow di 04-render.js) */
+  S={x:x,y:y,cx:x,cy:y,r:r0,a:a0,rate:rate0,rim:1,sw:ms||2800};
   engage(now);show();fresh=hold?0:Math.min(winW(),winH())*R_HOLD;
   setUnder(true);   /* DI BAWAH #sky: bintang/rasi/BH/HUD yang ke-swallow tetap di depan terowongan. Sky "melubangi" platenya sendiri lewat hole() */
   kick();
 }
-/* Swallow sektor: terowongan sudah menutup layar -> naik ke ATAS sky (z 13) supaya zoom-out sektor di belakangnya tersembunyi, lalu menutup sendiri. */
-function coverUp(){if(cv&&state==='travel'&&S.sec){setUnder(false);S.cov=1;S.covT=performance.now();}}
 /* Lubang di plate sky (koordinat virtual stage, sama dengan canvas #sky) supaya terowongan di bawahnya kelihatan. null = tidak ada. */
 function hole(){
-  if(!under||state==='idle'||S.cov)return null;
+  if(!under||state==='idle')return null;
   if(state==='travel'&&!S.sw)return null;
   var c=(typeof c2v==='function'&&typeof STG!=='undefined'&&STG.on)?c2v(S.cx,S.cy):[S.cx,S.cy],
       k=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
@@ -197,7 +227,6 @@ function bhScr(){
   try{if(typeof camBH==='function'){var b=camBH(),c=toScr(b[0],b[1]);if(c&&isFinite(c[0])&&isFinite(c[1]))return c;}}catch(e){}
   return [winW()*.5,winH()*.5];
 }
-function zoomMostlyDone(){return typeof SECT!=='undefined'&&SECT.busy&&SECT.phase==='out'&&(performance.now()-SECT.t0)>SECT.dur*.6;}
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
 function gatePending(){return typeof SGATE!=='undefined'&&!!SGATE.pend;}
 function askOpen(){return (typeof LIS!=='undefined'&&!!LIS.cb)||document.body.classList.contains('lis-asking');}
@@ -305,6 +334,13 @@ function drawTele(){
   try{teleDrawBody(g,performance.now());}catch(e){}
   g.restore();
 }
+/* lubang hitam tengah terowongan: cakram hitam pekat dengan tepi lembut; al<1 = setengah transparan */
+function holeDisc(cx,cy,Rh,al){
+  if(al<.004)return;
+  var gr=g.createRadialGradient(cx,cy,Rh*.8,cx,cy,Rh*1.3);
+  gr.addColorStop(0,'rgba(0,0,0,'+al.toFixed(3)+')');gr.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=gr;g.beginPath();g.arc(cx,cy,Rh*1.3,0,6.283185307);g.fill();
+}
 function drawFrame(dt,cx,cy,r,cvr){
   var Rv=Math.min(r,Math.hypot(W,H)*.56),                 /* radius tampilan perspektif (kepala bintang menyentuh Rv = tepi) */
       Rh=Math.min(r*.15,Math.min(W,H)*.06),              /* radius lubang hitam tengah */
@@ -358,10 +394,8 @@ function drawFrame(dt,cx,cy,r,cvr){
     }
   }
   g.globalAlpha=1;g.globalCompositeOperation='source-over';
-  /* pusat: lubang hitam dengan tepi lembut */
-  gr=g.createRadialGradient(cx,cy,Rh*.8,cx,cy,Rh*1.3);
-  gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');
-  g.fillStyle=gr;g.beginPath();g.arc(cx,cy,Rh*1.3,0,6.283185307);g.fill();
+  /* pusat: lubang hitam dengan tepi lembut. Saat exit digambar SETELAH dinding dihapus (lihat bawah), dengan alpha yang memudar */
+  if(state!=='exit')holeDisc(cx,cy,Rh,1);
   /* vignette: portal mini = gelap di tepi lingkaran; layar penuh = tepi layar sedikit digelapkan */
   if(small){
     /* tepi mulut portal: alpha diluruhkan halus ke 0 (destination-in) -> terowongan menyatu dengan sky di bawahnya, tanpa potongan keras / vignette gelap */
@@ -376,14 +410,16 @@ function drawFrame(dt,cx,cy,r,cvr){
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
   }
-  if(state==='exit'){   /* dinding terowongan memudar dari tengah ke pinggir: BH overview + isi overview muncul di bawahnya */
+  if(!small&&!S.sw)drawTele();   /* mode layar penuh (sektor -> overview / lompat): teleskop ikut di dalam terowongan, ikut terhapus bareng dindingnya saat exit */
+  if(state==='exit'){   /* dinding terowongan memudar dari tengah lubang hitam ke pinggir layar: BH tujuan + isi layar muncul di bawahnya */
     var re=Math.hypot(W,H)*1.1*sm((S.u-.08)/.92),ff=Math.max(36,re*.5);
     g.globalCompositeOperation='destination-out';
     gr=g.createRadialGradient(cx,cy,0,cx,cy,re+ff);
     gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(Math.min(.98,re/(re+ff)),'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
     g.globalCompositeOperation='source-over';
-  }else if(!small&&(!S.sw||S.cov))drawTele();   /* mode layar penuh (gate): teleskop ikut di dalam terowongan */
+    holeDisc(cx,cy,Rh,1-sm(S.u));   /* lubang hitam yang tadinya pekat perlahan jadi transparan: kesan baru keluar dari terowongan */
+  }
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
   if(small&&RIM_GLOW>0&&S.rim>.02){   /* kilau lembut di sekitar mulut (bukan garis): halo tipis yang memudar ke dua arah */
@@ -398,7 +434,7 @@ function drawFrame(dt,cx,cy,r,cvr){
 function tick(now){
   raf=0;
   if(state==='idle'||!g||!ok)return;
-  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,cvr,rh,eT;
+  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,rh,eT;
   W=winW();H=winH();cvr=cover();rh=Math.min(W,H)*R_HOLD;
   last=now;ema+=(dt-ema)*.08;
   if(state==='charge'){
@@ -412,31 +448,36 @@ function tick(now){
     if(now-S.ta>30000)startClose(now,260,true);
   }else if(state==='held'){
     S.r=rh*(1+.03*Math.sin(now*.008));S.a=1;S.rate=.9;S.rim=1;env=.5;
-    if(secBusy()&&typeof SECT!=='undefined'&&SECT.phase==='out')engage(now);
+    if(secBusy()&&typeof SECT!=='undefined'&&SECT.phase==='out'){beginGo(now,null,true);setUnder(false);}   /* zoom-out dimulai tanpa lewat go() (mis. jalur lain): tetap pakai jadwal yang sama */
     else if(!askOpen()&&!secBusy()&&now-S.th>450)startClose(now,260,true);   /* kartu teleskop ditutup tanpa jalan */
     else if(now-S.th>20000)startClose(now,260,true);
   }
   if(state==='travel'){
-    hp=0;q=now-S.tt;
-    if(S.sw){   /* swallow overview: buka mengikuti tarikan swallow, lalu terus melesat sampai veil/tesseract */
+    q=now-S.tt;
+    if(S.sw){   /* swallow overview -> dumul.html: buka mengikuti tarikan swallow, lalu terus melesat sampai veil/tesseract */
+      hp=0;
       S.r=lerp(S.r1,cvr,eo(q/(S.sw*.72)));
-      p=S.sec?(S.cov?sm((now-S.covT)/700):0):sm(q/(S.sw*.6));   /* sektor: lubang tetap di BH mini (objek menyedot ke sana) sampai layar tertutup, baru geser ke tengah */
-      if(S.sec){var bt=bhScr();S.cx=lerp(S.cx1,bt[0],p);S.cy=lerp(S.cy1,bt[1],p);}else{S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);}
+      p=sm(q/(S.sw*.6));
+      S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
       S.a=lerp(S.a1,1,sm(q/380));S.rate=lerp(S.rate1,1.35,sm(q/(S.sw*.8)));S.rim=1-sm(q/(S.sw*.4));
       env=0;
-      if(S.sec&&S.cov&&q>S.sw+250&&!gatePending()&&(!secBusy()||zoomMostlyDone()))startExit(now);   /* zoom-out ~60% -> mulai keluar dari terowongan (tanpa nunggu zoom selesai) */   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
-      else if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
+      if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
     }else{
-    S.r=lerp(S.r1,cvr,eo(q/T_OPEN));
-    p=sm(q/T_MOVE);S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
-    S.a=lerp(S.a1,1,sm(q/T_FADE));S.rate=lerp(S.rate1,1.1,sm(q/T_MOVE));S.rim=1-sm(q/T_OPEN);
-    env=Math.max(env,0);env+=(1-env)*Math.min(1,dt*5);
-    if(q>MIN_TRAVEL&&!secBusy()&&!gatePending())startClose(now,T_CLOSE,false);
-    else if(q>9000)startClose(now,T_CLOSE,false);   /* pengaman: transisi macet */
+      /* sektor -> overview & lompat antar sektor: jadwal identik (lihat komentar T_TRAVEL). Beda cuma tujuan akhir lubang hitam. */
+      hp=S.hp1*(1-sm(q/380));   /* tarikan hold mengendur halus (objek balik ke tempatnya), bukan lompat balik */
+      S.r=lerp(S.r1,cvr,eo(q/T_OPEN));
+      if(q>T_OPEN*.92)S.cov=1;   /* layar sudah tertutup: BH tujuan di bawah boleh 'mengecil' siap muncul dari ujung terowongan (arrive) */
+      w=sm((q-T_SEEK)/(T_TRAVEL-T_SEEK));
+      if(w>0){var tg=seekTarget(dt);S.cx=lerp(W*.5,tg[0],w);S.cy=lerp(H*.5,tg[1],w);}   /* tengah layar -> tujuan (BH overview / BH mini sektor tujuan) */
+      else{p=sm(q/T_MOVE);S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);}              /* posisi BH mini -> tengah layar */
+      S.a=lerp(S.a1,1,sm(q/T_FADE));S.rate=lerp(S.rate1,1.1,sm(q/T_MOVE));S.rim=1-sm(q/T_OPEN);
+      env=Math.max(env,0);env+=(1-env)*Math.min(1,dt*5);
+      if(q>=T_TRAVEL&&!secBusy()&&!gatePending()&&(!S.dest||(typeof SECT!=='undefined'&&SECT.cur===S.dest)||q>T_TRAVEL+1500))startExit(now);
+      else if(q>9000)startClose(now,T_CLOSE,false);   /* pengaman: transisi macet */
     }
   }
   if(state==='exit'){
-    var ue=clamp((now-S.tx)/T_EXIT,0,1),bt=bhScr();
+    var ue=clamp((now-S.tx)/T_EXIT,0,1),bt=seekTarget(dt);
     S.u=ue;S.cx=bt[0];S.cy=bt[1];S.r=S.r0;S.a=1;S.rate=lerp(S.rate0,.7,sm(ue));S.rim=0;env=S.e0*(1-sm(ue));hp=0;
     if(ue>=1){state='idle';env=0;hp=0;hide();return;}
   }
@@ -471,12 +512,12 @@ window.WORMHOLE={
   holdMove:function(x,y){try{holdMove(x,y);}catch(e){}},
   holdCommit:function(){try{holdCommit();}catch(e){}},
   holdCancel:function(){try{holdCancel();}catch(e){}},
-  gate:function(s,pos){try{gate(s,pos);}catch(e){}},
-  swallow:function(pos,ms,sec){try{swallow(pos,ms,sec);}catch(e){}},   /* sec harus diteruskan: tanpa itu swallow sektor dianggap swallow overview & terowongan nggak pernah menutup (sampai pengaman 14 dtk) */
+  swallow:function(pos,ms){try{swallow(pos,ms);}catch(e){}},   /* hanya BH overview -> dumul.html */
+  gate:function(s,pos){try{go(s,pos);}catch(e){}},          /* lompat antar sektor: BH mini -> tengah -> BH mini sektor tujuan s */
+  overview:function(pos){try{go(null,pos);}catch(e){}},     /* sektor -> overview: BH mini -> tengah -> BH overview; jadwal & durasi sama dengan gate */
   hole:function(){try{return hole();}catch(e){return null;}},
-  cover:function(){try{coverUp();}catch(e){}},
-  pull:function(){return state==='idle'||state==='travel'||state==='exit'?0:hp;},
-  arrive:function(){if(state==='exit')return .08+.92*eo(clamp(S.u/.6,0,1));if(state==='travel'&&S.sec&&S.cov)return .08;return 1;},
+  pull:function(){return state==='idle'||state==='exit'||(state==='travel'&&!S.go)?0:hp;},
+  arrive:function(){if(state==='exit')return .08+.92*eo(clamp(S.u/.6,0,1));if(state==='travel'&&S.go&&S.cov)return .08;return 1;},
   muffle:function(){return muffle();},
   get on(){return state!=='idle';},
   get supported(){return usable();}

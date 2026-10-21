@@ -161,10 +161,25 @@ function sectToggle(){
   if(SECT.busy)return;
   if(SECT.phase==='sec')lisAsk(sectZoomOut,false);   /* ada teleskop di sini? tanya ajak / tinggal dulu */
 }
-/* Keluar sektor lewat tekan & tahan BH mini: sama dengan sectToggle, tapi pakai swallow (04-render.js) sebelum zoom-out */
+/* Keluar sektor lewat tekan & tahan BH mini (lepas jari): terowongan wormhole (09) dengan jadwal & durasi yang SAMA dengan lompat antar sektor.
+   Tanpa swallow: zoom-out jalan di bawah terowongan, lubang hitam terowongan: BH mini -> tengah -> BH overview. */
 function sectSwallowToggle(){
   if(SECT.busy||SW)return;
-  if(SECT.phase==='sec')lisAsk(startSectorSwallow,false);
+  if(SECT.phase==='sec')lisAsk(sectWormholeOut,false);
+}
+function sectWormholeOut(){
+  if(SECT.busy||SW||!SECT.cur||!SECT.target)return;
+  var wp=null;try{wp=camBH();}catch(eP){}   /* posisi BH mini SEBELUM sectZoomOut (sectApply menggeser kamera) */
+  sectZoomOut();
+  if(SECT.busy){try{if(typeof WORMHOLE!=='undefined')WORMHOLE.overview(wp);}catch(eW){}}
+}
+/* Posisi BH mini sektor s di ruang stage (siap dikonversi toScr di 09-wormhole.js), untuk lubang hitam terowongan yang 'mencari' BH tujuan saat lompat sektor.
+   Sudah di sektor itu: posisi hidup. Belum: posisi tersimpan (sumRestore, dengan clamp yang sama). Posisi 'auto' belum dihitung / BH tidak ada: null. */
+function sumDestPos(s){
+  if(!s)return null;
+  if(s===SECT.cur&&!SECT.busy)return SUM.on?camBH():null;
+  if(s.sum&&!s.sum.auto){var mg=Math.max(6,SUM_R*1.15);return [Math.max(mg,Math.min(W-mg,s.sum.x)),Math.max(mg,Math.min(H-mg,s.sum.y))];}
+  return null;
 }
 /* ---- Gargantua = sektor 0. Di dalam sektor dia disembunyikan; tombol 🕳️ memanggilnya kecil (seukuran pulse) & bebas di-parkir ---- */
 /* Soft proximity of summoned mini-BH to rasi/cluster mass. Continuous field, no hard edge. */
@@ -206,7 +221,7 @@ function bhNearAt(bx,by){
   return f*f*(3-2*f);
 }
 function bhScaleTarget(){
-  if(SW&&!SW.sec)return 1;   /* swallow sektor: BH mini tetap seukuran parkir (jatuh ke cabang SECT.cur di bawah) */
+  if(SW)return 1;
   if(SECT.cur){
     if(!SUM.on)return 0;
     if(CAMERA_MODE&&SUM.on&&camFocusId()==='bh')return 1; /* fokus kamera ke BH mini (cam 1x): seukuran BH overview; keluar fokus/kamera -> balik ke ukuran parkir */

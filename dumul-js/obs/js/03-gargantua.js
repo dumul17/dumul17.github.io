@@ -281,7 +281,6 @@ function drawHoleFallback(now,age){
      primitives so one unsupported effect cannot make the whole scene vanish. */
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
   sc*=ARV;
-  if(SW&&SW.sec)sc*=1-ease(clamp(swP/.3));
   var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ*BHSC);
   if(R<.5)return;
   var bp=camBH();
@@ -319,8 +318,7 @@ function drawHoleSafe(now,age){
 var BH_DISK_DY=.20,BH_LENS_DY=0;
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
-  sc*=ARV;   /* keluar dari terowongan: BH overview dari jauh -> penuh */
-  if(SW&&SW.sec)sc*=1-ease(clamp(swP/.3));   /* swallow sektor: BH mini mengecil & hilang ke dalam terowongan (yang jadi lubang hitamnya), bukan jadi 2 wormhole */
+  sc*=ARV;   /* keluar dari terowongan (sektor -> overview / lompat sektor): BH tujuan dari jauh -> penuh */
   BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*bhSizeMul();
   if(BH.Rr<1||!BH.sprite)return;
 
@@ -520,7 +518,7 @@ function drawHole(now,age){
     g.restore();
   }
 
-  if(SW&&!SW.sec){   /* flash cyan akhir: cuma swallow overview (sektor langsung disambung terowongan) */
+  if(SW){   /* flash cyan akhir swallow overview -> dumul.html */
     var f=clamp((swP-.80)/.18);
     if(f>0){
       var fr=Math.sqrt(W*W+H*H)*(.12+.75*f),
