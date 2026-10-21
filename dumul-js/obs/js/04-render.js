@@ -191,7 +191,7 @@ function startTesseractWarp(targetUrl) {
    terowongan wormhole (09) tumbuh DI BAWAH canvas sky. Setelah SECTOR_SW_MS terowongan sudah menutup layar: dia naik ke atas sky (WORMHOLE.cover),
    SW dilepas (isi sky balik tanpa kelihatan), lalu zoom-out ke overview jalan di bawah terowongan, dan terowongan menutup sendiri begitu SECT.busy selesai.
    Beda dengan startSwallow: tanpa redirect, tanpa matiin audio, tanpa swirl HUD. */
-var SECTOR_SW_MS=2000;
+var SECTOR_SW_MS=1700;
 function startSectorSwallow(){
   if(SW||SECT.busy||!SECT.cur||!SECT.target)return;
   SW={t0:performance.now(),dur:SECTOR_SW_MS,sec:true,h0:HPV*HP_K};
@@ -204,9 +204,9 @@ function startSectorSwallow(){
   },SECTOR_SW_MS);
 }
 /* Dimuntahkan: tepat saat terowongan swallow sektor mulai menutup, isi overview menyembur keluar spiral dari BH overview (kebalikan swallow). Dipanggil dari 09-wormhole.js. */
-function startSpit(){
+function startSpit(delay){
   if(reduce||SW)return;
-  SP={t0:performance.now(),dur:1500};
+  SP={t0:performance.now()+(delay||0),dur:1400};   /* delay: tunggu terowongan mulai pudar supaya semburannya kelihatan */
 }
 function startSwallow(href){
   if(SW)return;

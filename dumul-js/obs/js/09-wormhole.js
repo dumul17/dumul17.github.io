@@ -36,6 +36,7 @@ var RIM_GLOW=.09;     /* kilau tipis di luar mulut portal mini (0 = tanpa kilau)
 var R_HOLD=.22;       /* radius mulut portal saat hold, x min(W,H) */
 var CHARGE_MS=580;    /* harus sama dengan setTimeout long-press di beginBHDrag */
 var MIN_TRAVEL=2200;  /* ms minimal di dalam wormhole supaya efeknya kebaca */
+var T_CLOSE_SEC=650;   /* tutup terowongan swallow sektor: lebih singkat, dan mulai sebelum zoom-out selesai */
 var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / geser ke tengah / fade-in / tutup */
 
 var ZN=.05, BG='#02050d', WARM=16;
@@ -192,6 +193,7 @@ function bhScr(){
   try{if(typeof camBH==='function'){var b=camBH(),c=toScr(b[0],b[1]);if(c&&isFinite(c[0])&&isFinite(c[1]))return c;}}catch(e){}
   return [winW()*.5,winH()*.5];
 }
+function zoomMostlyDone(){return typeof SECT!=='undefined'&&SECT.busy&&SECT.phase==='out'&&(performance.now()-SECT.t0)>SECT.dur*.6;}
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
 function gatePending(){return typeof SGATE!=='undefined'&&!!SGATE.pend;}
 function askOpen(){return (typeof LIS!=='undefined'&&!!LIS.cb)||document.body.classList.contains('lis-asking');}
@@ -411,7 +413,7 @@ function tick(now){
       if(S.sec){var bt=bhScr();S.cx=lerp(S.cx1,bt[0],p);S.cy=lerp(S.cy1,bt[1],p);}else{S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);}
       S.a=lerp(S.a1,1,sm(q/380));S.rate=lerp(S.rate1,1.35,sm(q/(S.sw*.8)));S.rim=1-sm(q/(S.sw*.4));
       env=0;
-      if(S.sec&&S.cov&&q>S.sw+400&&!secBusy()&&!gatePending()){try{if(typeof startSpit==='function')startSpit();}catch(eSp){}startClose(now,T_CLOSE,false);}   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
+      if(S.sec&&S.cov&&q>S.sw+250&&!gatePending()&&(!secBusy()||zoomMostlyDone())){try{if(typeof startSpit==='function')startSpit(120);}catch(eSp){}startClose(now,T_CLOSE_SEC,false);}   /* tutup begitu zoom-out ~60% (tanpa nunggu selesai) + semburan isi overview */   /* swallow sektor: zoom-out selesai -> terowongan menutup, overview muncul */
       else if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
     }else{
     S.r=lerp(S.r1,cvr,eo(q/T_OPEN));
