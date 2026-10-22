@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v163'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v164'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -38,13 +38,14 @@ const SHELL = [
   'dumul-js/obs/js/05-sector-ui.js?v=137',
   'dumul-js/obs/js/06-interaction.js?v=117',
   'dumul-js/obs/js/07-boot.js?v=111',
-  'dumul-js/obs/js/08-tx-drone.js?v=4',
+  'dumul-js/obs/js/08-tx-drone.js?v=6',
   'dumul-js/obs/js/09-wormhole.js?v=15',
   'dumul-js/obs/js/10-ui-sound.js?v=6',
   'dumul-js/obs/js/11-live-count.js?v=3',
   'dumul-js/obs/js/12-ast3d.js?v=1',
   'dumul-js/obs/js/13-scope3d.js?v=1',
-  /* Three.js dimuat lazy oleh 12-ast3d.js (AST3D_CFG.lib): path + ?v= harus sama persis. GLTFLoader.js sengaja TIDAK di sini (hanya dipakai kalau AST3D_CFG.glb terisi; kalau nanti diisi, tambahkan juga). */
+  'dumul-js/obs/js/14-drone3d.js?v=1',
+  /* Three.js dimuat lazy oleh 12-ast3d.js (AST3D_CFG.lib), 13-scope3d.js, 14-drone3d.js (lib yang sama): path + ?v= harus sama persis. GLTFLoader.js sengaja TIDAK di sini (hanya dipakai kalau AST3D_CFG.glb terisi; kalau nanti diisi, tambahkan juga). */
   'dumul-js/obs/lib/three.min.js?v=1',
   'dumul-js/obs/img/nebula-portrait.webp?v=1',
   'dumul-js/obs/img/glyph/orion.webp?v=1',
