@@ -351,6 +351,7 @@ function teLedStep(now,role){
 /* Badan teleskop (origin di titik pusat, sudah di-translate/rotate/scale oleh pemanggil, globalAlpha diatur pemanggil).
    Dipakai drawFloatingTelescope (canvas #sky) DAN 09-wormhole.js (digambar ulang di atas terowongan wormhole). */
 function teleDrawBody(g,now){
+  if(typeof tele3dBody==='function'&&tele3dBody(g,now))return;   /* badan pesawat 3D (13-scope3d.js); false -> lanjut badan 2D di bawah */
   /*
       Solid Hubble-like silhouette.
       The previous version looked like a flat transparent icon because the
