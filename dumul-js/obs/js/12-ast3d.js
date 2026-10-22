@@ -19,6 +19,26 @@ try{
 }catch(eA3){}
 var AST3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
 
+/* Warm-up shader: render pertama sebuah renderer Three.js mengompilasi program shader (ratusan ms di HP) -> hitch pas drone/batu/teleskop pertama muncul.
+   compile() cuma MEMINDAHKAN stall itu; jadi dipanggil saat idle (layar boot, user belum main), satu renderer per giliran supaya tidak numpuk.
+   Dipakai juga oleh 13-scope3d.js dan 14-drone3d.js. */
+var THREE_WARM={q:[],busy:false};
+function threeWarm(r,sc,cam){
+  try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;}catch(e){}
+  THREE_WARM.q.push({r:r,sc:sc,cam:cam});
+  if(!THREE_WARM.busy)threeWarmNext();
+}
+function threeWarmNext(){
+  var it=THREE_WARM.q.shift();
+  if(!it){THREE_WARM.busy=false;return;}
+  THREE_WARM.busy=true;
+  var run=function(){
+    try{it.r.compile(it.sc,it.cam);}catch(e){}
+    setTimeout(threeWarmNext,150);
+  };
+  if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2000});else setTimeout(run,300);
+}
+
 function ast3dFail(why){AST3D.state=3;AST3D.err=String(why||'');try{console.warn('[ast3d] fallback ke sprite 2D:',AST3D.err);}catch(e){}}
 
 function ast3dScript(src,ok,bad){
@@ -130,6 +150,7 @@ function ast3dBuild(){
   AST3D.cap=Math.max(128,(AST&&AST.length||0)+16);
   for(var i=0;i<AST3D_CFG.procVariants;i++)ast3dAddVariant(ast3dRockGeo(i+1));
   AST3D.state=2;   /* siap dipakai segera dengan batu procedural */
+  threeWarm(r,AST3D.sc,AST3D.cam);
   if(AST3D_CFG.glb&&AST3D_CFG.glb.length)ast3dLoadGlb();
 }
 
@@ -229,3 +250,4 @@ function ast3dDraw(now,half){
     return false;
   }
 }
+try{ast3dLoad();}catch(eA3L){}   /* mulai muat + warm-up lebih awal (layar boot), bukan menunggu batu pertama digambar */

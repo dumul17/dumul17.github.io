@@ -122,6 +122,7 @@ function dr3dBuild(){
   o.hemi=new T.HemisphereLight(0x7a5cd8,0x0a0614,.4);sc.add(o.hemi);
   o.fill=new T.DirectionalLight(0x40e8ff,.55);o.fill.position.set(-40,-30,60);sc.add(o.fill);   /* fill cyan seperti teleskop */
   DR3D.state=2;
+  if(typeof threeWarm==='function')threeWarm(r,sc,cam);   /* kompilasi shader saat idle, bukan di render pertama (drone pertama muncul) */
 }
 
 /* ---------- per frame ---------- */
