@@ -1240,6 +1240,7 @@ function frame(now){
     pmk('astFront');
     try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX (sprite + label) di atas Gargantua, asteroid depan, reticle */
     try{drawSectorGate(now);}catch(err){window.__hub.renderError='sectorGate: '+(err&&err.message||err);}
+    try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}
     pmk('tail');

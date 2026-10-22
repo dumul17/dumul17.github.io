@@ -13,7 +13,7 @@
 var DR3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
-  size:17,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini */
+  size:25,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini */
   half:17,        /* setengah lebar kamera ortho (satuan model) */
   resMin:96,resMax:128
 };
@@ -50,7 +50,7 @@ function dr3dBuild(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI,DS=T.DoubleSide;
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
-  r.outputEncoding=T.sRGBEncoding;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
+  r.outputEncoding=T.sRGBEncoding;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.017
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();dr3dFail('webglcontextlost');},false);
   DR3D.r=r;
   var sc=new T.Scene(),R=DR3D_CFG.half,cam=new T.OrthographicCamera(-R,R,R,-R,-200,200);

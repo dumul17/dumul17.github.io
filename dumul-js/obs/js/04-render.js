@@ -573,14 +573,14 @@ function drawFloatingTelescope(now){
   var margin=110;
   var lensD=Math.hypot(TELESCOPE.x-BH.x,TELESCOPE.y-BH.y);
   var lensMag=1+0.16*clamp((BH.Rr*8-lensD)/(BH.Rr*8),0,1);
-  var sc=Math.max(.18,Math.min(.24,W/600))*lensMag*TELE_CFG.size;
+  var sc=Math.max(.36,Math.min(.48,W/600))*lensMag*TELE_CFG.size;
   TELESCOPE.sc=sc;   /* dipakai 09-wormhole.js untuk menggambar teleskop di atas terowongan */
 
   /* Small distant scene object; still participates fully in Gargantua's gravity. */
   var swallowedTelescope=null;
   if(SW){
     swallowedTelescope=pull(TELESCOPE.x,TELESCOPE.y);
-    if(swallowedTelescope[2]>.985)return;
+    if(swallowedTelescope[2]>.985){TELE_DRAW=null;return;}
   }
 
   var copies=SW?[[0,0]]:[[0,0]];
@@ -608,16 +608,29 @@ function drawFloatingTelescope(now){
   TELESCOPE.hitR=telescopeHitRadius();
   /* TX lines digambar di drawTxLines() setelah portal sx/sy di-set */
 
-  for(var ci=0;TELESCOPE.al>.02&&ci<copies.length;ci++){
+  /* Gambar DITUNDA: badan teleskop digambar di drawFloatingTelescopeTop() (dipanggil paling akhir di frame(), setelah rasi/bintang/garis/portal/BH/drone),
+     supaya teleskop selalu di atas semuanya. Di sini cuma simpan bahan gambarnya. */
+  TELE_DRAW={copies:copies,sc:sc,sw:swallowedTelescope};
+}
+
+/* Pass gambar teleskop (lapisan paling atas canvas #sky). Posisi/skala/lensing sama persis dengan versi lama; logika gerak tetap di drawFloatingTelescope(). */
+var TELE_DRAW=null;
+function drawFloatingTelescopeTop(now){
+  var D=TELE_DRAW;TELE_DRAW=null;
+  if(!D||!(TELESCOPE.al>.02))return;
+  var copies=D.copies,sc=D.sc,swl=D.sw,al=TELESCOPE.al;
+  /* Saat disedot BH (swallow): sekarang digambar DI ATAS lubang hitam, jadi mengecil + memudar mengikuti progres sedot (k) agar tidak nongkrong di tengah BH lalu menghilang mendadak. */
+  if(swl&&swl[2]>.5){var fk=clamp(1-(swl[2]-.5)/.47,0,1);sc*=.3+.7*fk;al*=fk;}
+  for(var ci=0;ci<copies.length;ci++){
     var tqx=TELESCOPE.x+copies[ci][0],tqy=TELESCOPE.y+copies[ci][1];
-    var tq=SW?swallowedTelescope:lens(tqx,tqy);
+    var tq=swl?swl:lens(tqx,tqy);
     if(!tq)continue;
 
     g.save();
     g.translate(tq[0],tq[1]);
     g.rotate(TELESCOPE.ang);
     g.scale(sc,sc);
-    g.globalAlpha=TELESCOPE.al;
+    g.globalAlpha=al;
 
     teleDrawBody(g,now);
 
