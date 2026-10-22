@@ -1238,6 +1238,7 @@ function frame(now){
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
     try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: melintas di depan BH */
     pmk('astFront');
+    try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX (sprite + label) di atas Gargantua, asteroid depan, reticle */
     try{drawSectorGate(now);}catch(err){window.__hub.renderError='sectorGate: '+(err&&err.message||err);}
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}

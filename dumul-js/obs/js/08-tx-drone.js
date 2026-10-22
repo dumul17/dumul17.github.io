@@ -12,7 +12,7 @@
    Hook long-press ada di 06-interaction.js (TXFX.holdStart / holdEnd). State dibaca dari TX / SUM / SECT; modul ini TIDAK mengubah state apa pun. */
 var TXFX=(function(){
   var SRC='110,229,255',RCV='255,154,217',NEU='200,214,226',HOLD_MS=580,HOLD_SHOW=160;
-  var D={},OV={},ovT=0,hold=null,pings=[],lastCur=null;
+  var D={},OV={},ovT=0,hold=null,pings=[],lastCur=null,TOP=null;
   function c01(v){return v<0?0:v>1?1:v;}
   function ease(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
   function hsh(k){var h=0,i;for(i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))|0;return (h&1)?1:-1;}
@@ -47,7 +47,7 @@ var TXFX=(function(){
   function targetOf(s,mode){
     if(mode==='rcv'){var b=camBH();return b?{x:b[0],y:b[1],r:Math.max(10,BH.Rr*(BHZ||1))*1.5+10}:null;}
     var t=TX.by[s.k],p=t&&txStarPos(t.key);if(!p)return null;
-    var q=gravityPos(p[0],p[1]);return q?{x:q[0],y:q[1],r:40}:null;
+    var q=gravityPos(p[0],p[1]);return q?{x:q[0],y:q[1],r:15}:null;
   }
   function orbit(T,now,sg){var a=reduce?.8:now*.0013*sg+1.2;return [T.x+Math.cos(a)*T.r,T.y+Math.sin(a)*T.r*.55];}
 
@@ -179,9 +179,18 @@ var TXFX=(function(){
     if(d.mode==='src'&&d.ph==='dock'&&SUM.on&&BHSC>.05){   /* lanjut: teleskop → Gargantua mini (masuk tunnel) */
       var b=camBH();if(b)tether(tp,[b[0],b[1]],col,.75,now,15,Math.max(8,BH.Rr*(BHZ||1))*1.25);
     }
-    drawDrone(pos[0],pos[1],col,Math.max(.35,al),now,W<420?1:1.15);
-    label(pos[0],pos[1]+11,d.mode==='rcv'?'RX':'TX',col,al);
+    TOP={x:pos[0],y:pos[1],col:col,al:al,txt:d.mode==='rcv'?'RX':'TX'};   /* sprite + label digambar belakangan di drawTop(): di ATAS Gargantua/reticle */
     g.restore();
+  }
+  /* Tahap atas: dipanggil setelah Gargantua + asteroid depan (05-sector-ui.js frame()), jadi drone selalu di atas lubang hitam & reticle. */
+  function drawTop(now){
+    var T=TOP;TOP=null;
+    if(!T||typeof g==='undefined'||!g)return;
+    g.save();
+    try{
+      drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,W<420?1:1.15);
+      label(T.x,T.y+11,T.txt,T.col,T.al);
+    }finally{g.restore();}
   }
 
   /* ---------- overview sektor: Gargantua = tunnel ---------- */
@@ -238,6 +247,7 @@ var TXFX=(function(){
   }
 
   function draw(now){
+    TOP=null;
     if(typeof g==='undefined'||!g)return;
     g.save();
     try{
@@ -249,6 +259,7 @@ var TXFX=(function(){
   }
   return {
     draw:draw,
+    drawTop:drawTop,
     holdStart:function(){hold={t0:performance.now()};},
     holdEnd:function(){hold=null;},
     role:function(){   /* 'src' = TX docked di sektor ini, 'rcv' = RX terhubung ke BH mini, null = idle; dipakai LED teleskop */
@@ -256,7 +267,8 @@ var TXFX=(function(){
       if(typeof lisGone==='function'&&lisGone())return null;
       return want(SECT.cur);
     },
-    reset:function(){D={};OV={};CF={};ovT=0;hold=null;pings.length=0;lastCur=null;}
+    reset:function(){D={};OV={};CF={};ovT=0;hold=null;pings.length=0;lastCur=null;TOP=null;}
   };
 })();
 function drawTxLines(now){TXFX.draw(now);}
+function drawTxTop(now){TXFX.drawTop(now);}
