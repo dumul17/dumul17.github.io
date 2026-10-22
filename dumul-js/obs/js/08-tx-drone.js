@@ -47,12 +47,13 @@ var TXFX=(function(){
   function targetOf(s,mode){
     if(mode==='rcv'){var b=camBH();return b?{x:b[0],y:b[1],r:Math.max(10,BH.Rr*(BHZ||1))*1.5+10}:null;}
     var t=TX.by[s.k],p=t&&txStarPos(t.key);if(!p)return null;
-    var q=gravityPos(p[0],p[1]);return q?{x:q[0],y:q[1],r:15}:null;
+    var q=gravityPos(p[0],p[1]);return q?{x:q[0],y:q[1],r:40}:null;
   }
   function orbit(T,now,sg){var a=reduce?.8:now*.0013*sg+1.2;return [T.x+Math.cos(a)*T.r,T.y+Math.sin(a)*T.r*.55];}
 
   /* ---------- primitif gambar ---------- */
   function drawDrone(x,y,col,a,now,sc){
+    if(typeof drone3dDraw==='function'&&drone3dDraw(g,x,y,col,a,now,sc))return;   /* quadcopter 3D (14-drone3d.js); false = gambar 2D di bawah */
     g.save();g.translate(x,y);g.scale(sc,sc);
     g.fillStyle='rgba('+col+','+(.10*a)+')';g.beginPath();g.arc(0,0,11,0,6.283);g.fill();
     g.fillStyle='rgba('+col+','+(.16*a)+')';g.beginPath();g.arc(0,0,6.5,0,6.283);g.fill();
