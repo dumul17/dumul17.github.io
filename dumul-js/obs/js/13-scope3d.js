@@ -283,7 +283,9 @@ function scp3dBuild(){
   var fill=new T.DirectionalLight(0x40e8ff,.55);fill.position.set(-40,-30,60);sc.add(fill);
   sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.4));
   SCP3D.state=2;
-  if(typeof threeWarm==='function')threeWarm(r,sc,cam);   /* kompilasi shader saat idle, bukan di render pertama */
+  if(typeof threeWarm==='function')threeWarm(r,sc,cam,function(){   /* pra-ukur: skala teleskop konstan (DPR dibatasi 2) -> res selalu resMin; cocok dgn scp3dUpdate, jadi tanpa setSize di frame pertama */
+    SCP3D.res=SCP3D_CFG.resMin;r.setPixelRatio(1);r.setSize(SCP3D.res,SCP3D.res,false);
+  });   /* kompilasi shader saat idle, bukan di render pertama */
 }
 
 /* ---------- per frame ---------- */

@@ -121,6 +121,11 @@ function dr3dBuild(){
   o.rim=new T.DirectionalLight(0xff4fd8,1.1);o.rim.position.set(-30,40,-55);sc.add(o.rim);
   o.hemi=new T.HemisphereLight(0x7a5cd8,0x0a0614,.4);sc.add(o.hemi);
   o.fill=new T.DirectionalLight(0x40e8ff,.55);o.fill.position.set(-40,-30,60);sc.add(o.fill);   /* fill cyan seperti teleskop */
+  /* pra-ukur kanvas ke resolusi yang akan dipakai drone pertama (skala sama dgn 08-tx-drone.js: W<420 ? 1 : 1.15): setSize pertama = realokasi framebuffer MSAA, terukur ~detik di headless -> hitch di drone pertama */
+  try{
+    var sc0=(typeof W!=='undefined'&&W<420)?1:1.15,res0=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*sc0*Math.min(2,DPR||1)*1.2/32)*32));
+    DR3D.res=res0;r.setPixelRatio(1);r.setSize(res0,res0,false);
+  }catch(eP){}
   DR3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam);   /* kompilasi shader saat idle, bukan di render pertama (drone pertama muncul) */
 }
