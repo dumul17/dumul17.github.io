@@ -1101,6 +1101,7 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 
 /* ===== v36: Gargantua summon di overview + panel tune + toggle spectrum + fix pinch cam fokus ===== */
 body.sect-ov #mode-bh{display:grid}
+body.portal-on.sect-ov #mode-bh{display:none}   /* F3: portal overview selalu ada (tidak bisa di-recall) -> tombol hanya di sektor */
 #mode-bhset{display:none!important} /* moved into owl panel Tune tab */
 .bp-sec[data-ov][hidden],.bp-row[data-ov][hidden],.bp-sec[data-sc][hidden],.bp-row[data-sc][hidden],.bp-sec[data-ovo][hidden],.bp-row[data-ovo][hidden]{display:none}   /* .bp-row{display:grid} menimpa [hidden]: tanpa ini baris khusus-sektor (Zoom follow dkk) bocor di overview & Portal halo bocor di sektor */
 #mode-bhset:hover,#mode-bhset:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
