@@ -103,6 +103,11 @@
     'mode.observe':{en:'Observation Mode',id:'Mode Pengamatan'},'mode.observe.exit':{en:'Exit Observation',id:'Keluar Pengamatan'},
     'mode.camera':{en:'Constellation Camera',id:'Kamera Rasi'},'mode.camera.exit':{en:'Exit Constellation Camera',id:'Keluar Kamera Rasi'},
     'mode.bh.summon':{en:'Summon Gargantua',id:'Panggil Gargantua'},'mode.bh.recall':{en:'Recall Gargantua',id:'Tarik Gargantua'},
+    'mode.portal.summon':{en:'Open portal',id:'Buka portal'},'mode.portal.recall':{en:'Close portal',id:'Tutup portal'},
+    'portal.link':{en:'Open the sector portal',id:'Buka portal sektor'},
+    'toast.portalsumtip':{en:'PORTAL OPENED\nTAP IT FOR SECTOR SHORTCUTS · HOLD TO RETURN',id:'PORTAL DIBUKA\nTAP UNTUK SHORTCUT ANTAR SEKTOR · TAHAN UNTUK KEMBALI'},
+    'toast.sectip.portal':{en:'RETURN TO OVERVIEW\nPRESS BACK, OR OPEN THE PORTAL AND HOLD IT',id:'KEMBALI KE OVERVIEW\nTEKAN BACK, ATAU BUKA PORTAL LALU TAHAN'},
+    'toast.nosum.portal':{en:'SHORTCUT LOCKED\nOPEN THE PORTAL IN THAT SECTOR FIRST',id:'SHORTCUT TERKUNCI\nBUKA PORTAL DI SEKTOR TUJUAN DULU'},
     'mode.tune':{en:'Tuning',id:'Penyetelan'},'mode.sectors':{en:'Back to overview',id:'Kembali ke ringkasan'},
 
     /* tuning panel */
