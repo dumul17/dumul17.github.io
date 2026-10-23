@@ -857,7 +857,7 @@ function updateTimeDilation(now){
   if(TD.a!==a){TD.a=a;TD.rate=1;TD.ar=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
   var gm=focusGeom(cid),target=1,miniBH=false;
-  if(SECT.cur&&SUM.on){
+  if(SECT.cur&&mbhOn()){
     if(!SUM.moved&&Math.hypot(BH.x-SUM.x0,BH.y-SUM.y0)>8)SUM.moved=true;   /* latch: sekali di-drag dari titik spawn, dilatasi aktif */
     miniBH=SUM.moved&&!(CAMERA_MODE&&camFocusId()==='bh');
   }   /* fokus kamera di BH mini: audio normal */   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
@@ -1008,6 +1008,13 @@ PORTALS.forEach(function(p){
     el.addEventListener('focus',function(){hot=p.id;});
     el.addEventListener('blur',function(){if(hot===p.id)hot=null;});
   });
+  if(p.id==='band'){   /* F4: masuk dumul.html lewat sabuk Orion (supernova + zoom + tesseract). Tanpa JS / flag mati / ctrl-klik = anchor biasa */
+    a.addEventListener('click',function(e){
+      if(!PORTAL_ON||e.defaultPrevented||e.button||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
+      var ok=false;try{ok=beltEnter(p.href);}catch(eB){ok=false;}
+      if(ok||SW)e.preventDefault();
+    });
+  }
   h.addEventListener('click',function(e){
     e.preventDefault();
     e.stopPropagation();
@@ -1200,7 +1207,7 @@ function txComp(s){
   var t=s&&s.k?TX.by[s.k]:null,
       p=!!(t&&t.on),
       y=!!(s&&(s.sum||(typeof SECT!=='undefined'&&SECT.cur===s&&typeof SUM!=='undefined'&&SUM.on))),
-      c=!!(typeof HBH!=='undefined'&&HBH.on)&&(y||p);
+      c=!!(typeof HBH!=='undefined'&&hbhOn())&&(y||p);
   return {y:y,p:p,c:c,lvl:(y&&p&&c)?3:(p?2:(y?1:0))};
 }
 function txInterlock(s){var o=txComp(s);return {lvl:o.lvl,y:o.y,p:o.p,c:o.c};}
@@ -1829,7 +1836,7 @@ function layout(){
     el.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px)'+STG.up;
   });
   if(!drag.on){
-    if(SECT.cur&&SUM.on){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
+    if(SECT.cur&&mbhOn()){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
     else{BH.x=BH.hx;BH.y=BH.hy;}
   }
   /* Keep telescope inside the new viewport after rotation/URL-bar resize. */

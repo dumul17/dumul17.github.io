@@ -41,11 +41,14 @@ var TXFX=(function(){
   function want(s){
     var t=TX.by[s.k],src=typeof sfxSector==='function'?sfxSector():null;
     if(src===s&&t&&t.on&&!t.recv)return 'src';
-    if(TX.recv[s.k]&&SUM.on&&BHSC>.05)return 'rcv';
+    if(TX.recv[s.k]&&SUM.on&&(PORTAL_ON||BHSC>.05))return 'rcv';   /* PORTAL_ON: receiver mendarat di PORTAL sektor (BHSC = BH mini, tidak relevan) */
     return null;
   }
   function targetOf(s,mode){
-    if(mode==='rcv'){var b=camBH();return b?{x:b[0],y:b[1],r:Math.max(10,BH.Rr*(BHZ||1))*1.5+10}:null;}
+    if(mode==='rcv'){
+      if(PORTAL_ON){var an=ptlScreen();return an?{x:an[0],y:an[1],r:Math.max(10,an[2]*.85)*1.5+10}:null;}   /* F3: dock di portal, bukan BH mini */
+      var b=camBH();return b?{x:b[0],y:b[1],r:Math.max(10,BH.Rr*(BHZ||1))*1.5+10}:null;
+    }
     var t=TX.by[s.k],p=t&&txStarPos(t.key);if(!p)return null;
     var q=gravityPos(p[0],p[1]);return q?{x:q[0],y:q[1],r:17}:null;
   }
@@ -176,8 +179,8 @@ var TXFX=(function(){
     }
     drawTrail(d,col,now);
     tether(pos,tp,col,al,now,6,15);   /* sinyal ngalir dari drone ke teleskop */
-    if(d.mode==='src'&&d.ph==='dock'&&SUM.on&&BHSC>.05){   /* lanjut: teleskop → Gargantua mini (masuk tunnel) */
-      var b=camBH();if(b)tether(tp,[b[0],b[1]],col,.75,now,15,Math.max(8,BH.Rr*(BHZ||1))*1.25);
+    if(d.mode==='src'&&d.ph==='dock'&&SUM.on&&(PORTAL_ON||BHSC>.05)){   /* lanjut: teleskop → portal (PORTAL_ON) / Gargantua mini (masuk tunnel) */
+      var an2=PORTAL_ON?ptlScreen():null,b=an2||camBH();if(b)tether(tp,[b[0],b[1]],col,.75,now,15,an2?Math.max(8,an2[2]*.85)*1.25:Math.max(8,BH.Rr*(BHZ||1))*1.25);
     }
     TOP={x:pos[0],y:pos[1],col:col,al:al,txt:d.mode==='rcv'?'RX':'TX'};   /* sprite + label digambar belakangan di drawTop(): di ATAS Gargantua/reticle */
     g.restore();

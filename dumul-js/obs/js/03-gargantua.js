@@ -4,7 +4,7 @@
 function ease(u){return u*u*(3-2*u);}
 function pull(x,y){                       /* posisi benda saat disedot: berputar spiral ke lubang hitam */
   var P;
-  if(SW){P=clamp((swP-.05)/.82);var h0=SW.h0||0;if(h0>0)P=h0+(1-h0)*P;}   /* h0: tarikan hold yang sudah berjalan -> swallow lanjut mulus, tanpa lompat balik */
+  if(SWV){P=clamp((swP-.05)/.82);var h0=SWV.h0||0;if(h0>0)P=h0+(1-h0)*P;}   /* h0: tarikan hold yang sudah berjalan -> swallow lanjut mulus, tanpa lompat balik */
   else if(HPV>.002)P=HPV*HP_K;                                              /* hold portal: objek di atas mulut wormhole ditarik pelan ke tengah */
   else return [x,y,0];
   var bp=camBH(),bx=bp[0],by=bp[1];
@@ -15,6 +15,7 @@ function pull(x,y){                       /* posisi benda saat disedot: berputar
   return [bx+Math.cos(t2)*r2,by+Math.sin(t2)*r2,k];
 }
 function lens(x,y){                       /* smooth gravitational lens: bounded, continuous, no visual explosions */
+  if(PORTAL_ON&&!SECT.cur)return [x,y];     /* F2: di overview BH tidak digambar lagi (portal), jadi lensing galaksinya ikut mati (disengaja) */
   var R=BH.Rr*(BHZ||1);if(R<1)return [x,y];
   var bp=camBH(),bx=bp[0],by=bp[1];
   var dx=x-bx,dy=y-by,d2=dx*dx+dy*dy;
@@ -46,7 +47,7 @@ function lens(x,y){                       /* smooth gravitational lens: bounded,
 function gravityPos(x,y){
   /* Gargantua continuously lenses the galaxy; during the swallow transition,
      keep the existing spiral pull animation. Saat hold portal (HPV>0): lensing tetap jalan, lalu hasilnya ikut ditarik ke tengah. */
-  if(SW)return pull(x,y);
+  if(SWV)return pull(x,y);
   var q=lens(x,y);
   if(HPV>.002){
     if(!q)return [x,y,1];
@@ -279,7 +280,7 @@ function drawHoleFallback(now,age){
   /* Compatibility fallback for older/mobile canvas engines.  If the layered
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
      primitives so one unsupported effect cannot make the whole scene vanish. */
-  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
+  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SWV?ease(swP):0;
   sc*=ARV;
   var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ*BHSC);
   if(R<.5)return;
@@ -317,7 +318,7 @@ function drawHoleSafe(now,age){
    Keduanya terpisah supaya menurunkan lensa nggak ikut menurunkan serat cakram. */
 var BH_DISK_DY=.20,BH_LENS_DY=0;
 function drawHole(now,age){
-  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SW?ease(swP):0;
+  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SWV?ease(swP):0;
   sc*=ARV;   /* keluar dari terowongan (sektor -> overview / lompat sektor): BH tujuan dari jauh -> penuh */
   BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*bhSizeMul();
   if(BH.Rr<1||!BH.sprite)return;
@@ -327,6 +328,11 @@ function drawHole(now,age){
   var bp=camBH();
   var gk=OFX.pK; /* 0..1: seberapa "hidup" Gargantua saat BGM Collapsars main */
   var bhFull=!!(BH_CSS.spr&&BH.sprite===BH_CSS.spr),bhCS=bhFull?.72:1; /* disk CSS lebih pendek dari sprite lama: overlay horizontal ikut diskalakan */
+  /* F2: PORTAL_ON di overview = portal 3D menggantikan gambar BH (anchor BH.hx/hy, BHSC, camBH tetap hidup). Gagal = gambar BH lama. */
+  if(PORTAL_ON&&!SECT.cur&&typeof portal3dOverview==='function'){
+    var pOK=false;try{pOK=portal3dOverview(now,bp,R);}catch(ePt){window.__hub.renderError='portal3d: '+(ePt&&ePt.message||ePt);}
+    if(pOK){bhSwFlash(bp);return;}
+  }
 
   g.save();
   g.translate(bp[0],bp[1]);
@@ -518,7 +524,10 @@ function drawHole(now,age){
     g.restore();
   }
 
-  if(SW){   /* flash cyan akhir swallow overview -> dumul.html */
+  bhSwFlash(bp);
+}
+function bhSwFlash(bp){
+  if(SWV){   /* flash cyan akhir swallow overview -> dumul.html */
     var f=clamp((swP-.80)/.18);
     if(f>0){
       var fr=Math.sqrt(W*W+H*H)*(.12+.75*f),

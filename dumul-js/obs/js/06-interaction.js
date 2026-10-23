@@ -290,7 +290,11 @@ document.addEventListener('pointerdown',function(e){
 
 })();
 var bhA=$('#bh');
-bhA.addEventListener('click',function(e){if(SECT.cur){e.preventDefault();if(SUM.on)sgToggle();}}); /* di sector: link BH ke dumul.html dimatikan (keyboard/AT) */
+bhA.addEventListener('click',function(e){
+  if(SECT.cur){e.preventDefault();if(SUM.on)sgToggle();}   /* di sector: link BH ke dumul.html dimatikan (keyboard/AT) */
+  else if(PORTAL_ON){e.preventDefault();ovSelSet(!OVSEL.open);}   /* F3 (D7): di overview link ini = buka/tutup ikon sektor; dumul.html lewat link sabuk Orion */
+});
+if(PORTAL_ON){try{bhA.setAttribute('data-i18n-aria','portal.link');bhA.setAttribute('aria-label',T('portal.link'));bhA.title=T('portal.link');}catch(ePL){}}
 bhA.addEventListener('mouseenter',function(){hot='bh';});
 bhA.addEventListener('mouseleave',function(){if(hot==='bh')hot=null;});
 bhA.addEventListener('focus',function(){hot='bh';});
@@ -350,8 +354,60 @@ function constellationHitDist(x,y){
 function clearBHlp(){
   if(drag.lpTimer){try{clearTimeout(drag.lpTimer);}catch(e){}drag.lpTimer=null;try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdCancel();}catch(eW){}}   /* hold batal (geser / lepas): portal menutup */
 }
+/* ===== F3: gestur PORTAL sektor (PORTAL_ON) =====
+   Tap portal = shortcut gate antar sektor (sgToggle, pusat gate = portal). Tahan 580 ms = mulut wormhole tumbuh di portal & siaga (armed); lepas jari = terowongan balik overview.
+   Portal tidak bisa di-drag (D4: auto-place): geser jari >12 px membatalkan. BH mini sekarang hanya bisa di-drag (beginBHDrag): tanpa tap/hold relay. */
+var PTG={on:false,pid:0,x0:0,y0:0,t0:0,armed:false,timer:0};
+function ptgClear(){if(PTG.timer){clearTimeout(PTG.timer);PTG.timer=0;}}
+function ptgCancel(){
+  ptgClear();
+  if(PTG.on){try{WORMHOLE.holdCancel();}catch(e0){}try{cv.releasePointerCapture(PTG.pid);}catch(e1){}}
+  PTG.on=false;PTG.armed=false;
+}
+function ptgDown(e){
+  if(!PORTAL_ON||!SECT.cur||SECT.busy||SW||PTG.on||drag.on||CAMERA_MODE)return false;
+  var bc=document.body.classList;if(bc.contains('owl-open')||bc.contains('owl-block'))return false;
+  if(e.target.closest&&e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#bh-panel,#mode-cluster,#mode-observe,#mode-silence,#mode-bh'))return false;
+  var P=ptlHitAt(e.clientX,e.clientY);if(!P)return false;
+  if(BHSC>=.05){   /* BH mini menumpuk di atas portal: yang pusatnya lebih dekat ke jari menang */
+    var bp=camBH(),bd=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]);
+    if(bd<P.d&&bd<=Math.max(BH.R*BHSC*1.9*skyZoom,24))return false;
+  }
+  PTG.on=true;PTG.pid=e.pointerId;PTG.x0=e.clientX;PTG.y0=e.clientY;PTG.t0=performance.now();PTG.armed=false;
+  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(P.x,P.y,580);}catch(eW0){}   /* wormhole (09): mulut portal tumbuh selama hold */
+  PTG.timer=setTimeout(function(){
+    PTG.timer=0;
+    if(!PTG.on||SECT.busy||!SECT.cur||!SUM.on){ptgCancel();return;}
+    if(typeof WORMHOLE!=='undefined'&&WORMHOLE.supported){PTG.armed=true;haptic(18);try{WORMHOLE.holdArm();}catch(eW2){}return;}
+    ptgCancel();haptic(18);try{if(typeof sectToggle==='function')sectToggle();}catch(eT){}   /* fallback (reduced-motion / tanpa canvas 2D): zoom-out biasa */
+  },580);
+  try{cv.setPointerCapture(e.pointerId);}catch(err){}
+  haptic(15);e.preventDefault();e.stopPropagation();
+  return true;
+}
+function ptgMove(e){
+  if(!PTG.on||e.pointerId!==PTG.pid)return;
+  if(Math.hypot(e.clientX-PTG.x0,e.clientY-PTG.y0)>12)ptgCancel();   /* digeser: batal (portal tidak bisa di-drag) */
+}
+function ptgUp(e){
+  if(!PTG.on||e.pointerId!==PTG.pid)return;
+  var armed=PTG.armed,cancelled=(e.type==='pointercancel');
+  ptgClear();PTG.on=false;PTG.armed=false;
+  try{cv.releasePointerCapture(e.pointerId);}catch(err){}
+  if(armed){   /* hold selesai & mulut portal terbuka: lepas jari = masuk terowongan; pointercancel / keadaan berubah = batal */
+    if(cancelled||!SECT.cur||!SUM.on||SECT.busy){try{WORMHOLE.holdCancel();}catch(e4){}return;}
+    haptic(18);
+    try{WORMHOLE.holdCommit();}catch(e5){}
+    try{if(typeof sectSwallowToggle==='function')sectSwallowToggle();else if(typeof sectToggle==='function')sectToggle();}catch(er){}   /* terowongan portal -> overview (fallback: zoom-out biasa) */
+    return;
+  }
+  try{WORMHOLE.holdCancel();}catch(e6){}   /* dilepas sebelum 580 ms = tap: tutup mulut yang baru mulai tumbuh */
+  if(cancelled)return;
+  e.preventDefault();
+  sgToggle();   /* tap singkat: shortcut gate antar sektor */
+}
 function beginBHDrag(e){
-  if(reduce||SW||drag.on||BHSC<.05)return false;
+  if(reduce||SW||drag.on||PTG.on||BHSC<.05)return false;
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return false;
@@ -359,16 +415,18 @@ function beginBHDrag(e){
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
-  if(constellationTargetAt(e.clientX,e.clientY))return false;
+  var bp=camBH(),ovR=PORTAL_ON?ptOvR():0;   /* F3: radius portal overview yang tergambar (0 = bukan overview / belum tergambar) */
+  var inPtl=ovR>0&&Math.hypot(e.clientX-bp[0],e.clientY-bp[1])<=ovR*.8;   /* di dalam cincin portal: portal menutupi bintang di belakangnya, jadi portal menang */
+  if(!inPtl&&constellationTargetAt(e.clientX,e.clientY))return false;
   if(!bhDragAllowed())return false;
-  var bp=camBH();
-  var d=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]);
-  if(d>bhGrabRadius()*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
+  var d=Math.hypot(e.clientX-bp[0],e.clientY-bp[1]),grab=bhGrabRadius();
+  if(ovR>0)grab=Math.max(grab,ovR*.95);
+  if(d>grab*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;
-  drag.tapEligible=(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
+  drag.tapEligible=ovR>0?(d<=Math.max(ovR*.85,42)):(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
   drag.lpFired=false;drag.armed=false;drag.ov=false;clearBHlp();
   /* Fase 2: long-press BH mini di sektor → kembali ke overview (ganti tombol #mode-sectors). */
-  if(SECT.cur&&SUM.on&&drag.tapEligible){
+  if(!PORTAL_ON&&SECT.cur&&SUM.on&&drag.tapEligible){   /* PORTAL_ON: tap/hold relay pindah ke portal (ptgDown); BH mini hanya drag */
     try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580);}catch(eW0){}   /* wormhole (09): mulut portal tumbuh di BH mini selama hold */
     drag.lpTimer=setTimeout(function(){
       drag.lpTimer=null;
@@ -389,7 +447,7 @@ function beginBHDrag(e){
   }
   /* Overview (Gargantua): tekan & tahan = SAMA seperti BH mini. Portal tumbuh di BH selama hold, terbuka penuh (armed, boleh di-drag),
      lepas jari = swallow ke dumul.html. Tap singkat TIDAK lagi masuk (cegah kepencet); keyboard/AT tetap lewat link #bh. */
-  else if(!SECT.cur&&!SECT.busy&&drag.tapEligible){
+  else if(!PORTAL_ON&&!SECT.cur&&!SECT.busy&&drag.tapEligible){   /* PORTAL_ON: hold overview -> swallow dihapus (masuk dumul.html lewat sabuk Orion, F4); tap portal = buka ikon sektor (endBHDrag) */
     drag.ov=true;
     try{if(typeof WORMHOLE!=='undefined')WORMHOLE.holdStart(bp[0],bp[1],580,true);}catch(eO0){}
     drag.lpTimer=setTimeout(function(){
@@ -424,7 +482,7 @@ function moveBHDrag(e){
   }
   if(mv>7){drag.moved=true;clearBHlp();}
   if(drag.moved){
-    var dz=(SECT.cur&&SUM.on)?Math.max(1,skyZoom):1;dx/=dz;dy/=dz;
+    var dz=(SECT.cur&&mbhOn())?Math.max(1,skyZoom):1;dx/=dz;dy/=dz;
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);
     BH.x=drag.bx+Math.max(-limX,Math.min(limX,dx));
     BH.y=drag.by+Math.max(-limY,Math.min(limY,dy));
@@ -463,16 +521,18 @@ function endBHDrag(e){
     var bpSw=camBH();createBHShockwave(bpSw[0], bpSw[1]);
   }else if(drag.tapEligible){
     e.preventDefault();
-    if(SECT.cur&&SUM.on)sgToggle();   /* short tap: shortcut gate antar sektor */
+    if(PORTAL_ON){if(!SECT.cur&&!SECT.busy)ovSelSet(!OVSEL.open);}   /* F3: tap portal overview = buka/tutup ikon sektor (D1); tap BH mini di sektor tidak melakukan apa-apa */
+    else if(SECT.cur&&SUM.on)sgToggle();   /* short tap: shortcut gate antar sektor */
     /* overview: tap singkat tidak masuk lagi; masuk dumul.html = tekan & tahan (lihat blok hold overview di beginBHDrag) */
   }
 }
 document.addEventListener('pointerdown',function(e){
+  if(ptgDown(e))return;   /* F3: portal sektor lebih dulu dari BH mini */
   if(beginBHDrag(e))return;
 },{passive:false,capture:true});
-document.addEventListener('pointermove',moveBHDrag,{passive:true});
-document.addEventListener('pointerup',endBHDrag,{passive:false});
-document.addEventListener('pointercancel',endBHDrag,{passive:false});
+document.addEventListener('pointermove',function(e){ptgMove(e);moveBHDrag(e);},{passive:true});
+document.addEventListener('pointerup',function(e){ptgUp(e);endBHDrag(e);},{passive:false});
+document.addEventListener('pointercancel',function(e){ptgUp(e);endBHDrag(e);},{passive:false});
 
 /* ---------- mobile constellation pan + 2-finger rotate (±180°) ---------- */
 function skyPanLimits(){

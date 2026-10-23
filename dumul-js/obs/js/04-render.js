@@ -187,8 +187,9 @@ function startTesseractWarp(targetUrl) {
   requestAnimationFrame(render);
 }
 
-function startSwallow(href){
-  if(SW)return;
+/* ---------- F4: persiapan + handoff ke dumul.html (dipakai startSwallow lama DAN beltEnter) ----------
+   dumulPrepare: isi dipindah apa adanya dari startSwallow (audio kill, GARG, prefetch, neural-net). Kontrak sessionStorage (dm_collapsars_*) ke dumul.html tidak berubah. */
+function dumulPrepare(href){
   if(typeof markWentToDumul==='function')markWentToDumul();
   /* Gargantua's swallow SFX/BGM is glitch-instrumental.opus (GARG). Kill every
      other audio channel first (star SFX, collapsars HUD, ambient) so GARG never
@@ -210,22 +211,47 @@ function startSwallow(href){
     if(typeof setAVColor==='function')setAVColor(null,true);
     if(typeof musicForceStop==='function'){try{musicForceStop();}catch(e){}}
   }catch(e){}
-  /* Sky/UI swirl needs ~2.8s (delay≤940 + duration≤2000). Opaque tesseract
-     canvas must NOT start earlier or the swallow is visually cut off.
-     SW.dur tracks the sky pull only; redirect is owned by startTesseractWarp. */
-  var SWALLOW_MS=2800;
-  var TESS_MS=5600;
-  SW={t0:performance.now(),dur:SWALLOW_MS,h0:HPV*HP_K};
-  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SWALLOW_MS);}catch(eW){}   /* wormhole (09): terowongan tumbuh bareng swallow, digambar DI BAWAH canvas sky (lihat hole() di 05-sector-ui.js); veil hitam + tesseract menyusul */
-  /* BGM starts on the same user gesture (autoplay). Tesseract starts AFTER swallow. */
-  setTimeout(function(){startTesseractWarp(href);},SWALLOW_MS);
-  document.body.classList.add('sw');
   fadeTo(AMB,0,900);
   GARG.currentTime=0;GARG.volume=0;
   dmTransitionGraph();
   dmTransitionStart();
   fadeTo(GARG,.55,1800);
   var pf=document.createElement('link');pf.rel='prefetch';pf.href=href;document.head.appendChild(pf);
+}
+function dumulHandoff(){
+    try{
+      sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));
+      sessionStorage.setItem('dm_collapsars_from','swallow');
+      try{
+        var _t2=GARG&&GARG.currentTime||0;
+        var _spec2=null;
+        if(typeof DM_TR_SPEC!=='undefined'&&DM_TR_SPEC&&DM_TR_SPEC.length){
+          _spec2=Array.prototype.slice.call(DM_TR_SPEC,0,Math.min(DM_TR_SPEC.length,256));
+        }
+        sessionStorage.setItem('dm_visual_state',JSON.stringify({
+          t:_t2,phase:_t2,from:'dumul-transition',
+          level:(typeof DM_TR_LEVEL!=='undefined'?DM_TR_LEVEL:0)||0,
+          beatAge:(typeof DM_TR_BEAT!=='undefined'&&DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999),
+          mix:1,spec:_spec2
+        }));
+      }catch(e2){
+        sessionStorage.setItem('dm_visual_state',JSON.stringify({t:GARG&&GARG.currentTime||0,phase:GARG&&GARG.currentTime||0,from:'dumul-transition'}));
+      }
+    }catch(e){}
+}
+function startSwallow(href){
+  if(SW)return;
+  dumulPrepare(href);
+  /* Sky/UI swirl needs ~2.8s (delay≤940 + duration≤2000). Opaque tesseract
+     canvas must NOT start earlier or the swallow is visually cut off.
+     SW.dur tracks the sky pull only; redirect is owned by startTesseractWarp. */
+  var SWALLOW_MS=2800;
+  var TESS_MS=5600;
+  SW={t0:performance.now(),dur:SWALLOW_MS,h0:HPV*HP_K};SWV=SW;   /* F4: SWV = efek spiral/pull swallow (belt tidak mengisinya) */
+  try{if(typeof WORMHOLE!=='undefined')WORMHOLE.swallow(camBH(),SWALLOW_MS);}catch(eW){}   /* wormhole (09): terowongan tumbuh bareng swallow, digambar DI BAWAH canvas sky (lihat hole() di 05-sector-ui.js); veil hitam + tesseract menyusul */
+  /* BGM starts on the same user gesture (autoplay). Tesseract starts AFTER swallow. */
+  setTimeout(function(){startTesseractWarp(href);},SWALLOW_MS);
+  document.body.classList.add('sw');
   /* Include music toggle/HUD + side chrome so YT/IG aren't the only icons
      that fly into Gargantua — previously #music-toggle was left out. */
   var els=[].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock,#signal-fragment,#cons-archive,#mode-cluster,#mode-observe,#mode-silence,#last-signal')).filter(function(el){
@@ -260,31 +286,62 @@ function startSwallow(href){
   });
   [].slice.call(document.querySelectorAll('.hit,#bh')).forEach(function(el){el.style.opacity=0;});
   setTimeout(function(){$('#veil').classList.add('on');},SW.dur-600);
-  setTimeout(function(){
-    /* Hand off collapsars playback position so dumul.html can continue
-       instead of restarting the bed from 0 after the page load. Redirect
-       aktual sekarang dilakukan oleh startTesseractWarp() di ~8400ms (2800 swallow + 5600 tess), supaya
-       overlay warp sempat selesai dulu sebelum halaman benar-benar pindah. */
-    try{
-      sessionStorage.setItem('dm_collapsars_t',String(GARG&&GARG.currentTime||0));
-      sessionStorage.setItem('dm_collapsars_from','swallow');
-      try{
-        var _t2=GARG&&GARG.currentTime||0;
-        var _spec2=null;
-        if(typeof DM_TR_SPEC!=='undefined'&&DM_TR_SPEC&&DM_TR_SPEC.length){
-          _spec2=Array.prototype.slice.call(DM_TR_SPEC,0,Math.min(DM_TR_SPEC.length,256));
-        }
-        sessionStorage.setItem('dm_visual_state',JSON.stringify({
-          t:_t2,phase:_t2,from:'dumul-transition',
-          level:(typeof DM_TR_LEVEL!=='undefined'?DM_TR_LEVEL:0)||0,
-          beatAge:(typeof DM_TR_BEAT!=='undefined'&&DM_TR_BEAT?Math.max(0,performance.now()-DM_TR_BEAT):9999),
-          mix:1,spec:_spec2
-        }));
-      }catch(e2){
-        sessionStorage.setItem('dm_visual_state',JSON.stringify({t:GARG&&GARG.currentTime||0,phase:GARG&&GARG.currentTime||0,from:'dumul-transition'}));
-      }
-    }catch(e){}
-  },SW.dur);
+  setTimeout(dumulHandoff,SW.dur);
+}
+
+/* ---------- F4 (D6): masuk dumul.html lewat sabuk Orion ----------
+   Supernova di Alnilam + kamera zoom/pan ke bintang itu (~1,5 dtk), veil, lalu startTesseractWarp seperti biasa.
+   SW diisi {kind:'belt'} supaya semua guard input (SW) tetap jalan, tapi SWV tetap null: langit TIDAK disedot spiral.
+   Mengembalikan true kalau animasi mulai (klik di-handle); false = biarkan anchor biasa jalan. */
+var BELT=null;
+var BELT_MS=1500,BELT_Z=3;
+function beltEnter(href){
+  if(SW||BELT)return false;
+  if(typeof isLayoutEdit==='function'&&isLayoutEdit())return false;
+  var c=cons('orion'),s=c&&c.stars&&c.stars.alnilam;
+  if(!s)return false;
+  dumulPrepare(href);
+  var ms=reduce?600:BELT_MS,t0=performance.now();
+  SW={t0:t0,dur:ms,h0:0,kind:'belt'};
+  BELT={t0:t0,dur:ms,z0:skyZoom,rgb:'110,229,255',c:c,s:s,last:t0,ex:c.ox-skyPan.x,ey:c.oy-skyPan.y};   /* ex/ey = bagian non-pan dari c.ox (goyangan/mouse), diambil SEKALI di sini: c.ox baru di-update saat render, jadi (c.ox-skyPan) tidak konsisten begitu pan bergerak */
+  document.body.classList.add('sw');
+  /* Jadwal wajib duluan: apa pun yang gagal di animasi, tesseract + redirect tetap jalan */
+  setTimeout(function(){try{dumulHandoff();}catch(e){}startTesseractWarp(href);},ms);
+  setTimeout(function(){var v=$('#veil');if(v)v.classList.add('on');},Math.max(0,ms-480));
+  try{haptic(22);}catch(e){}
+  try{   /* kilat supernova (overlay yang sama dgn triggerSupernova) di posisi Alnilam */
+    var fl=$('#sn-flash'),q=gSky(s.x+c.ox,s.y+c.oy);
+    if(fl&&q){
+      fl.style.setProperty('--sx',Math.round(q[0])+'px');fl.style.setProperty('--sy',Math.round(q[1])+'px');
+      fl.style.setProperty('--sn-rgb',BELT.rgb);
+      fl.classList.remove('on');void fl.offsetWidth;fl.classList.add('on');
+      clearTimeout(fl._snT);fl._snT=setTimeout(function(){fl.classList.remove('on');},1000);
+    }
+  }catch(eF){}
+  try{   /* HUD memudar (bukan disedot) */
+    [].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock,#signal-fragment,#cons-archive,#mode-cluster,#mode-observe,#mode-silence,#last-signal,#mode-bh')).forEach(function(el){
+      if(el.animate)el.animate([{opacity:getComputedStyle(el).opacity},{opacity:0}],{duration:reduce?200:650,delay:reduce?0:120,easing:'ease-in',fill:'forwards'});
+      else el.style.opacity=0;
+    });
+  }catch(eH){}
+  if(!reduce)requestAnimationFrame(beltCamStep);
+  return true;
+}
+function beltCamStep(now){
+  var B=BELT;if(!B)return;
+  var u=Math.min(1,(now-B.t0)/B.dur),e=u*u*(3-2*u),dt=Math.max(0,Math.min(250,now-B.last));B.last=now;
+  var zt=Math.max(B.z0,BELT_Z);
+  try{
+    setSkyZoom(B.z0+(zt-B.z0)*e,false);
+    /* pan analitik: c.ox = skyPan + goyangan/mouse. Supaya Alnilam di tengah layar: pan = (tengah - posisi dasar bintang) - (bagian non-pan, B.ex/B.ey).
+       Tidak tergantung zoom/frame lama; ditarik halus (time-based), dan pas u=1 dikunci tepat. */
+    var lim=skyPanLimits(),ex=B.ex,ey=B.ey,
+        tx=Math.max(-lim.x,Math.min(lim.x,W*.5-B.s.x-ex)),ty=Math.max(-lim.y,Math.min(lim.y,H*.5-B.s.y-ey)),
+        k=u>=1?1:1-Math.exp(-dt/110);
+    skyPan.x+=(tx-skyPan.x)*k;skyPan.y+=(ty-skyPan.y)*k;
+    B.tx=tx;B.ty=ty;
+  }catch(eC){}
+  if(u<1)requestAnimationFrame(beltCamStep);
 }
 
 /* ---------- gambar ---------- */
@@ -578,7 +635,7 @@ function drawFloatingTelescope(now){
 
   /* Small distant scene object; still participates fully in Gargantua's gravity. */
   var swallowedTelescope=null;
-  if(SW){
+  if(SWV){
     swallowedTelescope=pull(TELESCOPE.x,TELESCOPE.y);
     if(swallowedTelescope[2]>.985){TELE_DRAW=null;return;}
   }
@@ -599,7 +656,7 @@ function drawFloatingTelescope(now){
 
   /* Cache the on-screen position of the primary body for hit-testing.
      Must match what the user actually sees (lens + BH), not raw world coords. */
-  var primaryTQ=SW?swallowedTelescope:lens(TELESCOPE.x,TELESCOPE.y);
+  var primaryTQ=SWV?swallowedTelescope:lens(TELESCOPE.x,TELESCOPE.y);
   if(primaryTQ&&primaryTQ[0]!=null){
     TELESCOPE.sx=primaryTQ[0];TELESCOPE.sy=primaryTQ[1];
   }else{
@@ -1032,7 +1089,7 @@ function astStep(now){
     var a=AST[i],rk=astRk(a);
     /* fase per batu (diintegrasi): ganti slider / zoom / ukuran BH nggak bikin batu loncat */
     a.ph=(a.ph==null?AST_T*a.spd:a.ph)+dtc*AST_CFG.spd*a.spd*astSlow(rk,R);
-    if(!SW){
+    if(!SWV){
       /* cull tingkat cincin: titik terdekat cincin ke pusat = rr*ee; kalau sudah lewat sudut layar terjauh, tak ada bagian cincin yang kelihatan */
       var ee=Math.max(.12,Math.min(.75,.40+(a.e-.40)*T));
       if(rk*AST_K*AST_CFG.w*skyZoom*.96*ee>dmax){a._vis=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;continue;}
@@ -1046,10 +1103,10 @@ function astStep(now){
       }
       a._fa=fa;
     }
-    if(SW)a._fa=1;
+    if(SWV)a._fa=1;
     astPlace(a,now,c,p);
     var x=p.x,y=p.y,z=astDepth(p.s),sz=a.sz*z*(skyZoom<=3?skyZoom:3*Math.sqrt(skyZoom/3))*AST_CFG.sz,vis=1;   /* ukuran batu tumbuh melambat di atas x3 (x10 = 5.5x, bukan 10x) */
-    if(SW){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
+    if(SWV){var q=pull(x,y),qq=q[2];x=q[0];y=q[1];sz*=1-.45*qq;}
     else{
       var dx0=x-bp[0],dy0=y-bp[1];
       if(dx0*dx0+dy0*dy0>lz){
