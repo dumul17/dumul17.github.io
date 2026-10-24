@@ -1279,7 +1279,7 @@ var EXITP=(function(){
     try{
       if(EXITP.isOpen())L.push({f:EXITP.stay,w:0});   /* panel pamitan: back = tutup (tinggal); guard-nya milik layer root di bawah */
       if(LIS&&LIS.ui&&!LIS.ui.hidden)L.push({f:lisCancel,w:(SECT.cur||SECT.busy)?0:1});   /* kartu ajak/tinggal: di dalam sektor muncul DARI back (sektor→overview) jadi nggak punya guard sendiri (guard sektor dipakai ulang); di overview (tap portal) dia lapisan sendiri */
-      if(SGATE&&SGATE.open)L.push({f:sgClose,w:1});
+      if(typeof SMENU!=='undefined'&&SMENU.open)L.push({f:function(){smenuClose();},w:1});   /* menu sektor (16): back = tutup menu dulu */
       if(has('owl-panel','on'))L.push({f:function(){var b=el('owl-backdrop');if(b)b.click();},w:1});
       if(has('bh-panel','on'))L.push({f:function(){if(typeof bhTuneClose==='function')bhTuneClose();},w:1});
       if(has('music-player','open'))L.push({f:function(){var c=el('music-close');if(c)c.click();},w:1});

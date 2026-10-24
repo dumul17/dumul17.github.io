@@ -857,9 +857,9 @@ function updateTimeDilation(now){
   if(TD.a!==a){TD.a=a;TD.rate=1;TD.ar=1;
     try{a.preservesPitch=false;a.mozPreservesPitch=false;a.webkitPreservesPitch=false;}catch(e){}}
   var gm=focusGeom(cid),target=1,miniBH=false;
-  if(SECT.cur&&mbhOn()){
-    if(!SUM.moved&&Math.hypot(BH.x-SUM.x0,BH.y-SUM.y0)>8)SUM.moved=true;   /* latch: sekali di-drag dari titik spawn, dilatasi aktif */
-    miniBH=SUM.moved&&!(CAMERA_MODE&&camFocusId()==='bh');
+  if(SECT.cur){
+    if(!RELAY.moved&&Math.hypot(BH.x-RELAY.x0,BH.y-RELAY.y0)>8)RELAY.moved=true;   /* latch: sekali di-drag dari titik spawn, dilatasi aktif */
+    miniBH=RELAY.moved&&!(CAMERA_MODE&&camFocusId()==='bh');
   }   /* fokus kamera di BH mini: audio normal */   /* distorsi AUDIO cuma buat Gargantua mini di dalam sektor */
   if(gm&&BH.R>0&&BHSC>.05&&sectShow(cid)){   /* rasi sumber harus ada di sektor yang lagi dimasuki; kalau di sektor lain, BH mini nggak ngaruh */
     /* rs is a small fraction of the visual radius, and the effect only engages once Gargantua has been
@@ -1008,9 +1008,9 @@ PORTALS.forEach(function(p){
     el.addEventListener('focus',function(){hot=p.id;});
     el.addEventListener('blur',function(){if(hot===p.id)hot=null;});
   });
-  if(p.id==='band'){   /* F4: masuk dumul.html lewat sabuk Orion (supernova + zoom + tesseract). Tanpa JS / flag mati / ctrl-klik = anchor biasa */
+  if(p.id==='band'){   /* F4: masuk dumul.html lewat sabuk Orion (supernova + zoom + tesseract). Tanpa JS / ctrl-klik = anchor biasa */
     a.addEventListener('click',function(e){
-      if(!PORTAL_ON||e.defaultPrevented||e.button||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
+      if(e.defaultPrevented||e.button||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
       var ok=false;try{ok=beltEnter(p.href);}catch(eB){ok=false;}
       if(ok||SW)e.preventDefault();
     });
@@ -1162,8 +1162,6 @@ function telescopeHitRadius(){
 var TX={by:{},recv:{}};
 function txOf(s){return s&&s.k?TX.by[s.k]:null;}
 function txOn(s){var t=txOf(s);return !!(t&&t.on);}
-function txRecvOn(s){return !!(s&&s.k&&TX.recv[s.k]);}
-function txSyncRelay(s){if(s)s.relay=txOn(s);}
 /* Semua perubahan TX lewat txSet/txClear: TX.by, TX.recv dan s.relay SELALU searah.
    (Dulu txDeploy tidak membersihkan TX.recv dan txRecvSet bisa membalik sumber jadi receiver -> state saling bertentangan -> "dock ke-reset" / muffled terus.)
    Peran: 'src' = drone dock di bintang sumber, 'rcv' = receiver di BH mini sektor lain. Satu sektor = satu TX (peran bisa berubah, lewat txFollowSfx). */
@@ -1182,7 +1180,6 @@ function txClear(s){
   return had;
 }
 function txDeploy(s,key){return !!key&&txSet(s,'src',key);}
-function txRecall(s){return txClear(s);}
 function txRecvSet(s,on){
   if(!s||!s.k)return false;
   if(!on)return txClear(s);
@@ -1190,69 +1187,88 @@ function txRecvSet(s,on){
   if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
   return txSet(s,'rcv',key);
 }
-/* Relay tampil (label + garis) di overview? Sumber: selalu. Receiver: BH mini pernah di-summon (receiver hasil pindah sumber otomatis di-summon lewat txAutoBH). */
-function txRelayShown(s){
-  var t=s&&s.k?TX.by[s.k]:null;
-  if(!t||!t.on)return false;
-  return t.recv?!!(s.summed||t.auto):true;
-}
-/* ===== Interlocking per SEKTOR (satu-satunya sumber kebenaran: label portal ◉◉◉, warna garis/drone, DAN muffle audio semuanya baca dari sini) =====
-   Tiga komponen, masing-masing punya warna sendiri:
-     y = BH mini di-summon di sektor itu            (◉ kuning)
-     p = drone TX terpasang di sektor itu (dock sumber atau receiver)   (◉ pink)
-     c = BH overview di-summon (global) — baru dihitung di sektor yang punya y atau p, supaya portal kosong nggak ikut menyala   (◉ cyan)
-   Level sektor:  1 = cuma BH mini · 2 = TX terpasang (tanpa BH mini lengkap) · 3 = ketiganya menyala.
-   BH overview di-recall → c mati → sektor level 3 turun (cyan jadi idle) → sinyal muffled. TX/docking TIDAK ikut di-reset. */
+/* ===== Interlocking per SEKTOR (satu-satunya sumber kebenaran: titik ◉ di window menu, warna drone/garis, DAN muffle audio semuanya baca dari sini) =====
+   Dua komponen, masing-masing punya warna sendiri:
+     y = drone di-summon di sektor itu (standby di teleskop): s.drn          (◉ kuning)
+     p = drone aktif/docking: TX.by[s.k].on (dock sumber ATAU receiver)       (◉ pink)
+   Aturan: pink hanya boleh kalau kuning. Recall drone (drnSet(s,0)) mematikan pink ikut.
+   Level sektor: 0 netral · 1 kuning · 2 pink. (Cyan / BH overview pensiun: portal overview selalu ada.)
+   s.drn hidup di objek sektor: tidak disimpan ke localStorage, tidak disentuh sumStash / sectZoomOut, tidak di-reset otomatis (interlock persisten).
+   Kuning dinyalakan lewat gestur tahan teleskop (txLongPressTele), pink lewat tahan drone (txLongPressDrone). */
 function txComp(s){
   var t=s&&s.k?TX.by[s.k]:null,
       p=!!(t&&t.on),
-      y=!!(s&&(s.sum||(typeof SECT!=='undefined'&&SECT.cur===s&&typeof SUM!=='undefined'&&SUM.on))),
-      c=!!(typeof HBH!=='undefined'&&hbhOn())&&(y||p);
-  return {y:y,p:p,c:c,lvl:(y&&p&&c)?3:(p?2:(y?1:0))};
+      y=!!(s&&s.drn);
+  return {y:y,p:p,lvl:p?2:(y?1:0)};
 }
-function txInterlock(s){var o=txComp(s);return {lvl:o.lvl,y:o.y,p:o.p,c:o.c};}
+function txInterlock(s){var o=txComp(s);return {lvl:o.lvl,y:o.y,p:o.p};}
+/* Nyala/matikan kuning sektor. Mematikan kuning = TX/pink sektor itu ikut dilepas (pink tidak boleh tanpa kuning). true = state berubah. */
+function drnSet(s,on){
+  if(!s||!s.k)return false;
+  on=!!on;
+  if(!!s.drn===on)return false;
+  s.drn=on?1:0;
+  if(!on)txClear(s);
+  return true;
+}
+/* Sektor yang sekarang jadi SUMBER (pink + bukan receiver). Tidak bergantung SFX lagi main, beda dengan sfxSector(): dipakai indikator link, bukan muffle. */
+function txSrcSector(){
+  var i,s,o;
+  for(i=0;i<SECT.list.length;i++){s=SECT.list[i];o=TX.by[s.k];if(o&&o.on&&!o.recv)return s;}
+  return null;
+}
+/* Cincin cyan di teleskop: sektor ini sudah interlocking dengan sumber (sinyal jernih).
+   Sektor sumber: menyala selama pink (interlock ke overview). Receiver: ada sumber pink DAN sektor ini kuning + pink. */
+function txLinked(s){
+  if(!s||!s.k)return false;
+  var o=TX.by[s.k];
+  if(!(o&&o.on))return false;
+  if(!o.recv)return true;
+  return !!(txSrcSector()&&s.drn);
+}
 /* Kenapa sinyal dari sektor `src` belum jernih di `here` (null = overview)? '' = jernih.
    Urutannya = urutan yang harus dipasang user, dipakai bareng oleh muffle (spatialTarget) dan toast petunjuk (spatialHint):
      di sektor sumber           → selalu jernih
-     di overview                → sumber harus level 3
-     di sektor lain             → sumber level 3 DAN sektor ini juga level 3 (beda level = muffled) */
+     di overview                → sumber pink (tidak ada syarat lain)
+     di sektor lain             → sumber pink DAN sektor ini kuning + pink
+   Kode: none (tidak ada sumber) · far (sumber belum pink) · needsum (sektor ini belum kuning) · needdock (kuning, belum pink). */
 function txWhy(src,here){
   if(!src)return 'none';
   if(here===src)return '';
   var a=txComp(src);
-  if(!a.p)return 'far';                       /* TX sumber belum di-dock */
-  if(!a.c)return 'needov';                    /* BH overview di-recall */
-  if(!a.y)return 'needbhsrc';                 /* BH mini sektor SUMBER belum/dilepas — berlaku juga dari overview (here=null; 'needbh' = BH mini di sektor ini, nggak ada artinya di overview) */
-  if(!here)return '';
+  if(!a.p)return 'far';                       /* drone sumber belum di-dock */
+  if(!here)return '';                         /* overview: sumber pink = jernih */
   var h=txComp(here);
-  if(!h.y)return 'needbh';                    /* panggil BH mini di sini */
-  if(!h.p)return 'needrecv';                  /* receiver di sini belum terpasang */
-  if(!h.c)return 'needov';
+  if(!h.y)return 'needsum';                   /* panggil drone di sini (tahan teleskop) */
+  if(!h.p)return 'needdock';                  /* drone sudah ada, belum di-dock (tahan drone) */
   return '';
 }
 function sigLinked(src,here){return !!src&&txWhy(src,here)==='';}
-/* SFX ganti sumber (dipanggil playSfx). Semua jalur (supernova, panel musik, repeat) lewat sini.
-   1. Sektor yang sama dengan TX dock: cukup ganti key (drone terbang ke bintang baru).
-   2. Sektor lain yang SUDAH punya TX sebagai receiver: jadi sumber baru; sumber lama otomatis jadi receiver (tetap terpasang, tanpa reset/long-press ulang).
-   3. Sektor yang belum punya TX: TX sektor lain TIDAK disentuh (dock lama tetap, nggak ada yang di-reset). */
-function txFollowSfx(key,ns){
-  if(!key||!ns||!ns.k)return false;
-  var cur=TX.by[ns.k],i,s,o;
-  if(!(cur&&cur.on))return false;
-  if(!cur.recv){cur.key=key;return true;}
+/* Sumber baru dipasang: sumber lama (pink, bukan receiver) selain `ns` diturunkan jadi receiver, supaya tidak pernah ada dua sumber.
+   Dipanggil dari dua jalur: SFX pindah (txFollowSfx) dan deploy manual (tahan drone, F8). Receiver baru ikut kuning (s.drn=1): gate menu menolak sektor yang sinyalnya sudah terhubung kalau tidak. */
+function txDemoteOthers(ns){
+  var i,s,o,n=0;
   for(i=0;i<SECT.list.length;i++){
     s=SECT.list[i];o=TX.by[s.k];
     if(s===ns||!o||!o.on||o.recv)continue;
     txSet(s,'rcv','recv',true);
-    if(typeof txAutoBH==='function')txAutoBH(s);   /* receiver butuh BH mini */
+    s.drn=1;
+    n++;
   }
+  return n;
+}
+/* SFX ganti sumber (dipanggil playSfx). Semua jalur (supernova, panel musik, repeat) lewat sini.
+   1. Sektor yang sama dengan TX dock: cukup ganti key (drone terbang ke bintang baru).
+   2. Sektor lain yang SUDAH punya TX sebagai receiver: jadi sumber baru; sumber lama otomatis jadi receiver (txDemoteOthers; tetap terpasang, tanpa reset/long-press ulang).
+   3. Sektor yang belum punya TX: TX sektor lain TIDAK disentuh (dock lama tetap, nggak ada yang di-reset). */
+function txFollowSfx(key,ns){
+  if(!key||!ns||!ns.k)return false;
+  var cur=TX.by[ns.k];
+  if(!(cur&&cur.on))return false;
+  if(!cur.recv){cur.key=key;return true;}
+  txDemoteOthers(ns);
   txSet(ns,'src',key);
   return true;
-}
-/* Sektor tampil line/relay di overview? TX dock ATAU receiver link. */
-function txMarked(s){
-  if(!s||!s.k)return false;
-  return !!(TX.by[s.k]&&TX.by[s.k].on);
 }
 function txStarPos(key){
   if(!key||typeof TRIGGERS==='undefined')return null;
@@ -1264,49 +1280,53 @@ function txStarPos(key){
   var fy=tr.cons==='pleiades'?(PLEIADES.y+st.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(st.y+c.oy);
   return skyXF(fx,fy);
 }
-/* Long-press teleskop di dalam sektor: pasang / lepas TX di SEKTOR INI. Keputusan cuma dari state sektor ini + SFX yang lagi bunyi, bukan dari
-   "SFX yang barusan jalan" yang bisa null (SFX habis / teleskop ditinggal) — itu dulu yang bikin sumber salah dikira sektor lain, dibalik jadi receiver lalu terhapus.
-   1. Sektor ini sudah punya TX/RX (peran apa pun) → dilepas.
-   2. Sektor sumber SFX (+SFX bunyi) → dock drone ke bintang.
-   3. Sektor lain (BH mini di-summon) → receiver.
-   Overview: no-op (toast). */
+/* ===== Gestur drone (F8) =====
+   Tahan TELESKOP  = kuning (toggle): drone muncul standby di teleskop. Tahan lagi = tarik drone: kuning + pink mati (idle).
+   Tahan DRONE     = pink (toggle), hanya kalau kuning:
+       sektor sumber SFX (+SFX bunyi) → drone meluncur ke bintang pemancar (txDeploy + txDemoteOthers)
+       sektor lain                    → receiver: drone tetap standby di teleskop, jadi pink (tanpa SFX)
+     Tahan drone lagi = lepas docking: pink mati, balik kuning (standby).
+   Overview: tahan teleskop = no-op (toast). Keputusan cuma dari state sektor ini (s.drn, TX) + SFX yang lagi bunyi, bukan dari "SFX yang barusan jalan" yang bisa null.
+   Short-tap teleskop = bubble pesan (tidak ganggu TX). */
+function txGestToast(k,ms,v){try{if(typeof showModeToast==='function')showModeToast(T(k,v),null,ms);}catch(e){}}
 function txLongPressTele(){
   if(typeof lisBlock==='function'&&lisBlock('sig')){if(typeof lisDenied==='function')lisDenied('sig');return true;}
   if(SW||SECT.busy)return false;
-  function toast(k,ms,v){try{if(typeof showModeToast==='function')showModeToast(T(k,v),null,ms);}catch(e){}}
-  if(!SECT.cur){toast('toast.tx.ov',2800);return true;}
+  if(!SECT.cur){txGestToast('toast.tx.ov',2800);return true;}
+  var X=SECT.cur,nm=X.name||X.k;
+  if(X.drn){drnSet(X,0);txGestToast('toast.drn.recall',2800,{s:nm});haptic(12);return true;}   /* tarik drone: pink ikut mati (drnSet → txClear) */
+  drnSet(X,1);txGestToast('toast.drn.summon',3200,{s:nm});haptic(14);return true;
+}
+function txLongPressDrone(){
+  if(typeof lisBlock==='function'&&lisBlock('sig')){if(typeof lisDenied==='function')lisDenied('sig');return true;}
+  if(SW||SECT.busy||!SECT.cur)return false;
   var X=SECT.cur,nm=X.name||X.k,src=typeof sfxSector==='function'?sfxSector():null,key=null;
-  if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
-  if(txOn(X)){
+  if(!X.drn){txGestToast('toast.drn.need',3000);return true;}   /* pink butuh kuning */
+  if(txOn(X)){   /* lepas docking: balik kuning */
     var wasRcv=!!(TX.by[X.k]&&TX.by[X.k].recv);
     txClear(X);
-    toast(wasRcv?'toast.tx.recvoff':'toast.tx.recall',2800,{s:nm});
+    txGestToast(wasRcv?'toast.tx.recvoff':'toast.tx.recall',2800,{s:nm});
     haptic(12);return true;
   }
-  if(src&&src===X){
-    if(!key){toast('toast.tx.needplay',3000);return true;}
-    txDeploy(X,key);
-    toast('toast.tx.deploy',3200,{s:nm});
+  if(activeSfx&&!activeSfx.paused&&!activeSfx.ended&&typeof keyFromAudio==='function')key=keyFromAudio(activeSfx);
+  if(src&&src===X){   /* sektor sumber SFX */
+    if(!key){txGestToast('toast.tx.needplay',3000);return true;}
+    txDeploy(X,key);txDemoteOthers(X);
+    txGestToast('toast.tx.deploy',3200,{s:nm});
     haptic(14);return true;
   }
-  if(SUM.on&&BHSC>.05){
-    txRecvSet(X,true);
-    var w=txWhy(src,X);
-    toast(w===''?'toast.tx.linked.rx':(w==='needov'?'toast.tx.needov':(w==='far'?'toast.tx.far':(w==='none'?'toast.tx.muff':(w==='needbhsrc'?'toast.tx.needbhsrc':'toast.tx.needbh')))),3600,{s:nm});
-    haptic(14);return true;
-  }
-  toast('toast.tx.needbh',3200);   /* sektor non-sumber: butuh BH mini dulu, baru receiver */
-  return true;
+  txRecvSet(X,true);   /* sektor lain: receiver, tidak butuh SFX main */
+  var w=txWhy(src,X),TXW={'':'toast.tx.linked.rx',far:'toast.tx.far',none:'toast.tx.muff',needsum:'toast.tx.needsum',needdock:'toast.tx.needdock'};
+  txGestToast(TXW[w]||'toast.tx.muff',3600,{s:nm});
+  haptic(14);return true;
 }
-function txRecallFromTele(){return txLongPressTele();}
-function txToggleFromTele(){return false;}
 
 /* ---------- Nebula plate (gambar) ----------
    Gambar nebula dipakai sebagai layer dasar plateDeep (overview) dan, lewat nebTint(), versi berwarna per sektor (dipakai sectDrawSky di 04-render.js).
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
    Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],HALO:.55,THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'dumul-js/obs/img/nebula-portrait.webp?v=1',img:null,base:null,key:'',tint:{}};
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'dumul-js/obs/img/nebula-portrait.webp?v=1',img:null,base:null,key:'',tint:{}};
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
   var im=NEB.img;   /* satu gambar untuk portrait & landscape (cover-fit di bawah); yang berubah cuma staging-nya */
@@ -1347,7 +1367,7 @@ function nebOv(){
 }
 /* ---- Tuning langit (panel tab "Langit", tombol 🎚️): nilai disimpan di localStorage.dumul_sky_cfg ----
    HAZE/BAND/DRIFT = kabut lama (lihat atas), A_OV = kuat nebula, THICK = tebal halo blob (0..1 -> NEB.MASK[0] 18..2; default .5 = 10),
-   VIG = vignette tepi, HALO = gelap halo portal sektor (dipakai 05-sector-ui.js). */
+   VIG = vignette tepi. */
 var NEB_TUNE={HAZE:{min:0,max:1,def:0},BAND:{min:0,max:1,def:0},DRIFT:{min:0,max:1,def:0},A_OV:{min:0,max:1,def:1},THICK:{min:0,max:1,def:.5},VIG:{min:0,max:2,def:1},HALO:{min:0,max:1,def:.55}};
 function nebTuneApply(k,v){
   var t=NEB_TUNE[k];v=+v;if(!(v===v))v=t.def;v=Math.max(t.min,Math.min(t.max,v));
@@ -1836,7 +1856,7 @@ function layout(){
     el.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px)'+STG.up;
   });
   if(!drag.on){
-    if(SECT.cur&&mbhOn()){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
+    if(SECT.cur){var mg=Math.max(6,BH.R*BHSC*1.15);BH.x=Math.max(mg,Math.min(W-mg,BH.x));BH.y=Math.max(mg,Math.min(H-mg,BH.y));}
     else{BH.x=BH.hx;BH.y=BH.hy;}
   }
   /* Keep telescope inside the new viewport after rotation/URL-bar resize. */

@@ -4,15 +4,15 @@
    1. Ring tahan di teleskop: waktu long-press, cincin progres ngisi (580 ms) = petunjuk "tahan terus".
    2. Di dalam sektor: drone terbang dari teleskop ke target, orbit di sana, tether putus-putus + paket sinyal ngalir ke teleskop.
         - SRC         : sektor sumber SFX → target = bintang pemancar. Kalau Gargantua mini lagi dipanggil, paket lanjut teleskop → Gargantua (masuk tunnel).
-        - RCV         : sektor lain → target = Gargantua mini (mulut tunnel). Paket ngalir dari Gargantua ke teleskop.
+        - RCV         : sektor lain → standby pink di teleskop (F8; dulu: Gargantua mini). SBY = kuning, standby di teleskop.
       Lepas (long-press lagi / recall) = drone balik ke teleskop. Pindah sektor = tanpa animasi (langsung posisi akhir).
    3. Di overview sektor: Gargantua = tunnel. Garis sumber → Gargantua → sektor penerima, paket cahaya ngalir searah sinyal.
-   Warna jalur/drone/ring mengikuti indikator interlocking sektornya (kuning/pink/cyan), bukan lagi cyan=TX pink=RX.
+   Warna jalur/drone/ring mengikuti indikator interlocking sektornya (kuning/pink). F9: tether TIDAK permanen (cuma ±1,2 dtk setelah transisi + selama tahan); cincin cyan di teleskop = sektor ini interlocking (txLinked); cincin pink pulsa di drone = docked; mode cam: semua disembunyikan.
    Dipanggil dari frame() lewat drawTxLines(now) (sudah ada di 04-render/05-sector-ui, tinggal didefinisikan).
-   Hook long-press ada di 06-interaction.js (TXFX.holdStart / holdEnd). State dibaca dari TX / SUM / SECT; modul ini TIDAK mengubah state apa pun. */
+   Hook long-press ada di 06-interaction.js (TXFX.holdStart / holdEnd). State dibaca dari TX / SECT (s.drn); modul ini TIDAK mengubah state apa pun. */
 var TXFX=(function(){
   var SRC='110,229,255',RCV='255,154,217',NEU='200,214,226',HOLD_MS=580,HOLD_SHOW=160;
-  var D={},OV={},ovT=0,hold=null,pings=[],lastCur=null,TOP=null;
+  var D={},hold=null,pings=[],lastCur=null,TOP=null;
   function c01(v){return v<0?0:v>1?1:v;}
   function ease(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
   function hsh(k){var h=0,i;for(i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))|0;return (h&1)?1:-1;}
@@ -24,7 +24,7 @@ var TXFX=(function(){
   }
   function tele(){var p=telescopeScreenPos();return p?[p[0],p[1]]:null;}
   /* Warna jalur/drone = warna indikator interlocking sektornya (txInterlock + IL_COL di 05-sector-ui.js):
-     1 kuning, 2 pink, 3 cyan. Lvl 0 (nggak ada TX) = netral. Peran TX/RX tetap dibedakan lewat label & arah paket. */
+     1 kuning, 2 pink (cyan pensiun). Lvl 0 (belum ada drone) = netral. Peran TX/RX tetap dibedakan lewat label & arah paket. */
   function ilLvl(s){return(s&&typeof txInterlock==='function')?txInterlock(s).lvl:0;}
   function lvlCol(l){return(typeof IL_COL!=='undefined'&&IL_COL[l])||NEU;}
   function ilCol(s){return lvlCol(ilLvl(s));}
@@ -41,18 +41,18 @@ var TXFX=(function(){
   function want(s){
     var t=TX.by[s.k],src=typeof sfxSector==='function'?sfxSector():null;
     if(src===s&&t&&t.on&&!t.recv)return 'src';
-    if(TX.recv[s.k]&&SUM.on&&(PORTAL_ON||BHSC>.05))return 'rcv';   /* PORTAL_ON: receiver mendarat di PORTAL sektor (BHSC = BH mini, tidak relevan) */
-    return null;
+    if(!s.drn)return null;                    /* F8: drone cuma ada kalau kuning */
+    if(TX.recv[s.k])return 'rcv';             /* receiver: standby di teleskop, pink (tanpa RELAY.on) */
+    return 'sby';                              /* kuning (atau pink sumber tanpa SFX bunyi): standby di teleskop */
   }
   function targetOf(s,mode){
-    if(mode==='rcv'){
-      if(PORTAL_ON){var an=ptlScreen();return an?{x:an[0],y:an[1],r:Math.max(10,an[2]*.85)*1.5+10}:null;}   /* F3: dock di portal, bukan BH mini */
-      var b=camBH();return b?{x:b[0],y:b[1],r:Math.max(10,BH.Rr*(BHZ||1))*1.5+10}:null;
+    if(mode==='rcv'||mode==='sby'){   /* standby: orbit teleskop; radius cukup besar supaya area tap drone dan teleskop tidak saling menutup */
+      var tp=tele();return tp?{x:tp[0],y:tp[1],r:Math.round(42*(typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1))}:null;
     }
     var t=TX.by[s.k],p=t&&txStarPos(t.key);if(!p)return null;
     var q=gravityPos(p[0],p[1]);return q?{x:q[0],y:q[1],r:17}:null;
   }
-  function orbit(T,now,sg){var a=reduce?.8:now*.0013*sg+1.2;return [T.x+Math.cos(a)*T.r,T.y+Math.sin(a)*T.r*.55];}
+  function orbit(T,now,sg){var a=reduce?.8:now*.00042*sg+1.2;return [T.x+Math.cos(a)*T.r,T.y+Math.sin(a)*T.r*.55];}
 
   /* ---------- primitif gambar ---------- */
   function drawDrone(x,y,col,a,now,sc){
@@ -75,11 +75,11 @@ var TXFX=(function(){
   }
   function drawTrail(d,col,now){
     var tr=d.trail,i,p,age,pr=null;
-    while(tr.length&&now-tr[0][2]>420)tr.shift();
+    while(tr.length&&now-tr[0][2]>600)tr.shift();
     if(tr.length<2)return;
     g.lineWidth=1.4;g.lineCap='round';
     for(i=1;i<tr.length;i++){
-      p=tr[i];pr=tr[i-1];age=1-(now-p[2])/420;
+      p=tr[i];pr=tr[i-1];age=1-(now-p[2])/600;
       if(p[2]-pr[2]>90||Math.abs(p[0]-pr[0])+Math.abs(p[1]-pr[1])>70)continue;   /* loncat (tab di-background / lag): jangan tarik garis panjang */
       g.strokeStyle='rgba('+col+','+(.5*age*age)+')';g.beginPath();g.moveTo(pr[0],pr[1]);g.lineTo(p[0],p[1]);g.stroke();
     }
@@ -118,14 +118,40 @@ var TXFX=(function(){
     }
   }
 
+  /* ---------- F9: tether non-permanen + cincin status ---------- */
+  var TETH_HOLD=800,TETH_FADE=400;
+  function tethF(d,now){   /* 1 selama tahan; setelah transisi (d.tch) penuh TETH_HOLD ms lalu pudar TETH_FADE ms */
+    if(hold)return 1;
+    var e=now-(d.tch||-1e9);
+    return e<TETH_HOLD?1:(e<TETH_HOLD+TETH_FADE?1-(e-TETH_HOLD)/TETH_FADE:0);
+  }
+  function teleSize(){return typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1;}
+  /* cincin cyan di teleskop: radius lebih besar dari orbit standby drone (42*size) supaya tidak bertumpuk dengan cincin pink drone */
+  function drawLinkRing(tp,now){
+    var C='110,229,255',R0=42*teleSize()+14;
+    g.save();g.lineWidth=1.3;
+    if(reduce||lite()){g.strokeStyle='rgba('+C+',.38)';g.beginPath();g.arc(tp[0],tp[1],R0+6,0,6.283);g.stroke();}
+    else{var f=(now%2400)/2400;g.strokeStyle='rgba('+C+','+(.42*(1-f))+')';g.beginPath();g.arc(tp[0],tp[1],R0+f*20,0,6.283);g.stroke();}
+    g.restore();
+  }
+  /* cincin pink di drone: drone docked (TX on). Fase digeser setengah siklus dari cincin cyan supaya tidak berkedip bersamaan. */
+  function drawDockRing(x,y,now){
+    var C=RCV;
+    g.save();g.lineWidth=1.2;
+    if(reduce||lite()){g.strokeStyle='rgba('+C+',.45)';g.beginPath();g.arc(x,y,15,0,6.283);g.stroke();}
+    else{var f=((now+1200)%2400)/2400;g.strokeStyle='rgba('+C+','+(.5*(1-f))+')';g.beginPath();g.arc(x,y,9+f*14,0,6.283);g.stroke();}
+    g.restore();
+  }
+
   /* ---------- ring tahan teleskop ---------- */
   function drawHold(now){
     if(!hold)return;
     var el=now-hold.t0;if(el<HOLD_SHOW)return;
-    var t=tele();if(!t)return;
+    var t=tele(),dd=(hold.tg==='drone'&&SECT.cur&&D[SECT.cur.k])?D[SECT.cur.k].pos:null;
+    if(dd)t=dd;if(!t)return;
     var col=NEU;
     if(SECT.cur&&!SECT.on)col=fcol('hold',ilCol(SECT.cur),now);
-    var f=c01(el/HOLD_MS),R=26*(typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1),fade=c01((el-HOLD_SHOW)/120),full=f>=1,pulse=full&&!reduce?.6+.4*Math.sin(now*.02):1;
+    var f=c01(el/HOLD_MS),R=dd?18:26*(typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1),fade=c01((el-HOLD_SHOW)/120),full=f>=1,pulse=full&&!reduce?.6+.4*Math.sin(now*.02):1;
     g.save();g.lineCap='round';
     g.strokeStyle='rgba('+col+','+(.18*fade)+')';g.lineWidth=2;g.beginPath();g.arc(t[0],t[1],R,0,6.283);g.stroke();
     g.strokeStyle='rgba('+col+','+(.28*fade*pulse)+')';g.lineWidth=6;g.beginPath();g.arc(t[0],t[1],R,-1.5708,-1.5708+6.283*f);g.stroke();
@@ -146,53 +172,47 @@ var TXFX=(function(){
       var live=!!(d.pos&&(d.ph==='back'||d.ph==='dock'||d.ph==='out'));
       d.from=live?d.pos.slice():null;
       d.hop=!!(live&&d.ph!=='back');   /* ganti peran (TX↔RX) saat drone masih di luar: terbang langsung dari posisi sekarang, tanpa fade dari teleskop */
-      d.ph='out';d.t0=now;d.mode=mode;d.key=curKey;col=fcol('sec:'+s.k,ilCol(s),now);
+      d.ph='out';d.t0=now;d.tch=now;d.mode=mode;d.key=curKey;col=fcol('sec:'+s.k,ilCol(s),now);
       if(!d.hop)ping(tp[0],tp[1],col,now,false);else ping(d.pos[0],d.pos[1],col,now,false);
     }else if(mode==='src'&&d.key!==curKey){   /* SFX ganti bintang di sektor yang sama: drone pindah orbit ke bintang baru */
-      if(d.ph==='dock'&&d.pos){d.from=d.pos.slice();d.ph='out';d.t0=now;d.hop=true;ping(d.pos[0],d.pos[1],col,now,false);}
+      if(d.ph==='dock'&&d.pos){d.from=d.pos.slice();d.ph='out';d.t0=now;d.tch=now;d.hop=true;ping(d.pos[0],d.pos[1],col,now,false);}
       d.key=curKey;   /* kalau masih 'out': targetOf() dihitung ulang tiap frame, jalur otomatis membelok ke bintang baru */
     }else if(!mode&&(d.ph==='out'||d.ph==='dock')){
-      d.from=d.pos?d.pos.slice():tp;d.ph='back';d.t0=now;d.hop=false;
+      d.from=d.pos?d.pos.slice():tp;d.ph='back';d.t0=now;d.tch=now;d.hop=false;
     }
+    if(typeof txLinked==='function'&&txLinked(s))drawLinkRing(tp,now);   /* cincin cyan: sektor ini interlocking (juga saat drone idle karena bintang sumber tak terlihat) */
     if(d.ph==='idle')return;
     var T=d.mode?targetOf(s,d.mode):null,pos,al=1,u,e;
     if(d.ph==='out'){
       if(!T){d.ph='idle';return;}
-      u=reduce?1:c01((now-d.t0)/1150);e=ease(u);al=d.hop?1:e;
+      u=reduce?1:c01((now-d.t0)/1700);e=ease(u);al=d.hop?1:e;
       pos=bez(d.from||tp,orbit(T,now,d.sg),e,d.sg*.28);
-      if(u>=1){d.ph='dock';d.hop=false;ping(T.x,T.y,col,now,true);}
+      if(u>=1){d.ph='dock';d.hop=false;d.tch=now;ping(T.x,T.y,col,now,true);}
     }else if(d.ph==='dock'){
       if(!T){d.ph='idle';return;}
       pos=orbit(T,now,d.sg);
     }else{   /* back */
-      u=reduce?1:c01((now-d.t0)/950);e=ease(u);al=1-e;
+      u=reduce?1:c01((now-d.t0)/1400);e=ease(u);al=1-e;
       pos=bez(d.from||tp,tp,e,-d.sg*.28);
       if(u>=1){d.ph='idle';d.trail.length=0;ping(tp[0],tp[1],col,now,false);return;}
     }
     d.pos=pos;
     if(!reduce){var tl=d.trail,lp=tl.length?tl[tl.length-1]:null;if(!lp||Math.abs(lp[0]-pos[0])+Math.abs(lp[1]-pos[1])>1.2){tl.push([pos[0],pos[1],now]);if(tl.length>28)tl.shift();}}
     g.save();
-    /* denyut antena di teleskop */
-    if(!reduce&&!lite()){
-      var f=(now%2200)/2200;
-      g.strokeStyle='rgba('+col+','+(.30*(1-f)*al)+')';g.lineWidth=1.2;g.beginPath();g.arc(tp[0],tp[1],14+f*22,0,6.283);g.stroke();
-    }
     drawTrail(d,col,now);
-    tether(pos,tp,col,al,now,6,15);   /* sinyal ngalir dari drone ke teleskop */
-    if(d.mode==='src'&&d.ph==='dock'&&SUM.on&&(PORTAL_ON||BHSC>.05)){   /* lanjut: teleskop → portal (PORTAL_ON) / Gargantua mini (masuk tunnel) */
-      var an2=PORTAL_ON?ptlScreen():null,b=an2||camBH();if(b)tether(tp,[b[0],b[1]],col,.75,now,15,an2?Math.max(8,an2[2]*.85)*1.25:Math.max(8,BH.Rr*(BHZ||1))*1.25);
-    }
-    TOP={x:pos[0],y:pos[1],col:col,al:al,txt:d.mode==='rcv'?'RX':'TX'};   /* sprite + label digambar belakangan di drawTop(): di ATAS Gargantua/reticle */
+    tether(pos,tp,col,al*tethF(d,now),now,6,15);   /* sinyal ngalir drone→teleskop: hanya saat transisi/tahan */
+    if(TX.by[s.k]&&TX.by[s.k].on&&d.ph==='dock')drawDockRing(pos[0],pos[1],now);
+    TOP={x:pos[0],y:pos[1],col:col,al:al,txt:d.mode==='rcv'?'RX':(d.mode==='sby'?'':'TX')};   /* sprite + label digambar belakangan di drawTop(): di ATAS Gargantua/reticle */
     g.restore();
   }
   /* Tahap atas: dipanggil setelah Gargantua + asteroid depan (05-sector-ui.js frame()), jadi drone selalu di atas lubang hitam & reticle. */
   function drawTop(now){
     var T=TOP;TOP=null;
-    if(!T||typeof g==='undefined'||!g)return;
+    if(!T||typeof g==='undefined'||!g||CAMERA_MODE)return;
     g.save();
     try{
       drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,W<420?1:1.15);
-      label(T.x,T.y+11,T.txt,T.col,T.al);
+      if(T.txt)label(T.x,T.y+11,T.txt,T.col,T.al);
     }finally{g.restore();}
   }
 
@@ -215,47 +235,14 @@ var TXFX=(function(){
     }
     g.restore();
   }
-  function drawOverview(now){
-    lastCur=null;
-    if(SECT.busy||SECT.vis<.05)return;
-    var bp=camBH(),Rv=Math.max(8,BH.Rr*(BHZ||1)),rad=Math.max(20,Math.min(30,W*.07)),i,s,t,o,role,srcs=[],rcvs=[],mx=0;
-    if(!bp)return;
-    /* Tiap sektor punya alpha jalur sendiri (src & rcv): sumber pindah / sektor ganti peran = jalur lama memudar, jalur baru muncul. State dibaca ulang tiap frame, jadi nggak butuh reset. */
-    var dt=ovT?Math.min(100,now-ovT):16,k=reduce?1:1-Math.exp(-dt/150);ovT=now;
-    for(i=0;i<SECT.list.length;i++){
-      s=SECT.list[i];if(s.sx==null||!s.ids||!s.ids.length)continue;
-      t=TX.by[s.k];role=null;
-      if(t&&t.on){if(!t.recv)role='src';else if(txRelayShown(s))role='rcv';}
-      o=OV[s.k]||(OV[s.k]={s:0,r:0});
-      o.s+=((role==='src'?1:0)-o.s)*k;o.r+=((role==='rcv'?1:0)-o.r)*k;
-      if(o.s<.015&&role!=='src')o.s=0;if(o.r<.015&&role!=='rcv')o.r=0;
-      if(o.s>0){srcs.push([s,o.s]);if(o.s>mx)mx=o.s;}
-      if(o.r>0){rcvs.push([s,o.r]);if(o.r>mx)mx=o.r;}
-    }
-    if(!srcs.length&&!rcvs.length)return;
-    g.save();
-    var bpp=[bp[0],bp[1]],flowIn=srcs.length>0,hasR=false;
-    for(i=0;i<srcs.length;i++){s=srcs[i][0];g.globalAlpha=SECT.vis*srcs[i][1];link([s.sx,s.sy],bpp,rad*1.35,Rv*1.35,fcol('ovs:'+s.k,ilCol(s),now),true,now,hsh(s.k));}
-    for(i=0;i<rcvs.length;i++){s=rcvs[i][0];if(rcvs[i][1]>.5)hasR=true;g.globalAlpha=SECT.vis*rcvs[i][1];link(bpp,[s.sx,s.sy],Rv*1.35,rad*1.35,fcol('ovr:'+s.k,ilCol(s),now),flowIn,now,hsh(s.k));}
-    /* cincin tunnel di Gargantua: ngembang pelan selama ada sinyal lewat */
-    if(!reduce&&!lite()){
-      var f=(now%2600)/2600,a=(flowIn&&hasR)?1:.55,ml=0,ql;
-      for(i=0;i<srcs.length;i++){ql=ilLvl(srcs[i][0]);if(ql>ml)ml=ql;}
-      for(i=0;i<rcvs.length;i++){ql=ilLvl(rcvs[i][0]);if(ql>ml)ml=ql;}
-      g.globalAlpha=SECT.vis*Math.min(1,mx);
-      g.strokeStyle='rgba('+fcol('ovring',lvlCol(ml),now)+','+(.34*(1-f)*a)+')';g.lineWidth=1.3;
-      g.beginPath();g.arc(bpp[0],bpp[1],Rv*1.4+f*Rv*1.6,0,6.283);g.stroke();
-    }
-    g.restore();
-  }
 
   function draw(now){
     TOP=null;
     if(typeof g==='undefined'||!g)return;
+    if(CAMERA_MODE){lastCur=null;return;}   /* mode cam: drone + teleskop disembunyikan; keluar cam = snap ke posisi akhir tanpa animasi */
     g.save();
     try{
       if(SECT.cur&&!SECT.on){if(!SECT.busy)drawSector(now,SECT.cur);}
-      else if(SECT.on&&!SECT.cur)drawOverview(now);
       else lastCur=null;
       drawHold(now);drawPings(now);
     }finally{g.restore();}
@@ -263,14 +250,21 @@ var TXFX=(function(){
   return {
     draw:draw,
     drawTop:drawTop,
-    holdStart:function(){hold={t0:performance.now()};},
+    holdStart:function(tg){hold={t0:performance.now(),tg:tg||'tele'};},
+    /* hit-test drone (F8): true kalau (x,y) kena drone yang sedang terlihat di sektor ini. Dites SEBELUM teleskop. */
+    droneAt:function(x,y){
+      if(CAMERA_MODE||!SECT.cur||SECT.on||SECT.busy)return false;
+      if(typeof lisGone==='function'&&lisGone())return false;
+      var d=D[SECT.cur.k];if(!d||!d.pos||(d.ph!=='dock'&&d.ph!=='out'))return false;
+      return Math.hypot(x-d.pos[0],y-d.pos[1])<=Math.max(22,W*.05);
+    },
     holdEnd:function(){hold=null;},
-    role:function(){   /* 'src' = TX docked di sektor ini, 'rcv' = RX terhubung ke BH mini, null = idle; dipakai LED teleskop */
+    role:function(){   /* 'src' = TX docked di sektor ini, 'rcv' = RX standby pink, 'sby' = kuning, null = idle; dipakai LED teleskop */
       if(!SECT.cur||SECT.on||SECT.busy)return null;
       if(typeof lisGone==='function'&&lisGone())return null;
       return want(SECT.cur);
     },
-    reset:function(){D={};OV={};CF={};ovT=0;hold=null;pings.length=0;lastCur=null;TOP=null;}
+    reset:function(){D={};CF={};hold=null;pings.length=0;lastCur=null;TOP=null;}
   };
 })();
 function drawTxLines(now){TXFX.draw(now);}

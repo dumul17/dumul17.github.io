@@ -2,20 +2,8 @@
 /* 03-gargantua.js — Gargantua, neural network, spectrum */
 /* ---------- lubang hitam Gargantua ---------- */
 function ease(u){return u*u*(3-2*u);}
-function pull(x,y){                       /* posisi benda saat disedot: berputar spiral ke lubang hitam */
-  var P;
-  if(SWV){P=clamp((swP-.05)/.82);var h0=SWV.h0||0;if(h0>0)P=h0+(1-h0)*P;}   /* h0: tarikan hold yang sudah berjalan -> swallow lanjut mulus, tanpa lompat balik */
-  else if(HPV>.002)P=HPV*HP_K;                                              /* hold portal: objek di atas mulut wormhole ditarik pelan ke tengah */
-  else return [x,y,0];
-  var bp=camBH(),bx=bp[0],by=bp[1];
-  var dx=x-bx,dy=y-by,r=Math.sqrt(dx*dx+dy*dy)+.001,th=Math.atan2(dy,dx);
-  var rmax=Math.sqrt(W*W+H*H)*.6,delay=.4*Math.min(1,r/rmax);
-  var k=clamp((P-delay)/(1-delay));k=k*k;
-  var r2=r*Math.pow(1-k,1.5),t2=th+k*3.4;
-  return [bx+Math.cos(t2)*r2,by+Math.sin(t2)*r2,k];
-}
 function lens(x,y){                       /* smooth gravitational lens: bounded, continuous, no visual explosions */
-  if(PORTAL_ON&&!SECT.cur)return [x,y];     /* F2: di overview BH tidak digambar lagi (portal), jadi lensing galaksinya ikut mati (disengaja) */
+  if(!SECT.cur)return [x,y];     /* di overview BH tidak digambar (portal), jadi lensing galaksinya mati (disengaja) */
   var R=BH.Rr*(BHZ||1);if(R<1)return [x,y];
   var bp=camBH(),bx=bp[0],by=bp[1];
   var dx=x-bx,dy=y-by,d2=dx*dx+dy*dy;
@@ -45,14 +33,8 @@ function lens(x,y){                       /* smooth gravitational lens: bounded,
   return [bx+dx*f,by+dy*f];
 }
 function gravityPos(x,y){
-  /* Gargantua continuously lenses the galaxy; during the swallow transition,
-     keep the existing spiral pull animation. Saat hold portal (HPV>0): lensing tetap jalan, lalu hasilnya ikut ditarik ke tengah. */
-  if(SWV)return pull(x,y);
+  /* Gargantua continuously lenses the galaxy. */
   var q=lens(x,y);
-  if(HPV>.002){
-    if(!q)return [x,y,1];
-    return pull(q[0],q[1]);
-  }
   return q ? [q[0],q[1],0] : [x,y,1];
 }
 /* ===== Visual Gargantua: "Interstellar Blackhole Gargantua #2 - Pure CSS" =====
@@ -280,9 +262,9 @@ function drawHoleFallback(now,age){
   /* Compatibility fallback for older/mobile canvas engines.  If the layered
      sprite cannot be drawn, keep Gargantua visible with only basic Canvas 2D
      primitives so one unsupported effect cannot make the whole scene vanish. */
-  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SWV?ease(swP):0;
+  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3);
   sc*=ARV;
-  var R=Math.max(.1,BH.R*sc*(1+1.6*e)*BHZ*BHSC);
+  var R=Math.max(.1,BH.R*sc*BHZ*BHSC);
   if(R<.5)return;
   var bp=camBH();
   g.save();g.translate(bp[0],bp[1]);
@@ -318,9 +300,9 @@ function drawHoleSafe(now,age){
    Keduanya terpisah supaya menurunkan lensa nggak ikut menurunkan serat cakram. */
 var BH_DISK_DY=.20,BH_LENS_DY=0;
 function drawHole(now,age){
-  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3),e=SWV?ease(swP):0;
+  var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3);
   sc*=ARV;   /* keluar dari terowongan (sektor -> overview / lompat sektor): BH tujuan dari jauh -> penuh */
-  BH.Rr=BH.R*sc*(1+1.6*e)*BHSC*bhSizeMul();
+  BH.Rr=BH.R*sc*BHSC*bhSizeMul();
   if(BH.Rr<1||!BH.sprite)return;
 
   BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
@@ -328,10 +310,10 @@ function drawHole(now,age){
   var bp=camBH();
   var gk=OFX.pK; /* 0..1: seberapa "hidup" Gargantua saat BGM Collapsars main */
   var bhFull=!!(BH_CSS.spr&&BH.sprite===BH_CSS.spr),bhCS=bhFull?.72:1; /* disk CSS lebih pendek dari sprite lama: overlay horizontal ikut diskalakan */
-  /* F2: PORTAL_ON di overview = portal 3D menggantikan gambar BH (anchor BH.hx/hy, BHSC, camBH tetap hidup). Gagal = gambar BH lama. */
-  if(PORTAL_ON&&!SECT.cur&&typeof portal3dOverview==='function'){
+  /* Overview = portal 3D menggantikan gambar BH (anchor BH.hx/hy, BHSC, camBH tetap hidup). Gagal = gambar BH lama. */
+  if(!SECT.cur&&typeof portal3dOverview==='function'){
     var pOK=false;try{pOK=portal3dOverview(now,bp,R);}catch(ePt){window.__hub.renderError='portal3d: '+(ePt&&ePt.message||ePt);}
-    if(pOK){bhSwFlash(bp);return;}
+    if(pOK)return;
   }
 
   g.save();
@@ -348,12 +330,12 @@ function drawHole(now,age){
   /* Core + static portal artwork */
   /* Bloom hangat (warna film) di belakang sprite: satu drawImage dari sprite gradien yang di-cache. */
   if(bhFull&&BHU.bloom>.01){
-    var bhr=R*4.6,bha=Math.min(1,.42*BHU.bloom*(1+.35*gk+.15*BH.h+.3*e))*(1-.85*ba);
+    var bhr=R*4.6,bha=Math.min(1,.42*BHU.bloom*(1+.35*gk+.15*BH.h))*(1-.85*ba);
     g.globalCompositeOperation='lighter';g.globalAlpha=bha;
     g.drawImage(bhBloomSprite(),-bhr,-bhr,bhr*2,bhr*2);
     g.globalAlpha=1;g.globalCompositeOperation='source-over';
   }
-  var a0=Math.min(1,.86+.14*BH.h+.5*e+.08*gk);
+  var a0=Math.min(1,.86+.14*BH.h+.08*gk);
   if(ba<.99){g.globalAlpha=a0*(1-ba);g.drawImage(BH.sprite,-S/2,-S/2,S,S);}
   if(ba>.01){g.globalAlpha=a0*ba;g.drawImage(bsp,-S/2,-S/2,S,S);}
   g.globalAlpha=1;
@@ -362,7 +344,7 @@ function drawHole(now,age){
     var fb=bhFiberSprite();
     if(fb){
       var fk=S/BH.S,fsh=(reduce||IS_POTATO)?0:Math.sin(now*.0011*BHU.speed);
-      var fa=Math.min(1,(.8+.2*BH.h+.4*e+.12*gk)*Math.min(1,.5+.5*BHU.bloom))*(1+.1*(reduce||IS_POTATO?0:Math.sin(now*.0007*BHU.speed+1.3)))*(1-.85*ba);
+      var fa=Math.min(1,(.8+.2*BH.h+.12*gk)*Math.min(1,.5+.5*BHU.bloom))*(1+.1*(reduce||IS_POTATO?0:Math.sin(now*.0007*BHU.speed+1.3)))*(1-.85*ba);
       var fw=fb.w*fk*(1+.012*fsh),fh=fb.h*fk;
       g.save();g.rotate(BH.ang);g.globalCompositeOperation='lighter';g.globalAlpha=Math.min(1,fa);
       /* Overlay serat (haze + serat horizontal) ikut pusat cakram CSS: BH_DISK_DY. Busur lensa di dalam sprite punya offset sendiri (BH_LENS_DY). */
@@ -375,7 +357,8 @@ function drawHole(now,age){
      untouched; this is a visual layer drawn on top of the normal ring only
      while one of Betelgeuse/Rigel/Spica SFX is actively playing. */
   if(typeof PERF!=='undefined'&&PERF)pmk('hole.draw');
-  drawAudioVisualizer(now,R);
+  /* F6a: visualizer lama (debu + pulse elips) sudah tidak di BH mini; di portal diganti kilatan petir (15-portal3d). Di sini tinggal fallback overview saat portal gagal tergambar. */
+  if(!SECT.cur)drawAudioVisualizer(now,R);
   if(typeof PERF!=='undefined'&&PERF)pmk('viz');
 
   /*
@@ -417,7 +400,7 @@ function drawHole(now,age){
        Secondary lens + plasma MUST use this same angle always — never apply
        drag wobble here, or they separate from the sprite disk. */
     var diskAng=BH.ang; /* bidang cakram sprite (-.48 visual lama, -23.5deg visual CSS) */
-    var sp=.00024*(1+.55*BH.h+1.8*e);
+    var sp=.00024*(1+.55*BH.h);
     g.save();g.rotate(diskAng);if(bhFull)g.translate(0,R*BH_DISK_DY);
     if(gk>.01){
       /* Collapsars: cakram akresi berdenyut pelan (hangat), lebih terang dari biasanya. */
@@ -428,7 +411,7 @@ function drawHole(now,age){
       g.beginPath();g.ellipse(0,0,R*2.5*bhCS,R*.09,0,0,6.283);g.fill();
     }
     if(bhFull&&BHU.speed>.01){ /* kilau plasma di sepanjang cakram CSS; kecepatan = slider speed */
-      var sp2=.00020*BHU.speed*(1+.55*BH.h+1.8*e);
+      var sp2=.00020*BHU.speed*(1+.55*BH.h);
       for(var m2=0;m2<(IS_POTATO?3:6);m2++){
         var q2=(now*sp2+OFX.dph+m2/6)%1,uu=q2*2-1;
         var al3=Math.pow(1-Math.abs(uu),1.8)*(.22+.14*BH.h+.10*gk)*Math.min(1,.6+.4*BHU.bloom);
@@ -439,7 +422,7 @@ function drawHole(now,age){
     if(!bhFull){
     for(var m=0;m<(IS_POTATO?3:7);m++){
       var ph2=(now*sp+OFX.dph+m/7)%1,u=ph2*2-1;
-      var al2=Math.pow(1-Math.abs(u),1.9)*(.16+.12*BH.h+.10*e+.10*gk);
+      var al2=Math.pow(1-Math.abs(u),1.9)*(.16+.12*BH.h+.10*gk);
       var tilt=(m%3-1)*.18;
       g.fillStyle='rgba(235,240,245,'+al2+')';
       g.beginPath();
@@ -524,20 +507,6 @@ function drawHole(now,age){
     g.restore();
   }
 
-  bhSwFlash(bp);
-}
-function bhSwFlash(bp){
-  if(SWV){   /* flash cyan akhir swallow overview -> dumul.html */
-    var f=clamp((swP-.80)/.18);
-    if(f>0){
-      var fr=Math.sqrt(W*W+H*H)*(.12+.75*f),
-          gr=g.createRadialGradient(bp[0],bp[1],0,bp[0],bp[1],fr);
-      gr.addColorStop(0,'rgba(232,250,255,'+(.95*f)+')');
-      gr.addColorStop(.4,'rgba(110,229,255,'+(.55*f)+')');
-      gr.addColorStop(1,'rgba(110,229,255,0)');
-      g.fillStyle=gr;g.fillRect(0,0,W,H);
-    }
-  }
 }
 /* ===== DUMUL neural network (kode SAMA di index.html & dumul.html — jangan diubah sebelah saja) =====
    Layout deterministik (seed tetap, koordinat relatif ke viewport) → posisi node & garis

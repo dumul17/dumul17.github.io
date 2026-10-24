@@ -1,6 +1,7 @@
 'use strict';
-/* ===== 09-wormhole.js — wormhole transisi (gate Sector Gate + hold Gargantua mini) + muffle audio =====
-   v5: hold/swallow di BAWAH sky (hole() di 05), tarikan hold (pull()), fix cover() ganda (NaN), frame error aman.
+/* ===== 09-wormhole.js — wormhole transisi (lompat antar sektor + sektor -> overview) + muffle audio =====
+   F11b: mesin hold (holdStart/Arm/Move/Commit/Cancel, state charge/armed/held), hole() di bawah sky, dan tarikan pull()/HPV dibuang (tidak ada pemanggil sejak portal sektor pensiun).
+   v5: fix cover() ganda (NaN), frame error aman.
    v4: terowongan "warp" biru-ungu-magenta dengan kilau hangat di tepi lubang, streak bintang melesat radial + berputar pelan
    (referensi: foto wormhole berkilau). Canvas 2D biasa: tanpa WebGL, tanpa shader, tanpa tekstur eksternal.
    Cara kerjanya (ringan): 2 buffer kecil (setengah resolusi layar) dipakai ping-pong sebagai "feedback zoom" — tiap frame isi buffer
@@ -10,10 +11,9 @@
    Biaya per frame: 1 drawImage kecil (feedback) + ~120 sprite + 1 drawImage ke layar + ~110 garis.
 
    Titik sambung (semua lewat window.WORMHOLE, selalu dibungkus try/catch + cek keberadaan) — TIDAK BERUBAH dari v3:
-     - 05-sector-ui.js  sgJump()         -> WORMHOLE.gate(s,camBH())        lompat antar sektor (BH mini -> tengah -> BH mini sektor tujuan)
-     - 05-sector-ui.js  sectWormholeOut()-> WORMHOLE.overview(camBH())      sektor -> overview (BH mini -> tengah -> BH overview); jadwal & durasi SAMA dengan gate(), tanpa swallow
-     - 06-interaction.js beginBHDrag()   -> holdStart / holdCommit / holdCancel   hold BH mini (long-press 580ms)
-     - 04-render.js     startSwallow()   -> WORMHOLE.swallow(camBH(),ms)    swallow BH overview -> dumul.html (sebelum tesseract); dipicu tekan & tahan BH overview (06-interaction.js, sama seperti BH mini)
+     - 05-sector-ui.js  sectJumpTo()     -> WORMHOLE.gate(s,pos,R,cb)       lompat antar sektor / overview -> sektor (pos = teleskop atau tengah layar, wormAnchor())
+     - 05-sector-ui.js  sectWormholeOut()-> WORMHOLE.overview(pos,R,cb)     sektor -> overview; jadwal & durasi SAMA dengan gate(), tanpa swallow
+     - (swallow BH overview dihapus di F5; masuk dumul.html lewat beltEnter di 04-render.js, tanpa WORMHOLE)
      - 01-core.js       spatialTarget()  -> WORMHOLE.muffle()               redam audio selama di dalam wormhole
    Efek mati sendiri (no-op) kalau prefers-reduced-motion atau canvas 2D tidak ada. */
 (function(){
@@ -34,20 +34,28 @@ var DUST_A=.55;       /* terang tiap debu */
 var GLOW_A=.32;       /* terang kilau hangat di tepi lubang (0 = matikan) */
 var EDGE_SOLID=.5;    /* mulut portal mini: bagian tengah (x radius) yang tetap pekat; sisanya meluruh halus jadi transparan ke arah tepi (makin kecil = tepi makin lembut) */
 var RIM_GLOW=.09;     /* kilau tipis di luar mulut portal mini (0 = tanpa kilau). Pengganti garis cincin cyan yang dulu */
-var R_HOLD=.22;       /* radius mulut portal saat hold, x min(W,H) */
-var CHARGE_MS=580;    /* harus sama dengan setTimeout long-press di beginBHDrag */
 /* Transisi sektor -> overview DAN lompat antar sektor memakai satu jadwal yang sama (go()), jadi durasinya identik:
      0 .. T_OPEN      dinding terowongan tumbuh dari tengah lubang hitam sampai memenuhi layar
      0 .. T_MOVE      lubang hitam terowongan bergeser dari posisi BH mini ke tengah layar (kesan masuk terowongan)
      T_SEEK..T_TRAVEL lubang hitam meluncur dari tengah layar ke tujuan: BH overview (ke overview) / BH mini sektor tujuan (lompat)
      T_TRAVEL..+T_EXIT dinding memudar dari tengah lubang hitam ke pinggir layar, lubang hitam yang pekat memudar jadi transparan
    Total = T_TRAVEL + T_EXIT. Underlying sektor (zoom-out, dan zoom-in untuk lompat) jalan di bawah terowongan; T_TRAVEL cukup panjang untuk keduanya. */
-var T_TRAVEL=2200, T_EXIT=1000, T_SEEK=1300;
-var T_OPEN=900, T_MOVE=1100, T_FADE=420, T_CLOSE=900;   /* durasi buka portal / geser ke tengah / fade-in / tutup (batal / pengaman) */
+/* Durasi lompatan (ms). T_DWELL = lama di dalam terowongan murni (bintang, teleskop melayang+miring), T_SEEKM = lubang hitam meluncur ke tujuan.
+   Total dari lepas tahan = T_ENTER_TELE + T_OPEN + T_DWELL + T_SEEKM (+550 kalau lompat antar sektor) + T_EXIT. Kecilkan T_DWELL kalau kepanjangan. */
+var T_OPEN=2300, T_DWELL=2600, T_SEEKM=2200;
+var T_TRAVEL=T_OPEN+T_DWELL+T_SEEKM, T_TRAVEL_GATE=T_TRAVEL+1550, T_EXIT=2400, T_SEEK=2300;   /* lompat sektor lebih panjang: sektor asal zoom-out + sektor tujuan zoom-in jalan SETELAH layar tertutup */
+function TT(){return S&&S.dest&&!S.fromOv?T_TRAVEL_GATE:T_TRAVEL;}   /* fromOv: overview -> sektor cuma satu zoom-in (tanpa zoom-out sektor asal), jadi jadwalnya = sektor -> overview */
+function TS(){return TT()-T_SEEKM;}
+/* Kemiringan teleskop di dalam terowongan (badan 3D; 2D cadangan cuma ikut roll). lean = condong ke arah lubang (keluar: condong ke depan), bank = miring ikut gerak melayang,
+   buffet = getar halus saat ngebut. sx/sy/sz = arah sumbu (balik ke -1 kalau kemiringannya terasa terbalik). on:0 = mati. */
+var TELE_TILT={on:1,lean:.5,bank:.9,buffet:.035,sx:1,sy:1,sz:1,exitDir:1,exitVel:.5};   /* exitDir: 1 = pose keluar sama seperti di terowongan (tidak berbalik), -1 = condong menjauhi lubang; exitVel: pengali bank/pitch dari kecepatan saat keluar */
+var T_MOVE=2100, T_FADE=1420, T_CLOSE=1900;   /* T_OPEN = cincin + dinding terowongan membesar (zoom-in ke portal) sampai menutup layar */
+var T_ENTER_TELE=1950;
+var T_TELE_OVERLAP=1600;   /* ms: zoom-in ke portal mulai SEBELUM teleskop selesai terbang masuk (0 = berurutan seperti dulu; harus < T_ENTER_TELE, otomatis dibatasi 80%) */   /* durasi teleskop terbang masuk ke tengah cincin sebelum zoom-in dimulai */   /* durasi buka portal / geser ke tengah / fade-in / tutup (batal / pengaman) */
 
 var ZN=.05, BG='#02050d', WARM=16;
 var cv=null,g=null,spr=null,SC=48,dpr=1,RGB=[],NP=STAR_PAL.length,NN=NEB_PAL.length,
-    ST=[],under=false,hp=0,inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
+    ST=[],inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
     W=0,H=0,bw=0,bh=0,bq=.5,bA=null,bB=null,gA=null,gB=null,fresh=0,nebAcc=0,dustAcc=0;
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
@@ -136,91 +144,90 @@ function init(){
 }
 
 /* ---------- state machine ----------
-   idle -> charge (hold berjalan) -> armed (portal terbuka penuh, jari masih menahan; boleh di-drag via holdMove) -> held (jari dilepas: nunggu kartu teleskop / sectZoomOut) -> travel -> close -> idle
-   gate() langsung ke travel. holdCancel() / hold gagal -> close (mengecil). */
+   idle -> enter (teleskop terbang masuk cincin) -> travel (zoom-in ke portal, terowongan, lubang hitam meluncur) -> exit -> idle   (go(): sektor->overview, lompat antar sektor, overview->sektor)
+   close = penutup darurat (pengaman macet). */
 function show(){if(cv&&cv.style.display!=='block'){resize();cv.style.display='block';}}
-function setUnder(b){under=!!b;if(cv)cv.style.zIndex=b?'-1':'13';}   /* true = DI BAWAH canvas #sky (hold + swallow); false = di atas (gate, penutup layar) */
-function hide(){under=false;hp=0;if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
-function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}state='idle';env=0;hp=0;hide();}
+/* KAMERA zoom-in ke portal: canvas #sky di-scale (CSS) di sekitar titik cincin sambil digeser ke tengah layar, jadi langit + cincin ikut mendekat (bukan cincin yang membesar di atas langit diam).
+   Koordinat lokal #sky = ruang virtual stage, jadi benar di portrait / landscape / ROT. Terowongan di kanvas ini mengikuti titik + skala yang sama. */
+function skyCam(uu,ee){
+  var sk=document.getElementById('sky'),Wv,Hv,m,tx,ty,k;
+  if(!sk||S.vx==null)return null;
+  Wv=sk.clientWidth||winW();Hv=sk.clientHeight||winH();m=sm(uu);k=Math.exp(S.lnK*ee);
+  tx=(Wv*.5-S.vx)*m;ty=(Hv*.5-S.vy)*m;
+  sk.style.willChange='transform,opacity';sk.style.transformOrigin=S.vx+'px '+S.vy+'px';
+  sk.style.transform='translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px) scale('+k.toFixed(4)+')';
+  sk.style.opacity=(1-.92*sm((ee-.5)/.5)).toFixed(3);   /* langit meredup menjelang tertutup terowongan (membesar jadi buram) */
+  S.skyOn=1;
+  return toScr(S.vx+tx,S.vy+ty);
+}
+function skyReset(){
+  try{
+    var sk=document.getElementById('sky');
+    if(sk&&S&&S.skyOn){sk.style.transform='';sk.style.transformOrigin='';sk.style.opacity='';sk.style.willChange='';}
+    if(S)S.skyOn=0;
+  }catch(e){}
+}
+function hide(){skyReset();try{if(typeof TELESCOPE!=='undefined')TELESCOPE.dive=0;}catch(eD){}if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
+function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
+function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}runCover();state='idle';env=0;hide();}
 function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);}}
 function startExit(now){
   if(state!=='travel')return;
   S.r0=S.r;S.rate0=S.rate;S.e0=env;S.tx=now;S.u=0;state='exit';kick();
 }
-function startClose(now,ms,shrink){
+function startClose(now,ms){
   if(state==='close'||state==='idle')return;
-  S.hp0=hp;S.c0=[S.cx,S.cy];S.r0=S.r;S.a0=S.a;S.e0=env;S.rate0=S.rate;S.tc=now;S.cms=ms;S.shrink=!!shrink;state='close';kick();
+  if(!cv||cv.style.display!=='block'){state='idle';env=0;S={};return;}   /* tanpa kanvas: langsung selesai */
+  S.c0=[S.cx,S.cy];S.r0=S.r;S.a0=S.a;S.e0=env;S.rate0=S.rate;S.tc=now;S.cms=ms;state='close';kick();
 }
-function holdStart(x,y,ms,pl){
-  if(!usable()||state!=='idle'&&state!=='close')return;
-  if(!init())return;
-  var sp=toScr(x,y);x=sp[0];y=sp[1];
-  state='charge';S={x:x,y:y,cx:x,cy:y,t0:performance.now(),ms:ms||CHARGE_MS,r:0,a:0,rate:.5,rim:1,pl:!!pl};   /* pl: objek ikut ditarik ke mulut portal selama hold (hanya BH overview -> dumul.html; di sektor TIDAK) */
-  dens=1;show();setUnder(true);fresh=Math.min(winW(),winH())*R_HOLD;kick();   /* mulut portal di BAWAH sky (sky dilubangi lewat hole()) */
+/* progres muatan 0..1 untuk cincin portal overview (plat menyala satu per satu selama 'enter'; penuh selama 'travel') */
+function chargeP(now){
+  if(state==='enter')return S.ch||0;
+  if(state==='travel')return 1;
+  return 0;
 }
-function holdArm(){if(state==='charge'){S.p=1;state='armed';S.ta=performance.now();}}   /* hold selesai: portal siaga, TIDAK masuk dulu */
-function holdMove(x,y){if(state==='armed'||state==='charge'){var sp=toScr(x,y);S.x=sp[0];S.y=sp[1];}}            /* geser mulut portal (jari masih menahan) */
-function holdCommit(){if(state==='charge'||state==='armed'){S.p=1;state='held';S.th=performance.now();}}   /* jari dilepas -> lanjut masuk */
-function holdCancel(){if(state==='charge'||state==='armed')startClose(performance.now(),240,true);}
-/* go(dest,pos): SATU transisi untuk "sektor -> overview" (dest=null) dan "lompat antar sektor" (dest=objek sektor tujuan).
-   Dimulai dari mulut portal hold yang sudah terbuka (lepas jari) kalau ada, kalau tidak (tap portal gate) dari mulut kecil di posisi BH mini.
-   Tanpa swallow: isi sektor tidak disedot, terowongan menutup layar dari atas sky (z 13). */
-function go(dest,pos){
-  if(!usable()||!init()||state==='travel')return;
-  var now=performance.now(),m=Math.min(winW(),winH()),
-      holdOpen=(state==='charge'||state==='armed'||state==='held')&&cv&&cv.style.display==='block',
-      sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5;
-  dens=1;
-  if(holdOpen){S.rim=1;}   /* teruskan portal yang sudah terbuka: nggak mengecil lalu tumbuh lagi */
-  else S={x:x,y:y,cx:x,cy:y,r:m*R_HOLD*.5,a:.4,rate:.7,rim:1};
-  beginGo(now,dest,holdOpen);
-  show();setUnder(false);fresh=holdOpen?0:Math.hypot(winW(),winH())*.56;kick();
+/* go(dest,pos,R,onCover): SATU transisi untuk "sektor -> overview" (dest=null) dan "lompat antar sektor" (dest=objek sektor tujuan).
+   pos = [x,y] pusat cincin portal (ruang virtual stage), R = radius LUAR cincin saat ini (virtual). Urutan:
+     enter  : (tap-gate: 12 plat charge dulu) teleskop terbang masuk ke tengah cincin
+     travel : zoom-in ke portal: cincin + dinding terowongan membesar dari dalam cincin sampai menutup layar -> onCover() (sektor asal zoom-out / lanjut gate)
+              -> teleskop muncul lagi dan melayang mengikuti lubang hitam terowongan -> lubang hitam meluncur ke portal tujuan
+     exit   : layar flash, terowongan memudar, teleskop keluar dari tengah portal tujuan
+   Return true = dijalankan (onCover akan dipanggil); false = tidak didukung (pemanggil jalankan onCover sendiri). */
+function go(dest,pos,R,onCover){
+  if(!usable()||!init())return false;
+  if(state==='travel'||state==='enter'||state==='exit')return false;
+  var sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,
+      x=sp?sp[0]:(S&&S.x!=null?S.x:winW()*.5),y=sp?sp[1]:(S&&S.y!=null?S.y:winH()*.5),
+      k=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1,
+      Rs=R>2?R*k:Math.min(winW(),winH())*.05,
+      tb=teleBase(),carry=false;
+  try{carry=!!tb&&!(typeof LIS!=='undefined'&&LIS.pend&&!LIS.pend.carry);}catch(eL){}
+  S={vx:sp?pos[0]:null,vy:sp?pos[1]:null,x:x,y:y,cx:x,cy:y,r:Rs*(typeof PT_IN==='number'?PT_IN:.745),rp:Rs,a:1,rate:.7,rim:0,dest:dest||null,fromOv:!!(dest&&typeof SECT!=='undefined'&&!SECT.cur),go:1,cov:0,tgi:0,onCover:onCover||null,t0:performance.now(),carry:carry,ch:0,fl:0,hv:null,tv:0};
+  S.A=carry?T_ENTER_TELE+450:900;   /* carry: terbang T_ENTER_TELE + 450ms muatan (dulu 1100 tetap -> tf0 negatif kalau T_ENTER_TELE > 1100) */
+  S.tf0=carry?S.A-T_ENTER_TELE:0;
+  S.chT=carry?Math.max(1,S.A-T_ENTER_TELE):S.A*.9;
+  dens=1;env=0;state='enter';
+  if(carry){try{TELESCOPE.dive=1;}catch(eT){}}   /* teleskop digambar di kanvas ini selama transisi (canvas #sky melewatinya) */
+  show();if(cv)cv.style.zIndex='13';kick();   /* kanvas di ATAS sky (penutup layar) */
+  return true;
 }
-function beginGo(now,dest,holdOpen){
-  S.go=1;S.dest=dest||null;S.hp1=holdOpen?hp:0;S.cov=0;S.tgi=0;
-  engage(now);
+function engageDive(now){
+  state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=1;S.rate1=S.rate;S.rate=.9;S.rim=0;S.edge=.94;S.ring=1;S.cov=0;S.tgi=0;
+  S.lnK=Math.log(Math.max(2,1.05*(Math.hypot(winW(),winH())*.5)/Math.max(4,S.rp*(typeof PT_IN==='number'?PT_IN:.745))));   /* skala akhir: tepi mulut pas melewati sudut layar */
+  fresh=Math.hypot(winW(),winH())*.56;   /* isi awal: terowongan sudah "penuh" begitu cincin mulai membesar */
 }
-function engage(now){
-  state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=S.a;S.rate1=S.rate;
-}
-/* Titik tujuan lubang hitam terowongan (layar): BH overview (dest=null) atau BH mini sektor tujuan. Diperhalus supaya
+function engage(now){engageDive(now);}
+/* Titik tujuan lubang hitam terowongan (layar): BH overview (dest=null) atau tengah layar (tujuan sektor). Diperhalus supaya
    perpindahan prediksi -> posisi asli (begitu sektor tujuan selesai di-zoom) tidak melompat. */
 function seekTarget(dt){
   var t=null,b;
   try{
-    if(S.dest){if(typeof sumDestPos==='function'){b=sumDestPos(S.dest);if(b&&isFinite(b[0])&&isFinite(b[1]))t=toScr(b[0],b[1]);}}
-    else t=bhScr();
+    if(!S.dest)t=bhScr();   /* F11: tujuan sektor tidak punya titik (portal sektor pensiun) -> t null -> jatuh ke tengah layar */
   }catch(e){}
   if(!t)t=[winW()*.5,winH()*.5];
   if(!S.tgi){S.tgx=t[0];S.tgy=t[1];S.tgi=1;}
   else{var k=1-Math.exp(-dt*8);S.tgx+=(t[0]-S.tgx)*k;S.tgy+=(t[1]-S.tgy)*k;}
   return [S.tgx,S.tgy];
-}
-/* Swallow BH overview (tap BH -> dumul.html): terowongan tumbuh dari BH BARENG swallow (ms ~ 2800) tapi digambar DI BAWAH canvas sky (z-index -1), penuh sebelum veil hitam
-   menutup dan tesseract mengambil alih. Tidak menutup sendiri (halaman pindah); pengaman 14 dtk kalau navigasi gagal.
-   Tanpa teleskop (di-swallow oleh sky canvas) dan tanpa muffle audio (GARG = BGM transisi, bukan stellar signal).
-   Hanya untuk BH overview -> dumul.html. Sektor -> overview dan lompat antar sektor TIDAK swallow: lihat go(). */
-function swallow(pos,ms){
-  if(!usable()||!init())return;
-  var now=performance.now(),sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,
-      x=sp?sp[0]:winW()*.5,y=sp?sp[1]:winH()*.5,
-      r0=Math.min(winW(),winH())*R_HOLD*.45,a0=.4,rate0=.7,
-      hold=(state==='charge'||state==='armed'||state==='held')&&cv&&cv.style.display==='block';   /* portal hold sudah terbuka (overview: tekan & tahan) */
-  dens=1;
-  if(hold){x=S.cx;y=S.cy;r0=Math.max(S.r,r0);a0=Math.max(S.a,a0);rate0=S.rate;}   /* teruskan portal yang ada: nggak mengecil lalu tumbuh lagi */
-  S={x:x,y:y,cx:x,cy:y,r:r0,a:a0,rate:rate0,rim:1,sw:ms||2800};
-  engage(now);show();fresh=hold?0:Math.min(winW(),winH())*R_HOLD;
-  setUnder(true);   /* DI BAWAH #sky: bintang/rasi/BH/HUD yang ke-swallow tetap di depan terowongan. Sky "melubangi" platenya sendiri lewat hole() */
-  kick();
-}
-/* Lubang di plate sky (koordinat virtual stage, sama dengan canvas #sky) supaya terowongan di bawahnya kelihatan. null = tidak ada. */
-function hole(){
-  if(!under||state==='idle')return null;
-  if(state==='travel'&&!S.sw)return null;
-  var c=(typeof c2v==='function'&&typeof STG!=='undefined'&&STG.on)?c2v(S.cx,S.cy):[S.cx,S.cy],
-      k=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
-  if(!isFinite(c[0])||!isFinite(c[1])||!isFinite(S.r))return null;
-  return {x:c[0],y:c[1],r:S.r/k,a:clamp(S.a,0,1)};
 }
 /* posisi BH overview (layar) -> tujuan akhir terowongan swallow sektor, supaya isi overview 'dimuntahkan' dari lubang yang sama */
 function bhScr(){
@@ -229,7 +236,6 @@ function bhScr(){
 }
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
 function gatePending(){return typeof SGATE!=='undefined'&&!!SGATE.pend;}
-function askOpen(){return (typeof LIS!=='undefined'&&!!LIS.cb)||document.body.classList.contains('lis-asking');}
 
 /* ---------- gambar satu frame ---------- */
 function moveStars(dt,adv){
@@ -311,10 +317,11 @@ function stepBuf(dt,cx,cy,Rv,Rh,adv){
 /* Teleskop ikut "terbang" lewat wormhole. Aslinya digambar di canvas #sky (04-render.js), yang tertutup canvas ini, jadi badannya
    digambar ulang di sini lewat teleDrawBody() (di-share dari 04-render.js). Goyangan/pembesaran naik pelan seiring portal membuka.
    Mendukung portrait, landscape biasa (body.ls, #sky di-scale) dan mode ROT (body.lr / lr-cw, stage diputar 90°). */
-function drawTele(){
-  var T=typeof TELESCOPE!=='undefined'?TELESCOPE:null,sk,rc,k,wob,x,y,sc,rot=0,cl;
-  if(!T||typeof teleDrawBody!=='function'||!(T.al>.02)||!T.sc||!(T.sx||T.sy))return;
-  sk=document.getElementById('sky');if(!sk)return;
+/* posisi/skala/rotasi teleskop di layar (px) sesuai yang digambar canvas #sky; null = tidak ada / tidak terlihat */
+function teleBase(){
+  var T=typeof TELESCOPE!=='undefined'?TELESCOPE:null,sk,rc,k,x,y,rot=0,cl;
+  if(!T||typeof teleDrawBody!=='function'||!(T.al>.02)||!T.sc||!(T.sx||T.sy))return null;
+  sk=document.getElementById('sky');if(!sk)return null;
   rc=sk.getBoundingClientRect();cl=document.body.classList;
   if(cl.contains('lr')){
     /* mode ROT: #stage diputar 90° (ccw default, cw kalau body.lr-cw). rect = kotak pembatas hasil rotasi, jadi koordinat sky -> layar dihitung dari sisinya */
@@ -325,13 +332,39 @@ function drawTele(){
     k=sk.clientWidth?rc.width/sk.clientWidth:1;
     x=rc.left+T.sx*k;y=rc.top+T.sy*k;
   }
-  wob=clamp((S.a-.4)/.6,0,1);
-  x+=Math.sin(tt*5.3)*3*wob;y+=Math.cos(tt*4.1)*2.5*wob;
-  sc=T.sc*k*(1+.10*wob);
+  return {x:x,y:y,sc:T.sc*k,rot:rot,ang:T.ang,al:clamp(T.al,0,1)};
+}
+/* ov (opsional): {x,y} posisi layar pengganti, s = pengali skala, a = pengali alpha, w = goyangan 0..1, sp = putaran tambahan (rad) */
+/* h = posisi teleskop, (cx,cy) = lubang, m = sisi pendek layar, k 0..1 = seberapa teleskop "dipegang" terowongan, dir 1 = menuju lubang, -1 = menjauh (keluar) */
+function teleTilt(dt,h,cx,cy,m,k,dir,vk){
+  var C=TELE_TILT;if(!C.on||!(dt>0))return null;
+  vk=vk==null?1:vk;
+  var st=S.tt3||(S.tt3={x:0,y:0,z:0,px:h[0],py:h[1],s:state});
+  if(st.s!==state){st.s=state;st.px=h[0];st.py=h[1];}
+  var vx=clamp((h[0]-st.px)/dt/m,-1.5,1.5),vy=clamp((h[1]-st.py)/dt/m,-1.5,1.5),b=1-Math.exp(-dt*7),
+      dx=clamp((cx-h[0])/m*3,-1,1)*dir,dy=clamp((cy-h[1])/m*3,-1,1)*dir,bf=C.buffet*k*S.rate,
+      tx=C.sx*(C.lean*dy+.5*vy*C.bank*vk)+bf*Math.sin(tt*17+1.3),
+      ty=C.sy*(C.lean*dx+.6*vx*C.bank*vk)+bf*Math.sin(tt*13),
+      tz=C.sz*(-vx*C.bank*1.2*vk)+bf*Math.sin(tt*23+.6);
+  st.px=h[0];st.py=h[1];
+  st.x+=(clamp(tx,-.6,.6)-st.x)*b;st.y+=(clamp(ty,-.6,.6)-st.y)*b;st.z+=(clamp(tz,-.6,.6)-st.z)*b;
+  return {x:st.x*k,y:st.y*k,z:st.z*k};
+}
+function drawTele(ov){
+  var b=teleBase(),wob,x,y,sc,al;
+  if(!b)return;
+  ov=ov||{};
+  wob=ov.w!=null?ov.w:clamp((S.a-.4)/.6,0,1);
+  x=(ov.x!=null?ov.x:b.x)+Math.sin(tt*5.3)*3*wob;y=(ov.y!=null?ov.y:b.y)+Math.cos(tt*4.1)*2.5*wob;
+  sc=b.sc*(ov.s!=null?ov.s:1+.10*wob);al=b.al*(ov.a!=null?ov.a:1);
+  if(sc<.01||al<.01)return;
   g.save();
-  g.translate(x,y);g.rotate(T.ang+rot+Math.sin(tt*2.7)*.14*wob);g.scale(sc,sc);
-  g.globalAlpha=clamp(T.al,0,1);
+  var tl=ov.tilt,t3=!!(tl&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&typeof SCP3D_CFG!=='undefined'&&SCP3D_CFG.on&&!potato());
+  g.translate(x,y);g.rotate(b.ang+b.rot+(ov.sp||0)+Math.sin(tt*2.7)*.14*wob+(tl&&!t3?tl.z:0));g.scale(sc,sc);
+  g.globalAlpha=clamp(al,0,1);
+  if(t3){SCP3D.tilt=tl;SCP3D.last=-1e9;}   /* paksa render 3D ulang dengan kemiringan ini (cache 3ms di tele3dBody) */
   try{teleDrawBody(g,performance.now());}catch(e){}
+  if(t3){SCP3D.tilt=null;SCP3D.last=-1e9;}   /* gambar teleskop biasa berikutnya render ulang tanpa kemiringan */
   g.restore();
 }
 /* lubang hitam tengah terowongan: cakram hitam pekat dengan tepi lembut; al<1 = setengah transparan */
@@ -401,8 +434,9 @@ function drawFrame(dt,cx,cy,r,cvr){
     /* tepi mulut portal: alpha diluruhkan halus ke 0 (destination-in) -> terowongan menyatu dengan sky di bawahnya, tanpa potongan keras / vignette gelap */
     g.globalCompositeOperation='destination-in';
     gr=g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,r));
-    gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(EDGE_SOLID,'rgba(0,0,0,1)');
-    gr.addColorStop(EDGE_SOLID+(1-EDGE_SOLID)*.36,'rgba(0,0,0,.72)');gr.addColorStop(EDGE_SOLID+(1-EDGE_SOLID)*.68,'rgba(0,0,0,.26)');gr.addColorStop(1,'rgba(0,0,0,0)');
+    var es=S.edge||EDGE_SOLID;   /* saat zoom-in dari cincin: tepi hampir keras, dirapikan oleh cincin yang digambar di atasnya */
+    gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(es,'rgba(0,0,0,1)');
+    gr.addColorStop(es+(1-es)*.36,'rgba(0,0,0,.72)');gr.addColorStop(es+(1-es)*.68,'rgba(0,0,0,.26)');gr.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
     g.globalCompositeOperation='source-over';
   }else{
@@ -410,7 +444,6 @@ function drawFrame(dt,cx,cy,r,cvr){
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
   }
-  if(!small&&!S.sw)drawTele();   /* mode layar penuh (sektor -> overview / lompat): teleskop ikut di dalam terowongan, ikut terhapus bareng dindingnya saat exit */
   if(state==='exit'){   /* dinding terowongan memudar dari tengah lubang hitam ke pinggir layar: BH tujuan + isi layar muncul di bawahnya */
     var re=Math.hypot(W,H)*1.1*sm((S.u-.08)/.92),ff=Math.max(36,re*.5);
     g.globalCompositeOperation='destination-out';
@@ -429,71 +462,98 @@ function drawFrame(dt,cx,cy,r,cvr){
     g.fillStyle=gr;g.beginPath();g.arc(cx,cy,r*1.25,0,6.283185307);g.fill();
     g.globalCompositeOperation='source-over';
   }
+  /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
+  if(S.ring&&small&&typeof portal3dDraw==='function'){
+    var ra=1-sm((r/cvr-.3)/.55);
+    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,ch:1});}catch(eR){}}
+    g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
+  }
+  /* teleskop: melayang mengikuti lubang hitam terowongan (travel), lalu keluar dari tengah portal tujuan (exit) */
+  if(S.carry&&state==='travel'){
+    /* teleskop terlihat dari awal travel: kecil di tengah mulut -> membesar mengikuti zoom -> melayang+miring di terowongan -> menyusut masuk ke lubang tujuan (lanjut ke exit tanpa pop) */
+    var tq=(performance.now()-S.tt),mm=Math.min(W,H),zu=sm(tq/T_OPEN),sw=sm((tq-TS())/Math.max(1,TT()-TS())),
+        fq=(performance.now()-S.t0-S.tf0)/T_ENTER_TELE,fe=sm(clamp(fq)),b1=fe<1?teleBase():null;   /* fe<1 = teleskop masih terbang masuk ke cincin sementara zoom-in sudah jalan (T_TELE_OVERLAP) */
+    var hp2=teleHover(dt,cx,cy,mm,zu),bx=b1?lerp(b1.x,cx,fe):cx,by=b1?lerp(b1.y,cy,fe):cy,
+        px=lerp(bx+(hp2[0]-cx),cx,sw),py=lerp(by+(hp2[1]-cy),cy,sw);
+    drawTele({x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw),tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
+  }else if(S.carry&&state==='exit'){
+    var pu=eo(clamp((S.u-.1)/.72,0,1)),b0=teleBase(),h0=S.hv||[cx,cy];
+    if(b0){var ex=lerp(cx,b0.x,pu),ey=lerp(cy,b0.y,pu);drawTele({x:ex,y:ey,s:lerp(.12,1,pu),a:1,w:(1-pu)*.5,sp:(1-pu)*pu*2.2,tilt:teleTilt(dt,[ex,ey],cx,cy,Math.min(W,H),1-pu,TELE_TILT.exitDir,TELE_TILT.exitVel)});}
+  }
+  if(S.fl>.01){   /* kilat layar menjelang tiba di portal tujuan */
+    g.globalCompositeOperation='source-over';g.globalAlpha=1;
+    g.fillStyle='rgba(228,249,255,'+Math.min(1,S.fl*.96).toFixed(3)+')';g.fillRect(0,0,W,H);
+  }
+}
+/* posisi teleskop di dalam terowongan: menuju titik sedikit di depan/bawah lubang hitam dengan jeda (pegas), jadi kelihatan MENGIKUTI gerakan lubang hitam, bukan menempel */
+function teleHover(dt,cx,cy,m,amp){   /* amp 0..1: amplitudo melayang (naik pelan seiring zoom-in) */
+  var h=S.hv;amp=amp==null?1:amp;
+  if(!h){h=S.hv=[cx,cy];}
+  var tx=cx+Math.sin(tt*1.3)*m*.05*amp,ty=cy+(m*.11+Math.cos(tt*1.7)*m*.025)*amp,k=1-Math.exp(-dt*4);
+  h[0]+=(tx-h[0])*k;h[1]+=(ty-h[1])*k;
+  return h;
 }
 
 function tick(now){
   raf=0;
   if(state==='idle'||!g||!ok)return;
-  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,rh,eT;
-  W=winW();H=winH();cvr=cover();rh=Math.min(W,H)*R_HOLD;
+  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,eT;
+  W=winW();H=winH();cvr=cover();
   last=now;ema+=(dt-ema)*.08;
-  if(state==='charge'){
-    p=clamp((now-S.t0)/S.ms,0,1);
-    S.r=rh*eo(p);S.a=Math.min(1,p*1.7);S.rate=lerp(.5,.9,p);S.cx=S.x;S.cy=S.y;S.rim=1;env=.5*sm(p);hp=.4*sm(p);
-    if(now>S.t0+S.ms+220)startClose(now,240,true);   /* timer long-press batal di tengah jalan tanpa lapor */
-  }else if(state==='armed'){
-    /* siaga: mulut sedikit lebih besar & berdenyut, ikut jari dengan easing halus; tanpa batas waktu singkat (pengaman 30 dtk) */
-    p=Math.min(1,dt*16);S.cx+=(S.x-S.cx)*p;S.cy+=(S.y-S.cy)*p;
-    S.r=rh*(1.05+.03*Math.sin(now*.008));S.a=1;S.rate=lerp(S.rate,1,Math.min(1,dt*4));S.rim=1;env=.5;hp=lerp(.4,1,sm((now-S.ta)/1400));
-    if(now-S.ta>30000)startClose(now,260,true);
-  }else if(state==='held'){
-    S.r=rh*(1+.03*Math.sin(now*.008));S.a=1;S.rate=.9;S.rim=1;env=.5;
-    if(secBusy()&&typeof SECT!=='undefined'&&SECT.phase==='out'){beginGo(now,null,true);setUnder(false);}   /* zoom-out dimulai tanpa lewat go() (mis. jalur lain): tetap pakai jadwal yang sama */
-    else if(!askOpen()&&!secBusy()&&now-S.th>450)startClose(now,260,true);   /* kartu teleskop ditutup tanpa jalan */
-    else if(now-S.th>20000)startClose(now,260,true);
+  if(state==='enter'){
+    q=now-S.t0;
+    S.ch=sm(q/S.chT);env=Math.min(.5,q/Math.max(1,S.A)*.5);
+    if(q>=S.A-(S.carry?Math.min(T_TELE_OVERLAP,T_ENTER_TELE*.8):0))engageDive(now);   /* teleskop yang masih terbang diteruskan di blok travel (fe) */
   }
   if(state==='travel'){
     q=now-S.tt;
-    if(S.sw){   /* swallow overview -> dumul.html: buka mengikuti tarikan swallow, lalu terus melesat sampai veil/tesseract */
-      hp=0;
-      S.r=lerp(S.r1,cvr,eo(q/(S.sw*.72)));
-      p=sm(q/(S.sw*.6));
-      S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);
-      S.a=lerp(S.a1,1,sm(q/380));S.rate=lerp(S.rate1,1.35,sm(q/(S.sw*.8)));S.rim=1-sm(q/(S.sw*.4));
-      env=0;
-      if(q>14000)startClose(now,T_CLOSE,false);   /* pengaman: navigasi gagal / kembali dari bfcache */
-    }else{
+    {
       /* sektor -> overview & lompat antar sektor: jadwal identik (lihat komentar T_TRAVEL). Beda cuma tujuan akhir lubang hitam. */
-      hp=S.hp1*(1-sm(q/380));   /* tarikan hold mengendur halus (objek balik ke tempatnya), bukan lompat balik */
-      S.r=lerp(S.r1,cvr,eo(q/T_OPEN));
-      if(q>T_OPEN*.92)S.cov=1;   /* layar sudah tertutup: BH tujuan di bawah boleh 'mengecil' siap muncul dari ujung terowongan (arrive) */
-      w=sm((q-T_SEEK)/(T_TRAVEL-T_SEEK));
+      var uu=clamp(q/T_OPEN),ee=Math.pow(uu,1.35),ck=null;   /* kamera mendekat: skala eksponensial, pelan di awal lalu makin cepat */
+      S.r=q<T_OPEN?S.rp*(typeof PT_IN==='number'?PT_IN:.745)*Math.exp(S.lnK*ee):cvr;
+      if(q<T_OPEN)ck=skyCam(uu,ee);
+      if(!S.cov){
+        var cd=Math.max(Math.hypot(S.cx,S.cy),Math.hypot(W-S.cx,S.cy),Math.hypot(S.cx,H-S.cy),Math.hypot(W-S.cx,H-S.cy));
+        if(S.r>=cd*1.02||q>T_OPEN){S.cov=1;runCover();}   /* layar sudah tertutup: sektor asal boleh zoom-out di bawah (tak kelihatan), BH tujuan siap muncul dari ujung terowongan (arrive) */
+      }
+      w=sm((q-TS())/(TT()-TS()));
       if(w>0){var tg=seekTarget(dt);S.cx=lerp(W*.5,tg[0],w);S.cy=lerp(H*.5,tg[1],w);}   /* tengah layar -> tujuan (BH overview / BH mini sektor tujuan) */
+      else if(ck){S.cx=ck[0];S.cy=ck[1];}   /* titik cincin ikut kamera (bergeser ke tengah layar) */
       else{p=sm(q/T_MOVE);S.cx=lerp(S.cx1,W*.5,p);S.cy=lerp(S.cy1,H*.5,p);}              /* posisi BH mini -> tengah layar */
-      S.a=lerp(S.a1,1,sm(q/T_FADE));S.rate=lerp(S.rate1,1.1,sm(q/T_MOVE));S.rim=1-sm(q/T_OPEN);
+      S.a=1;S.rate=lerp(S.rate1,1.1,sm(q/T_MOVE))+.6*Math.sin(Math.PI*clamp((q-T_OPEN)/Math.max(1,TS()-T_OPEN)));S.rim=0;S.fl=sm((q-(TT()-380))/380);   /* + lonjakan kecepatan di tengah terowongan (streak memanjang) */
       env=Math.max(env,0);env+=(1-env)*Math.min(1,dt*5);
-      if(q>=T_TRAVEL&&!secBusy()&&!gatePending()&&(!S.dest||(typeof SECT!=='undefined'&&SECT.cur===S.dest)||q>T_TRAVEL+1500))startExit(now);
-      else if(q>9000)startClose(now,T_CLOSE,false);   /* pengaman: transisi macet */
+      if(S.cov&&q>=TT()&&!secBusy()&&!gatePending()&&(!S.dest||(typeof SECT!=='undefined'&&SECT.cur===S.dest)||q>TT()+1500))startExit(now);
+      else if(q>TT()+6000){runCover();startClose(now,T_CLOSE);}   /* pengaman: transisi macet */
     }
   }
   if(state==='exit'){
     var ue=clamp((now-S.tx)/T_EXIT,0,1),bt=seekTarget(dt);
-    S.u=ue;S.cx=bt[0];S.cy=bt[1];S.r=S.r0;S.a=1;S.rate=lerp(S.rate0,.7,sm(ue));S.rim=0;env=S.e0*(1-sm(ue));hp=0;
-    if(ue>=1){state='idle';env=0;hp=0;hide();return;}
+    S.u=ue;S.cx=bt[0];S.cy=bt[1];S.r=S.r0;S.a=1;S.rate=lerp(S.rate0,.7,sm(ue));S.rim=0;S.ring=0;S.fl=1-sm(ue/.35);env=S.e0*(1-sm(ue));
+    if(ue>=1){state='idle';env=0;hide();return;}
   }
   if(state==='close'){
     q=clamp((now-S.tc)/S.cms,0,1);eT=sm(q);
     S.cx=S.c0[0];S.cy=S.c0[1];
-    S.r=S.shrink?S.r0*(1-.55*eT):S.r0;
-    S.a=S.a0*(1-eT);S.rate=lerp(S.rate0,.6,eT);S.rim=S.shrink?1:0;env=S.e0*(1-eT);hp=(S.hp0||0)*(1-eT);
-    if(q>=1){state='idle';env=0;hp=0;hide();return;}
+    S.r=S.r0;
+    S.a=S.a0*(1-eT);S.rate=lerp(S.rate0,.6,eT);S.rim=0;env=S.e0*(1-eT);
+    if(q>=1){state='idle';env=0;hide();return;}
+  }
+  if(state==='enter'){   /* belum ada terowongan: kanvas transparan, hanya teleskop yang terbang masuk ke tengah cincin */
+    tt+=dt;
+    g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.clearRect(0,0,W,H);
+    if(S.carry){
+      var fu=clamp((now-S.t0-S.tf0)/T_ENTER_TELE),b1=teleBase(),fe=sm(fu);
+      if(b1)drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:fe*5.2});   /* tetap terlihat di tengah mulut (tidak memudar) supaya travel melanjutkan tanpa pop */
+    }
+    cv.style.opacity='1';
+    raf=requestAnimationFrame(tick);return;
   }
   /* kalau frame berat: kurangi jumlah stream (maks sampai 45%), resolusi tetap tajam */
   if(ema>.034&&dens>.46){dens-=.18;ema=.016;}
   if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr))resize();
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
   if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
-  if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*R_HOLD;S.cx=W*.5;S.cy=H*.5;}
+  if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*.22;S.cx=W*.5;S.cy=H*.5;}
   try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
@@ -507,24 +567,19 @@ function tick(now){
 function muffle(){return state==='idle'?0:.88*clamp(env,0,1);}
 
 window.WORMHOLE={
-  holdStart:function(x,y,ms,pl){try{holdStart(x,y,ms,pl);}catch(e){}},
-  holdArm:function(){try{holdArm();}catch(e){}},
-  holdMove:function(x,y){try{holdMove(x,y);}catch(e){}},
-  holdCommit:function(){try{holdCommit();}catch(e){}},
-  holdCancel:function(){try{holdCancel();}catch(e){}},
-  swallow:function(pos,ms){try{swallow(pos,ms);}catch(e){}},   /* hanya BH overview -> dumul.html */
-  gate:function(s,pos){try{go(s,pos);}catch(e){}},          /* lompat antar sektor: BH mini -> tengah -> BH mini sektor tujuan s */
-  overview:function(pos){try{go(null,pos);}catch(e){}},     /* sektor -> overview: BH mini -> tengah -> BH overview; jadwal & durasi sama dengan gate */
-  hole:function(){try{return hole();}catch(e){return null;}},
-  pull:function(){return !S.pl||state==='idle'||state==='exit'||(state==='travel'&&!S.go)?0:hp;},
+  gate:function(s,pos,R,cb){try{return go(s,pos,R,cb);}catch(e){return false;}},          /* lompat antar sektor: BH mini -> tengah -> BH mini sektor tujuan s */
+  overview:function(pos,R,cb){try{return go(null,pos,R,cb);}catch(e){return false;}},     /* sektor -> overview: BH mini -> tengah -> BH overview; jadwal & durasi sama dengan gate */
   arrive:function(){if(state==='exit')return .08+.92*eo(clamp(S.u/.6,0,1));if(state==='travel'&&S.go&&S.cov)return .08;return 1;},
   muffle:function(){return muffle();},
+  charge:function(){try{return chargeP(performance.now());}catch(e){return 0;}},   /* 0..1: progres muatan cincin (plat menyala satu per satu) */
+  ringOwned:function(){return state==='travel'&&!!S.ring;},   /* cincin portal sektor sedang digambar di kanvas wormhole (zoom-in) */
   get on(){return state!=='idle';},
+  get busy(){return state==='enter'||state==='travel'||state==='exit';},   /* transisi sedang jalan */
   get supported(){return usable();}
 };
 
 window.addEventListener('resize',function(){if(state!=='idle'&&cv)resize();},{passive:true});
-/* bake atlas ~puluhan ms: lakukan saat idle supaya hold pertama tidak patah (HP lemah: lazy). */
+/* bake atlas ~puluhan ms: lakukan saat idle supaya transisi pertama tidak patah (HP lemah: lazy). */
 if(!potato()&&usable()){
   var idle=window.requestIdleCallback||function(f){return setTimeout(f,3500);};
   idle(function(){if(document.body)init();},{timeout:7000});

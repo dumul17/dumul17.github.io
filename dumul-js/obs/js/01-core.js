@@ -307,7 +307,7 @@ var CULL={on:true,off:false,m:64,x0:0,y0:0,x1:0,y1:0,zone:false,bx:0,by:0,zr2:0,
 function cullBegin(){
   CULL.lTot=CULL.tot;CULL.lDrawn=CULL.drawn;CULL.lSaved=CULL.saved;
   CULL.tot=0;CULL.drawn=0;CULL.saved=0;
-  CULL.off=!CULL.on||!!SWV||!W||!H;
+  CULL.off=!CULL.on||!W||!H;
   CULL.zone=false;
   if(CULL.off)return;
   var m=Math.max(48,Math.min(W,H)*.12);
@@ -393,7 +393,7 @@ function sectorScanUpdate(now){
     pushPt(PLEIADES.x+.53*PLEIADES.scale,PLEIADES.y+.42*PLEIADES.scale,'pleiades',(PLEIADES._vis|0)>0,'190,218,255',4,'PLEIADES');
   }
   /* Optional: summoned Gargantua inside this sector */
-  if(typeof BH!=='undefined'&&typeof SUM!=='undefined'&&mbhOn()&&BHSC>.05){
+  if(typeof BH!=='undefined'&&typeof RELAY!=='undefined'&&SECT.cur&&BHSC>.05){
     pushPt(BH.x,BH.y,'bh',true,'255,170,90',4,'BH');
   }
 
@@ -490,32 +490,10 @@ function sectorScanUpdate(now){
   if(cullT!==SSC.cT){SSC.cT=cullT;if(SSC.cull)SSC.cull.textContent=cullT;}
 }
 var BHZ=1,BHK=0,BHSC=1;
-var SUM={on:false},SUM_R=6;
-/* ===== PORTAL_ON — rombak portal (rencana-portal.md, fase F0) =====
-   Jalur baru "portal menggantikan BH" dipasang di belakang flag ini sampai F5. F0: flag BELUM dipakai siapa pun -> perilaku identik.
-   Nyalakan: buka ?portal=1 (tersimpan di localStorage.dumul_portal, jadi tidak perlu console). Matikan: ?portal=0 (menghapus kunci). */
-var PORTAL_ON=false;
-try{
-  var _pq=(location.search.match(/[?&]portal=([01])(&|$)/)||[])[1];
-  if(_pq==='1'){localStorage.setItem('dumul_portal','1');}
-  else if(_pq==='0'){localStorage.removeItem('dumul_portal');}
-  PORTAL_ON=(_pq==='1')||(_pq!=='0'&&localStorage.getItem('dumul_portal')==='1');
-}catch(ePO){}
-/* F3 (D1): overview idle = satu portal tanpa ikon sektor; ikon sektor muncul saat portal di-tap (ovSelSet di 05-sector-ui.js, hanya dipakai kalau PORTAL_ON).
-   open = target tampil, t = waktu interaksi terakhir (auto-tutup), seen = pengunjung sudah pernah membuka -> petunjuk idle (cincin berdenyut) berhenti. */
-var OVSEL={open:false,t:0,seen:false};
+var RELAY={x0:0,y0:0,moved:false,pend:0},SUM_R=6;   /* F10: .on dihapus (relay/portal sektor pensiun); sisanya dipakai dilatasi audio BH mini (02-sky-logic.js) */
+/* OVSEL.seen = pengunjung sudah pernah membuka menu sektor -> petunjuk idle (cincin portal berdenyut, 15-portal3d.js) berhenti. (F6: .open/.t pensiun bersama ikon sektor.) */
+var OVSEL={seen:false};
 try{OVSEL.seen=localStorage.getItem('dumul_portal_seen')==='1';}catch(eOV){}
-/* Gargantua di OVERVIEW sekarang bisa di-summon/recall (tombol 🕳️ sama seperti di dalam sektor).
-   HOME_BH_DEFAULT = kondisi awal kalau pengunjung belum pernah memilih; pilihan terakhir diingat di localStorage.dumul_bh_home. */
-var HOME_BH_DEFAULT=true;
-var HBH={on:HOME_BH_DEFAULT};
-try{var _hb=localStorage.getItem('dumul_bh_home');if(_hb==='0')HBH.on=false;else if(_hb==='1')HBH.on=true;}catch(e){}
-/* ===== F1 rombak portal: dua saklar lama yang tadinya bercampur dipisah di sini (rencana-portal.md 2.1/2.2). PORTAL_ON mati = persis perilaku lama =====
-   hbhOn(): BH overview "di-summon" (muffle overview, komponen cyan interlock, target ukuran BH overview). PORTAL_ON: selalu true (portal overview selalu ada).
-   mbhOn(): BH mini ADA (fisika/visual: dilatasi, lensing, ukuran, drag, titik fokus). PORTAL_ON: selalu ada selama di sektor, tanpa summon.
-   SUM.on sekarang HANYA berarti relay (kuning interlock, shortcut gate, receiver TX) — nanti dipindah ke portal (F3). */
-function hbhOn(){return PORTAL_ON?true:!!HBH.on;}
-function mbhOn(){return PORTAL_ON?!!(typeof SECT!=='undefined'&&SECT.cur):!!SUM.on;}
 /* Tune Gargantua (panel 🎚️): size = ukuran, str = kekuatan lensing, bloom = glow hangat, speed = kecepatan animasi. Disimpan di localStorage.dumul_bh_cfg. */
 var BHU_DEF={size:1,str:1,bloom:1,speed:1};
 var BHU={size:1,str:1,bloom:1,speed:1};
@@ -772,7 +750,7 @@ function focusList(){
     if(sectShow(id,true))L.push({id:id,n:SKY.rasiBy[id].focusName||id});
   }
   /* Di dalam sektor, kalau BH mini lagi dipanggil: opsi fokus terakhir sebelum balik ke Free */
-  if(SECT.cur&&mbhOn())L.push({id:'bh',n:'Gargantua'});
+  if(SECT.cur)L.push({id:'bh',n:'Gargantua'});
   return L;
 }
 /* Free band of screen between the caption panel (top) and the CAM controls (bottom). */
@@ -1454,7 +1432,7 @@ function focusStep(){
 })();
 var konamiSeq=[],konami=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
 var utcClicks=0,utcReset=0;
-var SW=null,swP=0,SWV=null;   /* SW = transisi keluar ke dumul.html sedang jalan (guard input, dipakai ~65 tempat). SWV = SW khusus swallow BH (spiral/pull/flash). F4: SW.kind==='belt' => SWV tetap null, jadi langit tidak ikut tersedot */
+var SW=null;   /* SW = transisi keluar ke dumul.html sedang jalan (guard input, dipakai ~65 tempat). F5: hanya SW.kind==='belt' (beltEnter) */
 var ARV=1;   /* skala kedatangan BH overview saat keluar dari terowongan swallow sektor (0.08 = jauh di ujung terowongan .. 1 = penuh); dari WORMHOLE.arrive() tiap frame */
 var HPV=0,HP_K=.5;   /* HPV: tarikan portal saat hold (0..1, dari WORMHOLE.pull() tiap frame); HP_K: porsi tarikan penuh swallow yang dipakai saat hold */
 var AMB=mkAudio('constellation.opus',.5,true,'auto');
@@ -1821,9 +1799,9 @@ function camStrain(s){
   var d=Math.abs(((SECT.cur.a-s.a)%360+360)%360);if(d>180)d=360-d;
   return .5+.4*(d/180);
 }
-/* Sektor sumber interlocking penuh (indikator cyan): TX docked + BH mini di sektor itu + BH overview aktif.
-   Dipakai di overview supaya muffle selaras dengan ◉◉◉ (txInterlock), bukan cuma cek TX + BH overview. */
-function srcLinked(s){return !!(s&&typeof sigLinked==='function'&&sigLinked(s,null));}   /* sumber level 3, dilihat dari overview — aturan lengkapnya di txWhy (02-sky-logic.js) */
+/* Sektor sumber interlocking (pink): drone TX docked di sektor itu.
+   Dipakai di overview supaya muffle selaras dengan ◉◉ di window menu (txInterlock). */
+function srcLinked(s){return !!(s&&typeof sigLinked==='function'&&sigLinked(s,null));}   /* sumber pink, dilihat dari overview — aturan lengkapnya di txWhy (02-sky-logic.js) */
 function spatialTargetBase(){
   var cx=W*.5,cy=H*.5,maxD=Math.max(120,Math.hypot(W,H)*.48),t,p,s;
   var gone=(typeof lisGone==='function'&&lisGone());
@@ -1835,17 +1813,14 @@ function spatialTargetBase(){
   /* Star tracker / tunnel shortcut: muffled */
   if(typeof LIS!=='undefined'&&LIS.cd&&performance.now()<LIS.cd&&LIS.kind==='full')return .88;
   if(typeof SGATE!=='undefined'&&SGATE.tunnelUntil&&performance.now()<SGATE.tunnelUntil)return .88;
-  /* Overview: jernih = TX sumber + BH overview aktif (HBH.on).
-     Recall BH overview → muffled; summon lagi → jernih. TIDAK reset docking/TX. */
+  /* Overview: jernih = TX sumber sudah terhubung (relay). TIDAK reset docking/TX. */
   if(SECT.on||SECT.busy){
-    var _hbOk=!!(typeof HBH!=='undefined'&&hbhOn());
     if(srcLinked(s)&&SECT.on&&SECT.phase!=='in')return 0;
-    /* F3: ikon sektor disembunyikan saat idle (s.sx=null), tapi muffle harus tetap sama seperti ikon terbuka -> pakai posisi "hantu" s.gx/gy (posisi ikon penuh, selalu dihitung drawSectorOverview). */
-    var _sx=(s&&s.sx!=null)?s.sx:((PORTAL_ON&&s&&s.gx!=null)?s.gx:null),_sy=(s&&s.sx!=null)?s.sy:((PORTAL_ON&&s&&s.gx!=null)?s.gy:null);
+    /* Ikon sektor sudah pensiun: muffle pakai posisi hantu s.gx/gy (dihitung drawSectorOverview di 05-sector-ui.js). */
+    var _sx=(s&&s.gx!=null)?s.gx:null,_sy=(s&&s.gx!=null)?s.gy:null;
     if(_sx!=null){t=Math.min(1,Math.hypot(_sx-cx,_sy-cy)/maxD);t=Math.max(0,(t-.12)/.88);}
     else t=.7;
     if(!SECT.busy)t=Math.max(.7,t);
-    if(!_hbOk)t=Math.max(.85,t); /* BH overview di-recall → muffled */
     return t;
   }
   /* Sektor lain: jernih HANYA kalau sektor sumber level 3 DAN sektor ini juga level 3 (BH mini + receiver + BH overview). Beda level = muffled.
@@ -1885,7 +1860,7 @@ function spatialHint(t){
   }else if(s&&SECT.cur&&!SECT.busy&&s!==SECT.cur){
     w=txWhy(s,SECT.cur);
     /* 'strain' (kamera cam constellation menjauh dari sektor sumber) HANYA muncul kalau receiver sudah tersambung penuh (w===''):
-       kalau rantai belum lengkap, toast harus menunjuk langkah yang kurang (BH mini / receiver), bukan 'terbebani'. */
+       kalau rantai belum lengkap, toast harus menunjuk langkah yang kurang (drone kuning / dock pink), bukan 'terbebani'. */
     st=w===''?(camStrain(s)>0?'strain':'relay-here'):w;
   }
   if(st===AV._hint)return;
@@ -1894,11 +1869,9 @@ function spatialHint(t){
   if(st==='muffled')showModeToast(T('toast.tx.muff'),null,4400);
   else if(st==='relay')showModeToast(T('toast.tx.linked'),null,3600);
   else if(st==='far')showModeToast(T('toast.tx.far'),null,4600);
-  else if(st==='needbh')showModeToast(T('toast.tx.needbh'),null,4200);
-  else if(st==='needbhsrc')showModeToast(T('toast.tx.needbhsrc'),null,4200);
+  else if(st==='needsum')showModeToast(T('toast.tx.needsum'),null,4200);
+  else if(st==='needdock')showModeToast(T('toast.tx.needdock'),'tip',4200);
   else if(st==='relay-here')showModeToast(T('toast.tx.linked.rx'),null,3600);
-  else if(st==='needov')showModeToast(T('toast.tx.needov'),null,4200);
-  else if(st==='needrecv')showModeToast(T('toast.tx.tiprecv'),'tip',4200);
   else if(st==='strain')showModeToast(T('toast.tx.strain'),null,4200);
   else showModeToast(T('toast.tx.linked'),null,3600);
 }
@@ -2048,6 +2021,7 @@ function setAVColor(a,immediate){
 }
 function updateAVColor(now){
   if(AV_COLOR_T>=1)return;
+  if(updateAVColor._n===now)return;updateAVColor._n=now;   /* dipanggil dari cincin portal DAN glow BH mini di frame yang sama: transisi warna jangan jalan 2x */
   AV_COLOR_T=Math.min(1,AV_COLOR_T+16/AV_COLOR_MS);
   var u=AV_COLOR_T, e=u*u*(3-2*u);
   AV_COLOR_RGB[0]=AV_COLOR_FROM[0]+(AV_COLOR_TO[0]-AV_COLOR_FROM[0])*e;
@@ -2056,7 +2030,7 @@ function updateAVColor(now){
   AV_COLOR=''+(AV_COLOR_RGB[0]|0)+','+(AV_COLOR_RGB[1]|0)+','+(AV_COLOR_RGB[2]|0);
 }
 
-/* Toggle spectrum Gargantua (panel music). Disimpan di localStorage.dumul_av_on ('0' = mati). */
+/* Toggle spectrum portal (panel music; dulu "Gargantua Spectrum"). Disimpan di localStorage.dumul_av_on ('0' = mati). */
 var AV_ON=(function(){var o=null;try{o=localStorage.getItem('dumul_av_on');}catch(e){}return o!=='0';})();
 var AV_DOTS=true,AV_RHINT=0; /* sisa flag lama, dibiarkan supaya file lain yang masih nyebut nggak error */
 

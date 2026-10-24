@@ -305,7 +305,8 @@ function scp3dUpdate(now,mm){
 
   /* pose 3D: roll/yaw pelan; muka kokpit tetap kebaca, mesin sedikit condong ke kamera */
   var t=now*.001;
-  SCP3D.root.rotation.set(.34+.24*Math.sin(t*.37),.22+.30*Math.sin(t*.23),.05*Math.sin(t*.51));
+  var tl=SCP3D.tilt;   /* offset kemiringan dari luar (09-wormhole.js: teleskop di dalam terowongan), rad; null = pose normal */
+  SCP3D.root.rotation.set(.34+.24*Math.sin(t*.37)+(tl?tl.x:0),.22+.30*Math.sin(t*.23)+(tl?tl.y:0),.05*Math.sin(t*.51)+(tl?tl.z:0));
 
   /* api mesin ion: drift = tipis, orbit = sedang, warp = panjang (dua thruster, fase kedip beda) */
   var th=mode==='warp'?1:(mode==='orbit'?.35:.12),i,ph,fl,fw;

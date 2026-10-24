@@ -1,27 +1,47 @@
 'use strict';
-/* 15-portal3d.js — Portal (rombak BH -> portal, fase F2 di rencana-portal.md). Hanya aktif kalau PORTAL_ON (?portal=1); flag mati = file ini tidak dipanggil siapa pun.
+/* 15-portal3d.js — Portal (rombak BH -> portal, fase F2 di rencana-portal.md). Jalur tunggal (flag PORTAL_ON sudah dihapus di F5).
    Pola sama dengan 12/13/14: Three.js r128 dimuat LAZY (three.min.js yang sama), satu WebGL renderer offscreen kecil merender SATU cincin portal, hasilnya di-drawImage ke canvas 2D.
    Gagal apa pun (potato, reduce motion, perf-tier-0, WebGL mati / context lost / three.js nggak termuat) -> cincin 2D sederhana, tanpa error.
    Isi:
-     - Cincin 3D: 12 plat segmen logam gelap, sirkuit cyan EMISSIVE dari tekstur procedural, tengah transparan.
+     - Cincin 3D: 12 plat segmen logam gelap (tipis, sudut miring + takik), jejak sirkuit cyan EMISSIVE simetris dari tekstur procedural polar, tepi dalam lilac, tengah transparan.
      - Mulut wormhole IDLE di tengah cincin (2D, dipasang di bawah cincin): gradien gelap + 3 lengan spiral pelan. Potato / reduce motion = statis. Tidak menyentuh state 09-wormhole.js, muffle tetap 0.
        (Rencana awal: mode WORMHOLE.idle di 09. Dipilih terpisah di sini karena 09 punya state/mask/kanvas sendiri untuk hold & swallow; idle statis murah ini tidak perlu ikut ke sana.)
-     - Visualizer: drawAudioVisualizer(now,R) dipanggil dari sini (bukan dari BH). 12 plat <-> 12 pita (AVB.v) = intensitas emissive; warna ikut AV_COLOR (tema BGM/SFX).
-   Penempatan: overview = dipanggil dari drawHole (03-gargantua.js) di anchor BH (menggantikan gambar BH). Sektor = portal3dSectorDraw() (05-sector-ui.js frame), muncul saat relay aktif (SUM.on), posisi disimpan per sektor di s.ptl (ruang BH).
+     - Visualizer: 12 plat <-> 12 pita (AVB.v) = intensitas emissive; warna cincin DIKUNCI ke tema scope3d (PT3D_CFG.ringCol), tidak ikut AV_COLOR (tema BGM/SFX). Debu + pulse elips visualizer BH lama DIGANTI kilatan petir di dalam cincin (ptBolts): onset pita musik memicu petir yang tumbuh dari tengah portal ke tepi cincin di sudut pita itu (sudut = posisi plat); tiap sambaran memercik di cincin. Tanpa musik cuma kilat redup jarang. Reduce motion = tanpa petir. Spike = petir bercabang + kilat mulut.
+   Penempatan: overview = dipanggil dari drawHole (03-gargantua.js) di anchor BH (menggantikan gambar BH). Di dalam sektor TIDAK ada portal lagi (F10-F11, rencana-drone-sektor.md): menu sektor dibuka dari tombol HUD #mode-bh, pusat interlock = drone (08-tx-drone.js). Yang tersisa dari sisi sektor cuma ptSecR() (ukuran R mulut wormhole keluar sektor).
+   Rombak F6 (mulut idle + charge + dive): (1) mulut wormhole IDLE di dalam cincin = terowongan warp mini (ptt*, buffer feedback 80px, ~30 fps) — tidak ada lagi mulut yang tumbuh di luar cincin saat hold / pindah sektor;
+     (2) tekan & tahan: 12 plat menyala SATU PER SATU searah jarum jam (WORMHOLE.charge() 0..1), tiap plat memicu petir + percikan, full charge = ledakan petir + petir terus-menerus keliling cincin;
+     (3) saat lompat, 09-wormhole.js memegang cincin (WORMHOLE.ringOwned) dan memanggil portal3dDraw(...,{noMouth:true,ch:1}) di kanvasnya sendiri: cincin membesar (zoom-in) dengan terowongan di dalamnya.
    Matikan 3D saja: ?portal3d=0 atau localStorage dumul_portal3d=0 (cincin 2D tetap tampil). */
 var PT3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
-  ovK:2.5,        /* radius luar cincin overview = ovK x horizon BH (BH.Rr) */
-  secK:1.9,       /* radius luar cincin sektor = secK x BH.R x BHSC sektor-standar, lihat ptSecR() */
-  half:1.3,       /* setengah lebar kamera ortho (satuan model; radius luar cincin = 1) */
-  resMin:128,resMax:320,
-  vizK:.46        /* R yang dikasih ke drawAudioVisualizer = vizK x radius luar cincin */
+  ovK:2,        /* radius luar cincin overview = ovK x horizon BH (BH.Rr) */
+  secK:0.50,       /* dasar ukuran R mulut wormhole keluar sektor (ptSecR) = secK x BH.R x .62 */
+  half:1.5,       /* setengah lebar kamera ortho (satuan model; radius luar cincin = 1) */
+  resMin:128,resMax:384,
+  ringCol:'53,243,255',    /* warna cincin (emissive 12 plat + garis cahaya + tepi mulut + denyut petunjuk), DIKUNCI tema scope3d (cyan #35f3ff, 13-scope3d.js); tidak ikut warna SFX */
+  inR:.86,          /* radius tepi dalam plat (radius luar = 1). Makin besar = cincin makin tipis. Mulut/petir/percikan pakai PT_IN (= inR-.015); 09-wormhole.js ikut PT_IN */
+  ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */
+  plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
+  mouthStars:34,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
+  glow:1.3,         /* pengali terang garis sirkuit emissive */
+  boltMax:9,       /* petir bersamaan (potato: 1) */
+  boltCd:17,        /* jeda minimum per pita (ms), potato 90 */
+  boltCap:6,        /* maks petir baru per frame dari onset pita (potato 1) */
+  onFlux:.09,       /* ambang lonjakan mentah per pita buat memicu petir (makin kecil = makin sensitif; fallback tanpa analyser pakai .14) */
+  spikeK:6.3,       /* spike = flux total > rata-rata x spikeK (+.05). Naikkan kalau spike terlalu sering, turunkan kalau jarang */
+  boltW:.4,         /* ketebalan petir (tetap, tidak ikut kekuatan beat); .4 = setara petir idle */
+  boltCol:'255,255,255',   /* warna petir + kilau tepi + kilat mulut + inti percikan (tetap putih, tidak ikut warna SFX) */
+  sparkCol:'255,214,140',  /* warna ekor percikan api/listrik di titik sambaran */
+  sparkMax:90,      /* percikan bersamaan (potato 14) */
+  spikeBr:[3,5],    /* jumlah cabang utama saat spike (min,max); tiap cabang bisa punya sub-cabang */
+  idleMin:220,idleMax:560   /* jeda kilat redup saat tanpa musik (ms) */
 };
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
 }catch(ePT0){}
-var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.43,cg:.9,cb:1,lv:[],lastNow:-1,sa:0,ta:0};
+var PT_IN=PT3D_CFG.inR-.015;   /* rasio radius mulut terhadap Rp (dulu hard-code .745); dipakai juga 09-wormhole.js */
+var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0};
 
 function pt3dFail(why){PT3D.state=3;PT3D.err=String(why||'');try{console.warn('[portal3d] fallback ke cincin 2D:',PT3D.err);}catch(e){}}
 function pt3dLoad(){
@@ -45,31 +65,60 @@ function pt3dLoad(){
 
 /* sirkuit procedural (deterministik): garis siku + bantalan, putih di atas hitam -> dipakai sebagai emissiveMap */
 function pt3dCircuitTex(T){
-  var c=document.createElement('canvas');c.width=c.height=256;var x=c.getContext('2d');
-  x.fillStyle='#000';x.fillRect(0,0,256,256);
+  /* Kanvas = citra atas-bawah cincin: 1 satuan model = S/2 px, pusat di tengah kanvas (repeat .5 + offset .5 mengubah UV koordinat model jadi 0..1).
+     Jejak sirkuit digambar dalam koordinat polar (lajur sepanjang busur + cabang radial), disimetriskan terhadap tengah tiap plat seperti di gambar referensi. */
+  var S=1024,c=document.createElement('canvas');c.width=c.height=S;var x=c.getContext('2d'),H=S/2,PI2=6.2832;
+  x.fillStyle='#000';x.fillRect(0,0,S,S);
   var seed=1337,rnd=function(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
   x.lineCap='round';x.lineJoin='round';
-  var i,j,px,py,hz,len;
-  for(i=0;i<30;i++){
-    px=Math.floor(rnd()*16)*16+8;py=Math.floor(rnd()*16)*16+8;hz=rnd()<.5;
-    x.strokeStyle='rgba(255,255,255,'+(.55+rnd()*.45).toFixed(2)+')';x.lineWidth=(i%5===0)?4:2.2;
-    x.beginPath();x.moveTo(px,py);
-    for(j=0;j<3+Math.floor(rnd()*3);j++){
-      len=(1+Math.floor(rnd()*5))*16*(rnd()<.5?-1:1);
-      if(hz)px=Math.max(8,Math.min(248,px+len));else py=Math.max(8,Math.min(248,py+len));
-      x.lineTo(px,py);hz=!hz;
+  var inR=PT3D_CFG.inR,w=1-inR,lanes=[inR+w*.2,inR+w*.4,inR+w*.6,inR+w*.8],N=12,gap=.075,pw=PI2/N-gap;
+  function px(r,a){return H+Math.cos(a)*r*H;}
+  function py(r,a){return H-Math.sin(a)*r*H;}
+  function arc(r,a0,a1){x.beginPath();x.arc(H,H,r*H,-a1,-a0,false);x.stroke();}
+  function stub(r0,r1,a){x.beginPath();x.moveTo(px(r0,a),py(r0,a));x.lineTo(px(r1,a),py(r1,a));x.stroke();}
+  function dot(r,a,rad){x.beginPath();x.arc(px(r,a),py(r,a),rad,0,PI2);x.fill();}
+  var i,j,k,am,off,l0,l1,ln,len,aa,ab,sg;
+  x.fillStyle='#fff';
+  for(i=0;i<N;i++){
+    am=i*PI2/N+PI2/N/2;   /* tengah plat */
+    for(k=0;k<3;k++){     /* 3 jejak per plat; tiap jejak dicerminkan ke sisi lain plat */
+      off=pw*.06+rnd()*pw*.3;l0=Math.floor(rnd()*4);aa=off;
+      x.strokeStyle='rgba(255,255,255,'+(.6+rnd()*.4).toFixed(2)+')';x.lineWidth=k===0?5:3.2;
+      for(j=0;j<2+Math.floor(rnd()*3);j++){
+        len=pw*(.06+rnd()*.16);ab=Math.min(pw*.47,aa+len);
+        for(sg=-1;sg<=1;sg+=2){arc(lanes[l0],am+sg*aa,am+sg*ab);}   /* kiri + kanan tengah plat */
+        aa=ab;
+        l1=Math.max(0,Math.min(3,l0+(rnd()<.5?-1:1)*(1+Math.floor(rnd()*2))));
+        if(l1!==l0){for(sg=-1;sg<=1;sg+=2)stub(lanes[l0],lanes[l1],am+sg*aa);}
+        l0=l1;if(aa>=pw*.47)break;
+      }
+      for(sg=-1;sg<=1;sg+=2)dot(lanes[l0],am+sg*aa,k===0?6:4.5);
     }
-    x.stroke();
-    x.fillStyle='#fff';x.beginPath();x.arc(px,py,i%4===0?5:3,0,6.2832);x.fill();
+    /* garis tengah plat (poros simetri) */
+    x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=3.2;stub(lanes[0],lanes[3],am);dot(lanes[1],am,4.5);
   }
-  var t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(1.15,1.15);t.encoding=T.sRGBEncoding;
+  var t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(.5,.5);t.offset.set(.5,.5);t.anisotropy=4;t.encoding=T.sRGBEncoding;
   return t;
 }
 function pt3dSeg(T,a0,a1,r0,r1){
-  var s=new T.Shape(),co=Math.cos,si=Math.sin;
-  s.moveTo(co(a0)*r0,si(a0)*r0);s.lineTo(co(a0)*r1,si(a0)*r1);s.absarc(0,0,r1,a0,a1,false);s.lineTo(co(a1)*r0,si(a1)*r0);s.absarc(0,0,r0,a1,a0,true);
-  var g=new T.ExtrudeGeometry(s,{depth:.26,bevelEnabled:true,bevelThickness:.035,bevelSize:.03,bevelSegments:1,curveSegments:6});
-  g.translate(0,0,-.13);return g;
+  /* plat busur dengan sudut miring dan takik kecil di tengah tepi luar (mirip plat di gambar referensi) */
+  var s=new T.Shape(),co=Math.cos,si=Math.sin,w=r1-r0,ch=w*.24,nd=w*.25,am=(a0+a1)/2,hw=.035,ci=ch/r0,co2=ch/r1;
+  function P(r,a){return [co(a)*r,si(a)*r];}
+  var p=P(r0,a0+ci);s.moveTo(p[0],p[1]);
+  s.absarc(0,0,r0,a0+ci,a1-ci,false);
+  p=P(r0+ch,a1);s.lineTo(p[0],p[1]);
+  p=P(r1-ch,a1);s.lineTo(p[0],p[1]);
+  p=P(r1,a1-co2);s.lineTo(p[0],p[1]);
+  s.absarc(0,0,r1,a1-co2,am+hw,true);
+  p=P(r1-nd,am+hw*.8);s.lineTo(p[0],p[1]);
+  s.absarc(0,0,r1-nd,am+hw*.8,am-hw*.8,true);
+  p=P(r1,am-hw);s.lineTo(p[0],p[1]);
+  s.absarc(0,0,r1,am-hw,a0+co2,true);
+  p=P(r1-ch,a0);s.lineTo(p[0],p[1]);
+  p=P(r0+ch,a0);s.lineTo(p[0],p[1]);
+  s.closePath();
+  var g=new T.ExtrudeGeometry(s,{depth:.16,bevelEnabled:true,bevelThickness:.018,bevelSize:.012,bevelSegments:1,curveSegments:12});
+  g.translate(0,0,-.08);return g;
 }
 function pt3dBuild(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI;
@@ -81,19 +130,19 @@ function pt3dBuild(){
   cam.position.set(0,0,10);cam.lookAt(0,0,0);PT3D.sc=sc;PT3D.cam=cam;
   var tex=pt3dCircuitTex(T);PT3D.tex=tex;
   var grp=new T.Group();sc.add(grp);PT3D.grp=grp;
-  var N=12,gap=.075,i,a0,a1,m,mesh;
+  var N=12,gap=.075,i,a0,a1,m,mesh,IR=PT3D_CFG.inR;
   for(i=0;i<N;i++){
     a0=i*2*PI/N+gap/2;a1=(i+1)*2*PI/N-gap/2;
-    m=new T.MeshStandardMaterial({color:0x06090d,metalness:.8,roughness:.5,emissive:new T.Color(0x6ee5ff),emissiveMap:tex,emissiveIntensity:.8})   /* hex r128 tidak dikonversi ke linear: logam 'gelap' harus sangat gelap */;
-    mesh=new T.Mesh(pt3dSeg(T,a0,a1,.76,1),m);grp.add(mesh);PT3D.mats.push(m);
+    m=new T.MeshStandardMaterial({color:PT3D_CFG.plateCol,metalness:.75,roughness:.45,emissive:new T.Color(0x35f3ff),emissiveMap:tex,emissiveIntensity:.8});   /* hex r128 tidak dikonversi ke linear: logam 'gelap' harus gelap */
+    mesh=new T.Mesh(pt3dSeg(T,a0,a1,PT3D_CFG.inR+.012,1-.012),m);grp.add(mesh);PT3D.mats.push(m);
   }
-  /* garis cahaya tipis di tepi dalam & luar (additive), warna tema */
-  var gm1=new T.MeshBasicMaterial({color:0x6ee5ff,transparent:true,opacity:.5,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,side:T.DoubleSide});
-  var gm2=new T.MeshBasicMaterial({color:0x6ee5ff,transparent:true,opacity:.28,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,side:T.DoubleSide});
-  var g1=new T.Mesh(new T.RingGeometry(.735,.76,72),gm1);g1.position.z=.17;grp.add(g1);
-  var g2=new T.Mesh(new T.RingGeometry(1.0,1.03,72),gm2);g2.position.z=.0;grp.add(g2);
+  /* garis cahaya tipis: tepi dalam = aksen lilac (ringAcc), tepi luar = cyan ringCol (additive) */
+  var gm1=new T.MeshBasicMaterial({color:0x9c7cff,transparent:true,opacity:.75,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,side:T.DoubleSide});
+  var gm2=new T.MeshBasicMaterial({color:0x35f3ff,transparent:true,opacity:.28,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,side:T.DoubleSide});
+  var g1=new T.Mesh(new T.RingGeometry(IR-.026,IR-.004,160),gm1);g1.position.z=.11;grp.add(g1);
+  var g2=new T.Mesh(new T.RingGeometry(1.0,1.02,160),gm2);g2.position.z=.0;grp.add(g2);
   PT3D.glow=[gm1,gm2];
-  var key=new T.DirectionalLight(0xffd2a0,.7);key.position.set(.6,.9,1.4);sc.add(key);
+  var key=new T.DirectionalLight(0xffc88c,.7);key.position.set(.6,.9,1.4);sc.add(key);
   var rim=new T.DirectionalLight(0xff4fd8,.85);rim.position.set(-1.2,-.7,.8);sc.add(rim);
   sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.35));
   var fill=new T.DirectionalLight(0x40e8ff,.5);fill.position.set(-.8,.5,1);sc.add(fill);
@@ -107,13 +156,13 @@ function pt3dBuild(){
 }
 function pt3dRes(Rp){var S=2*PT3D_CFG.half*Rp;return Math.max(PT3D_CFG.resMin,Math.min(PT3D_CFG.resMax,Math.ceil(S*Math.min(1.5,DPR||1)/32)*32));}
 
-/* ---------- warna tema (AV_COLOR 'r,g,b', diperbarui drawAudioVisualizer) ---------- */
+/* ---------- warna cincin: dikunci PT3D_CFG.ringCol ('r,g,b'), TIDAK ikut AV_COLOR / tema SFX ---------- */
 function ptCol(){
-  var c=(typeof AV_COLOR==='string'&&AV_COLOR)?AV_COLOR:'110,229,255';
-  if(c!==PT3D.lastCol){PT3D.lastCol=c;var p=c.split(',');PT3D.cr=(+p[0])/255;PT3D.cg=(+p[1])/255;PT3D.cb=(+p[2])/255;}
+  var c=PT3D_CFG.ringCol||'53,243,255',ac=PT3D_CFG.ringAcc||c,key=c+'|'+ac;
+  if(key!==PT3D.lastCol){PT3D.lastCol=key;var p=c.split(','),q=ac.split(',');PT3D.cr=(+p[0])/255;PT3D.cg=(+p[1])/255;PT3D.cb=(+p[2])/255;PT3D.xr=(+q[0])/255;PT3D.xg=(+q[1])/255;PT3D.xb=(+q[2])/255;}
   return c;
 }
-/* intensitas per plat: musik (AVB.v) kalau ada yang main, kalau tidak napas pelan bergeser antar plat */
+/* intensitas per plat (warna tetap, hanya terangnya yang ikut musik): musik (AVB.v) kalau ada yang main, kalau tidak napas pelan bergeser antar plat */
 function ptLevels(now,playing){
   var lv=PT3D.lv,i,k,n=0,v=null,a,b,s,e;
   if(playing&&typeof AVB!=='undefined'&&AVB.v&&AVB.n>0){n=AVB.n;v=AVB.v;}
@@ -128,16 +177,20 @@ function ptPlaying(){return !!(typeof AV_ON!=='undefined'&&AV_ON&&typeof activeS
 
 function pt3dRender(now,Rp,playing){
   var T=THREE,r=PT3D.r,res=pt3dRes(Rp);
+  if(PT3D.big&&res<PT3D_CFG.resMax)res=PT3D_CFG.resMax;   /* sudah pernah charge / dive: tetap resolusi penuh (zoom-in nggak buram, nggak realokasi di tengah animasi) */
   if(res!==PT3D.res){PT3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);}
   ptCol();
   var lv=ptLevels(now,playing),i,m,t=now*.001;
   for(i=0;i<12;i++){
-    m=PT3D.mats[i];m.emissive.setRGB(PT3D.cr,PT3D.cg,PT3D.cb);
-    m.emissiveIntensity=.4+(playing?.7:.3)*lv[i];   /* terlalu tinggi = ACES memutihkan cyan */
+    var cc=PT3D.cl[i]||0,fk=PT3D.cFull?.5+.5*Math.sin(now*.03+i*1.7):0;   /* cc = muatan plat (menyala satu-satu saat hold); full charge = berkedip */
+    m=PT3D.mats[i];m.emissive.setRGB(PT3D.cr+(1-PT3D.cr)*cc*.45,PT3D.cg+(1-PT3D.cg)*cc*.3,PT3D.cb);
+    m.emissiveIntensity=(.4+(playing?.7:.3)*lv[i]+cc*(1.1+.5*fk))*PT3D_CFG.glow;   /* terlalu tinggi = ACES memutihkan cyan */
   }
-  PT3D.glow[0].color.setRGB(PT3D.cr,PT3D.cg,PT3D.cb);PT3D.glow[1].color.setRGB(PT3D.cr,PT3D.cg,PT3D.cb);
+  PT3D.glow[0].color.setRGB(PT3D.xr,PT3D.xg,PT3D.xb);PT3D.glow[1].color.setRGB(PT3D.cr,PT3D.cg,PT3D.cb);
   var still=(typeof reduce!=='undefined'&&reduce);
-  PT3D.grp.rotation.x=still?0:.2*Math.sin(t*.5);PT3D.grp.rotation.y=still?0:.28*Math.sin(t*.37+1);PT3D.grp.rotation.z=still?0:t*.05;
+  PT3D.rz=still?0:t*.05;
+  PT3D.grp.rotation.x=still?0:.06*Math.sin(t*.5);PT3D.grp.rotation.y=still?0:.08*Math.sin(t*.37+1);   /* goyangan dikecilkan: cincin tampak bulat */
+  PT3D.grp.rotation.z=still?0:t*.05;
   r.render(PT3D.sc,PT3D.cam);
 }
 function pt3dUsable(){
@@ -177,21 +230,337 @@ function ptRing2D(g,Rp,now,playing){   /* cadangan tanpa WebGL: 12 busur gelap +
   g.lineCap='butt';
   for(i=0;i<N;i++){
     a0=i*6.2832/N+gp/2;a1=(i+1)*6.2832/N-gp/2;
-    g.strokeStyle='#222a33';g.lineWidth=Rp*.22;g.beginPath();g.arc(0,0,Rp*.88,a0,a1);g.stroke();
-    g.strokeStyle='rgba('+c+','+(.35+.55*lv[i])+')';g.lineWidth=Math.max(1,Rp*.03);g.beginPath();g.arc(0,0,Rp*.8,a0,a1);g.stroke();
+    g.strokeStyle='#222a33';g.lineWidth=Rp*(1-PT3D_CFG.inR);g.beginPath();g.arc(0,0,Rp*(1+PT3D_CFG.inR)/2,a0,a1);g.stroke();
+    g.strokeStyle='rgba('+c+','+Math.min(1,.35+.55*lv[i]+.6*(PT3D.cl[i]||0))+')';g.lineWidth=Math.max(1,Rp*.025);g.beginPath();g.arc(0,0,Rp*(PT3D_CFG.inR+(1-PT3D_CFG.inR)*.45),a0,a1);g.stroke();
   }
-  g.strokeStyle='rgba('+c+',.7)';g.lineWidth=Math.max(1,Rp*.025);g.beginPath();g.arc(0,0,Rp*.755,0,6.2832);g.stroke();
+  g.strokeStyle='rgba('+(PT3D_CFG.ringAcc||c)+',.7)';g.lineWidth=Math.max(1,Rp*.02);g.beginPath();g.arc(0,0,Rp*(PT3D_CFG.inR-.012),0,6.2832);g.stroke();
+}
+
+/* ---------- mulut wormhole IDLE di dalam cincin: terowongan warp mini (feedback zoom+putar, sama gaya dengan 09-wormhole.js tapi buffer 80px) ---------- */
+var PTT={ok:0,fail:0,N:80,A:null,B:null,gA:null,gB:null,spr:null,last:0,acc:0},PTT_PAL=[[70,95,255],[150,65,240],[255,75,175],[255,125,70],[90,190,255],[175,205,255],[255,255,255]];
+function pttInit(){
+  try{
+    var N=PTT.N,mk=function(){var c=document.createElement('canvas');c.width=c.height=N;return c;},S=24,sp=document.createElement('canvas'),x,i,gr,col;
+    PTT.A=mk();PTT.B=mk();PTT.gA=PTT.A.getContext('2d');PTT.gB=PTT.B.getContext('2d');
+    sp.width=S;sp.height=S*PTT_PAL.length;x=sp.getContext('2d');
+    for(i=0;i<PTT_PAL.length;i++){
+      col=PTT_PAL[i];gr=x.createRadialGradient(S/2,i*S+S/2,0,S/2,i*S+S/2,S/2);
+      gr.addColorStop(0,'rgba('+col+',1)');gr.addColorStop(.3,'rgba('+col+',.5)');gr.addColorStop(1,'rgba('+col+',0)');
+      x.fillStyle=gr;x.fillRect(0,i*S,S,S);
+    }
+    PTT.spr=sp;
+    PTT.gA.fillStyle='#02050d';PTT.gA.fillRect(0,0,N,N);PTT.gB.fillStyle='#02050d';PTT.gB.fillRect(0,0,N,N);
+    PTT.ok=1;
+    for(i=0;i<26;i++)pttStep(.04);   /* isi awal: langsung "penuh" */
+  }catch(e){PTT.ok=0;PTT.fail=1;}
+}
+function pttStep(dt){
+  var N=PTT.N,c=N/2,sc=Math.exp(1.7*dt),rot=.22*dt,co=Math.cos(rot)*sc,si=Math.sin(rot)*sc,g2=PTT.gB,i,n,ang,rr,d,ci,t;
+  g2.globalCompositeOperation='source-over';g2.globalAlpha=1;g2.setTransform(1,0,0,1,0,0);
+  g2.fillStyle='#02050d';g2.fillRect(0,0,N,N);
+  g2.setTransform(co,si,-si,co,c-(co*c-si*c),c-(si*c+co*c));
+  g2.globalAlpha=Math.pow(.95,dt*60);g2.drawImage(PTT.A,0,0);
+  g2.setTransform(1,0,0,1,0,0);g2.globalCompositeOperation='lighter';
+  n=Math.max(2,Math.round(dt*420));   /* debu halus dekat lubang -> memanjang jadi streak radial oleh zoom */
+  for(i=0;i<n;i++){
+    ang=Math.random()*6.2832;ci=Math.random()<.25?5+((Math.random()*2)|0):(((ang/6.2832*5+Math.random()*1.5)|0)%5);
+    rr=N*(.06+.06*Math.random());d=2+Math.random()*3;g2.globalAlpha=.5*(.4+.6*Math.random());
+    g2.drawImage(PTT.spr,0,ci*24,24,24,c+Math.cos(ang)*rr-d/2,c+Math.sin(ang)*rr-d/2,d,d);
+  }
+  n=Math.max(1,Math.round(dt*40));   /* blob warna dinding */
+  for(i=0;i<n;i++){
+    ang=Math.random()*6.2832;ci=((ang/6.2832*5+Math.random()*1.2)|0)%5;
+    rr=N*(.08+.07*Math.random());d=N*(.12+.1*Math.random());g2.globalAlpha=.10;
+    g2.drawImage(PTT.spr,0,ci*24,24,24,c+Math.cos(ang)*rr-d/2,c+Math.sin(ang)*rr-d/2,d,d);
+  }
+  g2.globalAlpha=1;g2.globalCompositeOperation='source-over';
+  t=PTT.A;PTT.A=PTT.B;PTT.B=t;t=PTT.gA;PTT.gA=PTT.gB;PTT.gB=t;
+}
+/* streak bintang tajam di mulut idle: melesat dari tengah ke tepi (makin dekat tepi makin cepat dan makin panjang ekornya), ikut berputar pelan seperti terowongannya */
+var PTT_STAR=[[255,255,255],[175,205,255],[150,125,255],[255,125,205],[255,175,95],[95,225,255],[255,238,170]];
+function ptStarNew(init){return{th:Math.random()*6.2832,p:init?Math.random():0,v:.28+Math.random()*.5,ci:Math.random()<.65?(Math.random()<.5?0:1):((Math.random()*7)|0),L:(Math.random()*3)|0,al:.55+.45*Math.random()};}
+function pttStars(g,Rin,dt){
+  var n=PT3D_CFG.mouthStars|0;if(n<=0)return;
+  var A=PTT.st,i,s,rh,rt,pt,ca,sa,a,w,col,hx,hy;
+  if(!A||A.length!==n){A=PTT.st=[];for(i=0;i<n;i++)A.push(ptStarNew(true));}
+  g.save();g.globalCompositeOperation='lighter';g.lineCap='round';
+  for(i=0;i<n;i++){
+    s=A[i];s.p+=s.v*dt*(1+s.p*1.6);s.th+=.22*dt;
+    if(s.p>=1){A[i]=s=ptStarNew(false);}
+    a=Math.min(1,s.p*3)*(s.p>.85?1-(s.p-.85)/.15*.5:1)*s.al;
+    if(a<.03)continue;
+    rh=Rin*(.2+.85*Math.pow(s.p,1.7));pt=Math.max(0,s.p-.08-.14*s.p);rt=Rin*(.2+.85*Math.pow(pt,1.7));
+    ca=Math.cos(s.th);sa=Math.sin(s.th);col=PTT_STAR[s.ci];w=Math.max(.5,Math.min(1.6,.5+Rin*.01*s.L));
+    g.strokeStyle='rgba('+col+','+(a*.55).toFixed(3)+')';g.lineWidth=w;
+    g.beginPath();g.moveTo(ca*rt,sa*rt);g.lineTo(ca*rh,sa*rh);g.stroke();
+    if(s.L>0){   /* ujung kepala lebih terang */
+      hx=ca*(rt+(rh-rt)*.6);hy=sa*(rt+(rh-rt)*.6);
+      g.strokeStyle='rgba('+col+','+a.toFixed(3)+')';g.lineWidth=w*1.2;g.beginPath();g.moveTo(hx,hy);g.lineTo(ca*rh,sa*rh);g.stroke();
+      if(s.L>1){g.strokeStyle='rgba(255,255,255,'+(a*.9).toFixed(3)+')';g.lineWidth=w*.6;g.stroke();}
+    }
+  }
+  g.restore();
+}
+/* g sudah di-translate ke pusat portal; Rin = radius mulut (px). true = tergambar */
+function pttDraw(g,Rin,now){
+  if(!PTT.ok&&!PTT.fail)pttInit();
+  if(!PTT.ok)return false;
+  var dt=PTT.last?Math.min(.08,(now-PTT.last)/1000):.03,gr,hr=Rin*.16;
+  PTT.last=now;PTT.acc+=dt;
+  if(PTT.acc>=.032){pttStep(Math.min(.06,PTT.acc));PTT.acc=0;}   /* ~30 fps cukup buat mulut kecil */
+  g.save();g.beginPath();g.arc(0,0,Rin,0,6.2832);g.clip();
+  g.fillStyle='#02050d';g.fillRect(-Rin,-Rin,Rin*2,Rin*2);
+  g.imageSmoothingEnabled=true;g.drawImage(PTT.A,-Rin,-Rin,Rin*2,Rin*2);
+  pttStars(g,Rin,dt);   /* streak bintang tajam di atas dinding, di bawah lubang hitam + bayangan tepi */
+  gr=g.createRadialGradient(0,0,hr*.6,0,0,hr*1.7);gr.addColorStop(0,'rgba(0,0,0,.98)');gr.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=gr;g.beginPath();g.arc(0,0,hr*1.7,0,6.2832);g.fill();   /* lubang hitam di tengah */
+  gr=g.createRadialGradient(0,0,Rin*.62,0,0,Rin);gr.addColorStop(0,'rgba(2,8,16,0)');gr.addColorStop(1,'rgba(2,8,16,.7)');
+  g.fillStyle=gr;g.fillRect(-Rin,-Rin,Rin*2,Rin*2);   /* bayangan tepi: menyatu dengan cincin */
+  g.restore();
+  return true;
+}
+
+/* ---------- charge: 12 plat menyala SATU PER SATU saat tekan & tahan (WORMHOLE.charge() 0..1) ---------- */
+var PT_ORD=[3,2,1,0,11,10,9,8,7,6,5,4],PT_SWELL=.3;   /* urutan plat searah jarum jam mulai dari atas; PT_SWELL = cincin sedikit membengkak saat charge penuh */
+function ptWhCharge(){try{return(typeof WORMHOLE!=='undefined'&&WORMHOLE.charge)?WORMHOLE.charge():0;}catch(e){return 0;}}
+function ptChargeHit(i,now,ch){   /* plat i baru menyala: petir dari tengah ke plat itu + percikan api/listrik */
+  var th=-((i+.5)*.5236+(PT3D.rz||0));   /* sudut kanvas (y ke bawah) dari pusat plat */
+  ptBoltSpawn(th,.55+.4*ch,95,now,false);
+  ptSparkHit(Math.cos(th)*.99,Math.sin(th)*.99,.85,false,now);
+}
+function ptChargeFull(now){   /* muatan penuh: ledakan petir bercabang di semua sisi + kilat mulut */
+  var pot=(typeof IS_POTATO!=='undefined'&&IS_POTATO),k,th;
+  for(k=0;k<(pot?1:3);k++)ptBoltSpawn(Math.random()*6.2832,1,0,now,true);
+  for(k=0;k<(pot?2:6);k++){th=k*1.0472+Math.random()*.5;ptSparkHit(Math.cos(th)*.99,Math.sin(th)*.99,1,true,now);}
+  PT3D.spkT=now;
+}
+function ptChargeStep(now,ch){
+  var cl=PT3D.cl,on=PT3D.cOn,n=ch*12,j,i,tg,dt=PT3D.cTt?Math.min(.1,(now-PT3D.cTt)/1000):.016,pot=(typeof IS_POTATO!=='undefined'&&IS_POTATO);
+  PT3D.cTt=now;
+  for(j=0;j<12;j++){
+    i=PT_ORD[j];tg=n-j;tg=tg<0?0:tg>1?1:tg;
+    if(cl[i]===undefined)cl[i]=0;
+    cl[i]+=(tg-cl[i])*Math.min(1,dt*(tg>cl[i]?18:5));
+    if(n>j+.02){if(!on[j]){on[j]=1;ptChargeHit(i,now,ch);}}
+    else if(n<j-.05)on[j]=0;
+  }
+  if(ch>=.999){
+    if(!PT3D.cFull){PT3D.cFull=1;PT3D.cB=.08;PT3D.cS=.5;ptChargeFull(now);}
+    PT3D.cB-=dt;PT3D.cS-=dt;
+    if(PT3D.cB<=0){ptBoltSpawn(Math.random()*6.2832,.75+.25*Math.random(),70+Math.random()*60,now,false);PT3D.cB=(pot?.2:.07)+Math.random()*.07;}   /* petir terus-menerus keliling cincin */
+    if(PT3D.cS<=0){ptBoltSpawn(Math.random()*6.2832,1,0,now,true);PT3D.cS=.4+Math.random()*.35;}
+  }else PT3D.cFull=0;
+}
+/* kilau aditif di atas plat yang sudah menyala (terbaca juga di cincin kecil). g di pusat portal, Rp = radius luar cincin */
+function ptChargeGlow(g,Rp){
+  var cl=PT3D.cl,i,a0,a1,c=ptCol(),rz=PT3D.rz||0,v;
+  g.save();g.globalCompositeOperation='lighter';g.lineCap='butt';
+  for(i=0;i<12;i++){
+    v=cl[i]||0;if(v<.03)continue;
+    a0=i*.5236+.0375+rz;a1=(i+1)*.5236-.0375+rz;
+    g.strokeStyle='rgba('+c+','+(.30*v).toFixed(3)+')';g.lineWidth=Rp*(1-PT3D_CFG.inR)*1.25;g.beginPath();g.arc(0,0,Rp*(1+PT3D_CFG.inR)/2,-a1,-a0);g.stroke();
+    g.strokeStyle='rgba(255,255,255,'+(.4*v).toFixed(3)+')';g.lineWidth=Math.max(1,Rp*.025);g.beginPath();g.arc(0,0,Rp*(PT3D_CFG.inR+.004),-a1,-a0);g.stroke();
+  }
+  g.restore();
+}
+
+/* ---------- petir di dalam cincin ----------
+   Geometri dalam satuan radius mulut (1 = tepi dalam cincin), dibuat SEKALI saat spawn (titik tengah digeser acak) -> menggambar per frame murah.
+   Petir SELALU berasal dari area tengah portal (jauh di dalam leher wormhole) lalu menyambar ke tepi cincin di sudut th: jalurnya "tumbuh" dari pusat ke tepi
+   selama b.g ms (kepala petir), begitu kepala menyentuh cincin -> percikan (ptSparkHit). Ketebalan petir TETAP tipis (boltW), nggak ikut kekuatan beat;
+   kekuatan beat cuma menaikkan terang, jumlah cabang, dan jumlah percikan.
+   th = sudut tujuan di tepi (rad), inten 0..1 (terang), dur ms, spike = beat sangat kuat (lebih lama, BERCABANG banyak + kilat mulut + kilau tepi semua pita + percikan banyak).
+   Pemicu per pita: lonjakan MENTAH pita (AVB.tg, sebelum dihaluskan) -> onset langsung terbaca di ketukan rapat / polyrhythm; baseline per pita turun cepat supaya
+   ketukan berikutnya langsung terdeteksi lagi. Beat global = flux total semua pita (adaptif), bukan cuma bass dgn jeda 125 ms dari 01-core. */
+function ptBoltPath(x0,y0,x1,y1,amp,lvl,out){
+  if(lvl<=0){out.push(x1,y1);return;}
+  var mx=(x0+x1)/2,my=(y0+y1)/2,dx=x1-x0,dy=y1-y0,l=Math.sqrt(dx*dx+dy*dy)||1,o=(Math.random()-.5)*2*amp;
+  mx+=-dy/l*o;my+=dx/l*o;
+  ptBoltPath(x0,y0,mx,my,amp*.55,lvl-1,out);ptBoltPath(mx,my,x1,y1,amp*.55,lvl-1,out);
+}
+/* satu cabang dari titik acak di path P; depth>0 = boleh beranak sub-cabang. out = daftar {p,s,at,he,hit}.
+   at = posisi (0..1) cabang mulai tumbuh sepanjang tumbuhnya petir utama; he = kapan ujungnya selesai tumbuh; hit = {x,y} kalau ujungnya menyentuh cincin (hanya saat spike). */
+function ptBoltBranch(P,out,scale,depth,spike,at0){
+  var m=P.length/2,k,bx,by,ba,bl,br,at,den,ex,ey,er,hit=null;
+  if(m<3)return;
+  k=1+((Math.random()*(m-2))|0);bx=P[2*k];by=P[2*k+1];
+  at=at0?at0+(k/(m-1))*.18:k/(m-1);if(at>.92)at=.92;
+  ba=Math.atan2(by,bx)+(Math.random()-.5)*(spike?1.5:1.2);   /* condong ke luar (menjauhi pusat) */
+  bl=(spike?.3:.2)+Math.random()*(spike?.35:.25);
+  ex=bx+Math.cos(ba)*bl;ey=by+Math.sin(ba)*bl;er=Math.sqrt(ex*ex+ey*ey);
+  if(spike&&er>.88){ex*=.99/er;ey*=.99/er;hit={x:ex,y:ey};}   /* ujung cabang menyentuh cincin -> ikut memercik */
+  br=[bx,by];ptBoltPath(bx,by,ex,ey,.07,spike?3:2,br);
+  den=Math.max(.05,Math.min(.35,1-at));
+  out.push({p:br,s:scale,at:at,he:at+den,den:den,hit:hit,h:0});
+  if(depth>0&&Math.random()<.7)ptBoltBranch(br,out,scale*.65,depth-1,spike,at);
+}
+function ptBoltSpawn(th,inten,dur,now,spike){
+  var B=PT3D.bolts,pot=(typeof IS_POTATO!=='undefined'&&IS_POTATO),max=pot?1:PT3D_CFG.boltMax;
+  if(B.length>=max)B.shift();
+  var oa=Math.random()*6.2832,orr=.02+Math.random()*.1,   /* titik asal: area tengah portal */
+      x0=Math.cos(oa)*orr,y0=Math.sin(oa)*orr,x1=Math.cos(th)*.99,y1=Math.sin(th)*.99,pts=[x0,y0];
+  ptBoltPath(x0,y0,x1,y1,spike?.2:.16,4,pts);
+  var br=[],nb,i,C=PT3D_CFG.spikeBr,d=dur||(spike?130+Math.random()*80:85+Math.random()*60);
+  if(spike&&!pot){nb=C[0]+((Math.random()*(C[1]-C[0]+1))|0);for(i=0;i<nb;i++)ptBoltBranch(pts,br,.7,1,true,0);}
+  else if(Math.random()<.6)ptBoltBranch(pts,br,.6,pot?0:1,false,0);
+  if(spike)PT3D.spkT=now;
+  B.push({t0:now,d:d,g:Math.max(24,Math.min(spike?60:44,d*.38)),p:pts,br:br,i:Math.max(.25,Math.min(1,inten)),s:Math.random()*6.28,hs:spike?1:0,h:0});
+  PT3D.nb++;PT3D.lastBolt=now;
+}
+/* percikan di titik sambaran (x,y dalam satuan radius mulut): kilat kecil + serpihan api/listrik yang terpental ke dalam & menyamping di atas plat cincin */
+function ptSparkHit(x,y,inten,big,now){
+  var S=PT3D.sparks,pot=(typeof IS_POTATO!=='undefined'&&IS_POTATO),max=pot?14:PT3D_CFG.sparkMax,r=Math.sqrt(x*x+y*y)||1,
+      nx=x/r,ny=y/r,ia=Math.atan2(-ny,-nx),oa=Math.atan2(ny,nx),cnt=pot?(big?2:1):(big?7+((Math.random()*6)|0):2+((Math.random()*3)|0)),i,a,sp,d;
+  while(S.length>=max)S.shift();
+  S.push({k:1,x:x,y:y,t0:now,d:big?150:105,a:big?1:Math.min(1,.45+.5*inten),vx:0,vy:0,w:0});
+  for(i=0;i<cnt;i++){
+    a=(Math.random()<.3)?oa+(Math.random()-.5)*1.7:ia+(Math.random()-.5)*(big?2.7:2.1);   /* sebagian melesat ke luar menyusuri plat */
+    sp=(big?1.0:.7)+Math.random()*(big?1.9:1.1);d=(big?170:130)+Math.random()*(big?230:170);
+    if(S.length>=max)S.shift();
+    S.push({k:0,x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t0:now,d:d,a:Math.min(1,.55+.5*inten),w:Math.random()});
+  }
+}
+/* pemicu: onset per pita + beat global; tanpa musik = kilat redup acak jarang */
+function ptBoltTick(now,playing,still){
+  if(still){PT3D.rim=0;return;}
+  var pot=(typeof IS_POTATO!=='undefined'&&IS_POTATO),dt=PT3D.lastTk?(now-PT3D.lastTk)/1000:.016;
+  PT3D.lastTk=now;if(dt<0||dt>.25)dt=.016;
+  if(playing&&typeof AVB!=='undefined'&&AVB.v&&AVB.d&&AVB.tg&&AVB.n>0){
+    var n=AVB.n,v=AVB.v,d=AVB.d,tg=AVB.tg,k,j,best=0,bb=0,bd=0,bk,bv,fv,AVo=(typeof AV!=='undefined')?AV:null,fb=!!(AVo&&AVo.fallback),
+        beat=AVo?AVo.beat:0,cap=pot?1:PT3D_CFG.boltCap,cd=pot?90:PT3D_CFG.boltCd,thr=fb?.14:PT3D_CFG.onFlux,
+        mn,cf,fl,pt,df,sumF=0,made=0,F,hit=false,spk=false,avSpk=false,nbt,ba;
+    if(!PT3D.mn||PT3D.mn.length!==n){PT3D.mn=new Float32Array(n);PT3D.cf=new Float32Array(n);PT3D.fl=new Float32Array(n);PT3D.pt=new Float32Array(n);PT3D.df=new Float32Array(n);}
+    mn=PT3D.mn;cf=PT3D.cf;fl=PT3D.fl;pt=PT3D.pt;df=PT3D.df;PT3D.rim=1;
+    if(pot&&now-PT3D.lastBolt<160)cap=0;
+    for(k=0;k<n;k++){
+      df[k]=fb?d[k]:tg[k]-pt[k];   /* lonjakan mentah (target sebelum dihaluskan) -> onset langsung terbaca */
+      if(df[k]>0)sumF+=df[k];
+      if(df[k]>bd){bd=df[k];bb=k;}
+      pt[k]=tg[k];
+      fl[k]*=Math.exp(-dt*(9+9*k/n));if(fl[k]<.01)fl[k]=0;   /* kilau tepi: bass sedikit lebih lama, treble cepat; keduanya cukup singkat buat ketukan rapat */
+      if(v[k]>v[best])best=k;
+    }
+    /* pita dengan lonjakan terbesar dulu (bukan urutan bass -> treble), jadi jatah per frame (cap) nggak habis di bass saja */
+    for(j=0;j<cap;j++){
+      bk=-1;bv=thr;
+      for(k=0;k<n;k++)if(df[k]>bv&&tg[k]>.2&&tg[k]>mn[k]+.05&&now-cf[k]>=cd){bv=df[k];bk=k;}
+      if(bk<0)break;
+      cf[bk]=now;df[bk]=0;made++;
+      fv=tg[bk]+.35;if(fv>1.25)fv=1.25;if(fv>fl[bk])fl[bk]=fv;
+      ptBoltSpawn((bk+.5)/n*6.2832-1.5708+(Math.random()-.5)*.35,.5+.6*tg[bk],70+Math.random()*55,now,false);
+    }
+    for(k=0;k<n;k++)mn[k]+=(tg[k]-mn[k])*Math.min(1,dt*(tg[k]>mn[k]?3:12));   /* baseline naik pelan, TURUN cepat -> ketukan berikutnya langsung menonjol lagi */
+    /* beat global: flux total semua pita vs rata-ratanya sendiri (cepat beradaptasi); jeda antar hit 40 ms, spike 90 ms */
+    if(!fb){
+      F=sumF/n;
+      hit=F>PT3D.avgF*1.6+.012&&now-PT3D.lastHit>40;
+      spk=F>PT3D.avgF*PT3D_CFG.spikeK+.05&&now-PT3D.lastSpk>90;
+      PT3D.avgF+=(F-PT3D.avgF)*Math.min(1,dt*5);
+      if(hit)PT3D.lastHit=now;
+    }
+    /* beat bass dari 01-core tetap dipakai (kick besar), sebagai sumber spike tambahan */
+    nbt=fb?(beat>.62&&PT3D.prevBeat<=.62&&now-PT3D.lastBS>110):(AVo&&AVo.lastBeatT>0&&AVo.lastBeatT!==PT3D.lastBT&&beat>.5);
+    if(AVo)PT3D.lastBT=AVo.lastBeatT;PT3D.prevBeat=beat;
+    if(nbt){PT3D.lastBS=now;avSpk=beat>=(fb?.85:(typeof SPIKE_T==='number'?SPIKE_T:1));}
+    ba=((bd>0?bb:best)+.5)/n*6.2832-1.5708;
+    if(spk||avSpk){
+      PT3D.lastSpk=now;
+      ptBoltSpawn(ba,1,0,now,true);
+      if(!pot)ptBoltSpawn(ba+Math.PI+(Math.random()-.5)*1.4,.9,0,now,true);
+      for(k=0;k<n;k++)if(fl[k]<.9)fl[k]=.9;
+    }else if(made===0&&(hit||nbt))ptBoltSpawn(ba+(Math.random()-.5)*.5,.55+.4*Math.min(1,beat),70+Math.random()*55,now,false);
+  }else{
+    PT3D.prevBeat=0;PT3D.rim=0;if(PT3D.pt)PT3D.pt.fill(0);PT3D.avgF=0;
+    if(!PT3D.nextIdle)PT3D.nextIdle=now+PT3D_CFG.idleMin;
+    if(now>=PT3D.nextIdle){
+      ptBoltSpawn(Math.random()*6.2832,.3+Math.random()*.15,130+Math.random()*90,now,false);
+      PT3D.nextIdle=now+PT3D_CFG.idleMin+Math.random()*(PT3D_CFG.idleMax-PT3D_CFG.idleMin);
+    }
+  }
+}
+/* gambar jalur P dari pusat sampai fraksi f (0..1) -> kepala petir bergerak dari tengah ke tepi */
+function ptPathTo(g,P,Rin,f){
+  var n=P.length/2,tot=f*(n-1),full=tot|0,k,fr;
+  g.moveTo(P[0]*Rin,P[1]*Rin);
+  for(k=1;k<=full&&k<n;k++)g.lineTo(P[2*k]*Rin,P[2*k+1]*Rin);
+  if(full<n-1){fr=tot-full;g.lineTo((P[2*full]+(P[2*full+2]-P[2*full])*fr)*Rin,(P[2*full+1]+(P[2*full+3]-P[2*full+1])*fr)*Rin);}
+}
+/* g sudah di-translate ke pusat portal; Rin = radius mulut (px). Dipanggil SETELAH ptMouth dan SEBELUM cincin: ujung petir tertutup tepi cincin. Percikan digambar belakangan (ptSparksDraw) di ATAS cincin. */
+function ptBoltsDraw(g,Rin,now,c){
+  var B=PT3D.bolts,i,j,k,b,u,fl,al,P,sc,mf,f,e,W=PT3D_CFG.boltW,rim=!!(PT3D.rim&&PT3D.fl&&typeof AVB!=='undefined'&&AVB.v&&AVB.n===PT3D.fl.length),sk=(now-PT3D.spkT)/180;
+  if(!B.length&&!rim&&!(sk>=0&&sk<1))return;
+  g.save();g.beginPath();g.arc(0,0,Rin,0,6.2832);g.clip();
+  g.globalCompositeOperation='lighter';g.lineCap='round';g.lineJoin='round';
+  if(sk>=0&&sk<1){g.fillStyle='rgba('+c+','+(.2*(1-sk)*(1-sk))+')';g.beginPath();g.arc(0,0,Rin,0,6.2832);g.fill();}   /* kilat mulut saat spike */
+  if(rim){   /* kilau tepi per pita: nempel ke energi pita tiap frame + flash saat onset */
+    var N=AVB.n,w=6.2832/N,fa=PT3D.fl,vv=AVB.v,a,th;
+    g.lineCap='butt';g.lineWidth=Math.max(2,Rin*.14);
+    for(k=0;k<N;k++){
+      a=.18*vv[k]+.55*(fa[k]||0);if(a<.03)continue;if(a>.8)a=.8;
+      th=(k+.5)/N*6.2832-1.5708;
+      g.strokeStyle='rgba('+c+','+a+')';g.beginPath();g.arc(0,0,Rin*.97,th-w*.5,th+w*.5);g.stroke();
+    }
+    g.lineCap='round';
+  }
+  for(i=B.length-1;i>=0;i--){
+    b=B[i];e=now-b.t0;u=e/b.d;mf=e>=b.g?1:e/b.g;   /* mf = seberapa jauh kepala petir utama sudah tumbuh dari pusat */
+    /* kepala menyentuh cincin -> percikan (diproses sebelum petir dibuang supaya nggak ada hit yang terlewat saat frame jarang) */
+    if(!b.h&&mf>=1){b.h=1;P=b.p;ptSparkHit(P[P.length-2],P[P.length-1],b.i,!!b.hs,now);}
+    for(j=0;j<b.br.length;j++){e=b.br[j];if(e.hit&&!e.h&&(mf>=e.he||u>=1)){e.h=1;ptSparkHit(e.hit.x,e.hit.y,b.i*.8,false,now);}}
+    if(u>=1){B.splice(i,1);continue;}
+    fl=u<.3?1:.55+.45*Math.sin(now*.09+b.s);   /* kedip */
+    al=(1-u)*fl*b.i;
+    for(j=0;j<=b.br.length;j++){
+      if(j){e=b.br[j-1];P=e.p;sc=e.s;f=(mf-e.at)/e.den;if(f<=0)continue;if(f>1)f=1;}
+      else{P=b.p;sc=1;f=mf;}
+      g.beginPath();ptPathTo(g,P,Rin,f);
+      g.strokeStyle='rgba('+c+','+(.22*al)+')';g.lineWidth=Math.max(1.6,Rin*.11*W*sc);g.stroke();
+      g.strokeStyle='rgba('+c+','+(.55*al)+')';g.lineWidth=Math.max(1.1,Rin*.045*W*sc);g.stroke();
+      g.strokeStyle='rgba(255,255,255,'+(.95*al)+')';g.lineWidth=Math.max(.7,Rin*.016*sc);g.stroke();
+    }
+  }
+  g.restore();
+}
+/* percikan: digambar SETELAH cincin (di atasnya, tidak di-clip) supaya serpihan yang melesat ke luar terlihat menimpa plat. Rin = radius mulut (px). */
+function ptSparksDraw(g,Rin,now){
+  var S=PT3D.sparks,i,s,u,t,t2,px,py,qx,qy,al,k,sc=PT3D_CFG.sparkCol,bc=PT3D_CFG.boltCol;
+  if(!S.length)return;
+  g.save();g.globalCompositeOperation='lighter';g.lineCap='round';
+  for(i=S.length-1;i>=0;i--){
+    s=S[i];u=(now-s.t0)/s.d;
+    if(u>=1||u<0){S.splice(i,1);continue;}
+    if(s.k){   /* kilat benturan di titik sambaran */
+      al=(1-u)*(1-u)*s.a;
+      g.fillStyle='rgba('+sc+','+(.35*al)+')';g.beginPath();g.arc(s.x*Rin,s.y*Rin,Rin*.15*(1+.6*u),0,6.2832);g.fill();
+      g.fillStyle='rgba('+bc+','+(.9*al)+')';g.beginPath();g.arc(s.x*Rin,s.y*Rin,Rin*.05,0,6.2832);g.fill();
+      continue;
+    }
+    t=(now-s.t0)/1000;t2=Math.max(0,t-.04);k=1-.35*u;   /* melambat (seret) */
+    px=(s.x+s.vx*t*k)*Rin;py=(s.y+s.vy*t*k)*Rin;qx=(s.x+s.vx*t2*k)*Rin;qy=(s.y+s.vy*t2*k)*Rin;
+    al=(1-u)*(1-u)*s.a*(.65+.35*Math.sin(now*.05+s.w*20));
+    g.beginPath();g.moveTo(qx,qy);g.lineTo(px,py);
+    g.strokeStyle='rgba('+sc+','+(.85*al)+')';g.lineWidth=Math.max(1.3,Rin*.032);g.stroke();
+    g.strokeStyle='rgba('+bc+','+(.95*al)+')';g.lineWidth=Math.max(.7,Rin*.012);g.stroke();
+  }
+  g.restore();
 }
 /* x,y = pusat di layar, Rp = radius luar cincin (px), a = alpha 0..1 */
-function portal3dDraw(g,x,y,Rp,now,a){
+function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(!(Rp>2)||!(a>.01))return;
+  opts=opts||{};var ch=opts.ch||0;
+  if(ch>0||opts.big)PT3D.big=1;
   var use3d=pt3dUsable(),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
   g.save();
-  g.translate(x,y);if(typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());
+  g.translate(x,y);if(!opts.noRot&&typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());   /* noRot: window menu sektor (16) di luar stage, tidak ikut rotasi landscape */
   g.globalAlpha=a>1?1:a;
-  ptMouth(g,Rp*.745,now,!still);
-  /* visualizer cakram/debu: sekarang hidup di cincin portal, bukan di BH */
-  try{if(typeof drawAudioVisualizer==='function'){g.globalAlpha=1;drawAudioVisualizer(now,Rp*PT3D_CFG.vizK);g.globalAlpha=a>1?1:a;}}catch(eV){}
+  ptChargeStep(now,ch);   /* plat menyala satu-satu + petir/percikan pemicunya (ch = WORMHOLE.charge()) */
+  if(!opts.noMouth){if(still||!pttDraw(g,Rp*PT_IN,now))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
+  /* visualizer = kilatan petir di dalam cincin (debu + pulse elips visualizer BH lama dibuang). updateAVColor / avbUpdate dulu dipanggil lewat drawAudioVisualizer, sekarang dari sini. */
+  try{
+    if(typeof updateAVColor==='function')updateAVColor(now);
+    if(playing&&typeof avbUpdate==='function')avbUpdate(now);
+    if(!(typeof reduce!=='undefined'&&reduce)){ptBoltTick(now,playing,still&&!playing);ptBoltsDraw(g,Rp*PT_IN,now,PT3D_CFG.boltCol);}
+  }catch(eV){}
   if(use3d){
     try{
       if(now!==PT3D.lastNow){PT3D.lastNow=now;pt3dRender(now,Rp,playing);}
@@ -200,6 +569,8 @@ function portal3dDraw(g,x,y,Rp,now,a){
       g.drawImage(PT3D.r.domElement,-S/2,-S/2,S,S);
     }catch(e){pt3dFail(e&&e.message||e);ptRing2D(g,Rp,now,playing);}
   }else ptRing2D(g,Rp,now,playing);
+  ptChargeGlow(g,Rp);
+  if(!(typeof reduce!=='undefined'&&reduce)){try{ptSparksDraw(g,Rp*PT_IN,now);}catch(eS){}}   /* percikan di atas cincin */
   g.restore();
 }
 
@@ -208,10 +579,12 @@ function portal3dOverview(now,bp,R){
   if(!(R>1))return false;
   if(PT3D.state===0)pt3dLoad();
   var Rp=R*PT3D_CFG.ovK;
-  portal3dDraw(g,bp[0],bp[1],Rp,now,1);
+  if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringOwned&&WORMHOLE.ringOwned())return true;   /* zoom-in dari overview (F2): cincin digambar di kanvas wormhole; ovR/ovT sengaja tidak diperbarui (portal tidak bisa di-tap selama transisi) */
+  var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
+  if(!smenuHidesSky())portal3dDraw(g,bp[0],bp[1],Rd,now,1,ch>0?{ch:ch}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
   PT3D.ovR=Rp;PT3D.ovT=now;   /* F3: radius terakhir dipakai hit-test tap portal overview (06-interaction.js) */
-  /* F3 (D1): petunjuk idle — selama pengunjung belum pernah membuka ikon sektor, cincin luar berdenyut pelan ("portal ini bisa di-tap"). */
-  if(!OVSEL.seen&&!OVSEL.open&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
+  /* F3 (D1): petunjuk idle — selama pengunjung belum pernah membuka menu sektor, cincin luar berdenyut pelan ("portal ini bisa di-tap"). */
+  if(!OVSEL.seen&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
     var ph=(now%2600)/2600;
     g.save();g.translate(bp[0],bp[1]);
     g.strokeStyle='rgba('+ptCol()+','+(.38*(1-ph))+')';g.lineWidth=1.5;
@@ -220,53 +593,11 @@ function portal3dOverview(now,bp,R){
   }
   return true;
 }
+/* F3 menu sektor (16-sector-menu.js): selama window terbuka / menutup, sky tidak menggambar portal (ketutup backdrop; satu renderer WebGL tidak dipakai dua kanvas dengan resolusi beda tiap frame). */
+function smenuHidesSky(){return typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing);}
 /* Radius luar portal overview yang baru saja digambar (0 = tidak tampil / bukan overview). */
-function ptOvR(){return(PORTAL_ON&&typeof SECT!=='undefined'&&!SECT.cur&&!SECT.busy&&PT3D.ovT&&performance.now()-PT3D.ovT<1200)?PT3D.ovR:0;}
+function ptOvR(){return(typeof SECT!=='undefined'&&!SECT.cur&&!SECT.busy&&PT3D.ovT&&performance.now()-PT3D.ovT<1200)?PT3D.ovR:0;}
 
-/* ---------- sektor ---------- */
+/* ---------- ukuran cincin kecil (F11: portal sektor sudah pensiun; tinggal dipakai wormAnchor() di 05-sector-ui.js sebagai R mulut wormhole) ---------- */
 function ptSecR(){return Math.max(16,(typeof BH!=='undefined'?BH.R:26)*PT3D_CFG.secK*.62);}
-function ptSecPlace(s){   /* titik kosong terjauh dari bintang DAN dari BH mini; disimpan di ruang BH seperti sumPlace */
-  if(typeof sumSpot!=='function')return null;
-  var z=skyZoom||1,cx=W*.5,cy=H*.5,sp;
-  try{SPOT_AVOID=camBH();sp=sumSpot();}catch(e){sp=null;}
-  SPOT_AVOID=null;
-  if(!sp)return null;
-  s.ptl={x:cx+(sp[0]-cx)/z-skyPan.x*BHK,y:cy+(sp[1]-cy)/z-skyPan.y*BHK};
-  return s.ptl;
-}
-/* ---------- F3: portal sektor sebagai titik relay (pengganti BH mini untuk gate / hold / docking drone / terowongan) ---------- */
-/* [x,y,R] layar portal sektor; null = tidak ada (bukan PORTAL_ON, bukan di sektor, sedang transisi, relay mati).
-   Ditempatkan lazy (ptSecPlace, sama dengan portal3dSectorDraw) supaya pemanggil yang datang lebih dulu dari gambar (drone, gate) tidak mendapat null. */
-function ptlScreen(){
-  if(!PORTAL_ON||typeof SECT==='undefined'||!SECT.cur||SECT.busy||typeof SUM==='undefined'||!SUM.on)return null;
-  var s=SECT.cur,p=s.ptl||ptSecPlace(s);if(!p)return null;
-  var z=skyZoom||1,px=p.x+skyPan.x*BHK,py=p.y+skyPan.y*BHK;
-  if(z!==1){var cx=W*.5,cy=H*.5;px=cx+(px-cx)*z;py=cy+(py-cy)*z;}
-  return [px,py,ptSecR()*z];
-}
-/* Hit-test tap/hold portal sektor. Portal yang masih memudar masuk/keluar (sa<.5) belum bisa disentuh. */
-function ptlHitAt(x,y){
-  if(PT3D.sa<.5)return null;
-  var P=ptlScreen();if(!P)return null;
-  var d=Math.hypot(x-P[0],y-P[1]);
-  return d<=Math.max(P[2]*1.05,30)?{x:P[0],y:P[1],r:P[2],d:d}:null;
-}
-/* Pusat relay [x,y,Rv] di layar: portal sektor kalau ada, selain itu BH (perilaku lama). Rv = jari-jari "badan" yang dipakai tata letak gate/dock. */
-function relayAnchor(){
-  var P=ptlScreen();
-  if(P)return [P[0],P[1],Math.max(8,P[2]*.85)];
-  var b=camBH();return [b[0],b[1],Math.max(8,BH.Rr*(BHZ||1))];
-}
-function portal3dSectorDraw(now){
-  var s=(typeof SECT!=='undefined')?SECT.cur:null,want=!!(s&&!SECT.busy&&typeof SUM!=='undefined'&&SUM.on);
-  var dtp=PT3D.ta?Math.min(100,now-PT3D.ta):16;PT3D.ta=now;   /* fade berbasis waktu (bukan per frame): sama di 60 fps maupun HP lambat */
-  PT3D.sa+=((want?1:0)-PT3D.sa)*(1-Math.exp(-dtp/95));
-  if(!want&&PT3D.sa<.02){PT3D.sa=0;return;}
-  s=s||SECT.target;if(!s)return;
-  if(PT3D.state===0)pt3dLoad();
-  var p=s.ptl||ptSecPlace(s);if(!p)return;
-  var px=p.x+skyPan.x*BHK,py=p.y+skyPan.y*BHK,z=skyZoom||1;
-  if(z!==1){var cx=W*.5,cy=H*.5;px=cx+(px-cx)*z;py=cy+(py-cy)*z;}
-  portal3dDraw(g,px,py,ptSecR()*z,now,PT3D.sa);
-}
-try{if(typeof PORTAL_ON!=='undefined'&&PORTAL_ON)pt3dLoad();}catch(ePT3L){}   /* mulai muat lebih awal supaya tidak ada "pop" dari 2D ke 3D */
+try{pt3dLoad();}catch(ePT3L){}   /* mulai muat lebih awal supaya tidak ada "pop" dari 2D ke 3D */
