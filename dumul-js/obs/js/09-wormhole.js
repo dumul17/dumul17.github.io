@@ -242,7 +242,7 @@ function seekTarget(dt){
 }
 /* posisi BH overview (layar) -> tujuan akhir terowongan swallow sektor, supaya isi overview 'dimuntahkan' dari lubang yang sama */
 function bhScr(){
-  try{if(typeof camBH==='function'){var b=camBH(),c=toScr(b[0],b[1]);if(c&&isFinite(c[0])&&isFinite(c[1]))return c;}}catch(e){}
+  try{if(typeof camBH==='function'){var b=(typeof ptOvDest==='function')?ptOvDest():camBH(),c=toScr(b[0],b[1]);   /* P4: tujuan terowongan = titik portal overview yang mengorbit (bukan home BH), jadi teleskop keluar dari dalam portal */if(c&&isFinite(c[0])&&isFinite(c[1]))return c;}}catch(e){}
   return [winW()*.5,winH()*.5];
 }
 function secBusy(){return typeof SECT!=='undefined'&&!!SECT.busy;}
@@ -485,7 +485,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
   if(S.ring&&small&&typeof portal3dDraw==='function'){
     var ra=1-sm((r/cvr-.3)/.55);
-    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,ch:1});}catch(eR){}}
+    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,ch:1,tilt:ptWhTilt(r/cvr)});}catch(eR){}}
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
   /* teleskop: melayang mengikuti lubang hitam terowongan (travel), lalu keluar dari tengah portal tujuan (exit) */

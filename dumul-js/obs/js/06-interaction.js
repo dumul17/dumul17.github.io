@@ -360,7 +360,8 @@ function beginBHDrag(e){
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
-  var bp=camBH(),ovR=ptOvR();   /* radius portal overview yang tergambar (0 = bukan overview / belum tergambar) */
+  if(!SECT.cur&&typeof ptOvHidden==='function'&&ptOvHidden())return false;   /* P4: portal overview sedang di balik planet = tidak bisa di-tap / di-drag */
+  var ovR=ptOvR(),bp=(ovR>0&&typeof ptOvPos==='function')?ptOvPos():camBH();   /* radius portal overview yang tergambar (0 = bukan overview / belum tergambar); pusat = posisi portal yang mengorbit */
   var inPtl=ovR>0&&Math.hypot(e.clientX-bp[0],e.clientY-bp[1])<=ovR*.8;   /* di dalam cincin portal: portal menutupi bintang di belakangnya, jadi portal menang */
   if(!inPtl&&constellationTargetAt(e.clientX,e.clientY))return false;
   if(!bhDragAllowed())return false;
@@ -387,6 +388,7 @@ function moveBHDrag(e){
     var bm=BH.R*BHSC*1.15*Math.max(1,bhSizeMul());
     BH.x=Math.max(bm,Math.min(W-bm,BH.x));
     BH.y=Math.max(bm,Math.min(H-bm,BH.y));
+    if(SECT.cur&&typeof planetBhClamp==='function'){var pcl=planetBhClamp(BH.x,BH.y,bm/1.15);BH.x=pcl[0];BH.y=pcl[1];}   /* planet: BH mini boleh terbenam sedikit di balik limb, tidak sampai hilang */
     mouse.tx=Math.max(-1,Math.min(1,dx/(Math.min(W,H)*.24)));
     mouse.ty=Math.max(-1,Math.min(1,dy/(Math.min(W,H)*.24)));
   }
@@ -398,7 +400,7 @@ function endBHDrag(e){
   try{cv.releasePointerCapture(e.pointerId);}catch(err){}
   if(was){
     haptic(8);
-    var bpSw=camBH();createBHShockwave(bpSw[0], bpSw[1]);
+    var bpSw=(!SECT.cur&&typeof ptOvPos==='function')?ptOvPos():camBH();createBHShockwave(bpSw[0], bpSw[1]);
   }else if(drag.tapEligible){
     e.preventDefault();
     if(!SECT.cur&&!SECT.busy)smenuOpen();   /* tap portal overview = buka/tutup ikon sektor (D1); tap BH mini di sektor tidak melakukan apa-apa */

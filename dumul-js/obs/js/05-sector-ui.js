@@ -188,6 +188,7 @@ function sumSpot(){
       best=null,bs=-1e9,nx=22,ny=16;
   for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
     var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/ny,md=320,d,sc;
+    if(typeof planetBhOk==='function'&&!planetBhOk(cx,cy,Rv*.5))continue;   /* planet (17-planet3d.js): BH boleh terbenam sedikit di balik limb, tidak lebih */
     for(k=0;k<pts.length;k+=2){d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
     sc=md-(hudHit(cx,cy,Rv+14,rects)?2000:0)-Math.hypot(cx-W*.5,cy-H*.5)*.02;   /* terjauh dari bintang; HUD bebas; seri → condong ke tengah */
     if(sc>bs){bs=sc;best=[cx,cy];}
@@ -702,7 +703,7 @@ function sectJumpTo(s,carry,always){
   lisDecide(function(){
     if(SECT.busy||SW||whBusy()||SECT.cur)return;
     /* pusat + radius cincin overview: PT3D.ovR langsung (ptOvR() basi >1200 ms kalau sky sempat berhenti menggambar); cadangan = horizon BH x ovK */
-    var bp=camBH(),R=(typeof PT3D!=='undefined'&&PT3D.ovR>2)?PT3D.ovR:0;
+    var bp=(typeof ptOvPos==='function')?ptOvPos():camBH(),R=(typeof PT3D!=='undefined'&&PT3D.ovR>2)?PT3D.ovR:0;   /* P4: mulut wormhole di titik portal yang sedang mengorbit (orbit dibekukan selama transisi) */
     if(!(R>2)){try{R=BH.R*ptOvK();}catch(eR){R=0;}}
     var okO=false;
     try{if(typeof WORMHOLE!=='undefined')okO=!!WORMHOLE.gate(s,[bp[0],bp[1]],R,function(){sectZoomIn(s);});}catch(eW){}
@@ -880,10 +881,12 @@ function frame(now){
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     pmk('portals');
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
-    try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: melintas di depan BH */
-    pmk('astFront');
     try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX (sprite + label) di atas Gargantua, asteroid depan, reticle */
     try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
+    try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
+    pmk('planet');
+    try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: sekarang di ATAS planet (dulu di depan BH, di bawah drone/teleskop) */
+    pmk('astFront');
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}
     pmk('tail');

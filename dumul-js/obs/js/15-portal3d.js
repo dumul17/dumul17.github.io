@@ -36,13 +36,27 @@ var PT3D_CFG={
   sparkCol:'255,214,140',  /* warna ekor percikan api/listrik di titik sambaran */
   sparkMax:90,      /* percikan bersamaan (potato 14) */
   spikeBr:[3,5],    /* jumlah cabang utama saat spike (min,max); tiap cabang bisa punya sub-cabang */
-  idleMin:220,idleMax:560   /* jeda kilat redup saat tanpa musik (ms) */
+  idleMin:220,idleMax:560,   /* jeda kilat redup saat tanpa musik (ms) */
+  /* P4: kemiringan cincin overview, mengikuti gambar referensi (cincin dilihat 3/4: elips agak tegak, miring ke kanan). Radian. Urutan rotasi: yaw (y) -> pitch (x) -> roll (z, di bidang layar).
+     y = seberapa 'menyamping' (0 = hadap penuh; .9 = elips lebar ~62%). x = condong ke atas/bawah. z = roll (negatif = puncak cincin condong ke kanan). Window menu sektor + wormhole TIDAK memakai ini (datar). */
+  tilt:{x:.2,y:.9,z:-.22},
+  spin:.2,        /* kecepatan putar plat di bidang cincin, rad/dtk (.05 = ±2 menit/putaran, .2 = ±31 dtk, .6 = ±10 dtk). Berlaku di semua cincin (overview, menu sektor, wormhole); 0 = diam */
+  tiltOv:1,       /* 0..1 pengali kemiringan di overview (0 = datar seperti dulu) */
+  /* P4: orbit portal overview = orbit biasa (elips penuh, tanpa terbit/tenggelam): sumbu panjang sejajar kemiringan horizon planet (17-planet3d.js), pusat di home BH.
+     Selama di-drag, orbit berhenti (portal ikut jari) lalu springback seperti dulu. reduce motion = portal diam di home. */
+  orb:{on:true,
+    ax:.30,        /* setengah sumbu panjang terhadap lebar layar (dijepit supaya cincin tetap di dalam layar) */
+    ay:.085,       /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
+    per:26,        /* detik per satu putaran orbit. Jauh lebih cepat dari rotasi planet (rotPx .5 px/dtk) */
+    bet:1,         /* pengali kemiringan sumbu terhadap tangen limb (1 = sejajar horizon; >1 lebih curam) */
+    gap:1.1        /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
+  }
 };
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
 }catch(ePT0){}
 var PT_IN=PT3D_CFG.inR-.015;   /* rasio radius mulut terhadap Rp (dulu hard-code .745); dipakai juga 09-wormhole.js */
-var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0};
+var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0,tilt:null,lastTilt:-1,ovX:null,ovY:null,ovHid:0,orb:null,orbPhi:null,orbLast:0,orbInSect:0};
 
 function pt3dFail(why){PT3D.state=3;PT3D.err=String(why||'');try{console.warn('[portal3d] fallback ke cincin 2D:',PT3D.err);}catch(e){}}
 function pt3dLoad(){
@@ -130,7 +144,8 @@ function pt3dBuild(){
   var sc=new T.Scene(),H=PT3D_CFG.half,cam=new T.OrthographicCamera(-H,H,H,-H,-20,20);
   cam.position.set(0,0,10);cam.lookAt(0,0,0);PT3D.sc=sc;PT3D.cam=cam;
   var tex=pt3dCircuitTex(T);PT3D.tex=tex;
-  var grp=new T.Group();sc.add(grp);PT3D.grp=grp;
+  var tg=new T.Group();tg.rotation.order='ZXY';sc.add(tg);PT3D.tilt=tg;   /* P4: kemiringan = yaw -> pitch -> roll (ZXY = Rz*Rx*Ry); grp di dalamnya cuma berputar di bidang cincin */
+  var grp=new T.Group();tg.add(grp);PT3D.grp=grp;
   var N=12,gap=.075,i,a0,a1,m,mesh,IR=PT3D_CFG.inR;
   for(i=0;i<N;i++){
     a0=i*2*PI/N+gap/2;a1=(i+1)*2*PI/N-gap/2;
@@ -186,7 +201,18 @@ function ptLevels(now,playing){
 }
 function ptPlaying(){return !!(typeof AV_ON!=='undefined'&&AV_ON&&typeof activeSfx!=='undefined'&&activeSfx&&!activeSfx.paused&&!activeSfx.ended);}
 
-function pt3dRender(now,Rp,playing){
+/* P4: sudut kemiringan [pitch,yaw,roll] + goyangan kecil (potato/reduce tanpa goyang). tk = 0..1 */
+function ptTiltAng(now,tk){
+  var T=PT3D_CFG.tilt,t=now*.001,w=(typeof reduce!=='undefined'&&reduce)?0:1;
+  return [tk*(T.x+w*.04*Math.sin(t*.43)),tk*(T.y+w*.06*Math.sin(t*.31+1)),tk*T.z];
+}
+/* matriks affine 2D (a,b,c,d untuk g.transform) yang sama dengan proyeksi ortografis kemiringan 3D di atas, supaya mulut/petir/percikan (digambar 2D di bidang cincin) ikut miring. Sudah dicek sama dengan THREE.Euler 'ZXY'. */
+function ptTiltMat(an){
+  var cx=Math.cos(an[0]),sx=Math.sin(an[0]),cy=Math.cos(an[1]),sy=Math.sin(an[1]),cz=Math.cos(an[2]),sz=Math.sin(an[2]);
+  var exx=cy*cz-sy*sx*sz,exy=cy*sz+sy*sx*cz,eyx=-cx*sz,eyy=cx*cz;
+  return [exx,-exy,-eyx,eyy];   /* y three ke atas, y kanvas ke bawah */
+}
+function pt3dRender(now,Rp,playing,tk){
   var T=THREE,r=PT3D.r,res=pt3dRes(Rp);
   if(PT3D.big&&res<PT3D_CFG.resMax)res=PT3D_CFG.resMax;   /* sudah pernah charge / dive: tetap resolusi penuh (zoom-in nggak buram, nggak realokasi di tengah animasi) */
   if(res!==PT3D.res){PT3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);}
@@ -199,9 +225,11 @@ function pt3dRender(now,Rp,playing){
   }
   PT3D.glow[0].color.setRGB(PT3D.xr,PT3D.xg,PT3D.xb);PT3D.glow[1].color.setRGB(PT3D.cr,PT3D.cg,PT3D.cb);
   var still=(typeof reduce!=='undefined'&&reduce);
-  PT3D.rz=still?0:t*.05;
-  PT3D.grp.rotation.x=still?0:.06*Math.sin(t*.5);PT3D.grp.rotation.y=still?0:.08*Math.sin(t*.37+1);   /* goyangan dikecilkan: cincin tampak bulat */
-  PT3D.grp.rotation.z=still?0:t*.05;
+  PT3D.rz=still?0:t*(PT3D_CFG.spin||0);   /* rz = sudut putar yang sama dgn grp.rotation.z (dipakai kilau muatan + petir) */
+  tk=tk||0;
+  if(PT3D.tilt){var an=ptTiltAng(now,tk);PT3D.tilt.rotation.set(an[0],an[1],an[2]);}
+  PT3D.grp.rotation.x=(tk>0||still)?0:.06*Math.sin(t*.5);PT3D.grp.rotation.y=(tk>0||still)?0:.08*Math.sin(t*.37+1);   /* goyangan dikecilkan: cincin tampak bulat (kalau miring, goyangannya sudah ada di ptTiltAng) */
+  PT3D.grp.rotation.z=PT3D.rz;
   r.render(PT3D.sc,PT3D.cam);
 }
 function pt3dUsable(){
@@ -558,13 +586,16 @@ function ptSparksDraw(g,Rin,now){
 /* x,y = pusat di layar, Rp = radius luar cincin (px), a = alpha 0..1 */
 function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(!(Rp>2)||!(a>.01))return;
-  opts=opts||{};var ch=opts.ch||0;
+  opts=opts||{};var ch=opts.ch||0,tk=Math.max(0,Math.min(1,opts.tilt||0)),tm=null;
   if(ch>0||opts.big)PT3D.big=1;
   var use3d=pt3dUsable(),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
   g.save();
   g.translate(x,y);if(!opts.noRot&&typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());   /* noRot: window menu sektor (16) di luar stage, tidak ikut rotasi landscape */
   g.globalAlpha=a>1?1:a;
   ptChargeStep(now,ch);   /* plat menyala satu-satu + petir/percikan pemicunya (ch = WORMHOLE.charge()) */
+  if(tk>0.001){tm=ptTiltMat(ptTiltAng(now,tk));}   /* P4: elemen 2D (mulut, petir, percikan, kilau muatan) digambar di bidang cincin = affine yang sama dengan kemiringan 3D */
+  var r2d=function(){if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}ptRing2D(g,Rp,now,playing);if(tm)g.restore();};   /* cadangan 2D ikut miring */
+  if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
   if(!opts.noMouth){if(still||!pttDraw(g,Rp*PT_IN,now))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
   /* visualizer = kilatan petir di dalam cincin (debu + pulse elips visualizer BH lama dibuang). updateAVColor / avbUpdate dulu dipanggil lewat drawAudioVisualizer, sekarang dari sini. */
   try{
@@ -572,18 +603,89 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
     if(playing&&typeof avbUpdate==='function')avbUpdate(now);
     if(!(typeof reduce!=='undefined'&&reduce)){ptBoltTick(now,playing,still&&!playing);ptBoltsDraw(g,Rp*PT_IN,now,PT3D_CFG.boltCol);}
   }catch(eV){}
+  if(tm)g.restore();
   if(use3d){
     try{
-      if(now!==PT3D.lastNow){PT3D.lastNow=now;pt3dRender(now,Rp,playing);}
+      if(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001){PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);}
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
       g.drawImage(PT3D.r.domElement,-S/2,-S/2,S,S);
-    }catch(e){pt3dFail(e&&e.message||e);ptRing2D(g,Rp,now,playing);}
-  }else ptRing2D(g,Rp,now,playing);
+    }catch(e){pt3dFail(e&&e.message||e);r2d();}
+  }else r2d();
+  if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
   ptChargeGlow(g,Rp);
   if(!(typeof reduce!=='undefined'&&reduce)){try{ptSparksDraw(g,Rp*PT_IN,now);}catch(eS){}}   /* percikan di atas cincin */
+  if(tm)g.restore();
   g.restore();
 }
+
+/* ---------- P4: orbit portal overview (hanya overview) ----------
+   Elips penuh (bukan terbit/tenggelam): sumbu panjang sejajar tangen limb planet (limb miring turun ke kanan), pusat di home BH (digeser naik kalau titik terendah menyentuh limb),
+   searah jarum jam. Sudut diintegrasi per frame (bukan fungsi waktu mutlak): tidak ada lompatan waktu sky berhenti (menu) / geometri berubah (zoom, parallax).
+   Berhenti (diam di tempat): selama di-drag (portal ikut jari, lalu springback BH overview seperti dulu), transisi wormhole / zoom sektor, dan terowongan kedatangan (ARV<1).
+   Baru datang dari sektor: mulai dari puncak orbit (phi0). Titik itu juga tujuan terowongan wormhole (ptOvDest), jadi teleskop keluar dari dalam portal.
+   reduce motion = portal diam di home seperti sebelum P4. */
+var PT_PHI0=1.5708;
+function ptUp2Stage(x,y){var r=(typeof PL3D!=='undefined')?PL3D.rot:0;return r<0?[STG.ih-y,x]:(r>0?[y,STG.iw-x]:[x,y]);}   /* ruang layar tegak -> ruang stage (kebalikan v2c, sama dengan planetBhClamp) */
+function ptOrbRef(){   /* radius cincin 'penuh' (tanpa intro/ARV) supaya geometri orbit tidak bergeser selama cincin masih membesar */
+  try{return Math.max(8,BH.R*(BHSC||1)*(typeof bhSizeMul==='function'?bhSizeMul():1)*(BHZ||1)*ptOvK());}catch(e){return 30;}
+}
+/* posisi orbit pada sudut phi, ruang stage. bp = posisi BH sekarang (camBH, sudah termasuk geseran drag); null = tanpa geseran drag. */
+function ptOrbAt(phi,bp){
+  var O=PT3D_CFG.orb;
+  if(!O||!O.on||typeof pl3dGeom!=='function'||typeof PL3D==='undefined'||typeof astAnchor!=='function')return null;
+  pl3dSync();if(!PW||!PH)return null;
+  var Rp=ptOrbRef(),gm=pl3dGeom(),R2=gm.R*gm.R,an=astAnchor(),hu=pl3dScr(an[0],an[1]),i;
+  var limb=function(x){var d=x-gm.cx;return gm.cy-Math.sqrt(Math.max(0,R2-d*d));};
+  var cxo=Math.max(PW*.2,Math.min(PW*.8,hu[0])),cyo=hu[1],dd=cxo-gm.cx,beta=Math.atan(dd/Math.sqrt(Math.max(1,R2-dd*dd)))*(O.bet||1),cb=Math.cos(beta),sb=Math.sin(beta);
+  var ax=PW*O.ax,ay=Math.max(PH*O.ay,Rp*.9);
+  /* jepit lebar supaya cincin tetap di dalam layar (elips miring: cek ekstrem x lewat sampling) */
+  var xm=-1e9,xn=1e9,k,x,c,s2;
+  for(k=0;k<24;k++){c=Math.cos(k*.2618);s2=Math.sin(k*.2618);x=cxo+c*ax*cb+s2*ay*sb;if(x>xm)xm=x;if(x<xn)xn=x;}
+  var m=Rp*.7;
+  if(xm>PW-m&&xm>cxo+1)ax*=Math.max(.35,(PW-m-cxo)/(xm-cxo));
+  if(xn<m&&xn<cxo-1)ax*=Math.max(.35,(cxo-m)/(cxo-xn));
+  /* titik terendah orbit tidak boleh menyentuh limb: geser pusat naik kalau perlu */
+  var need=0,y;
+  for(k=0;k<24;k++){c=Math.cos(k*.2618);s2=Math.sin(k*.2618);x=cxo+c*ax*cb+s2*ay*sb;y=cyo+c*ax*sb-s2*ay*cb;need=Math.max(need,y+Rp*O.gap-limb(x));}
+  cyo-=need;
+  var cp=Math.cos(phi),sp=Math.sin(phi),lx=-cp*ax,lu=sp*ay,px=cxo+lx*cb+lu*sb,py=cyo+lx*sb-lu*cb,st=ptUp2Stage(px,py);   /* phi=pi/2 = puncak; bertambah = searah jarum jam */
+  return {x:(bp?bp[0]:an[0])+(st[0]-an[0]),y:(bp?bp[1]:an[1])+(st[1]-an[1])};   /* bp - an = geseran drag BH overview */
+}
+function ptOrbPinned(){
+  var arv=(typeof ARV!=='undefined')?ARV:1;
+  return arv<.999||PT3D.orbInSect||PT3D.orbPhi==null;
+}
+function portalOrbit(now,bp,Rp){
+  var out=PT3D.orb||(PT3D.orb={on:0,x:0,y:0,hid:0,w:0}),O=PT3D_CFG.orb;
+  out.on=0;out.x=bp[0];out.y=bp[1];out.hid=0;out.w=0;
+  if(!O||!O.on||(typeof reduce!=='undefined'&&reduce))return out;
+  var pin=ptOrbPinned(),phi=pin?PT_PHI0:PT3D.orbPhi;
+  if(pin&&!(typeof ARV!=='undefined'&&ARV<.999)){PT3D.orbInSect=0;}   /* sudah selesai datang: mulai dari puncak, lalu jalan */
+  var dt=PT3D.orbLast?Math.min(.1,Math.max(0,(now-PT3D.orbLast)/1000)):0;PT3D.orbLast=now;
+  var busy=(typeof SECT!=='undefined'&&SECT.busy)||(typeof whBusy==='function'&&whBusy())||(typeof drag!=='undefined'&&drag.on)||pin&&(typeof ARV!=='undefined'&&ARV<.999);
+  if(!busy)phi=(phi+dt*6.283185/O.per)%6.283185;
+  PT3D.orbPhi=phi;
+  var p=ptOrbAt(phi,bp);if(!p)return out;
+  out.x=p.x;out.y=p.y;out.on=1;out.w=1;
+  return out;
+}
+function ptSmooth(u){u=u<0?0:(u>1?1:u);return u*u*(3-2*u);}
+/* P4: kemiringan cincin saat zoom-in wormhole (09-wormhole.js). Asal overview = mulai dari kemiringan overview (tanpa pop), makin membesar makin tegak menghadap kamera. Asal sektor = datar. u = r/cvr (0 kecil .. 1 penuh layar) */
+function ptWhTilt(u){
+  try{if(typeof SECT!=='undefined'&&!SECT.cur){var k=PT3D_CFG.tiltOv||0;return k*(1-ptSmooth((u-.08)/.3));}}catch(e){}
+  return 0;
+}
+/* titik tujuan terowongan wormhole sektor -> overview (stage): posisi portal sesaat setelah datang (phi0) / posisi sekarang kalau orbit sudah jalan. Tanpa mengubah state. */
+function ptOvDest(){
+  var bp=camBH();
+  try{var O=PT3D_CFG.orb;if(O&&O.on&&!(typeof reduce!=='undefined'&&reduce)){var p=ptOrbAt(ptOrbPinned()?PT_PHI0:PT3D.orbPhi,bp);if(p)return [p.x,p.y];}}catch(e){}
+  return bp;
+}
+/* posisi portal overview terakhir yang digambar (ruang stage). Dipakai tap/drag (06), jangkar wormhole (05), lampu planet (17). Tanpa data -> posisi BH. */
+function ptOvPos(){return(PT3D.ovX!=null)?[PT3D.ovX,PT3D.ovY]:camBH();}
+/* (P4 lama: portal hilang di balik planet) sekarang selalu false, orbit biasa tanpa terbit/tenggelam */
+function ptOvHidden(){return false;}
 
 /* Overview: dipanggil dari drawHole (03-gargantua.js) menggantikan gambar BH. R = horizon BH sudah termasuk intro/terowongan (ARV)/swallow. true = sudah digambar. */
 function portal3dOverview(now,bp,R){
@@ -592,12 +694,15 @@ function portal3dOverview(now,bp,R){
   var Rp=R*ptOvK();
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringOwned&&WORMHOLE.ringOwned())return true;   /* zoom-in dari overview (F2): cincin digambar di kanvas wormhole; ovR/ovT sengaja tidak diperbarui (portal tidak bisa di-tap selama transisi) */
   var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
-  if(!smenuHidesSky())portal3dDraw(g,bp[0],bp[1],Rd,now,1,ch>0?{ch:ch}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
-  PT3D.ovR=Rp;PT3D.ovT=now;   /* F3: radius terakhir dipakai hit-test tap portal overview (06-interaction.js) */
+  var op=portalOrbit(now,bp,Rp),px=op.x,py=op.y,tk=PT3D_CFG.tiltOv||0;
+  if(!smenuHidesSky())portal3dDraw(g,px,py,Rd,now,1,(ch>0||tk>0)?{ch:ch,tilt:tk}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
+  PT3D.ovR=Rp;PT3D.ovT=now;PT3D.ovX=px;PT3D.ovY=py;PT3D.ovHid=op.hid;   /* F3: radius + posisi terakhir dipakai hit-test tap portal overview (06-interaction.js), jangkar wormhole (05), lampu planet (17) */
   /* F3 (D1): petunjuk idle — selama pengunjung belum pernah membuka menu sektor, cincin luar berdenyut pelan ("portal ini bisa di-tap"). */
-  if(!OVSEL.seen&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
+  if(!OVSEL.seen&&!op.hid&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
     var ph=(now%2600)/2600;
-    g.save();g.translate(bp[0],bp[1]);
+    g.save();g.translate(px,py);
+    if(typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());
+    if(tk>.001){var tm=ptTiltMat(ptTiltAng(now,tk));g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}   /* denyut ikut miring */
     g.strokeStyle='rgba('+ptCol()+','+(.38*(1-ph))+')';g.lineWidth=1.5;
     g.beginPath();g.arc(0,0,Rp*(1.04+.26*ph),0,6.2832);g.stroke();
     g.restore();
@@ -607,7 +712,7 @@ function portal3dOverview(now,bp,R){
 /* F3 menu sektor (16-sector-menu.js): selama window terbuka / menutup, sky tidak menggambar portal (ketutup backdrop; satu renderer WebGL tidak dipakai dua kanvas dengan resolusi beda tiap frame). */
 function smenuHidesSky(){return typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing);}
 /* Radius luar portal overview yang baru saja digambar (0 = tidak tampil / bukan overview). */
-function ptOvR(){return(typeof SECT!=='undefined'&&!SECT.cur&&!SECT.busy&&PT3D.ovT&&performance.now()-PT3D.ovT<1200)?PT3D.ovR:0;}
+function ptOvR(){return(typeof SECT!=='undefined'&&!SECT.cur&&!SECT.busy&&PT3D.ovT&&performance.now()-PT3D.ovT<1200&&!PT3D.ovHid)?PT3D.ovR:0;}   /* P4: 0 juga kalau portal sedang di balik planet (tidak bisa di-tap) */
 
 /* ---------- ukuran cincin kecil (F11: portal sektor sudah pensiun; tinggal dipakai wormAnchor() di 05-sector-ui.js sebagai R mulut wormhole) ---------- */
 function ptSecR(){return Math.max(16,(typeof BH!=='undefined'?BH.R:26)*PT3D_CFG.secK*.62);}
