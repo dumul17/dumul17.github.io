@@ -15,7 +15,12 @@ var SCP3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   half:64,       /* kotak gambar -half..half (satuan lokal teleDrawBody) */
-  resMin:128,resMax:384
+  resMin:128,resMax:384,
+  /* Pose IDLE (di overview & di sektor): teleskop tidak datar — mengayun 3D pelan + condong ke arah gerakannya (bank/lean).
+     Tersambung ke panel tuning tab Tele: SPIN = kecepatan + besar ayunan (0 = pose beku, tetap miring 3D), HOVER = kecepatan melayang -> makin kencang makin condong.
+     pitch/yaw/roll = besar ayunan (rad, di spin 1×) · bank = seberapa condong ke arah gerak (0 = mati) · ref = kecepatan (px/s) yang dianggap "penuh"
+     sx/sy = balik ke -1 kalau condongnya terasa terbalik · on:0 = pose idle lama (ayunan kecil) */
+  idle:{on:1,pitch:.38,yaw:.55,roll:.13,bank:.5,ref:40,sx:1,sy:1}
 };
 try{
   if(/[?&]scope3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_scope3d')==='0')SCP3D_CFG.on=false;
@@ -303,16 +308,39 @@ function scp3dUpdate(now,mm){
   }catch(eL){}
   o.key.position.set(lx*100,ly*100,65);o.key.intensity=1.5*fall;
 
-  /* pose 3D: roll/yaw pelan; muka kokpit tetap kebaca, mesin sedikit condong ke kamera */
-  var t=now*.001;
-  var tl=SCP3D.tilt;   /* pose dari luar (09-wormhole.js, teleskop di dalam terowongan), rad; null = pose normal.
-     Tanpa tl.k : offset euler biasa (x,y,z) ditambah ke pose normal (perilaku lama).
-     Dengan tl.k (0..1): pose normal di-slerp ke pose "kamera" — yaw tl.ty (+PI/2 = hidung menjauhi kamera / dilihat dari BELAKANG, mesin hijau menghadap kita;
+  /* pose 3D idle: ayunan pelan (SPIN) + condong ke arah gerak (HOVER). Fase diakumulasi per detik, bukan now*rate, supaya geser slider SPIN tidak bikin pose meloncat. */
+  var I=SCP3D_CFG.idle||{},cfg=(typeof TELE_CFG!=='undefined')?TELE_CFG:null,spinK=cfg&&isFinite(cfg.spin)?cfg.spin:1;
+  var dtI=SCP3D.pn!=null&&now>SCP3D.pn?Math.min(.1,(now-SCP3D.pn)/1000):0;SCP3D.pn=now;
+  if(SCP3D.ip==null)SCP3D.ip=now*.001;
+  SCP3D.ip+=dtI*spinK;
+  var ip=SCP3D.ip,amp=Math.max(.3,Math.min(1.4,.3+.7*spinK)),
+      ix=.34+(I.on?I.pitch:.24)*amp*Math.sin(ip*.37),iy=.22+(I.on?I.yaw:.30)*amp*Math.sin(ip*.23),iz=(I.on?I.roll:.05)*amp*Math.sin(ip*.51);
+  var bk=SCP3D.bk||(SCP3D.bk={x:0,y:0,z:0,vx:0,vy:0,px:null,py:null,pt:0});
+  if(I.on&&TL){
+    var bx0=TL.x,by0=TL.y;
+    if(bk.px==null||now<bk.pt){bk.px=bx0;bk.py=by0;bk.pt=now;}
+    else if(now-bk.pt>=8){   /* kecepatan dari selisih posisi (jalan juga untuk drift, orbit, warp, dan teleskop yang dibawa pindah sektor) */
+      var dv=Math.min(.1,(now-bk.pt)/1000),kv=1-Math.exp(-dv*6);
+      bk.vx+=((bx0-bk.px)/dv-bk.vx)*kv;bk.vy+=((by0-bk.py)/dv-bk.vy)*kv;
+      bk.px=bx0;bk.py=by0;bk.pt=now;
+    }
+    var sp=Math.hypot(bk.vx,bk.vy),nn=sp>.01?Math.min(1,Math.sqrt(sp/(I.ref||40))):0,ux=sp>.01?bk.vx/sp:0,uy=sp>.01?bk.vy/sp:0,
+        ph2=Math.atan2(mm.b,mm.a),c2=Math.cos(-ph2),s2=Math.sin(-ph2),
+        vxl=(ux*c2-uy*s2)*nn,vyl=-(ux*s2+uy*c2)*nn,   /* arah gerak di frame gambar badan (GL: y ke atas), sama seperti arah cahaya di atas */
+        bb=(I.bank!=null?I.bank:.5),bs=1-Math.exp(-dtI*5);
+    bk.x+=(-vyl*bb*(I.sx||1)-bk.x)*bs;bk.y+=(vxl*bb*(I.sy||1)-bk.y)*bs;bk.z+=(-vxl*bb*.3-bk.z)*bs;
+  }else{bk.x*=.9;bk.y*=.9;bk.z*=.9;}
+  var tl=SCP3D.tilt;   /* pose dari luar (09-wormhole.js, teleskop di dalam terowongan), rad; null = pose idle.
+     Tanpa tl.k : offset euler biasa (x,y,z) ditambah ke pose idle (perilaku lama).
+     Dengan tl.k (0..1): pose idle di-slerp ke pose "kamera" — yaw tl.ty (+PI/2 = hidung menjauhi kamera / dilihat dari BELAKANG, mesin hijau menghadap kita;
      -PI/2 = hidung menuju kamera / dilihat dari DEPAN), roll layar tl.tr (kokpit di atas), pitch tl.tp (mengintip dari atas supaya terasa 2.5D),
-     lalu tl.x/y/z dipakai sebagai kemiringan tambahan di ruang LAYAR (lean/bank dari gerak). */
+     lalu tl.x/y/z dipakai sebagai kemiringan tambahan di ruang LAYAR (lean/bank dari gerak). Pose idle = titik awal & akhir slerp, jadi keluar portal menyatu persis dgn sky. */
   var rt=SCP3D.root,qB=SCP3D._q0||(SCP3D._q0=new T.Quaternion()),qT=SCP3D._q1||(SCP3D._q1=new T.Quaternion()),qA=SCP3D._q2||(SCP3D._q2=new T.Quaternion()),eu=SCP3D._e||(SCP3D._e=new T.Euler()),ax=SCP3D._ax||(SCP3D._ax=[new T.Vector3(1,0,0),new T.Vector3(0,1,0),new T.Vector3(0,0,1)]);
+  eu.set(ix,iy,iz,'XYZ');qB.setFromEuler(eu);
+  qA.setFromAxisAngle(ax[2],bk.z);qB.premultiply(qA);
+  qA.setFromAxisAngle(ax[1],bk.y);qB.premultiply(qA);
+  qA.setFromAxisAngle(ax[0],bk.x);qB.premultiply(qA);   /* condong ke arah gerak (ruang layar) */
   if(tl&&tl.k!=null){
-    eu.set(.34+.24*Math.sin(t*.37),.22+.30*Math.sin(t*.23),.05*Math.sin(t*.51),'XYZ');qB.setFromEuler(eu);
     qT.setFromAxisAngle(ax[1],tl.ty||0);                                   /* yaw: arah hidung terhadap kamera */
     qA.setFromAxisAngle(ax[2],tl.tr||0);qT.premultiply(qA);                /* roll layar: kokpit menghadap atas */
     qA.setFromAxisAngle(ax[0],tl.tp||0);qT.premultiply(qA);                /* pitch: intip dari atas */
@@ -320,8 +348,10 @@ function scp3dUpdate(now,mm){
     qA.setFromAxisAngle(ax[1],tl.y||0);qT.premultiply(qA);                 /* belok kiri/kanan */
     qA.setFromAxisAngle(ax[0],tl.x||0);qT.premultiply(qA);                 /* condong ke depan/belakang */
     rt.quaternion.copy(qB).slerp(qT,Math.max(0,Math.min(1,tl.k)));
+  }else if(tl){
+    rt.rotation.set(ix+tl.x,iy+tl.y,iz+tl.z);
   }else{
-    rt.rotation.set(.34+.24*Math.sin(t*.37)+(tl?tl.x:0),.22+.30*Math.sin(t*.23)+(tl?tl.y:0),.05*Math.sin(t*.51)+(tl?tl.z:0));
+    rt.quaternion.copy(qB);
   }
 
   /* api mesin ion: drift = tipis, orbit = sedang, warp = panjang (dua thruster, fase kedip beda) */
