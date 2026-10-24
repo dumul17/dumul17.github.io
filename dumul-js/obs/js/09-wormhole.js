@@ -49,6 +49,14 @@ function TS(){return TT()-T_SEEKM;}
 /* Kemiringan teleskop di dalam terowongan (badan 3D; 2D cadangan cuma ikut roll). lean = condong ke arah lubang (keluar: condong ke depan), bank = miring ikut gerak melayang,
    buffet = getar halus saat ngebut. sx/sy/sz = arah sumbu (balik ke -1 kalau kemiringannya terasa terbalik). on:0 = mati. */
 var TELE_TILT={on:1,lean:.5,bank:.9,buffet:.035,sx:1,sy:1,sz:1,exitDir:1,exitVel:.5};   /* exitDir: 1 = pose keluar sama seperti di terowongan (tidak berbalik), -1 = condong menjauhi lubang; exitVel: pengali bank/pitch dari kecepatan saat keluar */
+/* POV "kamera di belakang pesawat" selama di terowongan (hanya badan 3D; badan 2D cadangan tetap pakai spin lama).
+   yaw  : 1.5708 = tepat membelakangi (hidung lurus ke dalam layar); dikecilkan (1.1-1.2) supaya sisi badan + kokpit masih kelihatan = terasa 2.5D, bukan datar
+   roll : 1.5708 = kokpit di atas (sayap/pod kiri-kanan), 0 = kokpit di samping
+   pitch: condong tambahan (rad), + = makin mengintip dari atas
+   th   : kekuatan api mesin saat POV belakang (1 = penuh); glow: pelebar kilau hijau mesin (0 = tanpa tambahan)
+   exitFace: pose waktu keluar portal tujuan. -1 = muncul menghadap kamera (hidung ke arah kita, api hijau masuk ke lubang) lalu belok ke pose istirahat;
+             +1 = tetap membelakangi seperti di terowongan lalu belok. exitMs: porsi pose dipertahankan sebelum mulai belok (0..1 dari pu) */
+var TELE_CHASE={on:1,yaw:1.12,roll:1.5708,pitch:0,th:1,glow:.7,exitFace:-1,exitHold:.18};
 var T_MOVE=2100, T_FADE=1420, T_CLOSE=1900;   /* T_OPEN = cincin + dinding terowongan membesar (zoom-in ke portal) sampai menutup layar */
 var T_ENTER_TELE=1950;
 var T_TELE_OVERLAP=1600;   /* ms: zoom-in ke portal mulai SEBELUM teleskop selesai terbang masuk (0 = berurutan seperti dulu; harus < T_ENTER_TELE, otomatis dibatasi 80%) */   /* durasi teleskop terbang masuk ke tengah cincin sebelum zoom-in dimulai */   /* durasi buka portal / geser ke tengah / fade-in / tutup (batal / pengaman) */
@@ -353,6 +361,13 @@ function teleTilt(dt,h,cx,cy,m,k,dir,vk){
   st.x+=(clamp(tx,-.6,.6)-st.x)*b;st.y+=(clamp(ty,-.6,.6)-st.y)*b;st.z+=(clamp(tz,-.6,.6)-st.z)*b;
   return {x:st.x*k,y:st.y*k,z:st.z*k};
 }
+function chase3d(){return !!(TELE_CHASE.on&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&typeof SCP3D_CFG!=='undefined'&&SCP3D_CFG.on&&!potato());}   /* true = badan 3D aktif -> POV belakang dipakai */
+function wrapPi(a){a=a%6.283185307;if(a>3.141592654)a-=6.283185307;else if(a<-3.141592654)a+=6.283185307;return a;}
+/* pose kamera (tanpa offset gerak): k 0..1 = seberapa jauh dari pose normal; face +1 = dari belakang, -1 = dari depan */
+function chasePose(k,face,tl){
+  var C=TELE_CHASE,o=tl||{x:0,y:0,z:0};
+  return {x:o.x,y:o.y,z:o.z,k:clamp(k,0,1),ty:C.yaw*face,tr:C.roll*face,tp:C.pitch,th:C.th,glow:C.glow};
+}
 function drawTele(ov){
   var b=(ov&&ov.base)||teleBase(),wob,x,y,sc,al;   /* ov.base = pose teleskop yang DIBEKUKAN (S.tb); tanpa itu dibaca live dari #sky */
   if(!b)return;
@@ -363,7 +378,9 @@ function drawTele(ov){
   if(sc<.01||al<.01)return;
   g.save();
   var tl=ov.tilt,t3=!!(tl&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&typeof SCP3D_CFG!=='undefined'&&SCP3D_CFG.on&&!potato());
-  g.translate(x,y);g.rotate(b.ang+b.rot+(ov.sp||0)+Math.sin(tt*2.7)*.14*wob+(tl&&!t3?tl.z:0));g.scale(sc,sc);
+  var a0=b.ang+b.rot,kk=(t3&&tl&&tl.k!=null)?clamp(tl.k,0,1):0;
+  if(kk>0)a0=wrapPi(a0)*(1-kk);   /* pose kamera: arah hidung diatur 3D, roll layar-nya diredam ke tegak supaya tidak berputar liar */
+  g.translate(x,y);g.rotate(a0+(ov.sp||0)+Math.sin(tt*2.7)*.14*wob*(1-.7*kk)+(tl&&!t3?tl.z:0));g.scale(sc,sc);
   g.globalAlpha=clamp(al,0,1);
   if(t3){SCP3D.tilt=tl;SCP3D.last=-1e9;}   /* paksa render 3D ulang dengan kemiringan ini (cache 3ms di tele3dBody) */
   try{teleDrawBody(g,performance.now());}catch(e){}
@@ -478,10 +495,22 @@ function drawFrame(dt,cx,cy,r,cvr){
         fq=(performance.now()-S.t0-S.tf0)/T_ENTER_TELE,fe=sm(clamp(fq)),b1=fe<1?(S.tb||teleBase()):null;   /* fe<1 = teleskop masih terbang masuk ke cincin sementara zoom-in sudah jalan (T_TELE_OVERLAP) */
     var hp2=teleHover(dt,cx,cy,mm,zu),bx=b1?lerp(b1.x,cx,fe):cx,by=b1?lerp(b1.y,cy,fe):cy,
         px=lerp(bx+(hp2[0]-cx),cx,sw),py=lerp(by+(hp2[1]-cy),cy,sw);
-    drawTele({base:S.tb,x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw),tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
+    if(chase3d()){
+      var tlc=teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1);
+      drawTele({base:S.tb,x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:Math.sin(tt*1.1)*.07*(1-sw),tilt:chasePose(fe,1,tlc)});   /* POV belakang: bank/lean dari gerak ikut di atas pose */
+    }else drawTele({base:S.tb,x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw),tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
   }else if(S.carry&&state==='exit'){
     var pu=eo(clamp((S.u-.1)/.72,0,1)),b0=teleBase(),h0=S.hv||[cx,cy];
-    if(b0){var ex=lerp(cx,b0.x,pu),ey=lerp(cy,b0.y,pu);drawTele({x:ex,y:ey,s:lerp(.12,1,pu),a:1,w:(1-pu)*.5,sp:(1-pu)*pu*2.2,tilt:teleTilt(dt,[ex,ey],cx,cy,Math.min(W,H),1-pu,TELE_TILT.exitDir,TELE_TILT.exitVel)});}
+    if(b0){
+      var ex=lerp(cx,b0.x,pu),ey=lerp(cy,b0.y,pu);
+      if(chase3d()){
+        /* keluar portal tujuan: mulai di pose terowongan (kilat layar menutupi pergantian dari belakang ke depan), ditahan sebentar, lalu belok mulus ke pose istirahat.
+           Pose = slerp (kuaternion), jadi tidak ada loncatan sudut; roll layar & arah api ikut menyatu ke badan normal di akhir (pu = 1 -> persis pose di sky). */
+        var hold=clamp(TELE_CHASE.exitHold,0,.9),pk=1-sm(clamp((pu-hold)/Math.max(.05,1-hold),0,1)),
+            tle=teleTilt(dt,[ex,ey],cx,cy,Math.min(W,H),pk,TELE_TILT.exitDir,TELE_TILT.exitVel);
+        drawTele({x:ex,y:ey,s:lerp(.12,1,pu),a:1,w:(1-pu)*.5,sp:0,tilt:chasePose(pk,TELE_CHASE.exitFace,tle)});
+      }else drawTele({x:ex,y:ey,s:lerp(.12,1,pu),a:1,w:(1-pu)*.5,sp:(1-pu)*pu*2.2,tilt:teleTilt(dt,[ex,ey],cx,cy,Math.min(W,H),1-pu,TELE_TILT.exitDir,TELE_TILT.exitVel)});
+    }
   }
   if(S.fl>.01){   /* kilat layar menjelang tiba di portal tujuan */
     g.globalCompositeOperation='source-over';g.globalAlpha=1;
@@ -546,7 +575,10 @@ function tick(now){
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.clearRect(0,0,W,H);
     if(S.carry){
       var fu=clamp((now-S.t0-S.tf0)/T_ENTER_TELE),b1=teleBase(),fe=sm(fu);
-      if(b1)drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:fe*5.2});   /* tetap terlihat di tengah mulut (tidak memudar) supaya travel melanjutkan tanpa pop */
+      if(b1){
+        if(chase3d())drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:0,tilt:chasePose(fe,1)});   /* pesawat berbalik: hidung ke portal, mesin hijau menghadap kita, sambil mengecil masuk */
+        else drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:fe*5.2});
+      }   /* tetap terlihat di tengah mulut (tidak memudar) supaya travel melanjutkan tanpa pop */
     }
     cv.style.opacity='1';
     raf=requestAnimationFrame(tick);return;

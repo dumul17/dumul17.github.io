@@ -305,16 +305,33 @@ function scp3dUpdate(now,mm){
 
   /* pose 3D: roll/yaw pelan; muka kokpit tetap kebaca, mesin sedikit condong ke kamera */
   var t=now*.001;
-  var tl=SCP3D.tilt;   /* offset kemiringan dari luar (09-wormhole.js: teleskop di dalam terowongan), rad; null = pose normal */
-  SCP3D.root.rotation.set(.34+.24*Math.sin(t*.37)+(tl?tl.x:0),.22+.30*Math.sin(t*.23)+(tl?tl.y:0),.05*Math.sin(t*.51)+(tl?tl.z:0));
+  var tl=SCP3D.tilt;   /* pose dari luar (09-wormhole.js, teleskop di dalam terowongan), rad; null = pose normal.
+     Tanpa tl.k : offset euler biasa (x,y,z) ditambah ke pose normal (perilaku lama).
+     Dengan tl.k (0..1): pose normal di-slerp ke pose "kamera" — yaw tl.ty (+PI/2 = hidung menjauhi kamera / dilihat dari BELAKANG, mesin hijau menghadap kita;
+     -PI/2 = hidung menuju kamera / dilihat dari DEPAN), roll layar tl.tr (kokpit di atas), pitch tl.tp (mengintip dari atas supaya terasa 2.5D),
+     lalu tl.x/y/z dipakai sebagai kemiringan tambahan di ruang LAYAR (lean/bank dari gerak). */
+  var rt=SCP3D.root,qB=SCP3D._q0||(SCP3D._q0=new T.Quaternion()),qT=SCP3D._q1||(SCP3D._q1=new T.Quaternion()),qA=SCP3D._q2||(SCP3D._q2=new T.Quaternion()),eu=SCP3D._e||(SCP3D._e=new T.Euler()),ax=SCP3D._ax||(SCP3D._ax=[new T.Vector3(1,0,0),new T.Vector3(0,1,0),new T.Vector3(0,0,1)]);
+  if(tl&&tl.k!=null){
+    eu.set(.34+.24*Math.sin(t*.37),.22+.30*Math.sin(t*.23),.05*Math.sin(t*.51),'XYZ');qB.setFromEuler(eu);
+    qT.setFromAxisAngle(ax[1],tl.ty||0);                                   /* yaw: arah hidung terhadap kamera */
+    qA.setFromAxisAngle(ax[2],tl.tr||0);qT.premultiply(qA);                /* roll layar: kokpit menghadap atas */
+    qA.setFromAxisAngle(ax[0],tl.tp||0);qT.premultiply(qA);                /* pitch: intip dari atas */
+    qA.setFromAxisAngle(ax[2],tl.z||0);qT.premultiply(qA);                 /* bank (ruang layar) */
+    qA.setFromAxisAngle(ax[1],tl.y||0);qT.premultiply(qA);                 /* belok kiri/kanan */
+    qA.setFromAxisAngle(ax[0],tl.x||0);qT.premultiply(qA);                 /* condong ke depan/belakang */
+    rt.quaternion.copy(qB).slerp(qT,Math.max(0,Math.min(1,tl.k)));
+  }else{
+    rt.rotation.set(.34+.24*Math.sin(t*.37)+(tl?tl.x:0),.22+.30*Math.sin(t*.23)+(tl?tl.y:0),.05*Math.sin(t*.51)+(tl?tl.z:0));
+  }
 
   /* api mesin ion: drift = tipis, orbit = sedang, warp = panjang (dua thruster, fase kedip beda) */
-  var th=mode==='warp'?1:(mode==='orbit'?.35:.12),i,ph,fl,fw;
+  var th=mode==='warp'?1:(mode==='orbit'?.35:.12),i,ph,fl,fw,gk=0;
+  if(tl&&tl.k!=null){th=th+((tl.th!=null?tl.th:1)-th)*Math.max(0,Math.min(1,tl.k));gk=Math.max(0,Math.min(1,tl.k))*(tl.glow!=null?tl.glow:.7);}   /* di terowongan: mesin menyala penuh + kilau hijau lebih lebar */
   for(i=0;i<2;i++){
     ph=i*1.7;
     fl=(.2+th*20)*(1+.12*Math.sin(now*.045+ph)+.07*Math.sin(now*.11+ph*2));fw=(1.5+th*2.4)*(1+.08*Math.sin(now*.07+ph));
     o.fl[i].scale.set(fl,fw,fw);o.fl2[i].scale.set(fl*.6,fw*.38,fw*.38);
-    o.eg[i].scale.set(14+th*14,14+th*14,1);o.eg[i].material.opacity=.35+.65*th;
+    o.eg[i].scale.set((14+th*14)*(1+gk),(14+th*14)*(1+gk),1);o.eg[i].material.opacity=Math.min(1,(.35+.65*th)*(1+.25*gk));
   }
   m.ion.opacity=.45+.35*th;m.ionCore.opacity=.35+.3*th;
 
