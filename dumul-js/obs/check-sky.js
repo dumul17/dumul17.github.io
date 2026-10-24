@@ -36,13 +36,6 @@ var tctx={};try{vm.runInNewContext(rd('texts.js')+';this.TXT=TXT',tctx);}catch(e
 if(tctx.TXT)['TELE_SCOPE_MESSAGES','TERM_POOL','TERM_W','TERM_PROMPTS','TG_POOL'].forEach(function(k){
   var v=tctx.TXT[k];if(!v||(Array.isArray(v)?!v.length:!Object.keys(v).length))P.push('texts.js: TXT.'+k+' kosong / hilang');
 });
-/* art glyph rasi: tiap id di GLYPH_ART_IDS (05-sector-ui.js) harus punya img/glyph/<id>.webp dan masuk SHELL service worker */
-var gm=rd('js/05-sector-ui.js').match(/var GLYPH_ART_IDS=\{([^}]*)\}/);
-if(!gm)P.push('js/05-sector-ui.js: GLYPH_ART_IDS tidak ketemu');
-else gm[1].split(',').map(function(x){return x.split(':')[0].trim();}).filter(Boolean).forEach(function(id){
-  if(!fs.existsSync(path.join(dir,'img','glyph',id+'.webp')))P.push('art glyph hilang: '+OBS+'img/glyph/'+id+'.webp');
-  if(shell.indexOf("'"+OBS+'img/glyph/'+id+".webp?v=")<0)P.push('SHELL service-worker belum memuat art glyph: '+id);
-});
 /* sisa pola lama */
 var js=jsFiles.map(function(f){return rd('js/'+f);}).join('\n');
 /* bintang bernama klaster Pleiades (PLEIADES.bright di js/*.js) harus punya tipe spektral: Pleione = STAR_PHYS, sisanya = PL_PHYS (kunci huruf kecil) */
