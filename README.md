@@ -25,9 +25,16 @@ DUMUL transition.
 
 -   Full-screen custom canvas sky with gravitational lensing around
     **Gargantua**
--   **Sector Overview → Sector Gate:** the sky is split into four
-    seasonal sectors. Tap a sector from the overview to enter it; the
-    **Sector Scan** HUD (minimap + draw/cull counters) shows what is
+-   **Sector Overview → Sector Menu:** the sky is split into four
+    seasonal sectors. Tap the portal in the overview, or the sector-menu
+    HUD button while inside a sector (sectors no longer show a portal of
+    their own), to open the sector window: swipe the ring's hole (or use
+    dots / arrows) to pick a sector, choose whether the telescope comes
+    along (optionally "always bring"), then ENTER. Inside a sector the
+    window also has a **TO OVERVIEW** button. Jumping straight from one
+    sector to another needs the destination's drone to be called first
+    (see Drone below); entering a sector from the overview is always free.
+    The **Sector Scan** HUD (minimap + draw/cull counters) shows what is
     actually being rendered.
 
     | Sector | Constellations |
@@ -42,18 +49,18 @@ DUMUL transition.
     `Aldebaran`, `Pleione`, `Sirius`, `Capella`, `Pollux`, `Procyon`;
     Spring — `Spica`, `Arcturus`, `Alioth`, `Regulus`; Summer — `Vega`,
     `Deneb`, `Altair`; Autumn — `Alpheratz`
--   **Spatial signal (muffle / relay):** an SFX that plays in one sector
+-   **Spatial signal (muffle / interlock):** an SFX that plays in one sector
     is *muffled* (low-pass + attenuation) when you hear it from somewhere
-    else. It is clear only when **both** are summoned: the **overview
-    Gargantua** (summoned by default, saved in `dumul_bh_home`) **and** the
-    Gargantua relay in the sector the sound comes from. If only one of the
-    two is summoned the signal stays muffled and a toast says which side
-    is missing.
+    else. It is always clear in its own (source) sector. In the **overview**
+    it is clear once the source sector's drone is docked (pink). In
+    **another sector** it is clear only when the source drone is docked
+    *and* that sector's own drone is called (yellow) and docked (pink).
+    Otherwise the signal stays muffled and a toast names the missing step.
 -   Tap/hover/focus feedback, supernova flashes, star chimes,
     constellation highlighting, and a **Last Signal** display
 -   **Music Transmission** HUD with 16 stellar signals (grouped per
     sector), `constellation` BGM, `collapsars` BGM, volume slider, shuffle /
-    repeat buttons, a Gargantua Spectrum visualizer toggle, observed-state
+    repeat buttons, a Portal Spectrum visualizer toggle, observed-state
     tracking, signal counter, and live spectrum indicators
 -   **Observation Mode** and **Radio Silence**
 -   **BGM-reactive sky** (visual only, follows whichever BGM is playing):
@@ -91,17 +98,23 @@ DUMUL transition.
     camera info cards, signal fragments and all UI labels are translated;
     star / constellation / track names and numbers stay as they are.
     Anything without a translation falls back to English.
--   **Sector Gate wormhole:** jumping through a Sector Gate, or holding the
-    mini Gargantua (~0.6 s), plays a warp-tunnel transition (blue-violet-
+-   **Sector wormhole:** jumping to a sector from the menu, or leaving a
+    sector with the menu's TO OVERVIEW button, plays a warp-tunnel transition (blue-violet-
     magenta streaks around a dark core) and muffles the audio while you are
     inside. It is plain Canvas 2D (no WebGL, no external textures) and
     switches itself off on `prefers-reduced-motion`.
--   **Drone relay (TX / RX) indicator:** long-press the telescope to send
-    a drone to the target star; a progress ring fills while you hold. Inside
-    a sector the drone flies from the telescope, orbits the target, and a
-    dashed tether carries signal packets back; in the sector overview the
-    Gargantua tunnel draws a line from the source sector through Gargantua to
-    the receiving sector. Colors follow each sector's interlocking indicator.
+-   **Drone (TX / RX) interlock:** two long-press gestures, each with a
+    progress ring. Long-press the **telescope** to call the drone (yellow):
+    it orbits the telescope on standby; press again to recall it. Long-press
+    the **drone** to dock it (pink): in the sector that is playing the SFX
+    it flies to the source star and becomes the transmitter (TX); in any
+    other sector it becomes a receiver (RX) and keeps orbiting the
+    telescope. Docking needs the drone called first. The state is kept while
+    you switch sectors or SFX (not across a page reload), a cyan ring on the
+    telescope shows that the sector is interlocked with the source, and the
+    dashed tether only appears briefly during transitions. The telescope and
+    drone are hidden in camera mode. Colors follow each sector's
+    interlocking indicator (two dots in the sector menu).
 -   **UI sound design:** small synthesized Web Audio effects (camera radar
     sweep, star-tracker noise, UI taps, constellation chime). No audio files;
     they follow the master volume and go silent in Radio Silence. Stellar
@@ -115,10 +128,7 @@ DUMUL transition.
 -   **Quality chip** (`Perf · HIGH / LOW`): no device auto-detect, the
     default is HIGH. The visitor's choice is saved (`dumul_quality`); append
     `?perf=low` or `?perf=high` to the URL to test a tier without saving.
--   Constellation glyph sprites (128 px WebP art in `img/glyph/<id>.webp`,
-    loaded per constellation the first time it is shown, tinted per star,
-    with a vector-line fallback) and a nebula backdrop image
-    (`img/nebula-portrait.webp`, one image cover-fitted for both portrait and landscape)
+-   A nebula backdrop image (`img/nebula-portrait.webp`, one image cover-fitted for both portrait and landscape)
 -   **Live observer counter:** loaded after the page has finished loading (on idle), so Firebase never competes with boot and audio for bandwidth. A small `N observers` readout showing how many
     unique devices have the Observatory open right now (Firebase Realtime
     Database presence, one entry per device, removed when the last tab
@@ -263,19 +273,21 @@ once its files (and, optionally, its music) have been cached.
 │       ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
 │       ├── img/
 │       │   ├── nebula-portrait.webp    # Nebula backdrop (single image, used for portrait AND landscape)
-│       │   └── glyph/                  # 23 constellation glyph arts, <id>.webp (128 px)
 │       └── js/             # Observatory logic, split from the old index.js (load order matters!)
 │           ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
 │           ├── 02-sky-logic.js     # data wiring, Pleiades, memory, unlock, observation mode, alignment, time dilation, layout, plate
 │           ├── 03-gargantua.js     # black hole, shared neural network, transition spectrum
 │           ├── 04-render.js        # overlays, telescope, SFX, target reticle, constellation drawing, observatory FX
-│           ├── 05-sector-ui.js     # sector overview, Gargantua summon/relay, sector gate, tune panel, music player
+│           ├── 05-sector-ui.js     # sector overview (positions only), mini Gargantua parking, sector jump (sectJumpTo), telescope carry (LIS), tune panel, music player
 │           ├── 06-interaction.js   # interaction, easter eggs, terminal, greeting, clock dilation
 │           ├── 07-boot.js          # boot, layout editor, render loop
 │           ├── 08-tx-drone.js      # drone TX/RX animation + hold ring (TXFX)
-│           ├── 09-wormhole.js      # wormhole transition for sector gates / mini Gargantua (WORMHOLE)
+│           ├── 09-wormhole.js      # wormhole transition for sector jumps / leaving a sector (WORMHOLE)
 │           ├── 10-ui-sound.js      # synthesized UI sound effects (UIS)
-│           └── 11-live-count.js    # live observer counter (ES module, loaded lazily via import(); Firebase presence)
+│           ├── 11-live-count.js    # live observer counter (ES module, loaded lazily via import(); Firebase presence)
+│           ├── 12-ast3d.js … 14-drone3d.js  # hybrid 3D layers (asteroids, telescope, TX drone; Three.js self-hosted in lib/)
+│           ├── 15-portal3d.js      # 3D portal ring (overview only) and its shared WebGL renderer (PT3D)
+│           └── 16-sector-menu.js   # sector menu window (#sect-menu): holo star map, swipe, telescope toggle
 │
 ├── dumul.html              # DUMUL / album page
 ├── dumul.css               # DUMUL styles
@@ -387,11 +399,6 @@ Notes:
     (`{en, id}`), then use `data-i18n="key"` / `data-i18n-aria="key"` in the
     HTML or `T('key')` in JS. New telescope / terminal lines go in
     `texts.js` and get a counterpart in `i18n-texts.js`.
--   **Glyph art:** one `img/glyph/<id>.webp` per constellation. To add or
-    replace one, put the file there, add the id to `GLYPH_ART_IDS` in
-    `05-sector-ui.js`, add it to `SHELL` in `service-worker.js`, and bump
-    `GLYPH_ART_V` (and the `?v=` in `SHELL`) if you replaced an existing image.
-    `check-sky.js` verifies the id list, the files and the `SHELL` entries.
 -   **Adding, renaming or removing a track:** put the file in `audio/`
     and register it in `sky-data.js` (the service worker's `ALL_AUDIO`
     is generated from it), then update `SIZE_MB` in the offline
@@ -454,7 +461,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     `https://dumul17.github.io/` and
     `https://dumul17.github.io/dumul.html`.
 4.  Upload the HTML and CSS files, the whole `dumul-js/obs/` folder
-    (`sky-data.js`, `texts.js`, `i18n*.js`, `img/` incl. `img/glyph/`, `js/01…11`) and the `dumul.*` files
+    (`sky-data.js`, `texts.js`, `i18n*.js`, `img/`, `js/01…16`) and the `dumul.*` files
     together, and keep the referenced audio and image assets beside them
     on the same origin. Upload `dumul-js/obs/` **before** the new
     `index.html` / `service-worker.js` so the page never points at scripts
@@ -508,8 +515,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     drives the Constellation Log) and unlocked constellations in `obs_unlock_v1`
     (separate on purpose: *heard* is not *unlocked*). Unlocking asks the
     service worker to save that constellation's `.opus` (`CACHE_AUDIO`); existing
-    cached audio is never cleared. The overview Gargantua summoned/recalled state is kept in
-    `dumul_bh_home` (default: summoned). The language is stored in
+    cached audio is never cleared. The language is stored in
     `dumul_lang`, the quality tier in `dumul_quality`, tune-panel settings in
     `dumul_sky_cfg`, `dumul_ast_cfg` and `dumul_tele_cfg`, and the music
     player's volume / shuffle / repeat in `mp_vol`, `mp_shuffle` and

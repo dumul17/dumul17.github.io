@@ -1009,7 +1009,6 @@ body.sect-in #mode-bh{display:grid}
 /* Fase 2: kembali ke overview via long-press BH mini — tombol #mode-sectors disembunyikan */
 #mode-sectors{display:none!important;pointer-events:none!important}
 #mode-bh:hover{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
-#mode-bh.on{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);box-shadow:0 0 12px rgba(110,229,255,.15)}
 #mode-bh{font-size:14px}
 @media (max-width:520px){#mode-bh{width:31px;height:31px}body.sect-in #mp-now-playing{right:130px!important}}
 @media (max-height:520px) and (orientation:landscape){#mode-bh{width:28px;height:28px}}
@@ -1100,8 +1099,7 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 #music-player:not(.open) .mp-grp-marq{animation:none;transform:none}
 
 /* ===== v36: Gargantua summon di overview + panel tune + toggle spectrum + fix pinch cam fokus ===== */
-body.sect-ov #mode-bh{display:grid}
-body.portal-on.sect-ov #mode-bh{display:none}   /* F3: portal overview selalu ada (tidak bisa di-recall) -> tombol hanya di sektor */
+/* #mode-bh: portal overview selalu ada (tidak bisa di-recall) -> tombol hanya di sektor (default display:none, body.sect-in menampilkan) */
 #mode-bhset{display:none!important} /* moved into owl panel Tune tab */
 .bp-sec[data-ov][hidden],.bp-row[data-ov][hidden],.bp-sec[data-sc][hidden],.bp-row[data-sc][hidden],.bp-sec[data-ovo][hidden],.bp-row[data-ovo][hidden]{display:none}   /* .bp-row{display:grid} menimpa [hidden]: tanpa ini baris khusus-sektor (Zoom follow dkk) bocor di overview & Portal halo bocor di sektor */
 #mode-bhset:hover,#mode-bhset:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
@@ -1110,9 +1108,6 @@ body.portal-on.sect-ov #mode-bh{display:none}   /* F3: portal overview selalu ad
 @media (max-height:520px) and (orientation:landscape){#mode-bhset{width:28px;height:28px}}
 /* now-playing minggir sesuai jumlah tombol di cluster */
 body.sect-ov #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)!important}
-body.sect-ov.bh-live #mp-now-playing,body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)!important}
-body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 152px + 8px)!important}
-@media (max-width:520px){body.sect-in.bh-live #mp-now-playing{right:200px!important}}
 
 /* Panel tuning — embedded in owl Tune tab (compact, same controls) */
 /* Panel tune embedded di tab owl. JANGAN pointer-events:auto!important di base —
@@ -1314,8 +1309,6 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 #owl-panel .owl-links{margin-top:0}
 /* now-playing offsets without mode-bhset */
 body.sect-ov #mp-now-playing{right:calc(12px + 32px + 6px + 72px + 8px)!important}
-body.sect-ov.bh-live #mp-now-playing,body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 72px + 8px)!important}
-body.sect-in.bh-live #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)!important}
 
 
 /* ===== owl panel v2: tab Settings / About, kompak ===== */
