@@ -15,7 +15,8 @@
 var PT3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
-  ovK:2,        /* radius luar cincin overview = ovK x horizon BH (BH.Rr) */
+  ovK:2,        /* cadangan: radius luar cincin overview = ovK x horizon BH (BH.Rr), dipakai kalau ptOvK() tidak bisa menghitung */
+  ovMenu:.5,    /* ukuran portal overview = ovMenu x ukuran cincin di window menu sektor (16-sector-menu.js, smenuRingD). .5 = setengahnya */
   secK:0.50,       /* dasar ukuran R mulut wormhole keluar sektor (ptSecR) = secK x BH.R x .62 */
   half:1.5,       /* setengah lebar kamera ortho (satuan model; radius luar cincin = 1) */
   resMin:128,resMax:384,
@@ -148,11 +149,21 @@ function pt3dBuild(){
   var fill=new T.DirectionalLight(0x40e8ff,.5);fill.position.set(-.8,.5,1);sc.add(fill);
   /* pra-ukur ke resolusi overview (setSize pertama = realokasi framebuffer MSAA yang mahal) */
   try{
-    var res0=pt3dRes(Math.max(40,(typeof BH!=='undefined'?BH.R:26)*PT3D_CFG.ovK));
+    var res0=pt3dRes(Math.max(40,(typeof BH!=='undefined'?BH.R:26)*ptOvK()));
     PT3D.res=res0;r.setPixelRatio(1);r.setSize(res0,res0,false);
   }catch(eP){}
   PT3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam);
+}
+/* Pengali radius cincin overview terhadap BH.R: dihitung supaya radius luar portal overview (ukuran slider 1x) = ovMenu x radius cincin menu sektor.
+   Menu ada di ruang layar asli (CSS px), overview di ruang virtual #stage (skala STG.k di tablet/desktop; HP landscape k=1), jadi dibagi k.
+   BHSC / BHZ / ukuran slider teleskop tetap ikut karena mereka mengalikan R di portal3dOverview, bukan masuk ke K ini. */
+function ptOvK(){
+  try{
+    var d=(typeof smenuRingD==='function')?smenuRingD():0,b=BH.R,k=(typeof STG!=='undefined'&&STG.on&&STG.k)?STG.k:1;
+    if(d>0&&b>1)return PT3D_CFG.ovMenu*d*.5/k/b;
+  }catch(e){}
+  return PT3D_CFG.ovK;
 }
 function pt3dRes(Rp){var S=2*PT3D_CFG.half*Rp;return Math.max(PT3D_CFG.resMin,Math.min(PT3D_CFG.resMax,Math.ceil(S*Math.min(1.5,DPR||1)/32)*32));}
 
@@ -578,7 +589,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
 function portal3dOverview(now,bp,R){
   if(!(R>1))return false;
   if(PT3D.state===0)pt3dLoad();
-  var Rp=R*PT3D_CFG.ovK;
+  var Rp=R*ptOvK();
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringOwned&&WORMHOLE.ringOwned())return true;   /* zoom-in dari overview (F2): cincin digambar di kanvas wormhole; ovR/ovT sengaja tidak diperbarui (portal tidak bisa di-tap selama transisi) */
   var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
   if(!smenuHidesSky())portal3dDraw(g,bp[0],bp[1],Rd,now,1,ch>0?{ch:ch}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */

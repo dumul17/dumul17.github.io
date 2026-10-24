@@ -6,7 +6,7 @@
    Fase 5: pilihan ajak/tinggal teleskop ditanam di window (toggle "Ajak teleskop" + centang "Selalu ajak"), diteruskan sectJumpTo(s,carry,always) -> lisDecide (05-sector-ui.js); tidak ada kartu lisAsk lagi di jalur ini. Disembunyikan kalau teleskop sedang tidak di tempat asal (lisGone()).
    Pola DOM seperti #lis-ask: dibangun lewat JS, isolasi sentuhan penuh (stopPropagation di fase capture), CSS disuntik dari sini (tidak menyentuh index.html).
    Hook luar: smenuOpen() dari 06-interaction.js; layer tombol back di 07-boot.js (SMENU.open -> smenuClose). */
-var SMENU={fz:'',open:false,closing:false,idx:0,pos:0,list:[],from:null,t:0,last:null,el:null,trk:null,hole:null,ring:null,cv:null,cx:null,d:0,dpr:1,w:0,drag:null,mon:0,cb:null,raf:0,lt:0,err:0,cols:{},carry:false};
+var SMENU={fz:'',open:false,closing:false,idx:0,pos:0,list:[],from:null,t:0,last:null,el:null,trk:null,hole:null,ring:null,cv:null,cx:null,d:0,dpr:1,w:0,drag:null,mon:0,cb:null,raf:0,lt:0,err:0,cols:{},carry:false,usr:false};
 var SM_PI=(typeof PT_IN==='number')?PT_IN:.845;   /* radius lubang / radius luar cincin (PT_IN dari 15-portal3d.js) */
 
 var SMENU_CSS=
@@ -62,9 +62,13 @@ var SMENU_CSS=
 '#sect-menu .sm-ov{min-height:38px;padding:0 18px;border-radius:19px;border:1px solid rgba(200,214,226,.32);background:transparent;color:rgba(214,228,240,.82);font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}'+
 '#sect-menu .sm-ov[hidden]{display:none}'+
 '#sect-menu .sm-go.off{opacity:.38;box-shadow:none;border-color:rgba(110,229,255,.4)}'+
-'@media (orientation:landscape) and (max-height:520px){#sect-menu .sm-card{display:grid;grid-template-columns:auto auto;grid-template-areas:"ttl ttl" "ring info";column-gap:22px;row-gap:4px;max-width:96vw;align-items:center;justify-items:center}#sect-menu .sm-ttl{grid-area:ttl}#sect-menu .sm-ringw{grid-area:ring}#sect-menu .sm-info{grid-area:info;display:flex;flex-direction:column;align-items:center;gap:6px}#sect-menu .sm-ring{--d:min(58vh,42vw)}#sect-menu .sm-st{min-height:2em}#sect-menu .sm-tele{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:6px}}'+
+'@media (orientation:landscape){#sect-menu .sm-card{display:grid;grid-template-columns:auto auto;grid-template-areas:"ttl ttl" "ring info";column-gap:22px;row-gap:4px;max-width:96vw;align-items:center;justify-items:center}#sect-menu .sm-ttl{grid-area:ttl}#sect-menu .sm-ringw{grid-area:ring}#sect-menu .sm-info{grid-area:info;display:flex;flex-direction:column;align-items:center;gap:6px}#sect-menu .sm-ring{--d:min(58vh,42vw,300px)}#sect-menu .sm-st{min-height:2em}#sect-menu .sm-tele{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:6px}}'+   /* semua landscape (HP, tablet, desktop): tata letak 2 kolom, bukan cuma HP pendek */
+'@media (orientation:landscape) and (max-height:430px){#sect-menu .sm-card{padding:8px 16px 10px;row-gap:0}#sect-menu .sm-info{gap:2px}#sect-menu .sm-dot{height:22px}#sect-menu .sm-tt,#sect-menu .sm-meta{min-height:0}#sect-menu .sm-st{min-height:1.2em}#sect-menu .sm-go{height:40px}#sect-menu .sm-ov{min-height:32px}}'+
+'body.ls #sect-menu{left:calc(-1 * var(--gut,0px));right:calc(-1 * var(--gut,0px))}'+   /* body.ls punya transform -> position:fixed anak body terkurung di kolom portrait; lebarkan balik ke seluruh layar (pola sama dgn #boot-screen / #veil) */
 '@media (prefers-reduced-motion:reduce){#sect-menu,#sect-menu .sm-dot::before,#sect-menu .sm-tgk,#sect-menu .sm-tgk::after{transition:none}#sect-menu .sm-ring.sm-flash{animation:none}}';
 
+/* Diameter cincin di window (px layar) = --d di CSS: portrait min(64vw,40vh,280px), landscape min(58vh,42vw,300px). Dipakai 15-portal3d.js (ptOvK) supaya portal overview = setengah ukuran ini. */
+function smenuRingD(){var w=window.innerWidth||0,h=window.innerHeight||0;return w>h?Math.min(h*.58,w*.42,300):Math.min(w*.64,h*.40,280);}
 function smenuStatus(s){   /* 'empty' sektor belum terpetakan · 'here' sedang di sini · 'nosum' (dari sektor) drone sektor tujuan belum di-summon (s.drn) · 'ok' */
   if(!s||!s.ids||!s.ids.length)return 'empty';
   if(SECT.cur&&s===SECT.cur)return 'here';
@@ -198,7 +202,7 @@ function smenuTele(){
 }
 function smenuGo(i,anim){
   var n=SMENU.list.length;i=Math.max(0,Math.min(n-1,i|0));
-  var ch=i!==SMENU.idx;SMENU.idx=i;
+  var ch=i!==SMENU.idx;SMENU.idx=i;if(ch)SMENU.usr=true;   /* pilihan user (panah/titik/geser/keyboard), bukan pilihan otomatis dari smenuOpen */
   if(!anim||reduce){SMENU.pos=i;smenuPlace();}   /* selain itu SMENU.pos menyusul pelan di smenuTick */
   if(ch){try{UIS.tap();}catch(e){}try{haptic(6);}catch(e2){}}
   smenuRefresh();
@@ -226,22 +230,25 @@ function smenuEnter(){
   smenuClose(function(){sectJumpTo(s,carry,always);});
 }
 /* geser lubang: mulai dihitung setelah ±12 px; lepas = snap ke sektor terdekat dengan inersia pendek (maks ±1 dari posisi awal) */
+/* clientX/clientY event di-hook global (01-core.js) ke ruang virtual #stage: di HP landscape (mode ROT) sumbunya DITUKAR, di tablet/desktop diskala + digeser.
+   Window ini di luar #stage dan hidup di ruang layar asli, jadi geser harus pakai koordinat layar mentah (scrPt). */
+function smenuX(e){return (typeof scrPt==='function')?scrPt(e)[0]:e.clientX;}
 function smenuDown(e){
   var h=e.target.closest&&e.target.closest('.sm-ring');
   if(!h||SMENU.drag||(e.button>0&&e.pointerType==='mouse'))return;
   SMENU.w=SMENU.hole.clientWidth||1;   /* satu slide = selebar lubang */
-  SMENU.drag={id:e.pointerId,x0:e.clientX,x:e.clientX,t:e.timeStamp,vx:0,on:false,i0:SMENU.idx,el:h};
+  var px=smenuX(e);SMENU.drag={id:e.pointerId,x0:px,x:px,t:e.timeStamp,vx:0,on:false,i0:SMENU.idx,el:h};
 }
 function smenuMove(e){
   var d=SMENU.drag;e.stopPropagation();
   if(!d||e.pointerId!==d.id)return;
-  var dx=e.clientX-d.x0,n=SMENU.list.length,w=SMENU.w,pos,mn;
+  var cx=smenuX(e),dx=cx-d.x0,n=SMENU.list.length,w=SMENU.w,pos,mn;
   if(!d.on){
     if(Math.abs(dx)<12)return;
     d.on=true;try{d.el.setPointerCapture(d.id);}catch(er){}
   }
-  var dt=e.timeStamp-d.t;if(dt>0){d.vx=d.vx*.7+((e.clientX-d.x)/dt)*.3;}
-  d.x=e.clientX;d.t=e.timeStamp;
+  var dt=e.timeStamp-d.t;if(dt>0){d.vx=d.vx*.7+((cx-d.x)/dt)*.3;}
+  d.x=cx;d.t=e.timeStamp;
   pos=-d.i0*w+dx;mn=-(n-1)*w;
   if(pos>0)pos*=.35;else if(pos<mn)pos=mn+(pos-mn)*.35;   /* karet di ujung */
   d.pos=pos;SMENU.pos=-pos/w;smenuPlace();
@@ -373,17 +380,28 @@ function smenuTick(now){
       smenuPlace();
     }
   }
+  if(SMENU.ring&&Math.abs((SMENU.ring.clientWidth||1)-SMENU.d)>.5){try{smenuLayout();}catch(eL){}}   /* rotasi / ganti layout (portrait <-> landscape): ukur ulang cincin + kanvas + lebar slide, jangan menunggu event resize */
   try{smenuDraw(now);}catch(e){if(!SMENU.err){SMENU.err=1;try{console.warn('[smenu] gambar gagal:',e&&e.message||e);}catch(e2){}}}
   SMENU.raf=requestAnimationFrame(smenuTick);
 }
 function smenuLoop(){if(!SMENU.raf){SMENU.lt=0;SMENU.raf=requestAnimationFrame(smenuTick);}}
+/* Index sektor tempat bintang SFX yang SEDANG bunyi (activeSfx, 01-core.js; sfxSector() sudah menangani rasi off lewat SKY.rasiBy). -1 = tidak ada SFX aktif / sektornya belum terpetakan. */
+function smenuSfxIdx(){
+  try{
+    if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.paused||activeSfx.ended||typeof sfxSector!=='function')return -1;
+    var sc=sfxSector(),ix=sc?SMENU.list.indexOf(sc):-1;
+    return(ix>=0&&smenuStatus(sc)!=='empty')?ix:-1;
+  }catch(e){return -1;}
+}
 function smenuOpen(){
   if(!smenuCanOpen())return false;
   smenuBuild();
-  var i,s,first=-1,pick=-1;
-  SMENU.list=SECT.list.slice();SMENU.from=SECT.cur||null;
-  for(i=0;i<SMENU.list.length;i++){s=SMENU.list[i];if(first<0&&smenuStatus(s)!=='empty'&&smenuStatus(s)!=='here')first=i;if(SMENU.last&&s.k===SMENU.last&&smenuStatus(s)!=='empty'&&smenuStatus(s)!=='here')pick=i;}
-  SMENU.idx=pick>=0?pick:(first>=0?first:0);   /* sektor terakhir dipakai; default = sektor pertama yang terpetakan */
+  var i,s,first=-1,pick=-1,sf;
+  SMENU.list=SECT.list.slice();SMENU.from=SECT.cur||null;SMENU.usr=false;
+  if(!SMENU.last){try{SMENU.last=localStorage.getItem('dumul_smenu_last')||null;}catch(eL){}}
+  for(i=0;i<SMENU.list.length;i++){s=SMENU.list[i];if(first<0&&smenuStatus(s)!=='empty'&&smenuStatus(s)!=='here')first=i;if(SMENU.last&&s.k===SMENU.last&&smenuStatus(s)!=='empty')pick=i;}
+  sf=smenuSfxIdx();
+  SMENU.idx=sf>=0?sf:(pick>=0?pick:(first>=0?first:0));   /* urutan: sektor bintang SFX yang lagi bunyi > pilihan terakhir user > sektor pertama yang terpetakan */
   if(!OVSEL.seen){OVSEL.seen=true;try{localStorage.setItem('dumul_portal_seen','1');}catch(eS){}}   /* petunjuk denyut "portal bisa di-tap" berhenti, sama seperti ovSelSet lama */
   smenuSlides();
   SMENU.carry=!!LIS.auto;smenuAutoCk(LIS.auto);   /* F5: default toggle OFF; kalau "selalu ajak" sudah aktif: toggle ON + centang */
@@ -407,7 +425,7 @@ function smenuOpen(){
 function smenuClose(cb){
   if(!SMENU.open)return;
   var a=SMENU.el,sel=SMENU.list[SMENU.idx];
-  if(cb&&sel)SMENU.last=sel.k;
+  if(sel&&(cb||SMENU.usr)){SMENU.last=sel.k;try{localStorage.setItem('dumul_smenu_last',sel.k);}catch(eS){}}   /* MASUK atau user sempat memilih; menutup tanpa menyentuh = pilihan terakhir tidak diubah (jangan menimpa dengan sektor SFX otomatis) */
   SMENU.open=false;SMENU.closing=true;SMENU.drag=null;
   clearInterval(SMENU.mon);SMENU.mon=0;
   a.classList.add('closing');a.classList.remove('on');

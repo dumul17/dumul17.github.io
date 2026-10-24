@@ -703,7 +703,7 @@ function sectJumpTo(s,carry,always){
     if(SECT.busy||SW||whBusy()||SECT.cur)return;
     /* pusat + radius cincin overview: PT3D.ovR langsung (ptOvR() basi >1200 ms kalau sky sempat berhenti menggambar); cadangan = horizon BH x ovK */
     var bp=camBH(),R=(typeof PT3D!=='undefined'&&PT3D.ovR>2)?PT3D.ovR:0;
-    if(!(R>2)){try{R=BH.R*PT3D_CFG.ovK;}catch(eR){R=0;}}
+    if(!(R>2)){try{R=BH.R*ptOvK();}catch(eR){R=0;}}
     var okO=false;
     try{if(typeof WORMHOLE!=='undefined')okO=!!WORMHOLE.gate(s,[bp[0],bp[1]],R,function(){sectZoomIn(s);});}catch(eW){}
     if(!okO)sectZoomIn(s);
