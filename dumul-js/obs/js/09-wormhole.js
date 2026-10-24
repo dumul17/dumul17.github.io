@@ -212,6 +212,9 @@ function go(dest,pos,R,onCover){
   return true;
 }
 function engageDive(now){
+  /* Bekukan pose teleskop (posisi/skala/sudut) SEBELUM skyCam mulai menskala #sky. teleBase() membaca getBoundingClientRect #sky, jadi saat zoom-in dia ikut membesar eksponensial
+     (k kamera) dan begitu runCover() -> skyReset() melepas transform, skalanya LONCAT turun ke ukuran asli = teleskop "kepotong" jadi kecil. Selama travel semua dibaca dari S.tb. */
+  S.tb=null;if(S.carry){try{S.tb=teleBase();}catch(eB){S.tb=null;}}
   state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=1;S.rate1=S.rate;S.rate=.9;S.rim=0;S.edge=.94;S.ring=1;S.cov=0;S.tgi=0;
   S.lnK=Math.log(Math.max(2,1.05*(Math.hypot(winW(),winH())*.5)/Math.max(4,S.rp*(typeof PT_IN==='number'?PT_IN:.745))));   /* skala akhir: tepi mulut pas melewati sudut layar */
   fresh=Math.hypot(winW(),winH())*.56;   /* isi awal: terowongan sudah "penuh" begitu cincin mulai membesar */
@@ -351,7 +354,7 @@ function teleTilt(dt,h,cx,cy,m,k,dir,vk){
   return {x:st.x*k,y:st.y*k,z:st.z*k};
 }
 function drawTele(ov){
-  var b=teleBase(),wob,x,y,sc,al;
+  var b=(ov&&ov.base)||teleBase(),wob,x,y,sc,al;   /* ov.base = pose teleskop yang DIBEKUKAN (S.tb); tanpa itu dibaca live dari #sky */
   if(!b)return;
   ov=ov||{};
   wob=ov.w!=null?ov.w:clamp((S.a-.4)/.6,0,1);
@@ -472,10 +475,10 @@ function drawFrame(dt,cx,cy,r,cvr){
   if(S.carry&&state==='travel'){
     /* teleskop terlihat dari awal travel: kecil di tengah mulut -> membesar mengikuti zoom -> melayang+miring di terowongan -> menyusut masuk ke lubang tujuan (lanjut ke exit tanpa pop) */
     var tq=(performance.now()-S.tt),mm=Math.min(W,H),zu=sm(tq/T_OPEN),sw=sm((tq-TS())/Math.max(1,TT()-TS())),
-        fq=(performance.now()-S.t0-S.tf0)/T_ENTER_TELE,fe=sm(clamp(fq)),b1=fe<1?teleBase():null;   /* fe<1 = teleskop masih terbang masuk ke cincin sementara zoom-in sudah jalan (T_TELE_OVERLAP) */
+        fq=(performance.now()-S.t0-S.tf0)/T_ENTER_TELE,fe=sm(clamp(fq)),b1=fe<1?(S.tb||teleBase()):null;   /* fe<1 = teleskop masih terbang masuk ke cincin sementara zoom-in sudah jalan (T_TELE_OVERLAP) */
     var hp2=teleHover(dt,cx,cy,mm,zu),bx=b1?lerp(b1.x,cx,fe):cx,by=b1?lerp(b1.y,cy,fe):cy,
         px=lerp(bx+(hp2[0]-cx),cx,sw),py=lerp(by+(hp2[1]-cy),cy,sw);
-    drawTele({x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw),tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
+    drawTele({base:S.tb,x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw),tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
   }else if(S.carry&&state==='exit'){
     var pu=eo(clamp((S.u-.1)/.72,0,1)),b0=teleBase(),h0=S.hv||[cx,cy];
     if(b0){var ex=lerp(cx,b0.x,pu),ey=lerp(cy,b0.y,pu);drawTele({x:ex,y:ey,s:lerp(.12,1,pu),a:1,w:(1-pu)*.5,sp:(1-pu)*pu*2.2,tilt:teleTilt(dt,[ex,ey],cx,cy,Math.min(W,H),1-pu,TELE_TILT.exitDir,TELE_TILT.exitVel)});}
