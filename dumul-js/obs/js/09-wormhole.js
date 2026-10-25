@@ -175,13 +175,14 @@ function skyReset(){
     if(S)S.skyOn=0;
   }catch(e){}
 }
-function hide(){skyReset();try{if(typeof TELESCOPE!=='undefined')TELESCOPE.dive=0;}catch(eD){}if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
+function warpFx(k){try{if(typeof UIS!=='undefined'&&UIS.warpFx)UIS.warpFx(k);}catch(e){}}   /* SFX terowongan (10-ui-sound.js), selalu aman kalau modul suara tidak ada */
+function hide(){warpFx('stop');skyReset();try{if(typeof TELESCOPE!=='undefined')TELESCOPE.dive=0;}catch(eD){}if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
 function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}runCover();state='idle';env=0;hide();}
 function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);}}
 function startExit(now){
   if(state!=='travel')return;
-  S.r0=S.r;S.rate0=S.rate;S.e0=env;S.tx=now;S.u=0;state='exit';kick();
+  S.r0=S.r;S.rate0=S.rate;S.e0=env;S.tx=now;S.u=0;state='exit';kick();warpFx('flash');
 }
 function startClose(now,ms){
   if(state==='close'||state==='idle')return;
@@ -217,6 +218,7 @@ function go(dest,pos,R,onCover){
   dens=1;env=0;state='enter';
   if(carry){try{TELESCOPE.dive=1;}catch(eT){}}   /* teleskop digambar di kanvas ini selama transisi (canvas #sky melewatinya) */
   show();if(cv)cv.style.zIndex='13';kick();   /* kanvas di ATAS sky (penutup layar) */
+  try{if(typeof UIS!=='undefined'&&UIS.warpBegin)UIS.warpBegin(S.A,S.chT);}catch(eU){}
   return true;
 }
 function engageDive(now){
@@ -556,6 +558,7 @@ function tick(now){
   var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,eT;
   W=winW();H=winH();cvr=cover();
   last=now;ema+=(dt-ema)*.08;
+  try{if(typeof UIS!=='undefined'&&UIS.warpUpd)UIS.warpUpd(state,env,S.rate);}catch(eW){}
   if(state==='enter'){
     q=now-S.t0;
     S.ch=sm(q/S.chT);env=Math.min(.5,q/Math.max(1,S.A)*.5);
@@ -570,7 +573,7 @@ function tick(now){
       if(q<T_OPEN)ck=skyCam(uu,ee);
       if(!S.cov){
         var cd=Math.max(Math.hypot(S.cx,S.cy),Math.hypot(W-S.cx,S.cy),Math.hypot(S.cx,H-S.cy),Math.hypot(W-S.cx,H-S.cy));
-        if(S.r>=cd*1.02||q>T_OPEN){S.cov=1;runCover();}   /* layar sudah tertutup: sektor asal boleh zoom-out di bawah (tak kelihatan), BH tujuan siap muncul dari ujung terowongan (arrive) */
+        if(S.r>=cd*1.02||q>T_OPEN){S.cov=1;runCover();warpFx('hit');}   /* layar sudah tertutup: sektor asal boleh zoom-out di bawah (tak kelihatan), BH tujuan siap muncul dari ujung terowongan (arrive) */
       }
       w=sm((q-TS())/(TT()-TS()));
       if(w>0){var tg=seekTarget(dt);S.cx=lerp(W*.5,tg[0],w);S.cy=lerp(H*.5,tg[1],w);}   /* tengah layar -> tujuan (BH overview / BH mini sektor tujuan) */
