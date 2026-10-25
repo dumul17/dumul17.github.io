@@ -38,7 +38,7 @@ var RIM_GLOW=.09;     /* kilau tipis di luar mulut portal mini (0 = tanpa kilau)
      0 .. T_OPEN      dinding terowongan tumbuh dari tengah lubang hitam sampai memenuhi layar
      0 .. T_MOVE      lubang hitam terowongan bergeser dari posisi BH mini ke tengah layar (kesan masuk terowongan)
      T_SEEK..T_TRAVEL lubang hitam meluncur dari tengah layar ke tujuan: BH overview (ke overview) / BH mini sektor tujuan (lompat)
-     T_TRAVEL..+T_EXIT dinding memudar dari tengah lubang hitam ke pinggir layar, lubang hitam yang pekat memudar jadi transparan
+     T_TRAVEL..+T_EXIT dinding memudar dari pinggir layar ke tengah (menyusut ke mulut portal tujuan, miring mengikuti cincin), lubang hitam yang pekat memudar jadi transparan
    Total = T_TRAVEL + T_EXIT. Underlying sektor (zoom-out, dan zoom-in untuk lompat) jalan di bawah terowongan; T_TRAVEL cukup panjang untuk keduanya. */
 /* Durasi lompatan (ms). T_DWELL = lama di dalam terowongan murni (bintang, teleskop melayang+miring), T_SEEKM = lubang hitam meluncur ke tujuan.
    Total dari lepas tahan = T_ENTER_TELE + T_OPEN + T_DWELL + T_SEEKM (+550 kalau lompat antar sektor) + T_EXIT. Kecilkan T_DWELL kalau kepanjangan. */
@@ -422,7 +422,8 @@ function drawFrame(dt,cx,cy,r,cvr){
   /* mulut mengikuti kemiringan cincin (elips, bukan lingkaran): kalau cincin miring (zoom-in dari overview) terowongan tidak meluber keluar cincin */
   var tkW=(S.ring&&small&&typeof ptWhTilt==='function'&&typeof ptTiltMat==='function')?ptWhTilt(r/cvr):0,tmW=null;
   if(tkW>.001){try{tmW=ptTiltMat(ptTiltAng(performance.now(),tkW));}catch(eTm){tmW=null;}}
-  var mouthXf=function(){g.translate(cx,cy);if(typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());if(tmW)g.transform(tmW[0],tmW[1],tmW[2],tmW[3],0,0);};
+  /* kanvas ini = koordinat LAYAR asli (tidak ikut #stage yang diputar), jadi TIDAK boleh rotate(upAng()) — itu bikin cincin/mulut miring balik ke sumbu portrait saat landscape */
+  var mouthXf=function(){g.translate(cx,cy);if(tmW)g.transform(tmW[0],tmW[1],tmW[2],tmW[3],0,0);};
   if(small){g.save();mouthXf();g.beginPath();g.arc(0,0,Math.max(1,r*1.06),0,6.283185307);g.restore();g.clip();}   /* batas kerja saja; tepi tampak asli dibentuk mask alpha di bawah, bukan potongan ini */
   g.fillStyle=BG;g.fillRect(0,0,W,H);
   g.imageSmoothingEnabled=true;
@@ -474,14 +475,24 @@ function drawFrame(dt,cx,cy,r,cvr){
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
   }
-  if(state==='exit'){   /* dinding terowongan memudar dari tengah lubang hitam ke pinggir layar: BH tujuan + isi layar muncul di bawahnya */
-    var re=Math.hypot(W,H)*1.1*sm((S.u-.08)/.92),ff=Math.max(36,re*.5);
-    g.globalCompositeOperation='destination-out';
-    gr=g.createRadialGradient(cx,cy,0,cx,cy,re+ff);
-    gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(Math.min(.98,re/(re+ff)),'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');
-    g.fillStyle=gr;g.fillRect(0,0,W,H);
+  if(state==='exit'){   /* dinding terowongan memudar dari PINGGIR layar ke tengah: batas dinding menyusut sampai seukuran mulut portal tujuan (miring mengikuti kemiringan cincin overview), lalu memudar habis */
+    var ux=S.u,wk=sm(ux/.78),wa=1-sm((ux-.74)/.26),Rm,tkE=0,tmE=null,re,fe=.3,BIGE=Math.hypot(W,H)*2;
+    try{
+      var kk=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
+      Rm=(!S.dest&&typeof PT3D!=='undefined'&&PT3D.ovR>2)?PT3D.ovR*kk*(typeof PT_IN==='number'?PT_IN:.745):S.rp*(typeof PT_IN==='number'?PT_IN:.745);
+      if(!S.dest&&typeof PT3D_CFG!=='undefined')tkE=(PT3D_CFG.tiltOv||0)*sm((ux-.25)/.5);   /* dinding makin miring seiring menyempit ke mulut portal */
+      if(tkE>.001)tmE=ptTiltMat(ptTiltAng(performance.now(),tkE));
+    }catch(eX){Rm=Math.min(W,H)*.06;}
+    if(!(Rm>2))Rm=Math.min(W,H)*.06;
+    re=lerp(Math.hypot(W,H)*1.1,Rm,wk);
+    g.globalCompositeOperation='destination-in';
+    g.save();g.translate(cx,cy);if(tmE)g.transform(tmE[0],tmE[1],tmE[2],tmE[3],0,0);
+    gr=g.createRadialGradient(0,0,0,0,0,Math.max(2,re));
+    gr.addColorStop(0,'rgba(0,0,0,'+wa.toFixed(3)+')');gr.addColorStop(1-fe,'rgba(0,0,0,'+wa.toFixed(3)+')');gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gr;g.fillRect(-BIGE,-BIGE,BIGE*2,BIGE*2);
+    g.restore();
     g.globalCompositeOperation='source-over';
-    holeDisc(cx,cy,Rh,1-sm(S.u));   /* lubang hitam yang tadinya pekat perlahan jadi transparan: kesan baru keluar dari terowongan */
+    holeDisc(cx,cy,Rh,(1-sm(ux))*wa);   /* lubang hitam ikut memudar */
   }
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
@@ -495,7 +506,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
   if(S.ring&&small&&typeof portal3dDraw==='function'){
     var ra=1-sm((r/cvr-.3)/.55);
-    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,ch:1,tilt:ptWhTilt(r/cvr)});}catch(eR){}}
+    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr)});}catch(eR){}}
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
   if(S.fl>.01){   /* kilat layar (di BAWAH teleskop supaya keluarnya dari portal tetap kelihatan) menjelang tiba di portal tujuan */
@@ -516,11 +527,11 @@ function drawFrame(dt,cx,cy,r,cvr){
   }else if(S.carry&&state==='exit'){
     /* keluar portal: HIDUNG duluan. Hidung mengarah ke arah terbang (portal -> posisi istirahat), bukan arah tetap; selama masih keluar hanya bagian di depan bidang portal yang digambar
        (hidung muncul dulu, badan lalu buritan menyusul), lalu belok mulus ke pose istirahat. Teleskop di atas kilat layar, alpha naik pelan supaya pergantian pose dari terowongan tak terlihat. */
-    var xe=clamp((S.u-.05)/.8,0,1),pu=sm(xe),b0=teleBase(),h0=S.hv||[cx,cy];
+    var xe=clamp((S.u-.4)/.6,0,1),pu=sm(xe),b0=teleBase(),h0=S.hv||[cx,cy];
     if(b0){
       var vx0=b0.x-cx,vy0=b0.y-cy,vl0=Math.hypot(vx0,vy0);
       if(vl0>6)S.xh=Math.atan2(vy0,vx0);else if(S.xh==null)S.xh=wrapPi(b0.ang+b0.rot);
-      var hd=S.xh,ddx=Math.cos(hd),ddy=Math.sin(hd),ex=lerp(cx,b0.x,pu),ey=lerp(cy,b0.y,pu),sE=lerp(.4,1,pu),aE=sm((S.u-.02)/.1),
+      var hd=S.xh,ddx=Math.cos(hd),ddy=Math.sin(hd),ex=lerp(cx,b0.x,pu),ey=lerp(cy,b0.y,pu),sE=lerp(.4,1,pu),aE=sm((S.u-.38)/.1),
           hold=clamp(TELE_CHASE.exitHold,0,.9),pk=1-sm(clamp((pu-hold)/Math.max(.05,1-hold),0,1)),
           Lh=b0.sc*sE*40,clip=(pu<1&&pu*vl0<Lh*1.4)?{x:cx,y:cy,dx:ddx,dy:ddy}:null;
       if(chase3d()){

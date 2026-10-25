@@ -885,11 +885,11 @@ function frame(now){
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     pmk('portals');
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
+    try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* seluruh orbit asteroid (separuh depan juga) di BELAKANG planet: digambar sebelum planet3dDraw, jadi permukaan planet menutupinya */
     try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
     try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
     pmk('planet');
-    try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: sekarang di ATAS planet (dulu di depan BH, di bawah drone/teleskop) */
     pmk('astFront');
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}
@@ -1428,6 +1428,9 @@ var SN_COOLDOWN={};
   function pickNext(from,dir,scope){   /* scope = 'sfx'|'bgm': hanya cari di daftar itu (repeat all otomatis nggak nyebrang Stellar Signals ↔ BGM) */
     var L=playableList();
     if(scope)L=L.filter(function(i){return tracks[i].type===scope;});
+    /* Sektor sumber lagi TX-lock: SFX lain di sektor itu nggak bisa diputar (playSfx -> toast 'signal locked' -> rantai repeat all / next mati).
+       Lewati bintang yang terkunci; track asal (from) tetap boleh jadi kandidat supaya list nggak pernah kosong. */
+    try{if(typeof sfxBlocked==='function')L=L.filter(function(i){var t=tracks[i];return i===from||!(t&&t.type==='sfx'&&t.key&&sfxBlocked(t.key));});}catch(eLk){}
     if(!L.length)return -1;
     if(shuffleOn){
       if(L.length===1)return L[0];

@@ -40,7 +40,7 @@ var PT3D_CFG={
   /* P4: kemiringan cincin overview, mengikuti gambar referensi (cincin dilihat 3/4: elips agak tegak, miring ke kanan). Radian. Urutan rotasi: yaw (y) -> pitch (x) -> roll (z, di bidang layar).
      y = seberapa 'menyamping' (0 = hadap penuh; .9 = elips lebar ~62%). x = condong ke atas/bawah. z = roll (negatif = puncak cincin condong ke kanan). Window menu sektor + wormhole TIDAK memakai ini (datar). */
   tilt:{x:.2,y:.9,z:-.22},
-  spin:.2,        /* kecepatan putar plat di bidang cincin, rad/dtk (.05 = ±2 menit/putaran, .2 = ±31 dtk, .6 = ±10 dtk). Berlaku di semua cincin (overview, menu sektor, wormhole); 0 = diam */
+  spin:.08,        /* kecepatan putar plat di bidang cincin, rad/dtk (.05 = ±2 menit/putaran, .2 = ±31 dtk, .6 = ±10 dtk). Berlaku di semua cincin (overview, menu sektor, wormhole); 0 = diam */
   tiltOv:1,       /* 0..1 pengali kemiringan di overview (0 = datar seperti dulu) */
   /* P4: orbit portal overview = orbit biasa (elips penuh, tanpa terbit/tenggelam): sumbu panjang sejajar kemiringan horizon planet (17-planet3d.js), pusat di home BH.
      Selama di-drag, orbit berhenti (portal ikut jari) lalu springback seperti dulu. reduce motion = portal diam di home. */
@@ -48,11 +48,11 @@ var PT3D_CFG={
     ax:.30,        /* setengah sumbu panjang terhadap lebar layar (dijepit supaya cincin tetap di dalam layar) */
     ay:.085,       /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
     per:90,        /* detik per satu putaran orbit (dulu 26). Pelan: gaya orbit drone di atmosfer (08-tx-drone.js) tapi jauh lebih lambat */
-    depth:.10,     /* cincin sedikit lebih besar di sisi dekat (bawah elips) dan lebih kecil di sisi jauh (atas), +-sekian x radius. 0 = ukuran tetap */
-    bob:5,         /* naik-turun ringan (px CSS), seperti drone. 0 = mati */
+    depth:.05,     /* cincin sedikit lebih besar di sisi dekat (bawah elips) dan lebih kecil di sisi jauh (atas), +-sekian x radius. 0 = ukuran tetap */
+    bob:1.5,         /* naik-turun ringan (px CSS), seperti drone. 0 = mati */
     counter:1,     /* 1 = arah orbit MELAWAN rotasi permukaan planet (PL3D_CFG.live.rot), 0 = selalu searah jarum jam */
     bet:1,         /* pengali kemiringan sumbu terhadap tangen limb (1 = sejajar horizon; >1 lebih curam) */
-    gap:1.1        /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
+    gap:.5        /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
   }
 };
 try{
@@ -207,7 +207,7 @@ function ptPlaying(){return !!(typeof AV_ON!=='undefined'&&AV_ON&&typeof activeS
 /* P4: sudut kemiringan [pitch,yaw,roll] + goyangan kecil (potato/reduce tanpa goyang). tk = 0..1 */
 function ptTiltAng(now,tk){
   var T=PT3D_CFG.tilt,t=now*.001,w=(typeof reduce!=='undefined'&&reduce)?0:1;
-  return [tk*(T.x+w*.04*Math.sin(t*.43)),tk*(T.y+w*.06*Math.sin(t*.31+1)),tk*T.z];
+  return [tk*(T.x+w*.015*Math.sin(t*.43)),tk*(T.y+w*.02*Math.sin(t*.31+1)),tk*T.z];
 }
 /* matriks affine 2D (a,b,c,d untuk g.transform) yang sama dengan proyeksi ortografis kemiringan 3D di atas, supaya mulut/petir/percikan (digambar 2D di bidang cincin) ikut miring. Sudah dicek sama dengan THREE.Euler 'ZXY'. */
 function ptTiltMat(an){
