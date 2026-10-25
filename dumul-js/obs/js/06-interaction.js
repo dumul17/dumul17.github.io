@@ -1135,6 +1135,7 @@ function teleGreetHide(){
 }
 function tgShow(msg){
   var el=TG.el;if(!el||!TELE_CFG.bubble)return;
+  try{UIS.pop('tele');}catch(eUP){}   /* bunyi bubble teleskop (bubble mati = tidak sampai sini = tanpa bunyi) */
   clearTimeout(el._t);clearTimeout(el._type);
   var short=msg.length<=24,txt=short?msg:teleWrapLines(msg,touchMode?24:28);
   el.classList.toggle('tele-short',short);

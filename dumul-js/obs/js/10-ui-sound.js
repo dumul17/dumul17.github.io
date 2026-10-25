@@ -120,12 +120,13 @@ var UIS=(function(){
   /* ---- pop: bunyi muncul toast / popup / sheet (satu timbre dgn tap & chime; debounce per jenis) ---- */
   var popLast={};
   function pop(kind){
-    var n=performance.now(),gap=kind==='toast'||kind==='tip'?260:120;
+    var n=performance.now(),gap=kind==='toast'||kind==='tip'||kind==='tele'?260:120;
     if(n-(popLast[kind]||0)<gap)return;popLast[kind]=n;
     var c=ctx();if(!c||!vol()||document.hidden)return;
     var t=c.currentTime,src,bp,g;
     if(kind==='toast'){tone(c,t,880,1180,.09,.05,'triangle');return;}
     if(kind==='tip'){tone(c,t,660,780,.14,.035,'sine');return;}
+    if(kind==='tele'){tone(c,t,780,1040,.09,.045,'sine');tone(c,t+.07,1170,1170,.12,.03,'sine');return;}   /* bubble teleskop muncul: bloop dua nada lembut */
     if(kind==='frag'){ /* fragment / last signal: dua nada naik pentatonik + harmonik tipis */
       var a=261.63*Math.pow(2,PENTA[2]/12)*2,b=261.63*Math.pow(2,PENTA[4]/12)*2;
       tone(c,t,a,a,.35,.06);tone(c,t+.14,b,b,.5,.06);tone(c,t+.14,b*2,b*2,.3,.02);return;
@@ -218,10 +219,10 @@ var UIS=(function(){
     }
   }
 
-  /* delegasi tap: ikon HUD, owl (+ isi panelnya), music, portal, tombol fokus cam, panel exit teleskop, kartu pilihan teleskop, panel tuning, kontrol music player (prev/next/shuffle/repeat/mute/visualizer/accordion), tombol CAM (band/lines/log/game), katalog + log rasi, tutup fragment, capsule boot (tap teleskop sendiri: UIS.tap() manual di 06) */
+  /* delegasi tap: ikon HUD, owl (+ isi panelnya), music, portal, tombol fokus cam, seluruh panel chat exit teleskop (tombol + tap lanjut/skip teks), kartu pilihan teleskop, panel tuning, kontrol music player (prev/next/shuffle/repeat/mute/visualizer/accordion), tombol CAM (band/lines/log/game), katalog + log rasi, tutup fragment, capsule boot (tap teleskop sendiri: UIS.tap() manual di 06) */
   document.addEventListener('pointerdown',function(e){
     var t=e.target;
-    if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#music-close,#exit-panel button,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,.owl-chip,.owl-tab,#lis-ask button,#bh-panel button,#owl-perf-save,#owl-perf-reset,#mode-silence,#mp-av-toggle,.mp-grp-head,.mp-ctrl,#cam-band button,#cg-btn,.ci-catbtn,#cam-cat button,#cam-ach button,#sf-close,.boot-cap'))tap();
+    if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#music-close,#exit-panel,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,.owl-chip,.owl-tab,#lis-ask button,#bh-panel button,#owl-perf-save,#owl-perf-reset,#mode-silence,#mp-av-toggle,.mp-grp-head,.mp-ctrl,#cam-band button,#cg-btn,.ci-catbtn,#cam-cat button,#cam-ach button,#sf-close,.boot-cap,.mp-play,.mp-track,.cc-row:not([disabled]),.cc-x,.cc-back'))tap();
   },true);
 
   return {noise:noise,radar:radar,pop:pop,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul,warpBegin:warpBegin,warpUpd:warpUpd,warpFx:warpFx};
