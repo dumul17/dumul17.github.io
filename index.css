@@ -1429,12 +1429,6 @@ body.tesseract-running #live-count{visibility:hidden}
 #cam-ach .af-meta{display:flex;flex-wrap:wrap;gap:2px 8px;margin-top:5px;font:500 7px/1.3 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(184,224,238,.5)}
 #cam-ach .af-lock .af-tag{color:rgba(184,224,238,.42)}
 #cam-ach .af-lock .af-body{font-style:normal;font:500 8px/1.3 'Courier New',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(184,224,238,.38)}
-/* Kunci SFX sektor sumber: TX dock di sektor ini -> bintang lain di grup ini terkunci sampai drone ditarik (02-sky-logic.js sfxLockInfo) */
-.mp-grp.mp-locked>.mp-grp-head{border-color:rgba(255,154,217,.38)}
-.mp-grp.mp-locked .mp-grp-n{color:#ff9ad9}
-.mp-track.mp-lockrow{opacity:.38;cursor:not-allowed}
-.mp-track.mp-linked{border-color:rgba(255,154,217,.4)}
-.mp-track.mp-linked .mp-num{color:#ff9ad9}
 
 /* ===== Seragam v2 — kotak melayang pakai kulit ringan yang sama dengan panel owl / musik =====
    Kulitnya (border tipis, gradien gelap, bayangan jatuh tipis) tetap diatur dari variabel --pn-* di blok "Panel seragam".
