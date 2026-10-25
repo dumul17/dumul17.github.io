@@ -418,7 +418,7 @@ function dmNeuralDraw(g,W,H,net,t){
      4) Warna address bar browser ikut lagu (theme-color)
      5) Haptic bass (opt-in, Android) -->
 
-<script defer src="dumul.js?v=2"></script>
+<script defer src="dumul.js?v=3"></script>
 <script type="module" src="dumul-app.js?v=1"></script>
 <script>
 /* PWA: daftar service worker + lapor lagu yang didengar >50% biar disimpan buat revisit */
@@ -454,7 +454,7 @@ if ('serviceWorker' in navigator) {
 /* Offline archive — banner opt-in (gaya HUD observatory). Teks & angka bisa diubah di TXT / SIZE_MB. */
 (function () {
   if (!('serviceWorker' in navigator) || !('caches' in window)) return;
-  var SIZE_MB = 43;          /* perkiraan total ukuran semua lagu */
+  var SIZE_MB = 75;          /* perkiraan total ukuran semua lagu */
   var ASK_AGAIN_DAYS = 14;   /* "NOT NOW" -> tanya lagi setelah sekian hari */
   var KEY = 'ofl_choice';
   var TXT = {

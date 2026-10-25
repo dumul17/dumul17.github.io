@@ -16,8 +16,8 @@ Live: [dumul17.github.io](https://dumul17.github.io/)
 | **PWA / offline** | `manifest.json`, `icons/` | -- | `service-worker.js` | Installable app, offline shell, and opt-in offline audio archive |
 
 The Observatory is the entry point. The **DUMUL** portal sits around
-Orion's belt, while **Gargantua** can also swallow the page into the
-DUMUL transition.
+Orion's belt, and the transition into DUMUL runs through that belt
+(`beltEnter`).
 
 ------------------------------------------------------------------------
 
@@ -71,8 +71,8 @@ DUMUL transition.
     cross-fades the tint over ~4 seconds.
 -   While a BGM plays: more frequent (capped) shooting stars, a soft glow
     on the clickable SFX stars, a star-dust trail behind the cursor /
-    touch colored by the active BGM, and **BGM ducking** (BGM drops to
-    ~28% while a star SFX plays, then rises back after it ends)
+    touch colored by the active BGM, and **BGM pausing** (BGM is paused
+    while a star SFX plays; there is no ducking)
 -   **Constellation Lock (minigame):** the 16 stellar SFX start locked.
     Open Observation Mode → Constellation Camera, focus a constellation and
     tap its stars in order (a yellow ring marks the next one; the SFX star is
@@ -163,8 +163,7 @@ DUMUL transition.
     `prefers-reduced-motion` support. All BGM-reactive visuals switch off
     on hidden tabs, `prefers-reduced-motion`, `IS_POTATO`, Radio Silence,
     the swallow transition and the tesseract; audio keeps playing. BGM
-    ducking is skipped on `IS_POTATO` and where `audio.volume` is
-    read-only (iOS Safari), where the old "BGM pauses" behavior is kept
+    is always paused (never ducked) while a star SFX plays
 -   Mobile-safe pointer/touch handling, haptics where supported, and
     throttled analyser/hover work
 
@@ -206,7 +205,7 @@ Player features:
 
 ### Gargantua handoff
 
-Entering DUMUL through the Observatory's Gargantua swallow is a
+Entering DUMUL through Orion's belt is a
 continuous audio/visual transition:
 
 -   `index.html` uses `glitch-instrumental.opus` as the transition BGM

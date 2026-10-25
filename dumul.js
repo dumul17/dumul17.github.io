@@ -713,7 +713,7 @@ try{
   });
   audio.addEventListener('error',function(){
     clear();setPP(false);hideBar();
-    toast('Audio belum ditemukan: '+(current?srcOf(current):''));
+    toast('Audio not found: '+(current?srcOf(current):''));
     current=null;
   });
   ['loadedmetadata','durationchange','timeupdate','seeked'].forEach(function(ev){audio.addEventListener(ev,uiStep);});
