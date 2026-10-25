@@ -18,7 +18,15 @@ var DR3D_CFG={
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   size:28,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini */
   half:15,        /* setengah lebar kamera ortho (satuan model) */
-  resMin:128,resMax:160
+  resMin:128,resMax:160,
+  /* knob tuning (tab Drone di panel owl; 1 = perilaku asli, ini = DEFAULT): */
+  spin:1,         /* kecepatan putar jari-jari muka */
+  bob:1,          /* amplitudo melayang naik-turun + goyang badan */
+  lean:1,         /* seberapa condong ke depan saat terbang */
+  flame:1,        /* panjang api thruster */
+  turn:1,         /* kecepatan nolehnya badan ke arah terbang (>1 = lebih sigap) */
+  light:1,        /* pengali semua lampu (kunci hangat, rim, fill, hemisphere) */
+  halo:1          /* pengali halo lembut 2D di bawah drone */
 };
 try{
   if(/[?&]drone3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_drone3d')==='0')DR3D_CFG.on=false;
@@ -247,20 +255,20 @@ function dr3dUpdate(now,x,y,col){
   if(sp>.004){
     var tgt=Math.atan2(-vx,-vy);
     if(!DR3D.hasV){DR3D.yawA=tgt;DR3D.hasV=true;}
-    else DR3D.yawA+=dr3dAngDiff(DR3D.yawA,tgt)*(1-Math.exp(-Math.min(60,dt||16)/320));
+    else DR3D.yawA+=dr3dAngDiff(DR3D.yawA,tgt)*(1-Math.exp(-Math.min(60,dt||16)*Math.max(.05,DR3D_CFG.turn)/320));
   }
   DR3D.yaw.rotation.y=DR3D.yawA;
   /* condong tipis ke depan sesuai kecepatan, melayang pelan */
-  var ln=Math.min(.32,sp*6),tt=now*.001;
+  var ln=Math.min(.32,sp*6)*DR3D_CFG.lean,tt=now*.001,bb=DR3D_CFG.bob;
   var LD=Math.max(0,Math.min(1,DR3D.land||0)),fl=1-LD;   /* DR3D.land (diisi 08-tx-drone.js): 0 terbang ... 1 mendarat -> tidak melayang/condong */
-  DR3D.lean.rotation.x=(-ln+.025*Math.sin(tt*1.1))*fl;
-  DR3D.lean.rotation.z=.03*Math.sin(tt*.8+.8)*fl;
-  DR3D.mdl.position.y=.3*Math.sin(tt*1.2)*fl;
+  DR3D.lean.rotation.x=(-ln+.025*bb*Math.sin(tt*1.1))*fl;
+  DR3D.lean.rotation.z=.03*bb*Math.sin(tt*.8+.8)*fl;
+  DR3D.mdl.position.y=.3*bb*Math.sin(tt*1.2)*fl;
 
   /* jari-jari muka berputar pelan; api thruster berdenyut halus */
-  o.spin.rotation.z=now*.0004;
+  o.spin.rotation.z=(DR3D.spinA=(DR3D.spinA||0)+(DR3D.spinT?Math.min(100,now-DR3D.spinT):0)*.0004*DR3D_CFG.spin);DR3D.spinT=now;   /* diintegrasi: ganti kecepatan lewat slider tidak bikin jari-jari melompat */
   var i;
-  for(i=0;i<o.flames.length;i++)o.flames[i].scale.z=(.75+.18*Math.sin(now*.009+i*1.7)+ln*.8)*(1-.75*LD);
+  for(i=0;i<o.flames.length;i++)o.flames[i].scale.z=(.75+.18*Math.sin(now*.009+i*1.7)+ln*.8)*(1-.75*LD)*DR3D_CFG.flame;
 
   /* warna interlock (col = 'r,g,b') -> jari-jari muka */
   if(col!==DR3D.lastCol){
@@ -274,8 +282,9 @@ function dr3dUpdate(now,x,y,col){
   /* kunci hangat dari arah Gargantua */
   try{
     var bp=camBH(),dx=bp[0]-x,dy=bp[1]-y,d=Math.hypot(dx,dy)||1,fall=Math.max(.3,Math.min(1.25,1.25-d/(Math.max(W,H)*.9)));
-    o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*fall;
+    o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*fall*DR3D_CFG.light;
   }catch(eL){}
+  o.rim.intensity=1.1*DR3D_CFG.light;o.hemi.intensity=.45*DR3D_CFG.light;o.fill.intensity=.55*DR3D_CFG.light;
   r.render(sc,DR3D.cam);
 }
 
@@ -291,8 +300,9 @@ function drone3dDraw(g,x,y,col,a,now,sc){
     var S=DR3D_CFG.size*(sc||1);
     g.save();
     /* halo lembut di bawah (sama seperti 2D) supaya drone gelap tetap kebaca di langit hitam */
-    g.fillStyle='rgba('+col+','+(.10*a)+')';g.beginPath();g.arc(x,y,S*.30,0,6.283);g.fill();
-    g.fillStyle='rgba('+col+','+(.14*a)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();
+    var hk=DR3D_CFG.halo;
+    if(hk>0.001){g.fillStyle='rgba('+col+','+Math.min(1,.10*a*hk)+')';g.beginPath();g.arc(x,y,S*.30,0,6.283);g.fill();
+    g.fillStyle='rgba('+col+','+Math.min(1,.14*a*hk)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();}
     g.globalAlpha=a>1?1:(a<0?0:a);
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
     g.drawImage(DR3D.r.domElement,x-S/2,y-S/2,S,S);

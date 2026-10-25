@@ -1393,6 +1393,15 @@ function nebBase(EW,EH,ds){
    A = kuat gambar, zf/pf = zoom/parallax (sama dgn plateDeep: .55 / .14). Matikan: ?mw=0 atau localStorage dumul_mw=0. ?v= di src HARUS sama dengan SHELL service-worker. */
 var MW={on:!IS_POTATO,src:'dumul-js/obs/img/milky-way.webp?v=3',A:1,scale:1,vx:2.5,mirror:false,zf:.55,pf:.14,img:null,off:0,t:0,w:-1,f:0};
 try{var _mq=(location.search.match(/[?&]mw=(\w+)/)||[])[1]||localStorage.getItem('dumul_mw')||'';if(_mq==='0')MW.on=false;}catch(eMW){}
+/* Tuning Milky Way overview (tab Sky di panel owl): angka di literal MW di atas = DEFAULT (MW_DEF); hasil Save masuk localStorage.dumul_mw_cfg dan dimuat di sini. */
+var MW_DEF={A:MW.A,scale:MW.scale,vx:MW.vx,zf:MW.zf,pf:MW.pf,mirror:MW.mirror?1:0};
+var MW_RNG={A:[0,1],scale:[.6,2.5],vx:[-12,12],zf:[0,1],pf:[0,.5]};
+function mwTuneSet(k,v){
+  if(k==='mirror'){MW.mirror=!!(+v);return;}
+  var r=MW_RNG[k];v=+v;if(!isFinite(v))v=MW_DEF[k];MW[k]=Math.max(r[0],Math.min(r[1],v));
+}
+try{var _mc=JSON.parse(localStorage.getItem('dumul_mw_cfg')||'null');if(_mc&&typeof _mc==='object')for(var _mk in MW_DEF)if(typeof _mc[_mk]==='number')mwTuneSet(_mk,_mc[_mk]);}catch(eMC){}
+function mwReady(){return !!(MW.on&&MW.img&&MW.img._ok);}   /* Milky Way benar-benar tampil di overview (kalau tidak, overview pakai nebula lama -> slider lama dipakai) */
 /* bobot efektif 0..1 (overview x fade-in setelah gambar siap); 0 = jalur lama utuh */
 function mwAlpha(now){
   if(!MW.on)return 0;
@@ -1446,7 +1455,7 @@ function nebOv(){
 /* ---- Tuning langit (panel tab "Langit", tombol 🎚️): nilai disimpan di localStorage.dumul_sky_cfg ----
    HAZE/BAND/DRIFT = kabut lama (lihat atas), A_OV = kuat nebula, THICK = tebal halo blob (0..1 -> NEB.MASK[0] 18..2; default .5 = 10),
    VIG = vignette tepi. */
-var NEB_TUNE={HAZE:{min:0,max:1,def:0},BAND:{min:0,max:1,def:0},DRIFT:{min:0,max:1,def:0},A_OV:{min:0,max:1,def:1},THICK:{min:0,max:1,def:.5},VIG:{min:0,max:2,def:1},HALO:{min:0,max:1,def:.55}};
+var NEB_TUNE={HAZE:{min:0,max:1,def:0},BAND:{min:0,max:1,def:0},DRIFT:{min:0,max:1,def:0},A_OV:{min:0,max:1,def:1},THICK:{min:0,max:1,def:.5},VIG:{min:0,max:2,def:1}};
 function nebTuneApply(k,v){
   var t=NEB_TUNE[k];v=+v;if(!(v===v))v=t.def;v=Math.max(t.min,Math.min(t.max,v));
   NEB[k]=v;if(k==='THICK')NEB.MASK=[18-16*v,80];

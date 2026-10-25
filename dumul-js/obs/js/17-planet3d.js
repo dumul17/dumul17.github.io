@@ -48,6 +48,10 @@ var PL3D_CFG={
   zoomK:.12,      /* planet membesar cuma .12x dari skyZoom (diklem di zoom 4; di atas itu planet keluar layar) */
   bhSink:.5,      /* BH mini boleh terbenam di balik limb sedalam sekian x radiusnya (0 = tidak boleh menyentuh limb) */
   teleSink:.35,   /* teleskop: idem bhSink (planetObjClamp). Radius yang dipakai = .7 x radius hit teleskop (04-render.js). 0 = tidak boleh menyentuh limb */
+  /* knob tuning tambahan (tab Planet di panel owl; angka ini = DEFAULT): */
+  atmK:1,         /* pengali opasitas atmosfer/glow limb (palette tetap per sektor) */
+  fallK:1,        /* pengali jangkauan cahaya BH/portal di tanah (>1 = cahaya sampai lebih jauh) */
+  ovDy:0,         /* geser horizon OVERVIEW (pecahan tinggi layar; + = turun). Sektor tidak terpengaruh */
   palFps:20,      /* selama palette bergeser (crossfade sektor), render ulang sampai segini per detik supaya fade mulus; di luar itu pakai fps */
   pal:null        /* palette HIDUP (hasil blend overview + sektor); diisi di bawah, jangan diedit */
 };
@@ -78,7 +82,8 @@ function pl3dPalOf(s){   /* palette sebuah sektor: s.planet kalau lengkap, kalau
 function pl3dGeoOf(s){
   var ov=PL3D_CFG.ov,p=(s&&s.planet)||{},hasH=p.hL!=null&&p.hR!=null,hL=hasH?p.hL:ov.hL,hR=hasH?p.hR:ov.hR,sd=(p.seed&&p.seed.length>=2)?p.seed:ov.seed,
       hLL=p.hLLand!=null?p.hLLand:(hasH?hL+(1-hL)*.4:ov.hLLand),hRL=p.hRLand!=null?p.hRLand:(hasH?hR+(1-hR)*.4:ov.hRLand);
-  return {hL:hL,hR:hR,hLL:hLL,hRL:hRL,rot:p.rot!=null?p.rot:ov.rot,sx:sd[0]|0,sy:sd[1]|0};
+  var od=s?0:(PL3D_CFG.ovDy||0);   /* ovDy: cuma overview */
+  return {hL:hL+od,hR:hR+od,hLL:hLL+od,hRL:hRL+od,rot:p.rot!=null?p.rot:ov.rot,sx:sd[0]|0,sy:sd[1]|0};
 }
 /* batas atas horizon tertinggi di antara SEMUA profil (ov + sektor), supaya ukuran strip tetap waktu geometri di-crossfade */
 function pl3dTopFrac(land){
@@ -412,7 +417,7 @@ function pl3dResize(){
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
   PL3D.cv2.width=rw;PL3D.cv2.height=rh;
   PL3D.fb=null;
-  if(PL3D.r){PL3D.r.setSize(rw,rh,false);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9;}
+  if(PL3D.r){PL3D.r.setSize(rw,rh,false);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
 }
 
 /* titik lampu (ruang layar tegak): overview = portal yang sedang mengorbit (P4; kalau di balik limb, lampunya di balik planet jadi cuma pinggir limb yang menyala), sektor = BH mini */
@@ -428,7 +433,7 @@ function pl3dUniforms(now){
   U.uSize.value.set(PW,gm.stripH);
   U.uC.value.set(gm.cx,PH-gm.cy+gm.bo);                               /* ruang strip: y ke atas, 0 = dasar layar */
   U.uR.value=gm.R;
-  U.uFx.value=100/PL3D_CFG.cell;
+  U.uFx.value=100/PL3D_CFG.cell;U.uPer.value=PL3D_CFG.persp;U.uRock.value=PL3D_CFG.rockD;U.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;
   U.uPhi0.value=Math.atan2(Math.sqrt(Math.max(0,gm.R*gm.R-(PW*.5-gm.cx)*(PW*.5-gm.cx))),PW*.5-gm.cx);   /* arah titik horizon di tengah layar = titik hilang perspektif */
   U.uRot.value=pl3dPhase(now)/gm.R;
   U.uSeed.value.set(PL3D_CFG.live.sx,PL3D_CFG.live.sy);
@@ -437,7 +442,7 @@ function pl3dUniforms(now){
   PL3D.bo=gm.bo;PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;   /* parallax/zoom yang baru dirender: selisihnya ke posisi sekarang digeser saat drawImage */
   pl3dPalUpdate();var P=PL3D_CFG.pal;   /* palette hidup (crossfade sektor) */
   U.uLo.value.set(P.lo[0],P.lo[1],P.lo[2]);U.uMid.value.set(P.mid[0],P.mid[1],P.mid[2]);U.uHi.value.set(P.hi[0],P.hi[1],P.hi[2]);
-  U.uAtm.value.set(P.atm[0],P.atm[1],P.atm[2]);U.uAtmA.value=P.atmA;
+  U.uAtm.value.set(P.atm[0],P.atm[1],P.atm[2]);U.uAtmA.value=P.atmA*PL3D_CFG.atmK;
   pl3dPalSnap();
   return gm;
 }

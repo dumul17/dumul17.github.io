@@ -279,8 +279,9 @@ function drawSectorOverview(now,age){
    Yang belum aktif = netral (idle), tanpa teks. Level sektor (txComp, 02-sky-logic.js): 0 netral · 1 kuning (drone di-summon, s.drn) · 2 pink (drone aktif/docking). */
 var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai garis/drone/cincin di 08-tx-drone.js */
 /* F6: drawInterlock + IL_DOT (◉◉ di bawah ikon sektor overview) dihapus; window menu sektor menampilkan statusnya sendiri lewat txInterlock (16-sector-menu.js). IL_COL tetap dipakai 08-tx-drone.js. */
-/* ---------- panel tuning: 1 tombol (#mode-bhset), 2 jendela/tab ----------
-   GARGANTUA = size / strength / bloom / speed, LANGIT = toggle asteroid (overview + di dalam sektor) + kabut, nebula, vignette, halo portal (baris ini hanya di overview). Save/Reset berlaku untuk tab yang aktif. */
+/* ---------- panel tuning (di panel owl > Settings): sub tab = ICON, semua halaman satu ukuran (isi panjang di-scroll di dalam) ----------
+   GARGANTUA = BH mini sektor (size / strength / bloom / speed) · SKY = overview: Milky Way (kekuatan, skala, geser, ikut zoom, parallax, cermin; slider nebula lama cuma muncul kalau Milky Way tidak aktif) / sektor: nebula bertint
+   ASTEROID · TELE · PLANET / DRONE / PORTAL (3 tab terakhir dibuat 18-tune3d.js dari daftar knob CFG-nya, T3D). Save/Reset berlaku untuk tab yang aktif. */
 (function bhTune(){
   var panel=document.getElementById('bh-panel'),btn=document.getElementById('mode-bhset');
   if(!panel)return; /* mode-bhset removed — panel lives in owl Tune tab */
@@ -303,10 +304,10 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   }
   /* ---- tab Langit ---- */
   function skyStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg')||'null');}catch(e){}var r={};SKYK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEB_TUNE[k].def;});return r;}
-  function skyOv(){return body.classList.contains('sect-ov')&&NEB.on;}   /* baris kabut/nebula/vinyet: cuma overview (di sektor plate ini diredam + ditimpa nebula bertint, jadi slider-nya nggak terasa) */
+  function skyMw(){return body.classList.contains('sect-ov')&&mwOn()&&t3('mw');}   /* overview + Milky Way aktif -> slider Milky Way (T3D 'mw') */
+  function skyOv(){return body.classList.contains('sect-ov')&&NEB.on&&!mwOn();}   /* slider nebula/kabut/vinyet LAMA: cuma kalau Milky Way tidak aktif (potato, ?mw=0, gambar gagal); selain itu plateDeep di-fade keluar dan slider ini tidak terasa */   /* baris kabut/nebula/vinyet: cuma overview (di sektor plate ini diredam + ditimpa nebula bertint, jadi slider-nya nggak terasa) */
   function skySect(){return body.classList.contains('sect-in')&&NEB.on;}   /* baris langit sektor: A_SEC/SDIM/SPREAD/ZF, disimpan terpisah (dumul_sky_cfg_s) */
   function secStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg_s')||'null');}catch(e){}var r={};SECK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEBS_TUNE[k].def;});return r;}
-  function skyPortals(){return body.classList.contains('sect-ov')&&NEB.on;}   /* halo portal: portal cuma ada di overview */
   function astStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null');}catch(e){}return astNorm(o);}
   function astFmt(k,v){return k==='n'?String(v):v.toFixed(2)+'\u00d7';}
   function paintAst(){
@@ -342,31 +343,36 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   }
   /* ---- umum ---- */
   function paint(){
-    if(sub)sub.textContent=cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
+    if(sub)sub.textContent=cur==='pl'?tx('tune.sub.pl','Planet // Tune'):cur==='dr'?tx('tune.sub.dr','Drone // Tune'):cur==='pt'?tx('tune.sub.pt','Portal // Tune'):cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
     paintBH();paintSky();paintAst();paintTele();
     var d=false,st;
-    if(cur==='bh'){st=stored();allKeys.forEach(function(k){if(Math.abs(st[k]-BHU[k])>.004)d=true;});}
+    if(typeof T3D!=='undefined'){if(T3D.has(cur)&&t3(cur))T3D.paint(cur);if(skyMw())T3D.paint('mw');}
+    if(cur==='pl'||cur==='dr'||cur==='pt')d=t3(cur)&&T3D.dirty(cur);
+    else if(cur==='sky'&&skyMw())d=T3D.dirty('mw');
+    else if(cur==='bh'){st=stored();allKeys.forEach(function(k){if(Math.abs(st[k]-BHU[k])>.004)d=true;});}
     else if(cur==='ast')d=astDirty();
     else if(cur==='tele')d=teleDirty();
     else if(skyOv()){st=skyStored();SKYK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     else if(skySect()){st=secStored();SECK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     if(bSave)bSave.classList.toggle('dirty',d);
   }
-  function avail(){var c=body.classList;return{bh:c.contains('sect-in'),sky:NEB.on&&(c.contains('sect-ov')||c.contains('sect-in')),ast:c.contains('sect-ov')||c.contains('sect-in'),tele:c.contains('sect-ov')||c.contains('sect-in')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
+  function t3(id){return typeof T3D!=='undefined'&&T3D.ok(id);}
+  function mwOn(){return typeof mwReady==='function'&&mwReady();}   /* overview memakai Milky Way (bukan nebula lama) */
+  function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:any&&t3('dr'),pt:any&&t3('pt')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
   function refresh(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
-    if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':(a.ast?'ast':cur));
+    if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':(a.ast?'ast':(a.tele?'tele':cur)));
     tabs.forEach(function(tb){var on=tb.getAttribute('data-tab')===cur;tb.classList.toggle('on',on);tb.setAttribute('aria-selected',on?'true':'false');});
     Object.keys(pages).forEach(function(id){pages[id].hidden=(id!==cur);});
-    var ov=skyOv(),ovp=skyPortals();[].slice.call(panel.querySelectorAll('[data-ov]')).forEach(function(el){el.hidden=!ov;});
-    [].slice.call(panel.querySelectorAll('[data-ovo]')).forEach(function(el){el.hidden=!ovp;});
+    var ov=skyOv();[].slice.call(panel.querySelectorAll('[data-ov]')).forEach(function(el){el.hidden=!ov;});
+    var mwb=document.getElementById('t3-mw');if(mwb)mwb.hidden=!skyMw();
     var sc=skySect();[].slice.call(panel.querySelectorAll('[data-sc]')).forEach(function(el){el.hidden=!sc;});   /* baris khusus overview (halo portal) */
-    panel.classList.toggle('empty',!(a.bh||a.sky||a.ast||a.tele));   /* belum ada yang bisa di-tune (mis. saat boot): tampilkan keterangan, sembunyikan tab/slider */
+    panel.classList.toggle('empty',!(a.bh||a.sky||a.ast||a.tele||a.pl||a.dr||a.pt));   /* belum ada yang bisa di-tune (mis. saat boot): tampilkan keterangan, sembunyikan tab/slider */
     paint();
   }
   function open(on){
-    var a=avail();on=!!on&&(a.bh||a.sky||a.ast);
+    var a=avail();on=!!on&&(a.bh||a.sky||a.ast||a.tele||a.pl||a.dr||a.pt);
     panel.classList.toggle('on',on);panel.setAttribute('aria-hidden',on?'false':'true');
     if(btn)btn.classList.toggle('on',on);if(btn)btn.setAttribute('aria-expanded',on?'true':'false');
     if(on)refresh();
@@ -406,6 +412,11 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   });
   if(bSave)bSave.addEventListener('click',function(e){
     e.stopPropagation();
+    if(cur==='pl'||cur==='dr'||cur==='pt'){
+      if(t3(cur))T3D.save(cur);   /* T3D sendiri yang menulis localStorage + toast */
+      paint();haptic(10);return;
+    }
+    if(cur==='sky'&&skyMw()){T3D.save('mw');paint();haptic(10);return;}
     if(cur==='tele'){
       try{localStorage.setItem(TELE_CFG_KEY,JSON.stringify(TELE_CFG));}catch(er){}
     }else if(cur==='ast'){
@@ -421,6 +432,8 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   });
   if(bReset)bReset.addEventListener('click',function(e){
     e.stopPropagation();
+    if(cur==='pl'||cur==='dr'||cur==='pt'){if(t3(cur))T3D.reset(cur);paint();haptic(8);return;}
+    if(cur==='sky'&&skyMw()){T3D.reset('mw');paint();haptic(8);return;}
     if(cur==='tele'){
       var dc=teleCfgDef();Object.keys(dc).forEach(function(k){TELE_CFG[k]=dc[k];});teleLedSet(dc.led);
       try{localStorage.removeItem(TELE_CFG_KEY);}catch(er){}
@@ -464,15 +477,15 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
       owl.classList.add('owl-scrub');
       if(back)back.classList.add('owl-scrub-bg');
     }
-    panel.querySelectorAll('input.bp-range').forEach(function(inp){
-      inp.addEventListener('pointerdown',function(e){
-        var row=inp.closest('.bp-row');if(row)start(row);
-      });
-      inp.addEventListener('pointerup',end);
-      inp.addEventListener('pointercancel',end);
-      inp.addEventListener('change',end);
-      /* touch: kadang pointerup ke document */
-    });
+    /* delegasi: slider yang dibuat belakangan (T3D: planet / drone / portal / milky way) ikut dapat scrub */
+    panel.addEventListener('pointerdown',function(e){
+      var inp=e.target&&e.target.closest&&e.target.closest('input.bp-range');
+      if(!inp)return;
+      var row=inp.closest('.bp-row');if(row)start(row);
+    },true);
+    panel.addEventListener('pointerup',end);
+    panel.addEventListener('pointercancel',end);
+    panel.addEventListener('change',end);
     document.addEventListener('pointerup',function(){if(active)end();});
     document.addEventListener('pointercancel',function(){if(active)end();});
   })();
