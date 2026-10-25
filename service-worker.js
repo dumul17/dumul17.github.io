@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v184'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v185'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -46,7 +46,7 @@ const SHELL = [
   'dumul-js/obs/js/13-scope3d.js?v=6',
   'dumul-js/obs/js/14-drone3d.js?v=7',
   'dumul-js/obs/js/15-portal3d.js?v=9',
-  'dumul-js/obs/js/16-sector-menu.js?v=2',
+  'dumul-js/obs/js/16-sector-menu.js?v=3',
   'dumul-js/obs/js/17-planet3d.js?v=6',
   'dumul-js/obs/js/18-tune3d.js?v=1',
   /* Three.js dimuat lazy oleh 12-ast3d.js (AST3D_CFG.lib), 13-scope3d.js, 14-drone3d.js (lib yang sama): path + ?v= harus sama persis. GLTFLoader.js sengaja TIDAK di sini (hanya dipakai kalau AST3D_CFG.glb terisi; kalau nanti diisi, tambahkan juga). */
