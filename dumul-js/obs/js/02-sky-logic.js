@@ -1059,7 +1059,7 @@ function astResize(){
 var BG=[],SS=[],PU=[],AST=[],GAL=[],nextSS=0,nextPU=0,bgW=0,bgH=0;
 /* Pre-baked asteroid rock sprites (shape is static; only transform changes per frame). */
 var AST_SPRITES=null,AST_SPRITE_R=24;
-var bgCanvas=null,bgCtx=null,bgDirty=true,HUD=null;
+var bgCanvas=null,bgCtx=null,bgDirty=true,bgEmpty=false,HUD=null;   /* bgEmpty: bgCanvas sengaja kosong (nebula gambar aktif) -> blit di 05-sector-ui.js dilewati */
 /* Grid RA/Dec equatorial: canvas terpisah, di-bake lazy saat cam ON (bukan di bgCanvas) */
 var gridCanvas=null,gridDPR=0,gridRot=0,gridW=0,gridH=0;
 /* Tactical HUD (LAT/LON/AZ/EL): fixed ke layar, nggak ikut geser/zoom canvas. Vektor kecil, murah. */
@@ -1358,7 +1358,7 @@ function txLongPressDrone(){
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
    Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'dumul-js/obs/img/nebula-portrait.webp?v=1',img:null,base:null,key:'',tint:{}};
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'dumul-js/obs/img/nebula.webp?v=1',img:null,base:null,key:'',tint:{}};
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
   var im=NEB.img;   /* satu gambar untuk portrait & landscape (cover-fit di bawah); yang berubah cuma staging-nya */
@@ -1385,7 +1385,7 @@ function nebBase(EW,EH,ds){
   NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;return c;
 }
 /* ---------- Milky Way overview (gambar, ROLLING mendatar) ----------
-   HANYA overview (SECT.on). Di dalam sektor tidak disentuh (plateDeep + nebula-portrait + bgCanvas jalan persis seperti dulu).
+   HANYA overview (SECT.on). Di dalam sektor tidak disentuh (plateDeep + nebula.webp jalan persis seperti dulu; bgCanvas kosong kalau nebula gambar aktif).
    Gambar (milky-way.webp) DIGULUNG pelan ke kanan (MW.vx px/dtk, negatif = ke kiri), tile berulang tanpa putus (lihat mwDraw). Di-composite 'lighter' di atas warna dasar ruang:
    latar hitam gambar = tidak menambah apa-apa, jadi tanpa topeng / getImageData. Overview: plateDeep (nebula lama) + bgCanvas (bintang kecil) di-fade keluar lewat bobot MW.w,
    transisi overview <-> sektor mulus (bobot disusul .06/frame, sama dengan SKYT). Gagal dimuat / IS_POTATO -> overview lama persis.
@@ -1619,14 +1619,15 @@ function bakeAstroPlates(){
   bgCtx=bgCanvas.getContext('2d');
   bgCtx.setTransform(DPR,0,0,DPR,M*DPR,M*DPR);
   var i,bb;
-  for(i=0;i<BG.length;i++){
+  bgEmpty=!!nb;   /* nebula.webp sudah membawa bintang latarnya sendiri: bintang latar prosedural (BG, ring margin, faint field, spike) TIDAK digambar. Rasi/cluster/bintang katalog digambar per frame di 04-render.js, tidak lewat bgCanvas. */
+  for(i=0;!bgEmpty&&i<BG.length;i++){
     bb=BG[i];
     bgCtx.fillStyle='rgba('+bb.c+','+bb.a+')';
     bgCtx.beginPath();bgCtx.arc(bb.x,bb.y,bb.r,0,6.283);bgCtx.fill();
   }
   /* margin ring: BG only covers the viewport, so top up the parallax margin with the same density */
   var nR=Math.round(BG.length*((EW*EH)/(W*H)-1)),ex,ey;
-  for(i=0;i<nR;i++){
+  for(i=0;!bgEmpty&&i<nR;i++){
     ex=rnd()*EW-M;ey=rnd()*EH-M;
     if(ex>=0&&ex<=W&&ey>=0&&ey<=H)continue;
     bgCtx.fillStyle='rgba(234,246,255,'+(.28+rnd()*.4).toFixed(2)+')';
@@ -1634,7 +1635,7 @@ function bakeAstroPlates(){
   }
   /* faint field: dim stars crowded toward the Milky-Way band (long-exposure depth) */
   var nF=IS_POTATO?50:Math.min(380,Math.round(W*H/2800)),tries=nF*4,cs=['190,225,255','255,224,190','234,246,255'],bd;
-  for(i=0;i<tries&&nF>0;i++){
+  for(i=0;!bgEmpty&&i<tries&&nF>0;i++){
     ex=rnd()*EW-M;ey=rnd()*EH-M;
     bd=-(ex-cx0)*Math.sin(BA)+(ey-cy0)*Math.cos(BA);
     if(rnd()>.22+.78*Math.exp(-(bd*bd)/(bt*bt*1.4)))continue;
@@ -1643,7 +1644,7 @@ function bakeAstroPlates(){
     bgCtx.beginPath();bgCtx.arc(ex,ey,.28+rnd()*.30,0,6.283);bgCtx.fill();
   }
   /* diffraction spikes + bloom on the brightest plate stars (skipped on potato) */
-  if(!IS_POTATO){
+  if(!IS_POTATO&&!bgEmpty){
     var sp=0,sx,sy,sl,sg,rgb;
     for(i=0;i<BG.length&&sp<6;i++){
       bb=BG[i];if(bb.r<1.4)continue;sp++;

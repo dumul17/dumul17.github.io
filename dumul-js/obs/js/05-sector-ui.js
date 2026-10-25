@@ -854,7 +854,7 @@ function frame(now){
       if(mwA>.01)mwDraw(now,mwA);
       sectDrawSky();   /* warna langit per sektor (data: SECTORS[].sky di sky-data.js) */
       if(mwK<1)g.globalAlpha=mwK;
-      if(mwK>.01)plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      if(mwK>.01&&!bgEmpty)plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
       g.globalAlpha=1;
       /* Grid RA/Dec: canvas terpisah, cuma di mode cam; param blit persis sama dgn bgCanvas */
       if(CAMERA_MODE){
