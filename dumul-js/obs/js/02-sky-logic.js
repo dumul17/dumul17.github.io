@@ -1171,46 +1171,15 @@ function txSet(s,role,key,auto){
   var o=TX.by[s.k],now=performance.now();
   if(role==='src'){TX.by[s.k]={on:1,key:key,t:(o&&o.t)||now};delete TX.recv[s.k];}
   else{TX.by[s.k]={on:1,key:key||'recv',recv:1,auto:auto?1:0,t:(o&&o.t)||now};TX.recv[s.k]=1;}
-  s.relay=true;mpLockSyncSafe();
+  s.relay=true;
   return true;
 }
 function txClear(s){
   if(!s||!s.k)return false;
   var had=!!TX.by[s.k];
-  delete TX.by[s.k];delete TX.recv[s.k];s.relay=false;mpLockSyncSafe();
+  delete TX.by[s.k];delete TX.recv[s.k];s.relay=false;
   return had;
 }
-/* ===== Kunci SFX sektor sumber =====
-   Selama TX dock di sektor sumber (bukan receiver), bintang SFX LAIN di sektor itu terkunci: tidak bisa dipilih dari kanvas (triggerSupernova)
-   maupun panel musik (playSfx dibungkus di bawah; baris panel diredupkan lewat mpLockSync di 05-sector-ui.js). Bintang yang tertaut tetap bisa
-   diputar / dijeda / diulang. Buka kunci = tahan drone lagi (lepas docking). Sektor lain & receiver tidak terkunci. */
-function mpLockSyncSafe(){try{if(typeof window.mpLockSync==='function')window.mpLockSync();}catch(e){}}
-function sfxKeySector(key){
-  var tr=(typeof TRIGGERS!=='undefined'&&key)?TRIGGERS[key]:null,i,rb;if(!tr)return null;
-  for(i=0;i<SECT.list.length;i++)if(SECT.list[i].ids.indexOf(tr.cons)>=0)return SECT.list[i];
-  rb=(typeof SKY!=='undefined'&&SKY.rasiBy)?SKY.rasiBy[tr.cons]:null;
-  if(rb)for(i=0;i<SECT.list.length;i++)if(SECT.list[i].k===rb.sector)return SECT.list[i];
-  return null;
-}
-function sfxLockInfo(){   /* {s,key} kalau ada sektor sumber yang terkunci, else null */
-  var s=txSrcSector(),o=s&&TX.by[s.k];
-  return (s&&o&&o.key&&o.key!=='recv')?{s:s,key:o.key}:null;
-}
-function sfxBlocked(key){
-  var L=sfxLockInfo();if(!L||!key||key===L.key)return false;
-  var ks=sfxKeySector(key);return !!ks&&ks===L.s;
-}
-function sfxLockedToast(){try{if(typeof showModeToast==='function')showModeToast(T('toast.tx.locked'),null,3200);}catch(e){}}
-(function(){   /* jalur panel musik / shuffle / next: bungkus playSfx (01-core.js) tanpa menyentuh file itu */
-  var base=window.playSfx;if(typeof base!=='function')return;
-  window.playSfx=function(a){
-    try{
-      var k=(a&&typeof keyFromAudio==='function')?keyFromAudio(a):null;
-      if(k&&a!==activeSfx&&sfxBlocked(k)){sfxLockedToast();return;}
-    }catch(eLk){}
-    return base.apply(this,arguments);
-  };
-})();
 function txDeploy(s,key){return !!key&&txSet(s,'src',key);}
 function txRecvSet(s,on){
   if(!s||!s.k)return false;

@@ -1130,16 +1130,6 @@ var SN_COOLDOWN={};
 
   var rows=[].slice.call(panel.querySelectorAll('.mp-track'));
   var trackNames=tracks.map(function(t){return t.name;});
-  /* Kunci SFX sektor sumber (sfxLockInfo di 02-sky-logic.js): grup sektor itu ditandai pink, baris selain bintang tertaut diredupkan. Dipanggil dari txSet/txClear. */
-  window.mpLockSync=function(){
-    var L=typeof sfxLockInfo==='function'?sfxLockInfo():null;
-    groups.forEach(function(g){g.classList.toggle('mp-locked',!!L&&g.getAttribute('data-sector')===L.s.k);});
-    rows.forEach(function(r,i){
-      var t=tracks[i],gp=r.closest&&r.closest('.mp-grp'),lk=!!(L&&t&&t.type==='sfx'&&gp&&gp.getAttribute('data-sector')===L.s.k);
-      r.classList.toggle('mp-lockrow',lk&&t.key!==L.key);r.classList.toggle('mp-linked',lk&&t.key===L.key);
-    });
-  };
-  window.mpLockSync();
   var activeIdx=SFX_N; /* default highlighted row: Constellation BGM */
   var specRAF=0;
   var nowTimer=0;
@@ -1446,9 +1436,6 @@ var SN_COOLDOWN={};
   function pickNext(from,dir,scope){   /* scope = 'sfx'|'bgm': hanya cari di daftar itu (repeat all otomatis nggak nyebrang Stellar Signals ↔ BGM) */
     var L=playableList();
     if(scope)L=L.filter(function(i){return tracks[i].type===scope;});
-    /* Sektor sumber lagi TX-lock: SFX lain di sektor itu nggak bisa diputar (playSfx -> toast 'signal locked' -> rantai repeat all / next mati).
-       Lewati bintang yang terkunci; track asal (from) tetap boleh jadi kandidat supaya list nggak pernah kosong. */
-    try{if(typeof sfxBlocked==='function')L=L.filter(function(i){var t=tracks[i];return i===from||!(t&&t.type==='sfx'&&t.key&&sfxBlocked(t.key));});}catch(eLk){}
     if(!L.length)return -1;
     if(shuffleOn){
       if(L.length===1)return L[0];
@@ -1710,7 +1697,6 @@ function triggerSupernova(key){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(SW)return;
   if(typeof lisBlock==='function'&&lisBlock('sig')){lisDenied('sig');return;}   /* Lost-in-Space */
-  if(typeof sfxBlocked==='function'&&sfxBlocked(key)){sfxLockedToast();return;}   /* sektor sumber terkunci selama TX dock */
   var tr=TRIGGERS[key],
       c=tr&&tr.cons==='pleiades'?PLEIADES:(tr&&cons(tr.cons)),
       s=tr&&c&&(tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star]);
