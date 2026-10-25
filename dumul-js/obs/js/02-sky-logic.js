@@ -1105,6 +1105,7 @@ var PLATE_DS_DEEP=1.5,PLATE_DS_DUST=2;
 /* Dust depth layers: 2 transparent plates baked ONCE at low res, drifting on sine paths with
    their own parallax speed. Per-frame cost = 2 drawImage; nothing is re-rendered. */
 var plateDust=[];
+var SKY_DRIFT=0;   /* kekuatan layer debu di sektor: 0 = langit sektor DIAM (planet yang bergerak), 1 = melayang pelan seperti dulu */
 function bakeDustLayers(M,EW,EH,hk){
   plateDust=[];
   if(IS_POTATO||hk===0)return; /* low-end devices (atau DRIFT=0): keep the single deep plate, no extra layers */
@@ -1382,6 +1383,52 @@ function nebBase(EW,EH,ds){
   vg2.addColorStop(0,'rgba(0,0,0,0)');vg2.addColorStop(.7,'rgba(0,0,0,'+(.15*NEB.VIG)+')');vg2.addColorStop(1,'rgba(0,0,0,'+(.65*NEB.VIG)+')');
   x.fillStyle=vg2;x.fillRect(0,0,cw,ch);
   NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;return c;
+}
+/* ---------- Milky Way overview (gambar, ROLLING mendatar) ----------
+   HANYA overview (SECT.on). Di dalam sektor tidak disentuh (plateDeep + nebula-portrait + bgCanvas jalan persis seperti dulu).
+   Gambar (milky-way.webp) DIGULUNG pelan ke kanan (MW.vx px/dtk, negatif = ke kiri), tile berulang tanpa putus (lihat mwDraw). Di-composite 'lighter' di atas warna dasar ruang:
+   latar hitam gambar = tidak menambah apa-apa, jadi tanpa topeng / getImageData. Overview: plateDeep (nebula lama) + bgCanvas (bintang kecil) di-fade keluar lewat bobot MW.w,
+   transisi overview <-> sektor mulus (bobot disusul .06/frame, sama dengan SKYT). Gagal dimuat / IS_POTATO -> overview lama persis.
+   Tuning: scale = tinggi gambar x tinggi layar tegak (>= 1 supaya tepi atas/bawah tak kelihatan; ganti gambar yang lebih lebar = otomatis lebih panjang gulungannya), vx = px/dtk (+ ke kanan di landscape / ke atas di portrait, 0 = diam), mirror = tile bergantian dicerminkan (sambungan mulus walau gambar tidak seamless),
+   A = kuat gambar, zf/pf = zoom/parallax (sama dgn plateDeep: .55 / .14). Matikan: ?mw=0 atau localStorage dumul_mw=0. ?v= di src HARUS sama dengan SHELL service-worker. */
+var MW={on:!IS_POTATO,src:'dumul-js/obs/img/milky-way.webp?v=3',A:1,scale:1,vx:2.5,mirror:false,zf:.55,pf:.14,img:null,off:0,t:0,w:-1,f:0};
+try{var _mq=(location.search.match(/[?&]mw=(\w+)/)||[])[1]||localStorage.getItem('dumul_mw')||'';if(_mq==='0')MW.on=false;}catch(eMW){}
+/* bobot efektif 0..1 (overview x fade-in setelah gambar siap); 0 = jalur lama utuh */
+function mwAlpha(now){
+  if(!MW.on)return 0;
+  var im=MW.img,tgt=(typeof SECT!=='undefined'&&SECT.on)?1:0;
+  if(!im){
+    im=MW.img=new Image();
+    im.onload=function(){im._ok=1;};
+    im.onerror=function(){MW.on=false;MW.w=0;};
+    im.src=MW.src;return 0;
+  }
+  if(!im._ok)return 0;
+  if(MW.w<0)MW.w=tgt;                                      /* frame pertama: langsung di keadaan sebenarnya (tanpa fade dari overview kalau mulai di sektor) */
+  MW.w+=(tgt-MW.w)*.06;if(Math.abs(tgt-MW.w)<.004)MW.w=tgt;
+  MW.f+=(1-MW.f)*.05;if(MW.f>.996)MW.f=1;                   /* fade-in sekali setelah gambar siap */
+  return MW.w*MW.f;
+}
+function mwDraw(now,a){
+  /* ROLLING: gambar digulung searah SUMBU PANJANG layar (loop tanpa putus), bukan diputar. Landscape: mendatar. Portrait: gambar diputar 90 derajat dan
+     digulung atas-bawah, jadi komposisi + ketajamannya sama dengan landscape (tinggi gambar = sisi pendek layar, tidak ke-zoom). Tile berjajar sepanjang
+     sumbu panjang; mirror=true -> tile bergantian dicerminkan (sambungan selalu mulus walau gambar tidak seamless). Landscape ROT: kanvas diputar upAng()
+     dulu, jadi tetap searah layar asli. */
+  var im=MW.img,dt=MW.t?Math.min(100,now-MW.t):0,m=plateM,rt=(typeof STG!=='undefined'&&STG.rot)||0,
+      uw=(rt?STG.iw:W)+2*m,uh=(rt?STG.ih:H)+2*m,port=uw<uh,lw=port?uh:uw,lh=port?uw:uh,z=1+(skyZoom-1)*MW.zf,
+      th=lh*MW.scale,tw=th*((im.naturalWidth||im.width||1)/(im.naturalHeight||im.height||1)),per=MW.mirror?tw*2:tw,k,x0,flip;
+  MW.t=now;
+  if(!(typeof reduce!=='undefined'&&reduce))MW.off=(MW.off+dt*.001*MW.vx)%per;if(MW.off<0)MW.off+=per;
+  g.save();
+  g.globalCompositeOperation='lighter';g.globalAlpha=Math.min(1,a*MW.A);
+  g.translate(W*.5+skyPan.x*MW.pf,H*.5+skyPan.y*MW.pf);g.scale(z,z);if(rt)g.rotate(upAng());if(port)g.rotate(-Math.PI/2);
+  var kMin=Math.floor((-lw*.5-MW.off)/tw)-1,kMax=Math.ceil((lw*.5-MW.off)/tw)+1;
+  for(k=kMin;k<=kMax;k++){
+    x0=k*tw+MW.off;flip=MW.mirror&&(((k%2)+2)%2===1);
+    if(flip){g.save();g.translate(x0,0);g.scale(-1,1);g.drawImage(im,-tw/2,-th/2,tw,th);g.restore();}
+    else g.drawImage(im,x0-tw/2,-th/2,tw,th);
+  }
+  g.restore();
 }
 /* Versi nebula berwarna sektor (hue+saturasi dari SECTORS[].sky.rgb, terang tetap dari gambar). Di-bake lazy, sekali per sektor. */
 /* Versi overview: warna asli gambar, tapi latar gelap -> transparan (topeng yang sama dgn sektor), supaya latar overview pekat/bening seperti di sektor.

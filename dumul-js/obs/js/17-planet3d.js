@@ -20,12 +20,12 @@ var PL3D_CFG={
   rK:14,          /* radius bola = rK x lebar layar. Makin besar = horizon makin datar (14 = nyaris lurus) */
   cell:100,        /* lebar 1 sel batu/medan (px CSS) saat 100px di bawah horizon; makin dekat horizon makin kecil (perspektif) */
   persp:120,      /* kekuatan perspektif tanah: makin besar = batu makin gepeng/rapat ke arah horizon */
-  haze:5,        /* lebar kabut atmosfer di atas permukaan dekat horizon (px CSS) */
-  hazeA:.3,     /* opasitas kabut di horizon 0..1 (tanah + batu). .78 = tebal (lama), .45 = agak transparan, .3 = tipis, 0 = tanpa kabut */
-  rockD:.9,     /* kepadatan batu 0..1: batu ada kalau acak sel > rockD. .3 rapat, .5 sedang, .7 jarang, >=1 = TIDAK ADA batu (gurun) */
+  haze:95,        /* lebar kabut atmosfer di atas permukaan dekat horizon (px CSS) */
+  hazeA:.45,     /* opasitas kabut di horizon 0..1 (tanah + batu). .78 = tebal (lama), .45 = agak transparan, .3 = tipis, 0 = tanpa kabut */
+  rockD:1,     /* kepadatan batu 0..1: batu ada kalau acak sel > rockD. .3 rapat, .5 sedang, .7 jarang, >=1 = TIDAK ADA batu (gurun) */
   cloud:.5,     /* opasitas lapisan awan/debu tipis kebiruan di atas tanah (0 = mati) */
   cloudCov:.8,  /* luas area awan 0..1: .5 = seperti dulu, makin besar makin luas/menyambung, .8 = hampir menutup, 0 = bercak kecil */
-  cloudH:40,     /* tinggi lapisan awan = cloudH x haze (px dari horizon ke bawah, memudar halus); ikut berubah kalau haze diubah. 0 = tanpa batas tinggi (awan menutup seluruh tanah, seperti dulu) */
+  cloudH:20,     /* tinggi lapisan awan = cloudH x haze (px dari horizon ke bawah, memudar halus); ikut berubah kalau haze diubah. 0 = tanpa batas tinggi (awan menutup seluruh tanah, seperti dulu) */
   rocks:true,   /* batu = mesh 3D asli (ast3dRockGeo dari 12-ast3d.js, sama dgn asteroid). false = tanpa batu */
   rockSz:.25,  /* skala mesh batu terhadap sel (1 = pas ukuran sel) */
   lod:.25,         /* detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
@@ -35,7 +35,13 @@ var PL3D_CFG={
   fps:4,          /* render ulang maks per detik; rotasi cuma 0.5 px/dtk jadi 4 fps tak terlihat bedanya. Gerak cahaya BH punya trigger sendiri di planet3dDraw */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
   ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
-      hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:.5,seed:[0,0]},   /* geometri OVERVIEW: kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */
+      hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:0,seed:[0,0]},   /* geometri OVERVIEW (rot 0 = planet DIAM di overview; langit yang berputar, lihat MW di 02-sky-logic.js): kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */
+  /* AYUNAN HORIZON (librasi latitudinal + nutasi), cuma di sektor (overview = 0 lewat bobot SKYT): ujung horizon kiri/kanan naik-turun GANTIAN (tilt, seperti jungkat-jungkit)
+     + sedikit naik-turun bersama (lat). Dua periode yang tidak berkelipatan -> tidak pernah persis berulang. Amplitudo = pecahan tinggi layar, periode = detik.
+     DIGAMBAR SEBAGAI TRANSFORMASI 2D (geser + miring) pada strip yang sudah dirender, tiap frame penuh (60fps) -> mulus; shader TIDAK dirender ulang (tetap 4 fps).
+     on:false / lat:0,tilt:0 = mati. Clamp BH/teleskop + drone ikut (pl3dGeom). */
+  libr:{on:true,lat:.004,tilt:.012,pLat:170,pTilt:120},
+  rotK:0,         /* pengali kecepatan rotasi tanah (SECTORS[].planet.rot). 0 = permukaan tanah DIAM (itu-itu saja), 1 = menggeser seperti dulu */
   live:null,      /* geometri HIDUP (blend ov + sektor): hL,hR,hLL,hRL,rot,sx,sy; diisi di bawah, jangan diedit */
   par:.045,       /* parallax: px planet per px skyPan (disengaja kecil, lebih pelan dari plateDeep .14; planet paling depan tapi nyaris diam) */
   parMax:24,      /* batas geser parallax (px CSS); juga margin strip supaya strip tidak berubah ukuran */
@@ -52,7 +58,7 @@ try{
   if(_pq==='0')PL3D_CFG.on=false;else if(_pq==='2d')PL3D_CFG.force2d=true;
 }catch(ePL0){}
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
-  rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null};
+  rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0};
 
 /* ---- palette (P2) ----
    Bobot per sektor = SKYT[k].v (04-render.js; sudah diperhalus .06/frame di sectDrawSky, 1 = sedang di sektor itu, semua 0 = overview).
@@ -88,8 +94,15 @@ function pl3dPhase(now){
   if(PL3D.phT==null)PL3D.phT=now;
   dt=Math.max(0,Math.min(100,now-PL3D.phT));
   if(now>PL3D.phT)PL3D.phT=now;
-  if(!rd)PL3D.ph+=dt*.001*PL3D_CFG.live.rot;
+  if(!rd)PL3D.ph+=dt*.001*PL3D_CFG.live.rot*PL3D_CFG.rotK;
   return PL3D.ph;
+}
+/* librasi: offset horizon (pecahan tinggi layar) kiri/kanan pada waktu sekarang. Diredam bobot sektor (PL3D.secW, 0 di overview). Waktu = jam fase (PL3D.phT) */
+function pl3dLib(){
+  var c=PL3D_CFG.libr,w=PL3D.secW;
+  if(!c||!c.on||w<=.001||(typeof reduce!=='undefined'&&reduce)||PL3D.phT==null)return [0,0];
+  var t=PL3D.phT*.001,la=c.lat*Math.sin(t*6.2831853/c.pLat),ti=c.tilt*Math.sin(t*6.2831853/c.pTilt+1.3);
+  return [(la+ti)*w,(la-ti)*w];
 }
 function pl3dPalUpdate(){
   var L=(typeof SECT!=='undefined'&&SECT&&SECT.list)||[],T=(typeof SKYT!=='undefined')?SKYT:null,cur=PL3D_CFG.pal,ov=PL3D_CFG.ov,
@@ -98,6 +111,7 @@ function pl3dPalUpdate(){
     t=T[L[i].k];w=t?t.v:0;
     if(w>.002&&(p=pl3dPalOf(L[i]))){A.push(p);B.push(w);G.push(pl3dGeoOf(L[i]));sum+=w;}
   }
+  PL3D.secW=Math.min(1,sum);
   w=Math.max(0,1-sum);tot=sum+w;A.push(ov);B.push(w);G.push(pl3dGeoOf(null));
   for(n=0;n<4;n++){
     nm=PL3D_PN[n];
@@ -144,16 +158,17 @@ function pl3dPar(){
 
 /* geometri (satuan px CSS, ruang stage): horizon = busur lingkaran besar yang melewati titik kiri (0,hL*H) dan kanan (W,hR*H), planet di bawahnya.
    Pusat (cx,cy), radius R. Strip = bagian bawah layar mulai sedikit di atas titik tertinggi busur (ruang untuk atmosfer) sampai dasar layar. */
-function pl3dGeom(still,tgt){   /* tgt=true: pakai geometri TUJUAN (sektor sekarang), bukan blend hidup; dipakai clamp BH mini supaya parkir saat masuk sektor tidak salah hitung selagi SKYT masih fade-in */
-  var land=PW>PH,lv=(tgt&&typeof SECT!=='undefined'&&SECT.cur)?pl3dGeoOf(SECT.cur):PL3D_CFG.live,yL=PH*(land?lv.hLL:lv.hL),yR=PH*(land?lv.hRL:lv.hR),R=Math.max(PW*PL3D_CFG.rK,PW*.6),
+function pl3dGeom(still,tgt,nolib){   /* tgt=true: pakai geometri TUJUAN (sektor sekarang), bukan blend hidup; dipakai clamp BH mini supaya parkir saat masuk sektor tidak salah hitung selagi SKYT masih fade-in */
+  var land=PW>PH,lv=(tgt&&typeof SECT!=='undefined'&&SECT.cur)?pl3dGeoOf(SECT.cur):PL3D_CFG.live,lb=nolib?[0,0]:pl3dLib(),yL=PH*((land?lv.hLL:lv.hL)+lb[0]),yR=PH*((land?lv.hRL:lv.hR)+lb[1]),R=Math.max(PW*PL3D_CFG.rK,PW*.6),
       dy=yR-yL,c=Math.hypot(PW,dy),hh=Math.sqrt(Math.max(0,R*R-c*c*.25)),
       cx=PW*.5+(-dy/c)*hh,cy=(yL+yR)*.5+(PW/c)*hh,ymin=1e9,i,x,yy;
   for(i=0;i<=16;i++){x=PW*i/16;yy=cy-Math.sqrt(Math.max(0,R*R-(x-cx)*(x-cx)));if(yy<ymin)ymin=yy;}
   /* ukuran strip dari horizon TERTINGGI di semua profil (pl3dTopFrac, dianggap datar -> batas atas konservatif) */
   var yT=PH*pl3dTopFrac(land),yMinB=yT-(R-Math.sqrt(Math.max(0,R*R-PW*PW*.25)));
-  var sH=Math.max(8,Math.min(PH,Math.ceil(PH-Math.max(0,yMinB-30-PL3D_CFG.parMax)))),par=still?null:pl3dPar(),f=par?par.f:1,ox=par?par.x:0,oy=par?par.y:0;
+  var libM=(PL3D_CFG.libr&&PL3D_CFG.libr.on)?(PL3D_CFG.libr.lat+PL3D_CFG.libr.tilt)*PH:0,bo=Math.ceil(libM*2),
+      sH=Math.max(8,Math.min(PH,Math.ceil(PH-Math.max(0,yMinB-30-PL3D_CFG.parMax-libM)))),par=still?null:pl3dPar(),f=par?par.f:1,ox=par?par.x:0,oy=par?par.y:0;
   if(f!==1){cx=PW*.5+(cx-PW*.5)*f;cy=PH*.5+(cy-PH*.5)*f;R*=f;ymin=PH*.5+(ymin-PH*.5)*f;}   /* zoom ringan terhadap tengah layar */
-  return {R:R,cx:cx+ox,cy:cy+oy,ymin:ymin+oy,stripH:sH,ox:ox,oy:oy,f:f};
+  return {R:R,cx:cx+ox,cy:cy+oy,ymin:ymin+oy,stripH:sH+bo,bo:bo,ox:ox,oy:oy,f:f};   /* bo = strip melebar ke BAWAH layar sebesar bo px, supaya transformasi ayunan tidak membuka celah di dasar layar */
 }
 
 function pl3dLoad(){
@@ -391,7 +406,7 @@ function pl3dBuild(){
 /* ukuran strip + kanvas 2D penyimpan hasil (kanvas WebGL offscreen tidak dijamin menyimpan isinya antar-task) */
 function pl3dResize(){
   pl3dSync();
-  var gm=pl3dGeom(true),q=PL3D_CFG.q,rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
+  var gm=pl3dGeom(true,false,true),q=PL3D_CFG.q,rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
   if(PL3D.W===PW&&PL3D.H===PH&&PL3D.rw===rw&&PL3D.rh===rh&&PL3D.cv2)return;
   PL3D.W=PW;PL3D.H=PH;PL3D.rw=rw;PL3D.rh=rh;PL3D.stripH=gm.stripH;PL3D.dirty=true;
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
@@ -409,17 +424,17 @@ function pl3dLightPos(){
 }
 function pl3dUniforms(now){
   pl3dSync();
-  var gm=pl3dGeom(),U=PL3D.uni,bp=pl3dLightPos();
+  var gm=pl3dGeom(false,false,true),U=PL3D.uni,bp=pl3dLightPos();   /* geometri RENDER tanpa ayunan; ayunan = transformasi saat drawImage */
   U.uSize.value.set(PW,gm.stripH);
-  U.uC.value.set(gm.cx,PH-gm.cy);                               /* ruang strip: y ke atas, 0 = dasar layar */
+  U.uC.value.set(gm.cx,PH-gm.cy+gm.bo);                               /* ruang strip: y ke atas, 0 = dasar layar */
   U.uR.value=gm.R;
   U.uFx.value=100/PL3D_CFG.cell;
   U.uPhi0.value=Math.atan2(Math.sqrt(Math.max(0,gm.R*gm.R-(PW*.5-gm.cx)*(PW*.5-gm.cx))),PW*.5-gm.cx);   /* arah titik horizon di tengah layar = titik hilang perspektif */
   U.uRot.value=pl3dPhase(now)/gm.R;
   U.uSeed.value.set(PL3D_CFG.live.sx,PL3D_CFG.live.sy);
   U.uHaze.value=PL3D_CFG.haze;U.uHazeA.value=PL3D_CFG.hazeA;U.uCloud.value=PL3D_CFG.cloud;U.uLod.value=PL3D_CFG.lod;U.uFadeS.value=PL3D_CFG.fadeS;U.uCloudCov.value=PL3D_CFG.cloudCov;U.uCloudH.value=PL3D_CFG.cloudH;   /* knob kabut bisa diubah live (console/panel tuning) */
-  U.uLight.value.set(bp[0],PH-bp[1]);
-  PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;   /* parallax/zoom yang baru dirender: selisihnya ke posisi sekarang digeser saat drawImage */
+  U.uLight.value.set(bp[0],PH-bp[1]+gm.bo);
+  PL3D.bo=gm.bo;PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;   /* parallax/zoom yang baru dirender: selisihnya ke posisi sekarang digeser saat drawImage */
   pl3dPalUpdate();var P=PL3D_CFG.pal;   /* palette hidup (crossfade sektor) */
   U.uLo.value.set(P.lo[0],P.lo[1],P.lo[2]);U.uMid.value.set(P.mid[0],P.mid[1],P.mid[2]);U.uHi.value.set(P.hi[0],P.hi[1],P.hi[2]);
   U.uAtm.value.set(P.atm[0],P.atm[1],P.atm[2]);U.uAtmA.value=P.atmA;
@@ -431,7 +446,7 @@ function pl3dUniforms(now){
    Dipanggil sebelum tiap render (4 fps), isi atribut instance per varian. */
 function pl3dRocks(gm){
   var rk=PL3D.rk,U=PL3D.uni;if(!rk||!rk.length)return;
-  var R=gm.R,sh=gm.stripH,cxs=gm.cx,cys=PH-gm.cy,N=U.uFx.value,F=PL3D_CFG.persp,phi0=U.uPhi0.value,rotpx=U.uRot.value*R,rd=PL3D_CFG.rockD,nr=PL3D.nr,nb=PL3D.nb,
+  var R=gm.R,sh=gm.stripH,cxs=gm.cx,cys=PH-gm.cy+gm.bo,N=U.uFx.value,F=PL3D_CFG.persp,phi0=U.uPhi0.value,rotpx=U.uRot.value*R,rd=PL3D_CFG.rockD,nr=PL3D.nr,nb=PL3D.nb,
       nV=rk.length,i,v,gx,gy,pm=Math.PI,sdx=U.uSeed.value.x|0,sdy=U.uSeed.value.y|0;
   function sOf(x,y){return R-Math.hypot(x-cxs,y-cys);}
   function uOf(x,y){return (Math.atan2(y-cys,x-cxs)-phi0)*R;}
@@ -469,9 +484,9 @@ function pl3dRocks(gm){
 /* fallback 2D: strip dibake sekali (gradien limb + pita noise + rim atmosfer), lalu cuma di-drawImage */
 function pl3dBake2D(){
   pl3dSync();
-  var gm=pl3dGeom(),w=PL3D.rw,h=PL3D.rh,k=w/PW,P=PL3D_CFG.pal,c=PL3D.c2,i,sy=PH-gm.stripH,cyS=gm.cy-sy,yTop=gm.ymin-sy;   /* sy = y layar tepi atas strip */
+  var gm=pl3dGeom(false,false,true),w=PL3D.rw,h=PL3D.rh,k=w/PW,P=PL3D_CFG.pal,c=PL3D.c2,i,sy=PH-gm.stripH+gm.bo,cyS=gm.cy-sy,yTop=gm.ymin-sy;   /* sy = y layar tepi atas strip */
   function rgb(a,m){return 'rgb('+Math.round(a[0]*255*m)+','+Math.round(a[1]*255*m)+','+Math.round(a[2]*255*m)+')';}
-  PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;
+  PL3D.bo=gm.bo;PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;
   c.clearRect(0,0,w,h);
   c.save();c.scale(k,k);
   c.beginPath();c.arc(gm.cx,cyS,gm.R,0,6.2831853);c.clip();
@@ -542,7 +557,13 @@ function planet3dDraw(now){
     g.save();
     if(PL3D.rot<0)g.transform(0,1,-1,0,STG.ih,0);else if(PL3D.rot>0)g.transform(0,-1,1,0,0,STG.iw);   /* ROT: ruang layar tegak -> ruang stage (kebalikan v2c) */
     g.globalAlpha=PL3D.al;
-    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+cp.y-(PL3D.roy||0),PW,sh);   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
+    var lb=pl3dLib(),lv=PL3D_CFG.live,land=PW>PH;
+    if(lb[0]||lb[1]){   /* ayunan: geser + miring terhadap titik tengah horizon (tiap frame, tanpa render ulang shader) */
+      var yc=PH*((land?lv.hLL+lv.hRL:lv.hL+lv.hR)*.5)+cp.y;
+      var th=Math.atan2((lb[1]-lb[0])*PH,PW),sc=1+Math.abs(Math.tan(th))*2*Math.max(0,PH+(PL3D.bo||0)-yc)/PW;   /* sc: lebarkan sedikit supaya sudut bawah yang terangkat karena miring tidak membuka celah di tepi kiri/kanan */
+      g.translate(PW*.5,yc);g.scale(sc,1);g.rotate(th);g.translate(-PW*.5,-yc+(lb[0]+lb[1])*.5*PH);
+    }
+    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
     g.restore();
     PL3D.frames++;
   }catch(e){

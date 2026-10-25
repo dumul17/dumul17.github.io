@@ -826,17 +826,23 @@ function frame(now){
       //    Deep (debu/galaksi) bergeser & zoom lebih lambat daripada mid (bintang) => kedalaman.
       var pM=plateM,pW=W+2*pM,pH=H+2*pM;
       var pmx=0,pmy=0;
-      if(plateDeep)plateBlit(plateDeep,pM,pW,pH,1+(skyZoom-1)*.55,skyPan.x*.14+pmx*4,skyPan.y*.14+pmy*3);
+      var mwA=mwAlpha(now),mwK=1-mwA;   /* overview: Milky Way berputar menggantikan plateDeep + bgCanvas (fade lewat bobot); di sektor mwA=0 -> jalur lama utuh */
+      if(mwK<1)g.globalAlpha=mwK;
+      if(plateDeep&&mwK>.01)plateBlit(plateDeep,pM,pW,pH,1+(skyZoom-1)*.55,skyPan.x*.14+pmx*4,skyPan.y*.14+pmy*3);
       /* Drifting dust depth layers (static when prefers-reduced-motion). */
-      for(var dli=0;dli<plateDust.length;dli++){
+      for(var dli=0;dli<plateDust.length&&mwK>.01;dli++){
         var dl=plateDust[dli],dt2=reduce?0:now*.001,
-            ddx=reduce?0:Math.sin(dt2*6.2832/dl.per+dl.ph)*dl.amp,
-            ddy=reduce?0:Math.cos(dt2*6.2832/(dl.per*1.37)+dl.ph)*dl.amp*.6;
+            ddx=(reduce||SKY_DRIFT<=0)?0:Math.sin(dt2*6.2832/dl.per+dl.ph)*dl.amp*SKY_DRIFT,
+            ddy=(reduce||SKY_DRIFT<=0)?0:Math.cos(dt2*6.2832/(dl.per*1.37)+dl.ph)*dl.amp*.6*SKY_DRIFT;
         if(STG.rot){var ua=upAng(),uc=Math.cos(ua),us=Math.sin(ua),tx=ddx*uc-ddy*us;ddy=ddx*us+ddy*uc;ddx=tx;}   /* landscape ROT: lintasan melayang searah layar, bukan searah stage yang diputar */
         plateBlit(dl.c,pM,pW,pH,1+(skyZoom-1)*dl.zf,skyPan.x*dl.par+ddx,skyPan.y*dl.par+ddy);
       }
+      g.globalAlpha=1;
+      if(mwA>.01)mwDraw(now,mwA);
       sectDrawSky();   /* warna langit per sektor (data: SECTORS[].sky di sky-data.js) */
-      plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      if(mwK<1)g.globalAlpha=mwK;
+      if(mwK>.01)plateBlit(bgCanvas,pM,pW,pH,skyZoom,skyPan.x*.35+pmx*10,skyPan.y*.35+pmy*7);
+      g.globalAlpha=1;
       /* Grid RA/Dec: canvas terpisah, cuma di mode cam; param blit persis sama dgn bgCanvas */
       if(CAMERA_MODE){
         ensureCamGrid();
