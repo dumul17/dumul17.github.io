@@ -537,7 +537,12 @@ function planet3dDraw(now){
       var bp=pl3dLightPos(),lx=bp[0],ly=PH-bp[1],pr=pl3dPar();
       var still=(typeof reduce!=='undefined'&&reduce);
       var parCh=Math.abs(pr.x-PL3D.rox)+Math.abs(pr.y-PL3D.roy)>1.5||Math.abs(pr.f-PL3D.rf)>.004;   /* parallax/zoom bergeser: render ulang (maks palFps) */
-      var due=PL3D.dirty||(!still&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(Math.abs(lx-PL3D.lastLx)+Math.abs(ly-PL3D.lastLy)>40&&now-PL3D.lastR>=30)||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
+      /* render periodik (fps) CUMA kalau permukaan memang berputar (rot x rotK != 0). Kalau diam, render hanya karena: dirty, cahaya bergeser,
+         palette/parallax berubah, atau sekali lagi saat palette selesai settle (sisa selisih di bawah ambang palCh). */
+      var rotMov=Math.abs(PL3D_CFG.live.rot*PL3D_CFG.rotK)>1e-6;
+      var lMv=Math.abs(lx-PL3D.lastLx)+Math.abs(ly-PL3D.lastLy);
+      var settle=!!PL3D.wasCh&&!palCh;PL3D.wasCh=palCh;
+      var due=PL3D.dirty||(!still&&rotMov&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
       if(due){
         pl3dRocks(pl3dUniforms(now));
         PL3D.r.render(PL3D.sc,PL3D.cam);

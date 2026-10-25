@@ -697,9 +697,8 @@ function sectJumpTo(s,carry,always){
   if(!s||SECT.busy||SW||whBusy()||!s.ids||!s.ids.length)return false;
   if(SECT.cur){
     if(s===SECT.cur)return false;
-    if(!s.drn){try{showModeToast(T('toast.nosum.drn'),null,3200);}catch(e){}return false;}   /* drone sektor tujuan harus sedang di-summon (kuning, belum di-recall) */
     lisDecide(function(){
-      if(SECT.busy||whBusy()||!SECT.cur||s===SECT.cur||!s.drn)return;
+      if(SECT.busy||whBusy()||!SECT.cur||s===SECT.cur)return;
       SGATE.pend=s;
       /* Tunnel side-effect: selalu muffle 2 dtk; lanjut muffle jika tujuan belum dock/summon siap */
       SGATE.tunnelUntil=performance.now()+2000;
