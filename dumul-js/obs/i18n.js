@@ -23,7 +23,7 @@
     'lang.btn':{en:'Language: EN',id:'Bahasa: ID'},
     'owl.tab.set':{en:'Settings',id:'Setelan'},'owl.tab.about':{en:'About',id:'Tentang'},
     'perf.chip':{en:'Perf · {m}',id:'Performa · {m}'},
-    'tune.quality':{en:'Quality',id:'Kualitas'},'tune.quality.hint':{en:'HIGH = full effects. LOW = lighter for weak devices. Tap to switch, then Save.',id:'HIGH = efek penuh. LOW = lebih ringan untuk perangkat lemah. Ketuk untuk ganti, lalu Simpan.'},
+    'tune.quality.hint':{en:'HIGH = full effects. LOW = lighter for weak devices. Tap to switch, then Save.',id:'HIGH = efek penuh. LOW = lebih ringan untuk perangkat lemah. Ketuk untuk ganti, lalu Simpan.'},
     'tune.none':{en:'Nothing to tune here yet.',id:'Belum ada yang bisa disetel di sini.'},
     'lang.label':{en:'EN → ID',id:'ID → EN'},
     'live.one':{en:'observer',id:'pengamat'},'live.many':{en:'observers',id:'pengamat'},
@@ -80,7 +80,6 @@
     'boot.detected':{en:'DETECTED',id:'TERDETEKSI'},'boot.buffering':{en:'BUFFERING',id:'MEMUAT'},'boot.aligning':{en:'ALIGNING',id:'MENYELARASKAN'},
     'boot.nominal':{en:'NOMINAL',id:'NORMAL'},'boot.ready':{en:'READY',id:'SIAP'},'boot.stable':{en:'STABLE',id:'STABIL'},
     'boot.locked':{en:'LOCKED',id:'TERKUNCI'},'boot.online':{en:'ONLINE',id:'AKTIF'},'boot.open':{en:'OPEN',id:'TERBUKA'},'boot.complete':{en:'COMPLETE',id:'SELESAI'},
-    'boot.transmitted':{en:'> SIGNAL TRANSMITTED',id:'> SINYAL TERKIRIM'},
     'boot.red':{en:'Red',id:'Merah'},'boot.blue':{en:'Blue',id:'Biru'},'boot.or':{en:'or',id:'atau'},
     'boot.red.aria':{en:'View Source Code',id:'Lihat Kode Sumber'},'boot.blue.aria':{en:'Enter Observatory',id:'Masuk Observatorium'},
 
@@ -90,7 +89,7 @@
     'mp.vol':{en:'Volume',id:'Volume'},'mp.unmute':{en:'Unmute',id:'Nyalakan suara'},
     'mp.open':{en:'Open music player',id:'Buka pemutar musik'},'mp.close':{en:'Close music player',id:'Tutup pemutar musik'},
     'mp.av.title':{en:'Portal Spectrum',id:'Spektrum Portal'},'mp.av.sub':{en:'Radial visualizer · signals',id:'Visualizer radial · sinyal'},
-    'mp.signals':{en:'Stellar Signals',id:'Sinyal Bintang'},'mp.bgm':{en:'Observatory BGM',id:'BGM Observatorium'},'mp.play':{en:'Play music',id:'Putar musik'},'mp.pause':{en:'Pause music',id:'Jeda musik'},
+    'mp.bgm':{en:'Observatory BGM',id:'BGM Observatorium'},'mp.play':{en:'Play music',id:'Putar musik'},'mp.pause':{en:'Pause music',id:'Jeda musik'},
     'mp.shuffle':{en:'Shuffle',id:'Acak'},'mp.prev':{en:'Previous',id:'Sebelumnya'},'mp.next':{en:'Next',id:'Berikutnya'},
     'mp.rep.off':{en:'Repeat off',id:'Ulang mati'},'mp.rep.one':{en:'Repeat one',id:'Ulang satu lagu'},'mp.rep.all':{en:'Repeat all',id:'Ulang semua'},
     'mp.seek':{en:'Seek',id:'Geser posisi'},
@@ -142,7 +141,7 @@
     'tune.led.0':{en:'Green',id:'Hijau'},'tune.led.1':{en:'Amber',id:'Amber'},'tune.led.2':{en:'White',id:'Putih'},'tune.led.3':{en:'Blue',id:'Biru'},'tune.led.4':{en:'Violet',id:'Ungu'},
 
     /* kamera / HUD */
-    'cam.focus.free':{en:'FOCUS · FREE',id:'FOKUS · BEBAS'},'cam.free':{en:'Free',id:'Bebas'},'cam.zoom.aria':{en:'Camera zoom',id:'Zoom kamera'},'cam.hint':{en:'TAP ‹ › TO ZOOM TO A CONSTELLATION',id:'KETUK ‹ › UNTUK ZOOM KE RASI'},'cam.sb.on':{en:'SPRINGBACK · ON',id:'SPRINGBACK · ON'},'cam.sb.off':{en:'SPRINGBACK · OFF',id:'SPRINGBACK · OFF'},'cam.prev.aria':{en:'Previous constellation',id:'Rasi sebelumnya'},'cam.next.aria':{en:'Next constellation',id:'Rasi berikutnya'},'cam.lock.on':{en:'LOCK · ON',id:'KUNCI · ON'},'cam.lock.off':{en:'LOCK · OFF',id:'KUNCI · OFF'},'cam.lock.aria':{en:'Lock camera on this star',id:'Kunci kamera ke bintang ini'},'cam.sb.aria':{en:'Toggle springback: sky returns to its position when released',id:'Springback: langit balik ke posisi semula saat dilepas'},
+    'cam.free':{en:'Free',id:'Bebas'},'cam.zoom.aria':{en:'Camera zoom',id:'Zoom kamera'},'cam.hint':{en:'TAP ‹ › TO ZOOM TO A CONSTELLATION',id:'KETUK ‹ › UNTUK ZOOM KE RASI'},'cam.sb.on':{en:'SPRINGBACK · ON',id:'SPRINGBACK · ON'},'cam.sb.off':{en:'SPRINGBACK · OFF',id:'SPRINGBACK · OFF'},'cam.prev.aria':{en:'Previous constellation',id:'Rasi sebelumnya'},'cam.next.aria':{en:'Next constellation',id:'Rasi berikutnya'},'cam.lock.on':{en:'LOCK · ON',id:'KUNCI · ON'},'cam.lock.off':{en:'LOCK · OFF',id:'KUNCI · OFF'},'cam.lock.aria':{en:'Lock camera on this star',id:'Kunci kamera ke bintang ini'},'cam.sb.aria':{en:'Toggle springback: sky returns to its position when released',id:'Springback: langit balik ke posisi semula saat dilepas'},
     'cam.fact':{en:'FACT',id:'FAKTA'},
     'cam.band.vis':{en:'BAND · VIS',id:'PITA · VIS'},'cam.band.uv':{en:'BAND · UV',id:'PITA · UV'},'cam.band.ir':{en:'BAND · IR',id:'PITA · IR'},
     'cam.band.aria':{en:'Spectral band filter: visible, ultraviolet, infrared',id:'Filter pita spektral: tampak, ultraviolet, inframerah'},
@@ -159,7 +158,6 @@
     'sf.recovered':{en:'RECOVERED · {s}',id:'DIPULIHKAN · {s}'},'sf.acquired':{en:'SIGNAL ACQUIRED',id:'SINYAL DIPEROLEH'},
     // ARCHIVED',id:'{s} // TERARSIP'},
     'ach.title':{en:'CONSTELLATION LOG',id:'CATATAN RASI'},'ach.legend':{en:'\u25cf ARCHIVED {a}/{b} \u00b7 \u25c6 ALIGNED {c}/{d}',id:'\u25cf TERARSIP {a}/{b} \u00b7 \u25c6 TERSELARAS {c}/{d}'},'ach.frag':{en:'SIGNAL FRAGMENTS',id:'FRAGMEN SINYAL'},'ach.unheard':{en:'NOT HEARD YET',id:'BELUM DIDENGAR'},'ach.btn':{en:'LOG',id:'CATATAN'},'ach.close':{en:'Close',id:'Tutup'},'ach.back':{en:'Back',id:'Kembali'},'ca.aligned':{en:'{s} // ALIGNED',id:'{s} // TERSELARAS'},'sf.archived':{en:'\u25cf ARCHIVED \u00b7 {s}',id:'\u25cf TERARSIP \u00b7 {s}'},'ca.align':{en:'ALIGNMENT COMPLETE',id:'PENYELARASAN SELESAI'},// UNLOCKED',id:'{s} // TERBUKA'},
-    'bh.cap':{en:'Gargantua',id:'Gargantua'},
 
     /* toast */
     'toast.obs':{en:'OBSERVATION MODE\nHUD OFF · LABELS OFF',id:'MODE PENGAMATAN\nHUD MATI · LABEL MATI'},
@@ -174,7 +172,6 @@
     'toast.override':{en:'SYSTEM OVERRIDE · DUMUL//OBSERVATORY',id:'SISTEM DIAMBIL ALIH · DUMUL//OBSERVATORY'},
     'toast.tx.deploy':{en:'TRANSMITTER DOCKED\n{s} · OVERVIEW SIGNAL CLEAR',id:'TRANSMITTER TERDOCK\n{s} · SINYAL OVERVIEW JERNIH'},
     'toast.tx.recall':{en:'TRANSMITTER UNDOCKED\n{s} · SIGNAL MUFFLED',id:'TRANSMITTER LEPAS DOCK\n{s} · SINYAL TEREDAM'},
-    'toast.tx.linked':{en:'TRANSMITTER LINKED\nSIGNAL CLEAR',id:'TRANSMITTER TERSAMBUNG\nSINYAL JERNIH'},
     'toast.tx.muff':{en:'SIGNAL MUFFLED\nDOCK THE DRONE IN THE SOURCE SECTOR',id:'SINYAL TEREDAM\nDOCK DRONE DI SEKTOR SUMBER'},
     'toast.tx.far':{en:'SOURCE IN ANOTHER SECTOR\nDOCK ITS DRONE THERE FIRST',id:'SUMBER DI SEKTOR LAIN\nDOCK DRONE-NYA DI SANA DULU'},
     'toast.tx.ov':{en:'THE DRONE WORKS INSIDE A SECTOR\nENTER ONE TO CALL IT',id:'DRONE BEKERJA DI DALAM SEKTOR\nMASUK SEKTOR UNTUK MEMANGGILNYA'},
@@ -192,7 +189,6 @@
     'toast.drn.summon':{en:'DRONE DROPPED\n{s} · HOLD THE DRONE TO DOCK',id:'DRONE DIDROP\n{s} · TAHAN DRONE UNTUK DOCK'},
     'toast.drn.recall':{en:'DRONE RECALLED\n{s}',id:'DRONE DITARIK\n{s}'},
     'toast.tx.linked.rx':{en:'RECEIVER LINKED\nSIGNAL CLEAR',id:'RECEIVER TERSAMBUNG\nSINYAL JERNIH'},
-    'toast.jump':{en:'JUMP TO SECTOR {s}',id:'LOMPAT KE SEKTOR {s}'},
     'toast.belt':{en:'PLEIADES LOCKED\nSTART AT SIRIUS · DRAW THE LINE THROUGH THE BELT',id:'PLEIADES TERKUNCI\nMULAI DARI SIRIUS · TARIK GARIS MELEWATI SABUK'},
     'toast.align':{en:'ALIGNMENT · {s}\nCONNECT THE STARS IN ORDER',id:'PENYELARASAN · {s}\nHUBUNGKAN BINTANG SECARA BERURUTAN'},
     'toast.align.ple':{en:'ALIGNMENT · PLEIADES\nSIRIUS → ORION BELT → ALDEBARAN',id:'PENYELARASAN · PLEIADES\nSIRIUS → SABUK ORION → ALDEBARAN'},
@@ -201,9 +197,6 @@
     'toast.timeout':{en:'ALIGNMENT TIMED OUT',id:'WAKTU PENYELARASAN HABIS'},
 
     /* teleskop sibuk */
-    'tele.busy.1':{en:"I'm busy tracking {s}. Can't come along.",id:'Aku sibuk melacak {s}. Nggak bisa ikut.'},
-    'tele.busy.2':{en:'Occupied. The signal in {s} still needs me.',id:'Lagi sibuk. Sinyal di {s} masih butuh aku.'},
-    'tele.busy.3':{en:"Not now. I'm still listening to {s}.",id:'Nanti dulu. Aku masih mendengarkan {s}.'},
     'lis.ask.q':{en:'Take the telescope along?',id:'Ajak teleskop?'},'lis.ask.bring':{en:'Bring',id:'Ajak'},'lis.ask.leave':{en:'Leave it',id:'Tinggal'},
     'lis.where.ov':{en:'OVERVIEW',id:'OVERVIEW'},'lis.where.sec':{en:'SECTOR {n}',id:'SEKTOR {n}'},
     'lis.toast.full':{en:'LOST IN SPACE\nCAMERA + SIGNAL LOCKED',id:'LOST IN SPACE\nKAMERA + SINYAL TERKUNCI'},
@@ -233,15 +226,7 @@
     'exit.bye':{en:"Safe travels, okay? Look up sometimes. We'll be looking back.",id:"Hati-hati di jalan, ya. Sesekali lihat ke atas. Kami juga lagi lihat ke arahmu."},
     'exit.native':{en:"Press back once more to leave",id:"Tekan back sekali lagi untuk keluar"},
     'exit.stay.bub':{en:"You stayed... Thank you. The stars burn brighter with company.",id:"Kamu tetap di sini... Makasih ya. Bintang-bintang lebih terang kalau ada yang nemenin."},
-    'tele.busy.4':{en:'Sorry. {s} has my lens for now.',id:'Maaf. Lensaku sedang untuk {s}.'},
 
-    /* offline banner */
-    'ofl.title':{en:'> OFFLINE ARCHIVE',id:'> ARSIP OFFLINE'},
-    'ofl.ask':{en:'Save all {n} tracks (~{mb} MB) so the observatory keeps playing without signal?',id:'Simpan semua {n} lagu (~{mb} MB) supaya observatorium tetap bunyi tanpa sinyal?'},
-    'ofl.yes':{en:'SAVE ALL',id:'SIMPAN SEMUA'},'ofl.no':{en:'NOT NOW',id:'NANTI'},
-    'ofl.sync':{en:'> SYNCING {d}/{t}',id:'> MENYINKRON {d}/{t}'},'ofl.syncNote':{en:'Runs in the background. Keep exploring.',id:'Jalan di latar belakang. Silakan lanjut menjelajah.'},
-    'ofl.done':{en:'> ARCHIVE SECURED',id:'> ARSIP TERSIMPAN'},'ofl.doneNote':{en:'Offline mode ready.',id:'Mode offline siap.'},
-    'ofl.part':{en:'> SYNC INTERRUPTED',id:'> SINKRON TERPUTUS'},'ofl.partNote':{en:'{d}/{t} saved. Resumes on your next visit.',id:'{d}/{t} tersimpan. Lanjut di kunjungan berikutnya.'},
 
     /* terminal (kalimat tetap; label kategori sengaja Inggris) */
     'term.nolnput':{en:'> NO INPUT. ALSO A RESPONSE.',id:'> TANPA INPUT. ITU JUGA JAWABAN.'},
