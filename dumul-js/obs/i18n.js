@@ -123,7 +123,7 @@
     'tune.atm':{en:'Atmosphere',id:'Atmosfer'},'tune.haze':{en:'Haze',id:'Kabut'},'tune.haze.s':{en:'dust clouds + glow',id:'awan debu + pendar'},
     'tune.band':{en:'Band',id:'Pita'},'tune.band.s':{en:'milky way',id:'bima sakti'},'tune.drift':{en:'Drift',id:'Hanyut'},'tune.drift.s':{en:'floating dust',id:'debu melayang'},
     'tune.neb':{en:'Nebula',id:'Nebula'},'tune.neb.s':{en:'image strength',id:'kekuatan gambar'},'tune.halo2':{en:'Blob halo',id:'Halo blob'},'tune.halo2.s':{en:'edge thickness',id:'tebal tepi'},
-    'tune.vig':{en:'Vignette',id:'Vinyet'},'tune.vig.s':{en:'edge darkness',id:'gelap tepi'},'tune.portals':{en:'Portals',id:'Portal'},
+    'tune.vig':{en:'Vignette',id:'Vinyet'},'tune.vig.s':{en:'edge darkness',id:'gelap tepi'},
     'tune.sneb':{en:'Sector sky',id:'Langit sektor'},'tune.sneb.s':{en:'tinted image strength',id:'kekuatan nebula tema'},'tune.sdim':{en:'Depth',id:'Kedalaman'},'tune.sdim.s':{en:'darken base sky',id:'gelapkan langit dasar'},
     'tune.sprd':{en:'Hue variety',id:'Variasi warna'},'tune.sprd.s':{en:'stays in sector theme',id:'tetap di tema sektor'},'tune.szf':{en:'Zoom follow',id:'Ikut zoom'},'tune.szf.s':{en:'nebula zooms with sector',id:'nebula ikut zoom sektor'},
     'tune.sub.skys':{en:'Sky // Sector Tune',id:'Langit // Setelan Sektor'},'tune.saved.skys':{en:'SECTOR SKY SAVED',id:'LANGIT SEKTOR TERSIMPAN'},
@@ -136,7 +136,8 @@
     'tune.ast.orbit':{en:'Orbit',id:'Orbit'},'tune.ast.orbit.s':{en:'width',id:'lebar'},'tune.ast.thick':{en:'Thickness',id:'Ketebalan'},'tune.ast.thick.s':{en:'ring density',id:'kerapatan cincin'},
     'tune.ast.spd.s':{en:'orbit',id:'orbit'},
     /* tuning panel: tab Tele (teleskop) */
-    'tune.tele.tab':{en:'Tele',id:'Tele'},'tune.sub.tele':{en:'Telescope // Tune',id:'Teleskop // Setelan'},'tune.saved.tele':{en:'TELESCOPE SETTINGS SAVED',id:'SETELAN TELESKOP TERSIMPAN'},
+    'tune.tele.tab':{en:'Telescope',id:'Teleskop'},'tune.pl.tab':{en:'Planet',id:'Planet'},'tune.dr.tab':{en:'Drone',id:'Drone'},'tune.pt.tab':{en:'Portal',id:'Portal'},
+    'tune.sub.pl':{en:'Planet // Tune',id:'Planet // Setelan'},'tune.sub.dr':{en:'Drone // Tune',id:'Drone // Setelan'},'tune.sub.pt':{en:'Portal // Tune',id:'Portal // Setelan'},'tune.sub.tele':{en:'Telescope // Tune',id:'Teleskop // Setelan'},'tune.saved.tele':{en:'TELESCOPE SETTINGS SAVED',id:'SETELAN TELESKOP TERSIMPAN'},
     'tune.on':{en:'On',id:'Nyala'},'tune.off':{en:'Off',id:'Mati'},
     'tune.tele.go':{en:'Bring along',id:'Ajak kemana saja'},'tune.tele.bub':{en:'Bubble messages',id:'Pesan bubble'},'tune.tele.led':{en:'LED color',id:'Warna LED'},
     'tune.tele.hover':{en:'Hover',id:'Melayang'},'tune.tele.spin':{en:'Spin',id:'Putar'},
