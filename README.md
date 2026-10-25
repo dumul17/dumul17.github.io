@@ -139,7 +139,7 @@ DUMUL transition.
 -   **Quality chip** (`Perf · HIGH / LOW`): no device auto-detect, the
     default is HIGH. The visitor's choice is saved (`dumul_quality`); append
     `?perf=low` or `?perf=high` to the URL to test a tier without saving.
--   A nebula backdrop image (`img/nebula-portrait.webp`, one image cover-fitted for both portrait and landscape)
+-   A nebula backdrop image (`img/nebula.webp`, one image cover-fitted for both portrait and landscape)
 -   **Live observer counter:** loaded after the page has finished loading (on idle), so Firebase never competes with boot and audio for bandwidth. A small `N observers` readout showing how many
     unique devices have the Observatory open right now (Firebase Realtime
     Database presence, one entry per device, removed when the last tab
@@ -283,7 +283,7 @@ once its files (and, optionally, its music) have been cached.
 │       ├── i18n-texts.js   # ID translation of texts.js (telescope messages, terminal log)
 │       ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
 │       ├── img/
-│       │   ├── nebula-portrait.webp    # Nebula backdrop (single image, used for portrait AND landscape)
+│       │   ├── nebula.webp             # Nebula backdrop (single image, used for portrait AND landscape)
 │       └── js/             # Observatory logic, split from the old index.js (load order matters!)
 │           ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
 │           ├── 02-sky-logic.js     # data wiring, Pleiades, memory, unlock, observation mode, alignment, time dilation, layout, plate
