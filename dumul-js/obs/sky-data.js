@@ -44,19 +44,21 @@ var SECTORS=[
   /* title = nama sektor; stars = rencana bintang SFX sektor ini (star-hopping).
      Yang belum ada di SFX array (Capella, Procyon, Regulus, Markab, Scheat, Algenib) = catatan saja.
      planet = palette permukaan planet di dasar layar (17-planet3d.js): lo/mid/hi = 3 stop warna (gelap -> terang, 0..1), atm = warna atmosfer tipis, atmA = alpha atmosfer (.12-.2).
-     Boleh dikosongkan: planet turun otomatis dari sky.rgb. Overview punya palette netral sendiri (PL3D_CFG.ov). */
+     Boleh dikosongkan: planet turun otomatis dari sky.rgb. Overview punya palette netral sendiri (PL3D_CFG.ov).
+     Geometri per sektor (opsional, kosong = ikut overview): hL/hR = tinggi horizon kiri/kanan (x tinggi layar dari atas; hL<hR = miring turun ke kanan), hLLand/hRLand = idem landscape (kosong = turunan dari hL/hR),
+     rot = px/dtk geser permukaan (+ kanan, - kiri, 0 diam), seed = [int,int] geser pola noise (tanah + batu beda per sektor). Semuanya di-crossfade lewat bobot SKYT. */
   {k:'winter', season:'Winter', name:'Winter', title:'The Pantheon of Radiant Heroes', a:-150, sky:{rgb:'110,185,255',a:.05,dim:.84,acc:{rgb:'225,95,190',a:.10,x:.26,y:.66,s:.40,sy:.70,rot:-.4}},
    stars:['Aldebaran','Betelgeuse','Capella','Pleione','Pollux','Procyon','Rigel','Sirius'],
-   planet:{lo:[.012,.030,.048],mid:[.10,.20,.28],hi:[.42,.60,.72],atm:[.43,.90,1],atmA:.18}},
+   planet:{lo:[.012,.030,.048],mid:[.10,.20,.28],hi:[.42,.60,.72],atm:[.43,.90,1],atmA:.18,hL:.78,hR:.975,rot:.5,seed:[31,87]}},
   {k:'spring', season:'Spring', name:'Spring', title:'The Guardians of the Cosmic Balance', a:-30, sky:{rgb:'150,178,228',a:.20,dim:.30},
    stars:['Alioth','Arcturus','Regulus','Spica'],
-   planet:{lo:[.012,.034,.030],mid:[.09,.22,.19],hi:[.36,.58,.48],atm:[.40,1,.80],atmA:.16}},
+   planet:{lo:[.012,.034,.030],mid:[.09,.22,.19],hi:[.36,.58,.48],atm:[.40,1,.80],atmA:.16,hL:.90,hR:.80,rot:-.45,seed:[53,19]}},
   {k:'summer', season:'Summer', name:'Summer', title:'The Assembly of Celestial Beasts', a:150, sky:{rgb:'255,160,60',a:.20,dim:.45,acc:{rgb:'255,225,150',a:.26,x:.5,y:.55,s:.90,sy:.28,rot:-.5}},
    stars:['Altair','Deneb','Vega'],
-   planet:{lo:[.040,.020,.012],mid:[.26,.12,.06],hi:[.62,.36,.18],atm:[1,.62,.30],atmA:.17}},
+   planet:{lo:[.040,.020,.012],mid:[.26,.12,.06],hi:[.62,.36,.18],atm:[1,.62,.30],atmA:.17,hL:.80,hR:.93,rot:.8,seed:[117,201]}},
   {k:'autumn', season:'Autumn', name:'Autumn', title:'The Royal Court of the Fallen Dynasty', a:30, sky:{rgb:'20,70,190',a:.22,dim:.55},
    stars:['Algenib','Alpheratz','Markab','Scheat'],
-   planet:{lo:[.024,.016,.050],mid:[.14,.10,.26],hi:[.42,.34,.62],atm:[.62,.52,1],atmA:.17}}
+   planet:{lo:[.024,.016,.050],mid:[.14,.10,.26],hi:[.42,.34,.62],atm:[.62,.52,1],atmA:.17,hL:.73,hR:.93,rot:-.65,seed:[191,77]}}
 ];
 
 /* ---------- 2. RASI & CLUSTER ---------- */
@@ -1136,6 +1138,10 @@ function check(){
       var c=p[n];if(!Array.isArray(c)||c.length!==3||c.some(function(v){return typeof v!=='number'||!(v>=0&&v<=1);}))P.push(w+n+' harus [r,g,b] angka 0..1');
     });
     if(p.atmA!=null&&!(typeof p.atmA==='number'&&p.atmA>=0&&p.atmA<=1))P.push(w+'atmA harus angka 0..1');
+    ['hL','hR','hLLand','hRLand'].forEach(function(n){if(p[n]!=null&&!(typeof p[n]==='number'&&p[n]>=.55&&p[n]<=1))P.push(w+n+' harus angka .55..1 (tinggi horizon, x tinggi layar dari atas)');});
+    if((p.hL==null)!==(p.hR==null))P.push(w+'hL dan hR harus diisi berdua');
+    if(p.rot!=null&&!(typeof p.rot==='number'&&Math.abs(p.rot)<=20))P.push(w+'rot harus angka px/dtk (-20..20)');
+    if(p.seed!=null&&!(Array.isArray(p.seed)&&p.seed.length===2&&p.seed.every(function(v){return typeof v==='number'&&v%1===0;})))P.push(w+'seed harus [int,int]');
   });
   RASI.forEach(function(r){
     var w='rasi '+r.id+': ';
