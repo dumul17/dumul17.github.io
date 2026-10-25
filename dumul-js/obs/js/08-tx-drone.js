@@ -9,6 +9,10 @@
    3. Di overview sektor: Gargantua = tunnel. Garis sumber → Gargantua → sektor penerima, paket cahaya ngalir searah sinyal.
    Warna jalur/drone/ring mengikuti indikator interlocking sektornya (kuning/pink). F9: tether TIDAK permanen (cuma ±1,2 dtk setelah transisi + selama tahan); cincin cyan di teleskop = sektor ini interlocking (txLinked); cincin pink pulsa di drone = docked; mode cam: semua disembunyikan.
    Dipanggil dari frame() lewat drawTxLines(now) (sudah ada di 04-render/05-sector-ui, tinggal didefinisikan).
+   MENDARAT DI PLANET: di sektor, drone yang di-drop (tahan teleskop) terbang dari teleskop lalu MENDARAT di permukaan planet (17-planet3d.js: planetGroundAt),
+   berdiri di tanah dan ikut berputar bersama permukaan (koordinat tanah ug/sg, bukan koordinat layar), pulse di kaki. TX/RX tetap berdiri di tanah:
+   TX = berkas sinyal dari bintang SFX ke drone, RX = sinyal turun dari atas. Terbawa rotasi sampai keluar layar = lepas landas, mendarat lagi di sisi lain.
+   Planet mati/tak tersedia (?planet3d=0) = perilaku lama (standby orbit teleskop / orbit bintang). Semua gambar drone dikumpulkan di drawTop() (dipanggil SETELAH planet).
    Hook long-press ada di 06-interaction.js (TXFX.holdStart / holdEnd). State dibaca dari TX / SECT (s.drn); modul ini TIDAK mengubah state apa pun. */
 var TXFX=(function(){
   var SRC='110,229,255',RCV='255,154,217',NEU='200,214,226',HOLD_MS=580,HOLD_SHOW=160;
@@ -17,6 +21,15 @@ var TXFX=(function(){
   function ease(u){return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
   function hsh(k){var h=0,i;for(i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))|0;return (h&1)?1:-1;}
   function lite(){return document.body&&document.body.classList.contains('perf-tier-0');}
+  /* ---------- mendarat di planet ---------- */
+  /* Orbit di atmosfer planet (bukan berdiri diam di tanah): drone mengitari titik jangkar di atas permukaan. ru = radius sepanjang horizon (px), rs = radius kedalaman (px, ke/menjauhi horizon),
+     lift = tinggi di atas tanah (px x skala), bob = naik-turun ringan, per = ms per putaran, counter = parallax LAWAN rotasi planet (1 = jangkar diam di layar, 0 = ikut berputar bersama tanah),
+     pose = 0 drone tetap pose terbang (tanpa kaki mendarat), 1 = pose mendarat. */
+  var DRONE_ORB={ru:46,rs:9,lift:34,bob:5,per:7000,counter:1,pose:0};
+  function landMode(){return typeof planetGroundAt==='function'&&typeof PL3D_CFG!=='undefined'&&PL3D_CFG.on;}
+  function fScale(){return W<420?1:1.15;}
+  function landSc(k){return fScale()*Math.max(.8,Math.min(1.2,k/46));}
+  function liftOf(sc){return 28*sc*.40;}   /* pusat badan di atas kaki (ukuran drone 3D = 28 px x sc) */
   function ping(x,y,col,now,big){pings.push({x:x,y:y,col:col,t:now,r:big?32:22});if(pings.length>8)pings.shift();}
   function bez(a,b,e,k){   /* kurva kuadratik a→b, k = lengkungan relatif (tanda = sisi) */
     var mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1],cx=mx-dy*k,cy=my+dx*k,i=1-e;
@@ -45,7 +58,16 @@ var TXFX=(function(){
     if(TX.recv[s.k])return 'rcv';             /* receiver: standby di teleskop, pink (tanpa RELAY.on) */
     return 'sby';                              /* kuning (atau pink sumber tanpa SFX bunyi): standby di teleskop */
   }
-  function targetOf(s,mode){
+  function targetOf(s,mode,d,now){
+    if(d&&landMode()){   /* mendarat: titik tujuan = tanah planet (null kalau planet belum/tidak kelihatan) */
+      if(d.gu==null)return null;
+      var g0=planetGroundAt(d.gu,d.gs,now,0);if(!g0)return null;
+      var O=DRONE_ORB,a=reduce?.8:now*(6.2832/O.per)*d.sg+1.2,cp=(typeof planetRotPx==='function')?(planetRotPx(now)-(d.g0||0))*O.counter:0,   /* parallax lawan rotasi: jangkar digeser berlawanan arah putaran tanah */
+          ug=d.gu+cp+Math.cos(a)*O.ru,sg=Math.max(10,d.gs+Math.sin(a)*O.rs),
+          g1=planetGroundAt(ug,sg,now,0);if(!g1)return null;
+      var lsc=landSc(g1.k),lf=O.lift*lsc+(reduce?0:Math.sin(now*.0016+d.sg)*O.bob*lsc),gl=planetGroundAt(ug,sg,now,lf);
+      return gl?{x:gl.lx,y:gl.ly,r:0,ground:gl,sc:lsc}:null;
+    }
     if(mode==='rcv'||mode==='sby'){   /* standby: orbit teleskop; radius cukup besar supaya area tap drone dan teleskop tidak saling menutup */
       var tp=tele();return tp?{x:tp[0],y:tp[1],r:Math.round(42*(typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1))}:null;
     }
@@ -120,6 +142,12 @@ var TXFX=(function(){
 
   /* ---------- F9: tether non-permanen + cincin status ---------- */
   var TETH_HOLD=800,TETH_FADE=400;
+  var BEAM_HOLD=1800,BEAM_FADE=900;   /* berkas bintang SFX -> drone (TX) / sinyal turun (RX): tampil BEAM_HOLD ms setelah mulai / drone mendarat / SFX ganti bintang, lalu pudar BEAM_FADE ms. Tidak permanen. */
+  function beamF(d,now){   /* 1 selama tahan; sesudah itu sama seperti tethF tapi pakai penanda sendiri d.bch */
+    if(hold)return 1;
+    var e=now-(d.bch||-1e9);
+    return e<BEAM_HOLD?1:(e<BEAM_HOLD+BEAM_FADE?1-(e-BEAM_HOLD)/BEAM_FADE:0);
+  }
   function tethF(d,now){   /* 1 selama tahan; setelah transisi (d.tch) penuh TETH_HOLD ms lalu pudar TETH_FADE ms */
     if(hold)return 1;
     var e=now-(d.tch||-1e9);
@@ -143,6 +171,23 @@ var TXFX=(function(){
     g.restore();
   }
 
+  /* pulse di kaki drone (elips di tanah; bidang tanah gepeng oleh perspektif). Kuning pelan = drone di-drop, pink cepat = TX/RX aktif. Digambar di ruang layar tegak. */
+  function ell(x,y,rx,ry){if(g.ellipse)g.ellipse(x,y,rx,ry,0,0,6.283);else{g.save();g.translate(x,y);g.scale(1,ry/rx);g.arc(0,0,rx,0,6.283);g.restore();}}
+  function drawFeet(fp,col,pink,now,d){
+    var x=fp.ux,y=fp.uy,k=Math.max(.8,Math.min(1.2,fp.k/46))*fScale(),per=pink?1500:2600,i,f,lt;
+    planetUprightBegin(g);
+    g.lineWidth=1.2;
+    g.fillStyle='rgba('+col+','+(pink?.24:.12)+')';g.beginPath();ell(x,y,7*k,2.4*k);g.fill();
+    if(reduce||lite()){g.strokeStyle='rgba('+col+','+(pink?.55:.3)+')';g.beginPath();ell(x,y,13*k,4.4*k);g.stroke();}
+    else for(i=0;i<(pink?2:1);i++){
+      f=((now+i*per*.5)%per)/per;
+      g.strokeStyle='rgba('+col+','+((pink?.62:.34)*(1-f))+')';g.beginPath();ell(x,y,(6+f*22)*k,(6+f*22)*k*.34);g.stroke();
+    }
+    lt=(d&&d.landT)?now-d.landT:1e9;
+    if(lt<700&&!reduce){f=lt/700;g.strokeStyle='rgba('+col+','+((1-f)*.75)+')';g.lineWidth=1.6;g.beginPath();ell(x,y,(8+f*38)*k,(8+f*38)*k*.34);g.stroke();}
+    g.restore();
+  }
+
   /* ---------- ring tahan teleskop ---------- */
   function drawHold(now){
     if(!hold)return;
@@ -162,12 +207,18 @@ var TXFX=(function(){
   /* ---------- di dalam sektor ---------- */
   function drawSector(now,s){
     if(typeof lisGone==='function'&&lisGone()){lastCur=null;return;}   /* teleskop ditinggal di sektor lain: nggak ada yang digambar */
-    var mode=want(s),d=D[s.k]||(D[s.k]={ph:'idle',mode:null,trail:[],sg:hsh(s.k),t0:0,from:null,pos:null,key:null,hop:false}),
+    var mode=want(s),d=D[s.k]||(D[s.k]={ph:'idle',mode:null,trail:[],sg:hsh(s.k),t0:0,from:null,pos:null,key:null,hop:false,gu:null,gs:0,landT:0}),
         curKey=(mode==='src'&&TX.by[s.k])?TX.by[s.k].key:null;   /* bintang pemancar sekarang (berubah kalau SFX ganti) */
-    if(lastCur!==s){lastCur=s;d.trail.length=0;d.ph=mode?'dock':'idle';d.mode=mode;d.from=null;d.pos=null;d.key=curKey;d.hop=false;}   /* masuk sektor: snap, tanpa animasi */
+    var LM=landMode();
+    if(lastCur!==s){lastCur=s;d.bon=false;d.trail.length=0;d.ph=mode?'dock':'idle';d.mode=mode;d.from=null;d.pos=null;d.key=curKey;d.hop=false;   /* masuk sektor: snap, tanpa animasi */
+      if(LM&&d.gu!=null){var gq=planetGroundAt(d.gu,d.gs,now,0);if(gq&&gq.off)d.gu=null;}}   /* selama ditinggal permukaan terus berputar: kalau drone sudah terbawa keluar layar, cari tempat baru */
     var tp=tele();if(!tp)return;
+    if(LM&&mode&&d.gu==null){   /* tempat mendarat: dekat teleskop, dipilih saat planet sudah kelihatan */
+      var pk=planetLandPick(tp[0],tp[1],now,null);if(pk){d.gu=pk.u;d.gs=pk.s;d.g0=(typeof planetRotPx==='function')?planetRotPx(now):0;}
+    }
     var col=fcol('sec:'+s.k,ilCol(s),now);
     /* transisi state */
+    if(LM&&mode&&d.ph==='dock'&&d.mode!==mode){d.mode=mode;d.key=curKey;}   /* sudah mendarat: ganti peran (sby/rcv/src) tanpa terbang lagi */
     if(mode&&(d.ph==='idle'||d.ph==='back'||d.mode!==mode)){
       var live=!!(d.pos&&(d.ph==='back'||d.ph==='dock'||d.ph==='out'));
       d.from=live?d.pos.slice():null;
@@ -175,44 +226,65 @@ var TXFX=(function(){
       d.ph='out';d.t0=now;d.tch=now;d.mode=mode;d.key=curKey;col=fcol('sec:'+s.k,ilCol(s),now);
       if(!d.hop)ping(tp[0],tp[1],col,now,false);else ping(d.pos[0],d.pos[1],col,now,false);
     }else if(mode==='src'&&d.key!==curKey){   /* SFX ganti bintang di sektor yang sama: drone pindah orbit ke bintang baru */
-      if(d.ph==='dock'&&d.pos){d.from=d.pos.slice();d.ph='out';d.t0=now;d.tch=now;d.hop=true;ping(d.pos[0],d.pos[1],col,now,false);}
+      if(!LM&&d.ph==='dock'&&d.pos){d.from=d.pos.slice();d.ph='out';d.t0=now;d.tch=now;d.hop=true;ping(d.pos[0],d.pos[1],col,now,false);}
       d.key=curKey;   /* kalau masih 'out': targetOf() dihitung ulang tiap frame, jalur otomatis membelok ke bintang baru */
     }else if(!mode&&(d.ph==='out'||d.ph==='dock')){
       d.from=d.pos?d.pos.slice():tp;d.ph='back';d.t0=now;d.tch=now;d.hop=false;
     }
     if(typeof txLinked==='function'&&txLinked(s))drawLinkRing(tp,now);   /* cincin cyan: sektor ini interlocking (juga saat drone idle karena bintang sumber tak terlihat) */
     if(d.ph==='idle')return;
-    var T=d.mode?targetOf(s,d.mode):null,pos,al=1,u,e;
+    var T=d.mode?targetOf(s,d.mode,d,now):null,pos,al=1,u,e,baseSc=fScale(),dsc=baseSc,landF=0;
     if(d.ph==='out'){
-      if(!T){d.ph='idle';return;}
+      if(!T){if(LM){d.t0=now;return;}d.ph='idle';return;}   /* planet belum kelihatan: tahan dulu, terbang mulai saat tanah ada */
       u=reduce?1:c01((now-d.t0)/1700);e=ease(u);al=d.hop?1:e;
       pos=bez(d.from||tp,orbit(T,now,d.sg),e,d.sg*.28);
-      if(u>=1){d.ph='dock';d.hop=false;d.tch=now;ping(T.x,T.y,col,now,true);}
+      if(T.sc){dsc=baseSc+(T.sc-baseSc)*e;landF=c01((e-.7)/.3);}
+      if(u>=1){d.ph='dock';d.hop=false;d.tch=now;if(LM)d.landT=now;else ping(T.x,T.y,col,now,true);}
     }else if(d.ph==='dock'){
-      if(!T){d.ph='idle';return;}
+      if(!T){if(LM)return;d.ph='idle';return;}
+      if(T.ground&&T.ground.off){   /* terbawa rotasi sampai keluar layar: lepas landas, mendarat lagi di sisi lain (status interlock tetap) */
+        var rp=planetLandPick(tp[0],tp[1],now,T.ground.ux>PW*.5?.13:.5);
+        if(rp){d.gu=rp.u;d.gs=rp.s;d.g0=(typeof planetRotPx==='function')?planetRotPx(now):0;d.from=d.pos?d.pos.slice():null;d.hop=true;d.ph='out';d.t0=now;d.tch=now;}
+        return;
+      }
       pos=orbit(T,now,d.sg);
+      if(T.sc){dsc=T.sc;landF=1;}
     }else{   /* back */
       u=reduce?1:c01((now-d.t0)/1400);e=ease(u);al=1-e;
       pos=bez(d.from||tp,tp,e,-d.sg*.28);
-      if(u>=1){d.ph='idle';d.trail.length=0;ping(tp[0],tp[1],col,now,false);return;}
+      if(T&&T.sc){dsc=T.sc+(baseSc-T.sc)*e;landF=1-c01(e/.35);}
+      if(u>=1){d.ph='idle';d.trail.length=0;d.gu=null;ping(tp[0],tp[1],col,now,false);return;}
     }
-    d.pos=pos;
+    d.pos=pos;landF*=DRONE_ORB.pose;
     if(!reduce){var tl=d.trail,lp=tl.length?tl[tl.length-1]:null;if(!lp||Math.abs(lp[0]-pos[0])+Math.abs(lp[1]-pos[1])>1.2){tl.push([pos[0],pos[1],now]);if(tl.length>28)tl.shift();}}
-    g.save();
-    drawTrail(d,col,now);
-    tether(pos,tp,col,al*tethF(d,now),now,6,15);   /* sinyal ngalir drone→teleskop: hanya saat transisi/tahan */
-    if(TX.by[s.k]&&TX.by[s.k].on&&d.ph==='dock')drawDockRing(pos[0],pos[1],now);
-    TOP={x:pos[0],y:pos[1],col:col,al:al,txt:d.mode==='rcv'?'RX':(d.mode==='sby'?'':'TX')};   /* sprite + label digambar belakangan di drawTop(): di ATAS Gargantua/reticle */
-    g.restore();
+    /* semua gambar drone ditunda ke drawTop() (setelah planet): trail, tether, berkas bintang, pulse kaki, sprite, label */
+    var tx=TX.by[s.k],beam=null;
+    var bOn=!!(d.ph==='dock'&&tx&&tx.on);
+    if(bOn&&(!d.bon||d.bkey!==curKey))d.bch=now;   /* berkas baru muncul (SFX mulai / mendarat / ganti bintang): mulai hitung tampil -> pudar */
+    d.bon=bOn;d.bkey=curKey;
+    if(bOn){
+      if(!tx.recv){var sp0=txStarPos(tx.key),q0=sp0&&gravityPos(sp0[0],sp0[1]);if(q0)beam={a:[q0[0],q0[1]],rx:false};}   /* TX: berkas dari bintang SFX ke drone */
+      else beam={a:[pos[0],Math.max(6,pos[1]-H*.4)],rx:true};   /* RX: sinyal turun dari atas */
+    }
+    TOP={x:pos[0],y:pos[1],col:col,al:al,txt:(tx&&tx.on)?(tx.recv?'RX':'TX'):'',d:d,tp:tp,sc:dsc,land:landF,beam:beam,
+         foot:(d.ph==='dock'&&T&&T.ground)?T.ground:null,pulse:!!(tx&&tx.on)};
   }
-  /* Tahap atas: dipanggil setelah Gargantua + asteroid depan (05-sector-ui.js frame()), jadi drone selalu di atas lubang hitam & reticle. */
+  /* Tahap atas: dipanggil SETELAH planet (05-sector-ui.js frame()), jadi drone yang mendarat berdiri DI ATAS permukaan planet, di atas Gargantua/reticle. */
   function drawTop(now){
     var T=TOP;TOP=null;
-    if(!T||typeof g==='undefined'||!g||CAMERA_MODE)return;
+    if(typeof g==='undefined'||!g||CAMERA_MODE)return;
     g.save();
     try{
-      drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,W<420?1:1.15);
-      if(T.txt)label(T.x,T.y+11,T.txt,T.col,T.al);
+      if(T){
+        drawTrail(T.d,T.col,now);
+        if(T.beam)tether(T.beam.a,[T.x,T.y],T.col,(T.beam.rx?.7:1)*beamF(T.d,now),now,T.beam.rx?0:8,10);   /* memudar sendiri (beamF), bukan permanen */
+        tether([T.x,T.y],T.tp,T.col,T.al*tethF(T.d,now),now,6,15);   /* sinyal drone→teleskop: hanya saat transisi/tahan */
+        if(T.foot)drawFeet(T.foot,T.col,T.pulse,now,T.d);
+        if(typeof DR3D!=='undefined')DR3D.land=T.land;
+        drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,T.sc);
+        if(T.txt)label(T.x,T.y-26*T.sc,T.txt,T.col,T.al);
+      }
+      drawHold(now);   /* cincin tahan di atas planet juga, supaya cincin di drone yang mendarat tidak tertutup */
     }finally{g.restore();}
   }
 
@@ -244,10 +316,11 @@ var TXFX=(function(){
     try{
       if(SECT.cur&&!SECT.on){if(!SECT.busy)drawSector(now,SECT.cur);}
       else lastCur=null;
-      drawHold(now);drawPings(now);
+      drawPings(now);
     }finally{g.restore();}
   }
   return {
+    ORB:DRONE_ORB,   /* knob orbit atmosfer: TXFX.ORB.ru / rs / lift / bob / per / counter / pose (bisa dituning live dari console) */
     draw:draw,
     drawTop:drawTop,
     holdStart:function(tg){hold={t0:performance.now(),tg:tg||'tele'};},

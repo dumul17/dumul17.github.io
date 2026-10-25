@@ -504,6 +504,10 @@ function drawFloatingTelescope(now){
     var fq=TELESCOPE.follow();
     if(fq){TELESCOPE.targetX=fq[0];TELESCOPE.targetY=fq[1];}
   }
+  if(TELESCOPE.mode==='warp'||TELESCOPE.mode==='orbit'){
+    /* planet (17-planet3d.js): bintang tujuan yang ada di balik planet -> titik tujuan teleskop dijepit di atas limb, jadi warp tetap "sampai" (dist<25) dan orbit tidak tenggelam */
+    try{if(typeof planetObjClamp==='function'){var ptc=planetObjClamp(TELESCOPE.targetX,TELESCOPE.targetY,telescopeHitRadius()*.7,PL3D_CFG.teleSink);TELESCOPE.targetX=ptc[0];TELESCOPE.targetY=ptc[1];}}catch(ePt){}
+  }
   if(TELESCOPE.mode==='warp'){
     /* Fast glide toward the target star */
     var dx=TELESCOPE.targetX-TELESCOPE.x;
@@ -569,6 +573,23 @@ function drawFloatingTelescope(now){
     if(TELESCOPE.y<mY){TELESCOPE.y=mY;TELESCOPE.vy=Math.abs(TELESCOPE.vy);TELESCOPE.ty=Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
     else if(TELESCOPE.y>H-mY){TELESCOPE.y=H-mY;TELESCOPE.vy=-Math.abs(TELESCOPE.vy);TELESCOPE.ty=-Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
   }
+
+  /* planet (17-planet3d.js): teleskop boleh menyentuh / terbenam sedikit di balik limb, tidak sampai hilang (sama seperti BH mini, planetBhClamp).
+     Drift/warp: ditarik halus (ease) supaya crossfade geometri sektor / parallax tidak bikin lompat; orbit: posisi dihitung ulang tiap frame dari bintang, jadi dijepit langsung.
+     Cuma menggeser posisi: state tether TX (d.tch di 08-tx-drone.js) tidak disentuh, garis drone-teleskop tetap pudar sendiri. */
+  try{
+    if(typeof planetObjClamp==='function'){
+      var pcl=planetObjClamp(TELESCOPE.x,TELESCOPE.y,telescopeHitRadius()*.7,PL3D_CFG.teleSink),pdx=pcl[0]-TELESCOPE.x,pdy=pcl[1]-TELESCOPE.y;
+      if(pdx||pdy){
+        var pks=TELESCOPE.mode==='orbit'?1:Math.min(1,dt*8);
+        TELESCOPE.x+=pdx*pks;TELESCOPE.y+=pdy*pks;
+        if(TELESCOPE.mode==='drift'){   /* pantul halus menjauhi planet, seperti pantulan tepi layar */
+          if(pdx<-.01){TELESCOPE.vx=-Math.abs(TELESCOPE.vx);TELESCOPE.tx=-Math.abs(TELESCOPE.tx||TELESCOPE.vx);}else if(pdx>.01){TELESCOPE.vx=Math.abs(TELESCOPE.vx);TELESCOPE.tx=Math.abs(TELESCOPE.tx||TELESCOPE.vx);}
+          if(pdy<-.01){TELESCOPE.vy=-Math.abs(TELESCOPE.vy);TELESCOPE.ty=-Math.abs(TELESCOPE.ty||TELESCOPE.vy);}else if(pdy>.01){TELESCOPE.vy=Math.abs(TELESCOPE.vy);TELESCOPE.ty=Math.abs(TELESCOPE.ty||TELESCOPE.vy);}
+        }
+      }
+    }
+  }catch(ePc){}
 
   /* margin used by edge-wrap ghost copies during draw (all modes). */
   var margin=110;

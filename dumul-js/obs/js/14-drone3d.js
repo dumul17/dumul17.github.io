@@ -252,14 +252,15 @@ function dr3dUpdate(now,x,y,col){
   DR3D.yaw.rotation.y=DR3D.yawA;
   /* condong tipis ke depan sesuai kecepatan, melayang pelan */
   var ln=Math.min(.32,sp*6),tt=now*.001;
-  DR3D.lean.rotation.x=-ln+.025*Math.sin(tt*1.1);
-  DR3D.lean.rotation.z=.03*Math.sin(tt*.8+.8);
-  DR3D.mdl.position.y=.3*Math.sin(tt*1.2);
+  var LD=Math.max(0,Math.min(1,DR3D.land||0)),fl=1-LD;   /* DR3D.land (diisi 08-tx-drone.js): 0 terbang ... 1 mendarat -> tidak melayang/condong */
+  DR3D.lean.rotation.x=(-ln+.025*Math.sin(tt*1.1))*fl;
+  DR3D.lean.rotation.z=.03*Math.sin(tt*.8+.8)*fl;
+  DR3D.mdl.position.y=.3*Math.sin(tt*1.2)*fl;
 
   /* jari-jari muka berputar pelan; api thruster berdenyut halus */
   o.spin.rotation.z=now*.0004;
   var i;
-  for(i=0;i<o.flames.length;i++)o.flames[i].scale.z=.75+.18*Math.sin(now*.009+i*1.7)+ln*.8;
+  for(i=0;i<o.flames.length;i++)o.flames[i].scale.z=(.75+.18*Math.sin(now*.009+i*1.7)+ln*.8)*(1-.75*LD);
 
   /* warna interlock (col = 'r,g,b') -> jari-jari muka */
   if(col!==DR3D.lastCol){

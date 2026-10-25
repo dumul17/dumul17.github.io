@@ -47,7 +47,10 @@ var PT3D_CFG={
   orb:{on:true,
     ax:.30,        /* setengah sumbu panjang terhadap lebar layar (dijepit supaya cincin tetap di dalam layar) */
     ay:.085,       /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
-    per:26,        /* detik per satu putaran orbit. Jauh lebih cepat dari rotasi planet (rotPx .5 px/dtk) */
+    per:90,        /* detik per satu putaran orbit (dulu 26). Pelan: gaya orbit drone di atmosfer (08-tx-drone.js) tapi jauh lebih lambat */
+    depth:.10,     /* cincin sedikit lebih besar di sisi dekat (bawah elips) dan lebih kecil di sisi jauh (atas), +-sekian x radius. 0 = ukuran tetap */
+    bob:5,         /* naik-turun ringan (px CSS), seperti drone. 0 = mati */
+    counter:1,     /* 1 = arah orbit MELAWAN rotasi permukaan planet (PL3D_CFG.live.rot), 0 = selalu searah jarum jam */
     bet:1,         /* pengali kemiringan sumbu terhadap tangen limb (1 = sejajar horizon; >1 lebih curam) */
     gap:1.1        /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
   }
@@ -658,16 +661,19 @@ function ptOrbPinned(){
 }
 function portalOrbit(now,bp,Rp){
   var out=PT3D.orb||(PT3D.orb={on:0,x:0,y:0,hid:0,w:0}),O=PT3D_CFG.orb;
-  out.on=0;out.x=bp[0];out.y=bp[1];out.hid=0;out.w=0;
+  out.on=0;out.x=bp[0];out.y=bp[1];out.hid=0;out.w=0;out.s=1;
   if(!O||!O.on||(typeof reduce!=='undefined'&&reduce))return out;
   var pin=ptOrbPinned(),phi=pin?PT_PHI0:PT3D.orbPhi;
   if(pin&&!(typeof ARV!=='undefined'&&ARV<.999)){PT3D.orbInSect=0;}   /* sudah selesai datang: mulai dari puncak, lalu jalan */
   var dt=PT3D.orbLast?Math.min(.1,Math.max(0,(now-PT3D.orbLast)/1000)):0;PT3D.orbLast=now;
   var busy=(typeof SECT!=='undefined'&&SECT.busy)||(typeof whBusy==='function'&&whBusy())||(typeof drag!=='undefined'&&drag.on)||pin&&(typeof ARV!=='undefined'&&ARV<.999);
-  if(!busy)phi=(phi+dt*6.283185/O.per)%6.283185;
+  var dir=1;
+  if(O.counter){try{dir=(PL3D_CFG.live.rot>0)?-1:1;}catch(eD){}}   /* lawan rotasi planet */
+  if(!busy)phi=(phi+dir*dt*6.283185/O.per+6.283185)%6.283185;
   PT3D.orbPhi=phi;
   var p=ptOrbAt(phi,bp);if(!p)return out;
-  out.x=p.x;out.y=p.y;out.on=1;out.w=1;
+  out.x=p.x;out.y=p.y+(O.bob?Math.sin(now*.0013)*O.bob:0);out.on=1;out.w=1;
+  out.s=1-(O.depth||0)*Math.sin(phi);   /* phi=pi/2 = puncak elips = sisi jauh (lebih kecil); bawah = sisi dekat (lebih besar) */
   return out;
 }
 function ptSmooth(u){u=u<0?0:(u>1?1:u);return u*u*(3-2*u);}
@@ -693,8 +699,9 @@ function portal3dOverview(now,bp,R){
   if(PT3D.state===0)pt3dLoad();
   var Rp=R*ptOvK();
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringOwned&&WORMHOLE.ringOwned())return true;   /* zoom-in dari overview (F2): cincin digambar di kanvas wormhole; ovR/ovT sengaja tidak diperbarui (portal tidak bisa di-tap selama transisi) */
-  var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
   var op=portalOrbit(now,bp,Rp),px=op.x,py=op.y,tk=PT3D_CFG.tiltOv||0;
+  Rp*=op.s||1;   /* orbit ala drone: sedikit membesar di sisi dekat, mengecil di sisi jauh (PT3D_CFG.orb.depth); ovR (hit-test tap) ikut */
+  var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
   if(!smenuHidesSky())portal3dDraw(g,px,py,Rd,now,1,(ch>0||tk>0)?{ch:ch,tilt:tk}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
   PT3D.ovR=Rp;PT3D.ovT=now;PT3D.ovX=px;PT3D.ovY=py;PT3D.ovHid=op.hid;   /* F3: radius + posisi terakhir dipakai hit-test tap portal overview (06-interaction.js), jangkar wormhole (05), lampu planet (17) */
   /* F3 (D1): petunjuk idle — selama pengunjung belum pernah membuka menu sektor, cincin luar berdenyut pelan ("portal ini bisa di-tap"). */

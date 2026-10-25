@@ -786,6 +786,10 @@ function frame(now){
       hoverDirty=false;lastHoverAt=now;
     }
     bhScaleStep();
+    if(!drag.on&&SECT.cur&&!SECT.on&&(skyZoom||1)<=1.02&&typeof planetBhClamp==='function'){   /* planet: BH mini yang kebetulan di balik limb (parkir awal, resize, crossfade geometri) ditarik halus naik; sama dgn clamp drag */
+      var bm0=BH.R*BHSC*Math.max(1,bhSizeMul()),pc0=planetBhClamp(BH.x,BH.y,bm0);
+      if(pc0[0]!==BH.x||pc0[1]!==BH.y){BH.x+=(pc0[0]-BH.x)*.12;BH.y+=(pc0[1]-BH.y)*.12;}
+    }
     if(!drag.on&&!SECT.cur&&(Math.abs(BH.x-BH.hx)>.05||Math.abs(BH.y-BH.hy)>.05)){
       BH.x+=(BH.hx-BH.x)*.065;BH.y+=(BH.hy-BH.y)*.065;
     }
@@ -881,9 +885,9 @@ function frame(now){
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     pmk('portals');
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
-    try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX (sprite + label) di atas Gargantua, asteroid depan, reticle */
     try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
+    try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
     pmk('planet');
     try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* separuh depan: sekarang di ATAS planet (dulu di depan BH, di bawah drone/teleskop) */
     pmk('astFront');
@@ -1108,6 +1112,16 @@ var SN_COOLDOWN={};
 
   var rows=[].slice.call(panel.querySelectorAll('.mp-track'));
   var trackNames=tracks.map(function(t){return t.name;});
+  /* Kunci SFX sektor sumber (sfxLockInfo di 02-sky-logic.js): grup sektor itu ditandai pink, baris selain bintang tertaut diredupkan. Dipanggil dari txSet/txClear. */
+  window.mpLockSync=function(){
+    var L=typeof sfxLockInfo==='function'?sfxLockInfo():null;
+    groups.forEach(function(g){g.classList.toggle('mp-locked',!!L&&g.getAttribute('data-sector')===L.s.k);});
+    rows.forEach(function(r,i){
+      var t=tracks[i],gp=r.closest&&r.closest('.mp-grp'),lk=!!(L&&t&&t.type==='sfx'&&gp&&gp.getAttribute('data-sector')===L.s.k);
+      r.classList.toggle('mp-lockrow',lk&&t.key!==L.key);r.classList.toggle('mp-linked',lk&&t.key===L.key);
+    });
+  };
+  window.mpLockSync();
   var activeIdx=SFX_N; /* default highlighted row: Constellation BGM */
   var specRAF=0;
   var nowTimer=0;
@@ -1675,6 +1689,7 @@ function triggerSupernova(key){
   if(typeof isLayoutEdit==="function"&&isLayoutEdit())return;
   if(SW)return;
   if(typeof lisBlock==='function'&&lisBlock('sig')){lisDenied('sig');return;}   /* Lost-in-Space */
+  if(typeof sfxBlocked==='function'&&sfxBlocked(key)){sfxLockedToast();return;}   /* sektor sumber terkunci selama TX dock */
   var tr=TRIGGERS[key],
       c=tr&&tr.cons==='pleiades'?PLEIADES:(tr&&cons(tr.cons)),
       s=tr&&c&&(tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star]);
