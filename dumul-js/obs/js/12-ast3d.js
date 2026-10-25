@@ -208,6 +208,7 @@ function ast3dDraw(now,half){
     }
     ast3dResize();
     for(i=0;i<nv;i++)vars[i].n=0;
+    var bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9;   /* bbox layar (px CSS) dari batu yang kegambar: blit cuma area ini */
     for(i=0;i<nA;i++){
       a=AST[i];
       if(!a._vis)continue;
@@ -226,6 +227,7 @@ function ast3dDraw(now,half){
       A[o]=a._x;A[o+1]=H-a._y;A[o+2]=a._sz;A[o+3]=al>1?1:(al<0?0:al);
       B[o]=a._ax;B[o+1]=a._ay;B[o+2]=a._az;B[o+3]=a.rot*2+now*a.rs;
       v.Z.array[k]=a._s*120;
+      if(a._x-hf<bx0)bx0=a._x-hf;if(a._x+hf>bx1)bx1=a._x+hf;if(a._y-hf<by0)by0=a._y-hf;if(a._y+hf>by1)by1=a._y+hf;
       total++;
     }
     AST3D.passes++;AST3D.drawn+=total;
@@ -244,7 +246,9 @@ function ast3dDraw(now,half){
       v.Z.updateRange.offset=0;v.Z.updateRange.count=v.n;v.Z.needsUpdate=true;
     }
     AST3D.r.render(AST3D.sc,AST3D.cam);
-    g.drawImage(AST3D.r.domElement,0,0,W,H);
+    var cvA=AST3D.r.domElement,kx=cvA.width/W,ky=cvA.height/H,
+        rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),rx1=Math.min(W,Math.ceil(bx1)+2),ry1=Math.min(H,Math.ceil(by1)+2);
+    if(rx1>rx0&&ry1>ry0)g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama persis dgn blit penuh: di luar bbox kanvas GL transparan */
     return true;
   }catch(e){
     ast3dFail(e&&e.message||e);
