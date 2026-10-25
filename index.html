@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=70">
+<link rel="stylesheet" href="index.css?v=71">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -284,20 +284,20 @@
 <!-- DEPLOY: naikkan ?v= dumul-js/obs/sky-data.js / texts.js / js/*.js (urutan JANGAN diubah; 11-live-count.js dimuat lewat import() di script inline; 12-ast3d.js ada SETELAH script inline itu; three.min.js dimuat lazy oleh 12-ast3d.js / 13-scope3d.js / 14-drone3d.js dan harus ada di SHELL) / index.css; samakan PERSIS dengan SHELL di service-worker.js (node check-sky.js memeriksa). -->
 <div id="live-count" hidden aria-hidden="true"><i></i><b>0</b><span>observer</span></div>
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
-<script defer src="dumul-js/obs/sky-data.js?v=29"></script>
+<script defer src="dumul-js/obs/sky-data.js?v=30"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=23"></script>
+<script defer src="dumul-js/obs/i18n.js?v=24"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=130"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=124"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=125"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=109"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=127"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=143"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=128"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=144"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=120"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=112"></script>
-<script defer src="dumul-js/obs/js/08-tx-drone.js?v=10"></script>
-<script defer src="dumul-js/obs/js/09-wormhole.js?v=19"></script>
+<script defer src="dumul-js/obs/js/08-tx-drone.js?v=11"></script>
+<script defer src="dumul-js/obs/js/09-wormhole.js?v=20"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=6"></script>
 <script>
 /* Live counter: dimuat BELAKANGAN (setelah window load + idle) supaya Firebase dari gstatic nggak rebutan bandwidth dengan boot & audio.
@@ -310,10 +310,10 @@
 </script>
 <script defer src="dumul-js/obs/js/12-ast3d.js?v=3"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=6"></script>
-<script defer src="dumul-js/obs/js/14-drone3d.js?v=5"></script>
-<script defer src="dumul-js/obs/js/15-portal3d.js?v=7"></script>
+<script defer src="dumul-js/obs/js/14-drone3d.js?v=6"></script>
+<script defer src="dumul-js/obs/js/15-portal3d.js?v=8"></script>
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=2"></script>
-<script defer src="dumul-js/obs/js/17-planet3d.js?v=1"></script>
+<script defer src="dumul-js/obs/js/17-planet3d.js?v=2"></script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
