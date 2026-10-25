@@ -23,7 +23,7 @@
 <meta name="twitter:title" content="Dumul's Observatory">
 <meta name="twitter:description" content="A modder and music composer's little universe: original soundtracks, gameplay, mods, and the music project DUMUL.">
 <meta name="twitter:image" content="https://dumul17.github.io/og-constellation.jpg">
-<link rel="preload" as="image" href="og.webp">
+<link rel="preload" as="image" href="og.webp" fetchpriority="low">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -301,7 +301,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=128"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=148"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=120"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=112"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=113"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=11"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=21"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=6"></script>
@@ -314,7 +314,7 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=3"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=4"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=6"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=7"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=9"></script>
@@ -325,7 +325,7 @@
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
   <div class="tesseract-stage" id="tesseract-stage">
-    <img class="tesseract-og" src="./og.webp" alt="" aria-hidden="true" decoding="async">
+    <img class="tesseract-og" src="./og.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="low">
     <div class="tesseract-shade s1"></div>
     <div class="tesseract-shade s2"></div>
     <div class="tesseract-shade s3"></div>
