@@ -93,7 +93,7 @@ footer nav a{display:grid;place-items:center;width:32px;height:32px;border-radiu
 footer nav a:hover,footer nav a:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.07)}
 footer nav svg{width:15px;height:15px;display:block}
 .quote{display:none}
-@media(max-width:520px){#music-player{right:10px;bottom:52px;width:min(280px,calc(100vw - 24px));padding:9px}.mp-name{font-size:8.5px}footer{padding-left:10px;padding-right:10px}#music-toggle{right:10px;width:31px;height:31px}#mp-now-playing{right:47px;height:31px;font-size:8px;padding:0 8px;max-width:min(140px,calc(100vw - 64px))}}
+@media(max-width:520px){#music-player{right:10px;bottom:52px;width:min(280px,calc(100vw - 24px));padding:9px}.mp-name{font-size:8.5px}footer{padding-left:10px;padding-right:10px}#music-toggle{right:10px;width:31px;height:31px}#mp-now-playing{height:31px;font-size:8px;padding:0 8px;max-width:min(140px,calc(100vw - 64px))}}
 
 .cap{display:none;position:fixed;left:0;top:0;z-index:3;font-size:10px;letter-spacing:.5em;text-transform:uppercase;color:rgba(184,198,214,.42);pointer-events:none;white-space:nowrap}
 #bh-clock{position:fixed;pointer-events:auto;cursor:pointer;left:0;top:0;z-index:5;font:500 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.08em;color:rgba(196,226,240,.58);pointer-events:auto;white-space:nowrap;text-shadow:0 0 7px rgba(110,229,255,.16);text-transform:uppercase}
@@ -423,7 +423,6 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
     bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
   }
   #mp-now-playing {
-    right: 42px !important;
     bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
     height: 28px !important;
     font-size: 8px !important;
@@ -856,9 +855,6 @@ body:not(.camera-mode) #cat-lock{opacity:0!important}
 #cam-zwrap i{position:absolute;top:50%;left:calc(var(--th) / 2 + (100% - var(--th)) * var(--p));width:1px;height:8px;margin:-4px 0 0 -.5px;background:rgba(110,229,255,.45);pointer-events:none}
 #cam-zoom .cz-hint{display:block;margin-top:4px;font-size:7px;letter-spacing:.1em;color:rgba(184,224,238,.45);font-weight:500}
 
-/* Now-playing title sits left of the mode cluster + music button */
-#mp-now-playing{right:calc(12px + 32px + 6px + 32px + 8px)!important}
-
 /* Observe mode: strip HUD chrome, keep sky + hole + telescope */
 body.observe-mode #header,
 body.observe-mode #footer,
@@ -908,7 +904,6 @@ body.lis-asking #mode-toast{bottom:calc(160px + env(safe-area-inset-bottom,0px))
   #mode-observe,#mode-silence,#mode-camera{width:31px;height:31px;padding:0;font-size:14px}
   #cam-zoom{font-size:9px;padding:5px 10px}
   body.observe-mode #mode-cluster{right:10px}
-  #mp-now-playing{right:calc(10px + 31px + 6px + 31px + 8px)!important}
   #last-signal{top:max(48px,env(safe-area-inset-top,0px) + 40px);padding:10px 12px}
   .ls-name{font-size:13px;letter-spacing:.12em}
 }
@@ -1010,9 +1005,8 @@ body.sect-in #mode-bh{display:grid}
 #mode-sectors{display:none!important;pointer-events:none!important}
 #mode-bh:hover{color:#6ee5ff;border-color:rgba(110,229,255,.45)}
 #mode-bh{font-size:14px}
-@media (max-width:520px){#mode-bh{width:31px;height:31px}body.sect-in #mp-now-playing{right:130px!important}}
+@media (max-width:520px){#mode-bh{width:31px;height:31px}}
 @media (max-height:520px) and (orientation:landscape){#mode-bh{width:28px;height:28px}}
-body.sect-in #mp-now-playing{right:calc(12px + 32px + 6px + 70px + 8px)!important}
 body.sect-ov .cap,body.sect-ov .hit{display:none!important}
 body.sect-ov #mode-camera,body.sect-ov.observe-mode #mode-camera{display:none!important}
 /* Tombol bintang di luar sektor yang lagi dibuka disembunyikan oleh JS (fxSectSync menambah .fx-other) — tidak perlu aturan per sektor. */
@@ -1106,8 +1100,6 @@ body.lr .portal .lab-open{font-size:6.5px;margin-top:2px}
 #mode-bhset.on{color:#6ee5ff;border-color:rgba(110,229,255,.55);background:rgba(110,229,255,.12);box-shadow:0 0 12px rgba(110,229,255,.15)}
 @media (max-width:520px){#mode-bhset{width:31px;height:31px}}
 @media (max-height:520px) and (orientation:landscape){#mode-bhset{width:28px;height:28px}}
-/* now-playing minggir sesuai jumlah tombol di cluster */
-body.sect-ov #mp-now-playing{right:calc(12px + 32px + 6px + 108px + 8px)!important}
 
 /* Panel tuning — embedded in owl Tune tab (compact, same controls) */
 /* Panel tune embedded di tab owl. JANGAN pointer-events:auto!important di base —
@@ -1310,8 +1302,6 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 .owl-pane{min-height:0}
 #owl-pane-tune #bh-panel .bp-head{margin-bottom:2px}
 #owl-panel .owl-links{margin-top:0}
-/* now-playing offsets without mode-bhset */
-body.sect-ov #mp-now-playing{right:calc(12px + 32px + 6px + 72px + 8px)!important}
 
 
 /* ===== owl panel v2: tab Settings / About, kompak ===== */
@@ -1445,3 +1435,62 @@ body.tesseract-running #live-count{visibility:hidden}
 .mp-track.mp-lockrow{opacity:.38;cursor:not-allowed}
 .mp-track.mp-linked{border-color:rgba(255,154,217,.4)}
 .mp-track.mp-linked .mp-num{color:#ff9ad9}
+
+/* ===== Seragam v2 — kotak melayang pakai kulit ringan yang sama dengan panel owl / musik =====
+   Kulitnya (border tipis, gradien gelap, bayangan jatuh tipis) tetap diatur dari variabel --pn-* di blok "Panel seragam".
+   Tanpa blur, tanpa glow berlapis. Radius: kotak besar (panel/kartu) = --pn-radius, kotak kecil (bubble, toast, HUD) = --pn-radius-s.
+   Ukuran, posisi, dan animasi tiap kotak tidak disentuh. Aksen warna (toast silence, tombol "pergi", garis kiri kartu kamera) tetap jadi identitasnya. */
+:root{
+  --pn-radius-s:8px;
+  --pn-bg-solid:linear-gradient(180deg,rgba(6,14,22,.98),rgba(2,6,11,.98));   /* kotak yang berdiri di atas backdrop gelap & berisi teks panjang (exit) */
+  --pn-bg-pink:linear-gradient(180deg,rgba(11,6,17,.95),rgba(5,3,10,.95));
+  --pn-text-glow:0 0 6px rgba(110,229,255,.4);                                 /* satu lapis, menggantikan 3 lapis text-shadow di bubble */
+}
+#secret-msg,#tele-greet,#mode-toast,#lis-hud,#cam-zoom,#sector-scan{
+  border:1px solid var(--pn-border);border-radius:var(--pn-radius-s);
+  background:var(--pn-bg);box-shadow:var(--pn-shadow);
+}
+#lis-ask,#exit-panel{
+  border:1px solid var(--pn-border);border-radius:var(--pn-radius);
+  background:var(--pn-bg);box-shadow:var(--pn-shadow);
+}
+#exit-panel{background:var(--pn-bg-solid)}
+#cam-whisper,#cam-cat,#cam-ach{
+  border:1px solid var(--pn-border);border-left:2px solid var(--cc,#6ee5ff);border-radius:var(--pn-radius-s);
+  background:var(--pn-bg);box-shadow:var(--pn-shadow);
+}
+#secret-msg,#tele-greet{text-shadow:var(--pn-text-glow)}
+/* lebar bubble tidak boleh tergantung posisi teleskop: left:50%-style + lebar otomatis membuatnya menyempit saat teleskop dekat tepi kanan (JS sudah menjepit posisi dengan asumsi lebar penuh) */
+#secret-msg,#tele-greet{width:max-content}
+#cam-zoom,#sector-scan .ss-sec{text-shadow:var(--pn-text-glow)}
+/* varian toast & HUD: aksen warna saja, bentuk ikut kulit */
+#mode-toast.silence{border-color:rgba(255,122,217,.3);background:var(--pn-bg-pink)}
+#mode-toast.tip{border-color:rgba(110,229,255,.12);background:var(--pn-bg)}
+#lis-hud.red{border-color:rgba(255,80,80,.45)}
+/* tombol di dalam kartu: radius sama dengan tombol di panel owl (6px) */
+#lis-ask button,#exit-panel .ex-choices button{border-radius:6px}
+#exit-panel .ex-name{border-radius:var(--pn-radius-s)}
+#exit-panel .ex-portrait{border-radius:var(--pn-radius-s)}
+/* perf tier 0: blur sudah nol di mana-mana; cukup bikin lebih pekat seperti panel lain */
+.perf-tier-0 #secret-msg,.perf-tier-0 #tele-greet,.perf-tier-0 #mode-toast,.perf-tier-0 #lis-hud,.perf-tier-0 #lis-ask,.perf-tier-0 #exit-panel{background:rgba(2,7,12,.96)!important}
+.perf-tier-0 #mode-toast.silence{background:rgba(6,3,11,.96)!important}
+
+/* ---------- Anti-kepotong ---------- */
+#secret-msg,#tele-greet,#mode-toast,#lis-ask,#lis-hud{overflow-wrap:break-word}
+#mode-toast,#lis-ask{max-width:min(calc(100vw - 24px),340px)}
+@media (max-width:340px){#lis-hud{font-size:8px;letter-spacing:.07em;padding:5px 8px}}   /* tetap satu baris (left:50% bikin lebar otomatis cuma separuh layar kalau boleh wrap) */
+#exit-panel .ex-text{overflow-wrap:break-word}
+/* label link panel owl: boleh turun ke 2 baris, jangan dipotong "…" */
+#owl-panel .owl-link span:last-child{white-space:normal;text-overflow:clip;overflow:visible;overflow-wrap:anywhere;line-height:1.2;text-wrap:balance}
+#owl-panel .owl-sub{white-space:normal;text-wrap:balance}
+/* layar pendek (landscape HP): panel owl scroll sendiri daripada terpotong di atas/bawah */
+#owl-panel{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(110,229,255,.3) transparent}
+
+/* ---------- Judul SFX (#mp-now-playing) menempel di kiri deretan tombol HUD ----------
+   Deretan tombol = [tombol musik] + cluster di kirinya. Jumlah tombol di cluster yang benar-benar tampil: overview = 1 (observe), di dalam sektor = 2 (observe + sektor).
+   Offset dihitung dari ukuran tombol, jadi tidak perlu angka keras per mode lagi (sisa tombol HUD lama yang sudah dihapus bikin jaraknya renggang). */
+:root{--hud-r:12px;--hud-b:32px;--hud-g:6px;--np-n:1}
+body.sect-in{--np-n:2}
+@media (max-width:520px){:root{--hud-r:10px;--hud-b:31px}}
+@media (orientation:landscape) and (max-height:520px){:root{--hud-r:8px;--hud-b:28px;--hud-g:5px}}
+#mp-now-playing{right:calc(var(--hud-r) + var(--hud-b) + var(--hud-g) + var(--np-n) * var(--hud-b) + (var(--np-n) - 1) * var(--hud-g) + 8px)!important}
