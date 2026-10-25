@@ -127,10 +127,6 @@ var StellarMem={
   }
 };
 StellarMem.load();
-/* Rasi tanpa SFX (CONS_STARS kosong) nggak punya bintang yang bisa "ditangkap", jadi nggak ada progres SCANNING -> READY.
-   Status log-nya ikut alignment: sudah di-unlock (alignment selesai) = ARCHIVED. Rasi ber-SFX tetap lewat StellarMem.archived. */
-function consNoSfx(cid){var s=CONS_STARS[cid];return !(s&&s.length);}
-function consArchived(cid){return StellarMem.isArchived(cid);}   /* ARCHIVED = semua SFX rasi sudah didengar sampai selesai; rasi tanpa SFX nggak punya ARCHIVED */
 
 /* ---------- UNLOCK (minigame lock) ----------
    Terpisah dari StellarMem: "pernah didengar" (observed) != "sudah di-unlock".
@@ -176,10 +172,6 @@ function alignAll(){
   return n;
 }
 function pad2(n){return (n<10?'0':'')+n;}
-function formatSrCount(){
-  var n=StellarMem.count();
-  return (n<10?'0':'')+n+' <span>/ '+pad2(STELLAR_KEYS.length)+'</span>';
-}
 function renderStellarRecord(){
   var countEl=document.getElementById('sr-count');
   var badge=document.getElementById('sr-badge');
@@ -833,12 +825,7 @@ function playingConstellationId(){
   if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.paused||activeSfx.ended)return null;
   return consIdFromAudio(activeSfx);
 }
-/* Nama track Stellar Signals yang lagi bunyi (sama dengan nama di panel musik), atau null kalau nggak ada. */
 var SIGNAL_NAMES=SKY.SIGNAL_NAMES; /* key -> nama track di panel musik (dari sky-data.js) */
-function playingSignalName(){
-  if(typeof activeSfx==='undefined'||!activeSfx||activeSfx.paused||activeSfx.ended)return null;
-  return SIGNAL_NAMES[keyFromAudio(activeSfx)]||null;
-}
 /* ---------- Gravitational time dilation (Schwarzschild) ----------
    Gargantua is the massive body, the constellation whose SFX is playing is the clock.
    Static-observer factor  dtau/dt = sqrt(1 - rs/r)   (r = distance BH <-> constellation centre, rs = 0.35*BH.R, only when dragged off home).

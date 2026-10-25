@@ -182,7 +182,7 @@ document.addEventListener('pointerdown',function(e){
   /* Tabs: Settings (tune) | About */
   (function owlTabs(){
     var tabs=[].slice.call(panel.querySelectorAll('.owl-tab'));
-    var panes={about:document.getElementById('owl-pane-about'),tune:document.getElementById('owl-pane-tune'),ui:document.getElementById('owl-pane-ui')};
+    var panes={about:document.getElementById('owl-pane-about'),tune:document.getElementById('owl-pane-tune')};
     function setTab(name){
       tabs.forEach(function(t){var on=t.getAttribute('data-owl-tab')===name;t.classList.toggle('on',on);t.setAttribute('aria-selected',on?'true':'false');});
       Object.keys(panes).forEach(function(k){var p=panes[k];if(!p)return;var on=k===name;p.classList.toggle('on',on);if(on)p.removeAttribute('hidden');else p.setAttribute('hidden','');});
@@ -260,31 +260,6 @@ document.addEventListener('pointerdown',function(e){
       e.stopPropagation();
       draft=null;
       apply(null,true); /* hapus preferensi → device detect lagi */
-    });
-  })();
-  /* Language button: hook I18N if present */
-  (function owlLang(){
-    var b=document.getElementById('owl-lang');if(!b)return;
-    function paint(){
-      var lang=(window.I18N&&I18N.lang)||'en';
-      b.textContent=String(lang).toUpperCase();
-    }
-    paint();
-    b.addEventListener('click',function(e){
-      e.stopPropagation();
-      try{
-        if(window.I18N&&typeof I18N.toggle==='function'){I18N.toggle();paint();return;}
-        if(window.I18N&&typeof I18N.setLang==='function'){
-          var next=(I18N.lang==='id')?'en':'id';I18N.setLang(next);paint();return;
-        }
-      }catch(err){}
-      /* fallback: flip ?lang= */
-      try{
-        var u=new URL(location.href);
-        var cur=u.searchParams.get('lang')||'en';
-        u.searchParams.set('lang',cur==='id'?'en':'id');
-        location.replace(u.toString());
-      }catch(e2){}
     });
   })();
 

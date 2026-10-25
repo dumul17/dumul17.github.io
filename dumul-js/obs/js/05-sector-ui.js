@@ -70,10 +70,6 @@ function wormAnchor(){
 }
 /* ---- Gargantua = sektor 0. Di dalam sektor dia disembunyikan; tombol 🕳️ memanggilnya kecil (seukuran pulse) & bebas di-parkir ---- */
 /* Soft proximity of summoned mini-BH to rasi/cluster mass. Continuous field, no hard edge. */
-function bhNearFactor(){
-  if(!SECT.cur||!W||!H)return 0;
-  return bhNearAt(BH.x,BH.y);
-}
 /* Faktor kedekatan di titik (bx,by) ruang BH. Dipakai juga sumSpot() biar spot parkir dipilih pakai rumus yang SAMA dengan yang menentukan ukuran. */
 function bhNearAt(bx,by){
   if(!SECT.cur||!W||!H)return 0;
@@ -283,10 +279,10 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
    GARGANTUA = BH mini sektor (size / strength / bloom / speed) · SKY = overview: Milky Way (kekuatan, skala, geser, ikut zoom, parallax, cermin; slider nebula lama cuma muncul kalau Milky Way tidak aktif) / sektor: nebula bertint
    ASTEROID · TELE · PLANET / DRONE / PORTAL (3 tab terakhir dibuat 18-tune3d.js dari daftar knob CFG-nya, T3D). Save/Reset berlaku untuk tab yang aktif. */
 (function bhTune(){
-  var panel=document.getElementById('bh-panel'),btn=document.getElementById('mode-bhset');
+  var panel=document.getElementById('bh-panel');
   if(!panel)return; /* mode-bhset removed — panel lives in owl Tune tab */
   var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),AK=['n','sz','w','t','spd'],ain={},aout={},inp={},out={},
-      bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),bClose=document.getElementById('bp-close'),sub=document.getElementById('bp-sub'),
+      bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),sub=document.getElementById('bp-sub'),
       tabs=[].slice.call(panel.querySelectorAll('.bp-tab')),pages={},cur='bh',SKYK=['HAZE','BAND','DRIFT','A_OV','THICK','VIG'],SECK=['A_SEC','SDIM','SPREAD','ZF'],ALLK=SKYK.concat(SECK),sin={},sout={},bakeT=0,tintT=0;
   AK.forEach(function(k){ain[k]=document.getElementById('ap-'+k);aout[k]=document.getElementById('ap-'+k+'-v');});
   function tx(k,f){try{var v=T(k);return(v&&v!==k)?v:f;}catch(e){return f;}}
@@ -374,14 +370,11 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   function open(on){
     var a=avail();on=!!on&&(a.bh||a.sky||a.ast||a.tele||a.pl||a.dr||a.pt);
     panel.classList.toggle('on',on);panel.setAttribute('aria-hidden',on?'false':'true');
-    if(btn)btn.classList.toggle('on',on);if(btn)btn.setAttribute('aria-expanded',on?'true':'false');
     if(on)refresh();
   }
   bhuRepaint=paint;
   bhTuneSync=refresh;
   try{new MutationObserver(function(){if(panel.classList.contains('on'))refresh();}).observe(body,{attributes:true,attributeFilter:['class']});}catch(e){}
-  if(btn)btn.addEventListener('click',function(e){e.stopPropagation();open(!panel.classList.contains('on'));haptic(6);});
-  if(bClose)bClose.addEventListener('click',function(e){e.stopPropagation();open(false);});
   tabs.forEach(function(tb){tb.addEventListener('click',function(e){e.stopPropagation();var id=tb.getAttribute('data-tab');if(!avail()[id])return;cur=id;refresh();haptic(6);});});
   keys.forEach(function(k){
     if(!inp[k])return;
@@ -702,7 +695,6 @@ function sectJumpTo(s,carry,always){
       SGATE.pend=s;
       /* Tunnel side-effect: selalu muffle 2 dtk; lanjut muffle jika tujuan belum dock/summon siap */
       SGATE.tunnelUntil=performance.now()+2000;
-      try{showModeToast(T('toast.jump',{s:sgNum(s)}),null,1500);}catch(e){}
       var wa=wormAnchor();   /* posisi mulut SEBELUM sectZoomOut (sectApply menggeser kamera) */
       haptic(12);
       var runOut=function(){sectZoomOut();if(!SECT.busy)SGATE.pend=null;};   /* dipanggil saat layar sudah tertutup terowongan (zoom-in ke portal) */
@@ -1834,6 +1826,4 @@ function drawBeltFx(now){
   }
   g.restore();
 }
-function cOrionOffsetX(){return cons('orion').ox||0}
-function cOrionOffsetY(){return cons('orion').oy||0}
 

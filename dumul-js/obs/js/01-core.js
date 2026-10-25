@@ -228,24 +228,6 @@ function lblFit(now,x,y,w,h,cands){
 }
 /* Teks/sprite di canvas ikut berputar bareng #stage di HP landscape. uprBegin putar balik terhadap titik (x,y) supaya tegak di layar. */
 function upAng(){return STG.rot<0?Math.PI/2:(STG.rot>0?-Math.PI/2:0);}
-/* Label bintang otomatis pindah sisi (kiri<->kanan) dan geser vertikal kalau mepet tepi layar, supaya nggak kepotong.
-   x,y = posisi bintang di kanvas; nx = sisi awal (<0 kiri, >0 kanan); gapH = jarak dari bintang; wT = lebar teks;
-   exL/exR = ruang ekstra (mis. batang spektrum) di sisi kiri/kanan teks. Mode ROT: teks tegak di layar, jadi diukur di koordinat layar asli. */
-function lblSide(x,y,nx,gapH,wT,exL,exR){
-  var cx=STG.rot?v2c(x,y)[0]:x,lim=STG.rot?STG.iw:W,m=6;
-  function over(sg){return sg>0?Math.max(0,cx+gapH+wT+exR-(lim-m)):Math.max(0,m-(cx-gapH-wT-exL));}
-  var sg=nx<0?-1:1,o1=over(sg);
-  if(o1<=0)return nx;
-  var o2=over(-sg);
-  return o2<o1?-nx:nx; /* pilih sisi yang paling sedikit kepotong */
-}
-function lblDY(x,y,dy){
-  var cy=STG.rot?v2c(x,y)[1]:y,lim=STG.rot?STG.ih:H;
-  var ny=cy+3+dy;
-  if(ny<10)return dy+(10-ny);
-  if(ny>lim-8)return dy-(ny-(lim-8));
-  return dy;
-}
 function uprBegin(x,y){
   if(!STG.rot)return false;
   g.save();g.translate(x,y);g.rotate(upAng());g.translate(-x,-y);return true;
@@ -353,7 +335,6 @@ function cullSegAt(x1,y1,x2,y2){
   var a=skyXF(x1,y1),ax=a[0],ay=a[1],b=skyXF(x2,y2);
   return cullSegIn(ax,ay,b[0],b[1]);
 }
-function cullPtAt(x,y,pad){var t=skyXF(x,y);return cullIn(t[0],t[1],pad);}
 
 /* ---------- Sector Scan HUD — per-sector minimap (camera / observe) ----------
    Di dalam sector: radar di-frame ke bounds rasi/cluster sector itu saja (bukan 4 kuadran full sky).
@@ -490,7 +471,7 @@ function sectorScanUpdate(now){
   if(cullT!==SSC.cT){SSC.cT=cullT;if(SSC.cull)SSC.cull.textContent=cullT;}
 }
 var BHZ=1,BHK=0,BHSC=1;
-var RELAY={x0:0,y0:0,moved:false,pend:0},SUM_R=6;   /* F10: .on dihapus (relay/portal sektor pensiun); sisanya dipakai dilatasi audio BH mini (02-sky-logic.js) */
+var RELAY={x0:0,y0:0,moved:false,pend:0};   /* F10: .on dihapus (relay/portal sektor pensiun); sisanya dipakai dilatasi audio BH mini (02-sky-logic.js) */
 /* OVSEL.seen = pengunjung sudah pernah membuka menu sektor -> petunjuk idle (cincin portal berdenyut, 15-portal3d.js) berhenti. (F6: .open/.t pensiun bersama ikon sektor.) */
 var OVSEL={seen:false};
 try{OVSEL.seen=localStorage.getItem('dumul_portal_seen')==='1';}catch(eOV){}
@@ -944,13 +925,6 @@ function specSvg(spt,teff){
   }
   return svg+'</svg>';
 }
-/* baris spektrograf untuk rasi id (string HTML kosong kalau rasi tidak punya bintang acuan / kelasnya tidak terbaca) */
-function specRow(id,delay){
-  var p=SKY.consPhys&&SKY.consPhys(id);if(!p)return '';
-  var svg=specSvg(p.spt,p.teff);if(!svg)return '';
-  var q=p.key.split('.'),c=cons(q[0]),nm=(c&&c.stars&&c.stars[q[1]]&&c.stars[q[1]].name)||(q[1].charAt(0).toUpperCase()+q[1].slice(1));
-  return '<div class="ci-i ci-spec" style="--d:'+delay+'s">'+svg+'<i>'+T('cam.spec')+' \u00b7 '+nm+' \u00b7 '+p.spt+'</i></div>';
-}
 function showWhisper(id){
   var w=document.getElementById('cam-whisper'),a=FOCUS_WHISPER[id],d=FOCUS_INFO[id],f=FOCUS.list&&FOCUS.list[FOCUS.i];
   if(!w||!d||!f)return;
@@ -1340,13 +1314,6 @@ function syncBHDom(){
   }catch(e){}
 }
 var _camUpOn=false,_freeReset=false;
-function focusRefresh(){ /* daftar fokus berubah (BH mini dipanggil/ditarik) saat mode kamera aktif */
-  if(!CAMERA_MODE)return;
-  var cid=camFocusId(),L=focusList(),k=0;
-  for(var i=0;i<L.length;i++)if(L[i].id===cid)k=i;
-  if(cid==='bh'&&k===0){FOCUS.anim=false;_freeReset=true;}
-  FOCUS.list=L;FOCUS.i=k;focusUI();
-}
 function focusStep(){
   var want=!!(CAMERA_MODE&&typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   var f=want&&FOCUS.list?FOCUS.list[FOCUS.i]:null,id=f?f.id:'free';
@@ -1867,13 +1834,11 @@ function spatialHint(t){
   AV._hint=st;
   if(!st||typeof showModeToast!=='function')return;
   if(st==='muffled')showModeToast(T('toast.tx.muff'),null,4400);
-  else if(st==='relay')showModeToast(T('toast.tx.linked'),null,3600);
   else if(st==='far')showModeToast(T('toast.tx.far'),null,4600);
   else if(st==='needsum')showModeToast(T('toast.tx.needsum'),null,4200);
   else if(st==='needdock')showModeToast(T('toast.tx.needdock'),'tip',4200);
-  else if(st==='relay-here')showModeToast(T('toast.tx.linked.rx'),null,3600);
   else if(st==='strain')showModeToast(T('toast.tx.strain'),null,4200);
-  else showModeToast(T('toast.tx.linked'),null,3600);
+  /* 'relay' / 'relay-here' (tersambung & jernih) sengaja tanpa toast: berulang tiap SFX baru = noise */
 }
 function spatialRelease(){
   AV.atten=0;AV._hint='';AV._attFor=null;
@@ -2032,7 +1997,6 @@ function updateAVColor(now){
 
 /* Toggle spectrum portal (panel music; dulu "Gargantua Spectrum"). Disimpan di localStorage.dumul_av_on ('0' = mati). */
 var AV_ON=(function(){var o=null;try{o=localStorage.getItem('dumul_av_on');}catch(e){}return o!=='0';})();
-var AV_DOTS=true,AV_RHINT=0; /* sisa flag lama, dibiarkan supaya file lain yang masih nyebut nggak error */
 
 /* ---------- Visualizer: debu kosmik yang terlempar dari tepi lubang hitam ----------
    Sinkron ke musik lewat ONSET per pita spektrum, bukan peluang acak:

@@ -3,7 +3,6 @@
 /* ---------- Neural Network Overlay: node menyambung satu per satu → lanjut di dumul.html ---------- */
 /* ===== Teks decode/glitch "WELCOME TO THE GLITCH" di area kosong bawah og.webp (hanya overlay; stage/mesh tak disentuh) ===== */
 var TP=null,TP_SCR='#%&*+=<>/\\|01';
-function tpEase(x){return 1-(1-x)*(1-x);}
 function tpFlash(el,cls,ms){el.classList.add(cls);setTimeout(function(){el.classList.remove(cls);},ms);}
 function tpSet(o,txt){o.el.textContent=txt;if(o.gl)o.gl.setAttribute('data-text',txt);}
 function tpInit(){
@@ -299,24 +298,6 @@ function beltCamStep(now){
    Home/overview : teleskop ngorbit IKON sektor yang SFX-nya lagi aktif.
    Dalam sektor sumber : ngorbit bintangnya (alur lama via triggerSupernova).
    Sektor lain (SFX aktif di sektor berbeda) : teleskop "sibuk", menghilang + bubble pamit. */
-var TELE_BUSY_MSG=[T('tele.busy.1'),T('tele.busy.2'),T('tele.busy.3'),T('tele.busy.4')];
-function teleStarFollow(key){
-  var tr=TRIGGERS[key];if(!tr)return null;
-  var c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons);if(!c)return null;
-  var st=tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star];
-  if(!st)return null;
-  return function(){
-    var fx=tr.cons==='pleiades'?(PLEIADES.x+st.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(st.x+c.ox),
-        fy=tr.cons==='pleiades'?(PLEIADES.y+st.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(st.y+c.oy);
-    return skyXF(fx,fy);
-  };
-}
-function teleIconFollow(sc){
-  return function(){
-    if(sc.bx==null)return null;
-    return skyXF(sc.bx+(SECT.mx||0),sc.by+(SECT.my||0));
-  };
-}
 function teleSectorLogic(dt){
   var T=TELESCOPE;
   if(SW)return;
@@ -920,23 +901,6 @@ function asteroidScreenAt(x,y){
     if(d<Math.max(8,a._sz*1.9)&&d<bd){bd=d;best=i;}
   }
   return best;
-}
-function scatterAsteroid(i,x,y){
-  if(i<0||!AST[i]||SW)return false;
-  var a=AST[i],now=performance.now(),c=astAnchor(),p=astPlace(a,now,c,_astP);
-  var dx=p.x-c[0],dy=p.y-c[1],dl=Math.hypot(dx,dy)||1;
-  var nx=dx/dl,ny=dy/dl;
-  /* One short impulse, then a damped spring brings the rock home.
-     Velocities are pixels/second (not per-frame), so the kick cannot accumulate forever. */
-  var tx=-ny,ty=nx;
-  var kick=48+Math.random()*22,side=(Math.random()-.5)*18;
-  a.vx=nx*kick+tx*side;
-  a.vy=ny*kick+ty*side;
-  a.ox=Math.max(-70,Math.min(70,a.ox));
-  a.oy=Math.max(-70,Math.min(70,a.oy));
-  a.kick=1;a.kickUntil=now+700;
-  haptic(6);
-  return true;
 }
 /* Tap = AREA: semua batu dalam radius R dari titik tap ditendang menjauhi jari (makin dekat makin kuat). Haptic cuma sekali. */
 function scatterAsteroidArea(x,y,R){
@@ -2307,8 +2271,4 @@ if(!reduce&&!IS_POTATO){
     ofxSpawnDust(e.clientX,e.clientY,3);
   },{passive:true});
 }
-/* Ducking BGM removed — mute is only via #mode-silence fade. */
-function ofxDuckBgm(){return false;}
-function ofxDuckAbort(){}
-function ofxDuckRelease(){}
 
