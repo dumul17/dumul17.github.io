@@ -69,10 +69,9 @@ var SMENU_CSS=
 
 /* Diameter cincin di window (px layar) = --d di CSS: portrait min(64vw,40vh,280px), landscape min(58vh,42vw,300px). Dipakai 15-portal3d.js (ptOvK) supaya portal overview = setengah ukuran ini. */
 function smenuRingD(){var w=window.innerWidth||0,h=window.innerHeight||0;return w>h?Math.min(h*.58,w*.42,300):Math.min(w*.64,h*.40,280);}
-function smenuStatus(s){   /* 'empty' sektor belum terpetakan · 'here' sedang di sini · 'nosum' (dari sektor) drone sektor tujuan belum di-summon (s.drn) · 'ok' */
+function smenuStatus(s){   /* 'empty' sektor belum terpetakan · 'here' sedang di sini · 'ok' */
   if(!s||!s.ids||!s.ids.length)return 'empty';
   if(SECT.cur&&s===SECT.cur)return 'here';
-  if(SECT.cur&&!s.drn)return 'nosum';
   return 'ok';
 }
 function smenuTx(k,f,v){try{var r=T(k,v);return(r&&r!==k)?r:f;}catch(e){return f;}}
@@ -171,10 +170,9 @@ function smenuRefresh(){
   if(st!=='empty'&&typeof txInterlock==='function'){var x=txInterlock(s);il.innerHTML='<i class="y'+(x.y?' on':'')+'"></i><i class="p'+(x.p?' on':'')+'"></i>';}
   else il.innerHTML='';
   if(st==='here')hint=smenuTx('smenu.here','KAMU DI SINI');
-  else if(st==='nosum')hint=smenuTx('smenu.nosum','Panggil drone di sektor itu dulu (tahan teleskop).');
   else if(st==='empty')hint=smenuTx('smenu.empty','Belum terpetakan.');
   else if(n>1)hint=smenuTx('smenu.swipe','Geser lubang untuk ganti sektor');
-  st2.textContent=hint;st2.className='sm-st'+(st==='nosum'||st==='empty'?' warn':'');
+  st2.textContent=hint;st2.className='sm-st'+(st==='empty'?' warn':'');
   var go=a.querySelector('.sm-go');go.textContent=smenuTx('smenu.go','MASUK');go.classList.toggle('off',st!=='ok');
   go.setAttribute('aria-disabled',st!=='ok'?'true':'false');
   var ov=a.querySelector('.sm-ov');   /* F10: KE OVERVIEW hanya saat menu dibuka dari dalam sektor */
@@ -217,7 +215,6 @@ function smenuEnter(){
   if(!s)return;
   if(st!=='ok'){
     smenuDeny();
-    if(st==='nosum'){try{showModeToast(T('toast.nosum.drn'),null,3200);}catch(e){}}
     return;
   }
   try{haptic(10);}catch(e2){}
