@@ -132,6 +132,17 @@
     'tune.ast.count':{en:'Count',id:'Jumlah'},'tune.ast.count.s':{en:'rocks',id:'batu'},'tune.ast.size.s':{en:'rock scale',id:'skala batu'},
     'tune.ast.orbit':{en:'Orbit',id:'Orbit'},'tune.ast.orbit.s':{en:'width',id:'lebar'},'tune.ast.thick':{en:'Thickness',id:'Ketebalan'},'tune.ast.thick.s':{en:'ring density',id:'kerapatan cincin'},
     'tune.ast.spd.s':{en:'orbit',id:'orbit'},
+    /* tab Asteroid: knob sabuk limb planet */
+    'tune.ast.ring':{en:'Limb belt',id:'Sabuk limb'},'tune.ast.ring.s':{en:'belt on the planet limb',id:'sabuk di limb planet'},
+    'tune.ast.nk':{en:'Density',id:'Kerapatan'},'tune.ast.nk.s':{en:'count multiplier',id:'pengali jumlah'},
+    'tune.ast.mx':{en:'Max rocks',id:'Batas batu'},'tune.ast.mx.s':{en:'simulation cap',id:'batas simulasi'},
+    'tune.ast.z':{en:'Belt rock size',id:'Ukuran batu sabuk'},'tune.ast.z.s':{en:'limb belt only',id:'khusus sabuk limb'},
+    'tune.ast.ed':{en:'Edge fade',id:'Pudar ujung'},'tune.ast.ed.s':{en:'arc ends',id:'ujung busur'},
+    'tune.ast.lm':{en:'Limb fade',id:'Pudar limb'},'tune.ast.lm.s':{en:'near horizon',id:'dekat horizon'},
+    'tune.ast.tp':{en:'Top limit',id:'Batas atas'},'tune.ast.tp.s':{en:'arc peak vs screen top',id:'puncak busur dari tepi atas'},
+    'tune.ast.arch':{en:'Arch',id:'Lengkung'},'tune.ast.arch.s':{en:'0 = follows horizon',id:'0 = ikut horizon'},
+    'tune.ast.fi':{en:'Fade in',id:'Pudar masuk'},'tune.ast.fi.s':{en:'after transition',id:'setelah transisi'},
+    'tune.ast.fo':{en:'Fade out',id:'Pudar keluar'},'tune.ast.fo.s':{en:'on back',id:'saat back'},
     /* tuning panel: tab Tele (teleskop) */
     'tune.tele.tab':{en:'Telescope',id:'Teleskop'},'tune.pl.tab':{en:'Planet',id:'Planet'},'tune.dr.tab':{en:'Drone',id:'Drone'},'tune.pt.tab':{en:'Portal',id:'Portal'},
     'tune.sub.pl':{en:'Planet // Tune',id:'Planet // Setelan'},'tune.sub.dr':{en:'Drone // Tune',id:'Drone // Setelan'},'tune.sub.pt':{en:'Portal // Tune',id:'Portal // Setelan'},'tune.sub.tele':{en:'Telescope // Tune',id:'Teleskop // Setelan'},'tune.saved.tele':{en:'TELESCOPE SETTINGS SAVED',id:'SETELAN TELESKOP TERSIMPAN'},
