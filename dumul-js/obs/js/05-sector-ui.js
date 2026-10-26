@@ -282,8 +282,8 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
 (function bhTune(){
   var panel=document.getElementById('bh-panel');
   if(!panel)return; /* mode-bhset removed — panel lives in owl Tune tab */
-  var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),astRingBtn=document.getElementById('bp-astring'),AK=['n','sz','w','t','spd','nk','mx','z','ed','lm','tp','arch','fi','fo'],
-      ASC={n:1,sz:100,w:100,t:100,spd:100,nk:100,mx:1,z:100,ed:100,lm:1,tp:100,arch:100,fi:1,fo:1},   /* skala slider -> nilai AST_CFG */
+  var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),astRingBtn=document.getElementById('bp-astring'),AK=['n','sz','w','t','spd','mx','ed','lm','tp','arch','fi','fo'],
+      ASC={n:1,sz:100,w:100,t:100,spd:100,mx:1,ed:100,lm:1,tp:100,arch:100,fi:1,fo:1},   /* skala slider -> nilai AST_CFG */
       ain={},aout={},inp={},out={},
       bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),sub=document.getElementById('bp-sub'),
       tabs=[].slice.call(panel.querySelectorAll('.bp-tab')),pages={},cur='bh',SKYK=['HAZE','BAND','DRIFT','A_OV','THICK','VIG'],SECK=['A_SEC','SDIM','SPREAD','ZF'],ALLK=SKYK.concat(SECK),sin={},sout={},bakeT=0,tintT=0;
@@ -343,7 +343,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   }
   /* ---- umum ---- */
   function paint(){
-    if(sub)sub.textContent=cur==='pl'?tx('tune.sub.pl','Planet // Tune'):cur==='dr'?tx('tune.sub.dr','Drone // Tune'):cur==='pt'?tx('tune.sub.pt','Portal // Tune'):cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
+    if(sub)sub.textContent=cur==='pl'?tx('tune.sub.pl','Planet // Tune'):cur==='dr'?tx('tune.sub.dr','Drone // Tune'):cur==='pt'?tx('tune.sub.pt','Portal // Tune'):cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?(AST_CTX?tx('tune.sub.ast.sc','Asteroid // Sector Tune'):tx('tune.sub.ast.o','Asteroid // Overview Tune')):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
     paintBH();paintSky();paintAst();paintTele();
     var d=false,st;
     if(typeof T3D!=='undefined'){if(T3D.has(cur)&&t3(cur))T3D.paint(cur);if(skyMw())T3D.paint('mw');}
@@ -355,6 +355,12 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     else if(skyOv()){st=skyStored();SKYK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     else if(skySect()){st=secStored();SECK.forEach(function(k){if(Math.abs(st[k]-NEB[k])>.004)d=true;});}
     if(bSave)bSave.classList.toggle('dirty',d);
+    ctxRows();
+  }
+  /* baris khusus overview (data-ctx="ov") / khusus sektor (data-ctx="sc"), diberi tanda oleh 18-tune3d.js: yang tidak berlaku di konteks sekarang disembunyikan */
+  function ctxRows(){
+    var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in');
+    [].slice.call(panel.querySelectorAll('[data-ctx]')).forEach(function(el){var x=el.getAttribute('data-ctx');el.hidden=(x==='ov')?!ov:!sc;});
   }
   function t3(id){return typeof T3D!=='undefined'&&T3D.ok(id);}
   function mwOn(){return typeof mwReady==='function'&&mwReady();}   /* overview memakai Milky Way (bukan nebula lama) */
@@ -426,7 +432,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     if(!ain[k])return;
     ain[k].addEventListener('input',function(){
       AST_CFG[k]=astClamp(k,ain[k].value/ASC[k]);
-      if(k==='n'||k==='w'||k==='nk'||k==='mx')astResize();   /* w: jumlah efektif ikut lebar orbit (kerapatan terlihat tetap); nk/mx: pengali + batas jumlah */
+      if(k==='n'||k==='w'||k==='mx')astResize();   /* w: jumlah efektif ikut lebar orbit (kerapatan terlihat tetap); mx: batas jumlah */
       paint();
     });
   });

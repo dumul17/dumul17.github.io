@@ -1039,7 +1039,7 @@ function astMake(j){
 /* sesuaikan jumlah batu ke target (slider / otomatis) tanpa mengacak ulang batu yang sudah ada */
 function astResize(){
   var t=AST_CFG.n<0?AST_AUTO:AST_CFG.n;
-  if(typeof astRingFrame==='function'&&astRingFrame())t=Math.min(AST_CFG.mx,Math.round(t*AST_CFG.nk*Math.max(1,Math.min(8,AST_CFG.w))));   /* cincin limb: cuma busur belakang yang hidup -> nk (.5) batu cukup untuk kerapatan setara sabuk lama; orbit melebar (w>1) busur yang kelihatan di layar tetap segitu, jadi jumlah ikut naik x w supaya kerapatan terlihat sama (dibatasi mx) */
+  if(typeof astRingFrame==='function'&&astRingFrame())t=Math.min(AST_CFG.mx,Math.round(t*AST_RING_NK*Math.max(1,Math.min(8,AST_CFG.w))));   /* cincin limb: cuma busur belakang yang hidup -> nk (.5) batu cukup untuk kerapatan setara sabuk lama; orbit melebar (w>1) busur yang kelihatan di layar tetap segitu, jadi jumlah ikut naik x w supaya kerapatan terlihat sama (dibatasi mx) */
   while(AST.length<t)AST.push(astMake(AST.length));
   if(AST.length>t)AST.length=t;
 }

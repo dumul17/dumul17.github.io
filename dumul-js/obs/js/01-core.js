@@ -483,12 +483,12 @@ var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3]};
    jari-jari tetap (AST_K, pengali global), bidang miring ikut BH.ang. Toggle ada di panel tab Langit, disimpan di localStorage.dumul_ast_cfg. */
 var AST_K=1;
 /* AST_CFG: on = tampil, n = jumlah batu (-1 = otomatis dari ukuran layar), sz/w/spd = pengali ukuran / lebar orbit / kecepatan orbit, t = ketebalan cincin (sebaran radius + kemiringan elips; kecil = cincin tipis rapat). Disimpan di localStorage.dumul_ast_cfg */
-var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1,ring:1,nk:.5,mx:600,ed:.07,lm:14,z:.95,tp:.06,arch:1,fi:450,fo:260},
-    AST_RNG={n:[0,300],sz:[.4,2.5],w:[.3,8],spd:[0,3],t:[.1,3],nk:[.1,2],mx:[50,1200],ed:[0,.3],lm:[0,60],z:[.3,2],tp:[0,.3],arch:[0,2],fi:[0,1500],fo:[0,1000]},
+var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1,ring:1,mx:600,ed:.07,lm:14,tp:.06,arch:1,fi:450,fo:260},
+    AST_RNG={n:[0,300],sz:[.4,2.5],w:[.3,8],spd:[0,3],t:[.1,3],mx:[50,1200],ed:[0,.3],lm:[0,60],tp:[0,.3],arch:[0,2],fi:[0,1500],fo:[0,1000]},
     AST_CFG={},AST_AUTO=40,AST_T=0,AST_TL=0;
-/* knob sabuk di limb planet (tab Asteroid, ikut Save/Reset + terpisah overview vs sektor): ring = 1 sabuk di limb / 0 sabuk lama, nk = pengali jumlah batu (Jumlah x nk),
-   mx = batas atas jumlah batu simulasi, ed = lebar fade di dua ujung busur (fraksi), lm = px fade dekat limb, z = skala ukuran batu cincin, tp = batas puncak busur dari tepi atas layar (fraksi tinggi layar), arch = lengkung busur (1 = seperti semula, 0 = rata mengikuti lengkung horizon planet, 2 = lebih melambung), fi / fo = durasi fade masuk / keluar (ms) */
-var AST_KEYS=['sz','w','spd','t','nk','mx','ed','lm','z','tp','arch','fi','fo'];
+/* knob sabuk di limb planet (tab Asteroid, ikut Save/Reset + terpisah overview vs sektor): ring = 1 sabuk di limb / 0 sabuk lama, (pengali jumlah .5 dan skala batu .95 = konstanta AST_RING_NK / AST_RING_Z di 04-render.js, bukan slider: sudah diwakili Jumlah dan Ukuran),
+   mx = batas atas jumlah batu simulasi, ed = lebar fade di dua ujung busur (fraksi), lm = px fade dekat limb, tp = batas puncak busur dari tepi atas layar (fraksi tinggi layar), arch = lengkung busur (1 = seperti semula, 0 = rata mengikuti lengkung horizon planet, 2 = lebih melambung), fi / fo = durasi fade masuk / keluar (ms) */
+var AST_KEYS=['sz','w','spd','t','mx','ed','lm','tp','arch','fi','fo'];
 (function(){for(var k in AST_DEF)AST_CFG[k]=AST_DEF[k];})();
 function astClamp(k,v){v=+v;if(!isFinite(v))return AST_DEF[k];var r=AST_RNG[k];return Math.max(r[0],Math.min(r[1],k==='n'?Math.round(v):v));}
 function astNorm(o){var r={},k;for(k in AST_DEF)r[k]=AST_DEF[k];if(o&&typeof o==='object'){if(typeof o.on==='number')r.on=o.on>=.5?1:0;if(typeof o.ring==='number')r.ring=o.ring>=.5?1:0;

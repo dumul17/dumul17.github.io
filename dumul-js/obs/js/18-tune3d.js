@@ -5,7 +5,7 @@
    (snapshot sebelum nilai tersimpan dimuat). Slider dibuat dari daftar ini ke dalam .bp-page[data-page] (HTML-nya cuma wadah kosong), jadi gaya,
    scrub (owl-scrub-row), dan Save/Reset sama dengan tab lain. Save -> localStorage (dumul_tune_pl / _dr / _pt, dumul_mw_cfg); Reset -> hapus + balik ke default.
    05-sector-ui.js (bhTune) memanggil API T3D di bawah: has / ok / paint / dirty / save / reset.
-   Baris: [path, label EN, label ID, min, max, skala, desimal, satuan, flag] — slider = round(nilai*skala); flag 't' = toggle, 'i' = terbalik (1 - nilai). */
+   Baris: [path, label EN, label ID, min, max, skala, desimal, satuan, flag] — slider = round(nilai*skala); flag 't' = toggle, 'i' = terbalik (1 - nilai), 'o' = baris cuma di overview, 's' = cuma di sektor (tanpa o/s = dua-duanya; panel menyembunyikan baris yang tidak berlaku di konteks sekarang lewat data-ctx). */
 var T3D=(function(){
   var ID=(function(){try{return window.I18N&&I18N.lang==='id';}catch(e){return false;}})(),G={},ORDER=['pl','dr','pt','mw'];
   function lb(en,id){return ID?id:en;}
@@ -17,14 +17,14 @@ var T3D=(function(){
   function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
 
   /* ---------- definisi grup ---------- */
-  function defGroup(id,o){o.id=id;o.rows=o.rows.map(function(r){return{p:r[0],en:r[1],id:r[2],min:r[3],max:r[4],sc:r[5],d:r[6],u:r[7],t:/t/.test(r[8]||''),inv:/i/.test(r[8]||''),el:null,out:null,sw:null};});G[id]=o;}
+  function defGroup(id,o){o.id=id;o.rows=o.rows.map(function(r){return{p:r[0],en:r[1],id:r[2],min:r[3],max:r[4],sc:r[5],d:r[6],u:r[7],t:/t/.test(r[8]||''),inv:/i/.test(r[8]||''),ctx:/o/.test(r[8]||'')?'ov':(/s/.test(r[8]||'')?'sc':''),el:null,out:null,sw:null};});G[id]=o;}
 
   defGroup('pl',{key:'dumul_tune_pl',root:function(){return window.PL3D_CFG;},
     en:'PLANET SETTINGS SAVED',idt:'SETELAN PLANET TERSIMPAN',
     after:function(p){try{PL3D.dirty=true;if(p==='ovDy')PL3D.topC=null;}catch(e){}},
     rows:[
       ['rK','Curve','Lengkung',3,40,2,1,'',''],
-      ['ovDy','Horizon','Horizon',-.2,.1,100,0,'%',''],
+      ['ovDy','Horizon','Horizon',-.2,.1,100,0,'%','o'],
       ['cell','Cell','Sel',40,260,1,0,'px',''],
       ['persp','Persp','Perspektif',20,300,1,0,'',''],
       ['haze','Haze','Kabut',0,240,1,0,'px',''],
@@ -37,8 +37,8 @@ var T3D=(function(){
       ['rockD','Rocks','Batu',0,1,100,0,'%','i'],
       ['rockSz','Rock size','Ukuran batu',.05,1.5,100,2,'×',''],
       ['rotK','Spin','Putar',0,3,100,2,'×',''],
-      ['libr.lat','Sway Y','Ayun Y',0,.03,1000,1,'\u2030',''],
-      ['libr.tilt','Sway tilt','Ayun miring',0,.05,1000,1,'\u2030',''],
+      ['libr.lat','Sway Y','Ayun Y',0,.03,1000,1,'\u2030','s'],
+      ['libr.tilt','Sway tilt','Ayun miring',0,.05,1000,1,'\u2030','s'],
       ['par','Parallax','Paralaks',0,.15,1000,0,'\u2030',''],
       ['zoomK','Zoom','Zoom',0,.4,100,2,'×',''],
       ['atmK','Atmos','Atmosfer',0,3,100,2,'×',''],
@@ -66,14 +66,14 @@ var T3D=(function(){
     en:'PORTAL SETTINGS SAVED',idt:'SETELAN PORTAL TERSIMPAN',
     after:function(){},
     rows:[
-      ['ovMenu','Size','Ukuran',.2,1.2,100,2,'×',''],
-      ['orb.on','Orbit','Orbit',0,1,1,0,'','t'],
-      ['orb.per','Period','Periode',20,240,1,0,'s',''],
-      ['orb.ax','Orbit W','Lebar orbit',.05,.45,100,1,'%',''],
-      ['orb.ay','Orbit H','Tinggi orbit',0,.25,100,1,'%',''],
-      ['orb.depth','Depth','Kedalaman',0,.2,100,1,'%',''],
-      ['orb.bob','Bob','Naik-turun',0,8,10,1,'px',''],
-      ['orb.gap','Gap','Jarak limb',0,2,100,2,'×',''],
+      ['ovMenu','Size','Ukuran',.2,1.2,100,2,'×','o'],
+      ['orb.on','Orbit','Orbit',0,1,1,0,'','to'],
+      ['orb.per','Period','Periode',20,240,1,0,'s','o'],
+      ['orb.ax','Orbit W','Lebar orbit',.05,.45,100,1,'%','o'],
+      ['orb.ay','Orbit H','Tinggi orbit',0,.25,100,1,'%','o'],
+      ['orb.depth','Depth','Kedalaman',0,.2,100,1,'%','o'],
+      ['orb.bob','Bob','Naik-turun',0,8,10,1,'px','o'],
+      ['orb.gap','Gap','Jarak limb',0,2,100,2,'×','o'],
       ['spin','Spin','Putar',0,.8,100,2,'',''],
       ['glow','Glow','Pendar',0,3,100,2,'×',''],
       ['tilt.x','Pitch','Pitch',-1,1,100,2,'',''],
@@ -82,7 +82,7 @@ var T3D=(function(){
       ['mouthStars','Stars','Bintang',0,80,1,0,'',''],
       ['boltMax','Bolts','Petir',0,16,1,0,'',''],
       ['boltW','Bolt W','Tebal petir',.1,1.2,100,2,'×',''],
-      ['secK','Exit','Mulut keluar',.2,1.2,100,2,'×','']
+      ['secK','Exit','Mulut keluar',.2,1.2,100,2,'×','s']
     ]});
 
   /* Milky Way overview: nilai default + loader ada di 02-sky-logic.js (MW_DEF / mwTuneSet), jadi di sini tidak dimuat ulang */
@@ -141,7 +141,7 @@ var T3D=(function(){
     var frag=document.createDocumentFragment();
     g.rows.forEach(function(r){
       var row=document.createElement(r.t?'div':'label'),k=document.createElement('span'),kt=document.createElement('span');
-      row.className=r.t?'bp-row bp-tog bp-wide':'bp-row';
+      row.className=r.t?'bp-row bp-tog bp-wide':'bp-row';if(r.ctx)row.setAttribute('data-ctx',r.ctx);
       k.className='bp-k';kt.textContent=lb(r.en,r.id);k.appendChild(kt);row.appendChild(k);
       if(r.t){
         var b=document.createElement('button');b.type='button';b.className='bp-switch';b.setAttribute('aria-pressed','true');

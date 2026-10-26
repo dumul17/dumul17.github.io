@@ -913,8 +913,8 @@ var _astP={x:0,y:0,s:0};
    Batu di bawah limb disembunyikan (planet digambar paling atas, jadi tertutup juga; ini cuma hemat gambar). Tampilan = sprite/shader DEPAN (a._fl=1), tapi tetap di pass belakang (di bawah rasi/portal).
    Overview: tanpa lensing. Sektor: lensing BH mini tetap jalan untuk batu yang lewat dekat BH (zona R*9.5) - BH mini digambar di belakang planet, jadi cuma batu di atas limb yang terlihat terlensa.
    Arah putar = kebalikan arah orbit portal. Planet gagal / belum ada geometri -> astRingFrame() null -> jalur lama (astPlace) dipakai lagi. Matikan: AST_RING_ON=false. */
-var AST_RING_ON=true,AST_RING_LAST=null;
-/* AST_RING_ON = saklar keras (false = selalu sabuk lama). Knob lain ada di AST_CFG (01-core.js, tab Asteroid): ring (saklar), nk (pengali jumlah; 0.5 = kerapatan sama dengan sabuk lama), mx, ed, lm, z, tp, fi, fo. */
+var AST_RING_ON=true,AST_RING_LAST=null,AST_RING_NK=.5,AST_RING_Z=.95;
+/* AST_RING_ON = saklar keras (false = selalu sabuk lama). Knob lain ada di AST_CFG (01-core.js, tab Asteroid): ring (saklar), mx, ed, lm, tp, arch, fi, fo. AST_RING_NK (.5) = pengali jumlah batu (cincin cuma separuh belakang, jadi kerapatan sama dengan sabuk lama), AST_RING_Z (.95) = skala ukuran batu cincin: konstanta, bukan slider (sudah diwakili slider Jumlah dan Ukuran). */
 function astRingDir(){
   var pd=1;
   try{var O=PT3D_CFG.orb;if(O&&O.counter)pd=(PL3D_CFG.live.rot>0)?-1:1;}catch(e){}
@@ -964,7 +964,7 @@ function astRingRock(a,i,now,dtc,F,mix){
   fa*=fe*lf*mix;
   if(fa<=.01){a._vis=0;a._fa=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;return;}
   var x=F.sx+ex*F.sux+ey*F.svx,y=F.sy+ex*F.suy+ey*F.svy,
-      sz=a.sz*AST_CFG.z*(skyZoom<=3?skyZoom:3*Math.sqrt(skyZoom/3))*AST_CFG.sz,vis=1;
+      sz=a.sz*AST_RING_Z*(skyZoom<=3?skyZoom:3*Math.sqrt(skyZoom/3))*AST_CFG.sz,vis=1;
   if(F.lens){   /* sektor: lensing BH mini (cuma batu belakang, yaitu semua batu cincin ini) */
     var bp=F.bp,dx0=x-bp[0],dy0=y-bp[1];
     if(dx0*dx0+dy0*dy0>F.lz){
