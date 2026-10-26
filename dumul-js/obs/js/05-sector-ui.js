@@ -1964,6 +1964,38 @@ function drawSupernovaBursts(now){
   var step=function(){var r2=keys.shift();if(!r2)return;try{snBake(r2);}catch(e){}if(keys.length)(ric?requestIdleCallback(step,{timeout:3000}):setTimeout(step,200));};
   if(ric)requestIdleCallback(step,{timeout:4000});else setTimeout(step,800);
 })();
+/* Warm-up sekali per sesi: hitch "tap SFX pertama" yang tersisa setelah burst dibuat ringan = biaya inisialisasi, bukan biaya burst.
+   SNFXW 1 (default): setelah gestur pertama, saat idle, bangun graph Web Audio (AudioContext + analyser + lowpass + gain). Dulu baru dibangun di tap SFX pertama
+     (lewat sfxWireSoon -> audioVizInit -> ensureAVGraph) saat burst sedang jalan; AudioContext baru itu mahal di WebView HP. ensureAVGraph() sama persis dgn yg dipakai UI sound/chime: cuma dimajukan waktunya.
+   SNFXW 2: + SFX yang masih dingin di-load() satu per giliran idle (preload auto), jadi tap pertama per bintang nggak lewat jalur "load() + tunggu canplay" di safePlay. Lebih boros data/RAM: buat A/B.
+   SNFXW 0: mati. Atur lewat ?snfxw=0/1/2 atau localStorage dumul_snfxw. */
+var SNFX_W=1;
+try{var _wm=/[?&]snfxw=(\d)/.exec(location.search);if(_wm)SNFX_W=+_wm[1];else{var _wl=localStorage.getItem('dumul_snfxw');if(_wl!=null&&_wl!=='')SNFX_W=+_wl;}}catch(eW){}
+(function(){
+  if(!SNFX.on||!SNFX_W||IS_POTATO)return;
+  var done=false,ric=typeof requestIdleCallback==='function';
+  function idle(fn,to){if(ric)requestIdleCallback(fn,{timeout:to});else setTimeout(fn,Math.min(to,600));}
+  function warmSfx(){
+    var keys=[],k;
+    try{for(k in SFX)keys.push(k);}catch(e){return;}
+    var step=function(){
+      var key=keys.shift();if(!key)return;
+      try{var el=SFX[key];
+        if(el&&el!==activeSfx&&el.paused&&!el._want&&!el._retrying&&el.readyState<2){el.preload='auto';el.load();}
+      }catch(e){}
+      if(keys.length)idle(step,3000);
+    };
+    idle(step,3000);
+  }
+  function go(){
+    if(done)return;done=true;
+    idle(function(){
+      try{if(typeof ensureAVGraph==='function'&&typeof AV!=='undefined'&&!AV.ctx)ensureAVGraph();}catch(e){}
+      if(SNFX_W>=2)warmSfx();
+    },2500);
+  }
+  ['pointerdown','touchend','keydown'].forEach(function(ev){window.addEventListener(ev,go,{once:true,passive:true,capture:true});});
+})();
 /* F4 (D6): efek masuk dumul.html lewat sabuk Orion. Posisi Alnilam diambil tiap frame (kamera lagi zoom/pan), jadi ledakan menempel ke bintangnya. */
 function drawBeltFx(now){
   var B=BELT;if(!B||!B.s||!B.c)return;
