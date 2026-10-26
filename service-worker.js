@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v192'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v193'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -34,7 +34,7 @@ const SHELL = [
   'dumul-js/obs/js/01-core.js?v=133',
   'dumul-js/obs/js/02-sky-logic.js?v=132',
   'dumul-js/obs/js/03-gargantua.js?v=109',
-  'dumul-js/obs/js/04-render.js?v=132',
+  'dumul-js/obs/js/04-render.js?v=133',
   'dumul-js/obs/js/05-sector-ui.js?v=153',
   'dumul-js/obs/js/06-interaction.js?v=122',
   'dumul-js/obs/js/07-boot.js?v=113',
@@ -42,7 +42,7 @@ const SHELL = [
   'dumul-js/obs/js/09-wormhole.js?v=22',
   'dumul-js/obs/js/10-ui-sound.js?v=8',
   'dumul-js/obs/js/11-live-count.js?v=3',
-  'dumul-js/obs/js/12-ast3d.js?v=5',
+  'dumul-js/obs/js/12-ast3d.js?v=6',
   'dumul-js/obs/js/13-scope3d.js?v=7',
   'dumul-js/obs/js/14-drone3d.js?v=7',
   'dumul-js/obs/js/15-portal3d.js?v=9',
