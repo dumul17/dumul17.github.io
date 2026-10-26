@@ -12,12 +12,13 @@ var AST3D_CFG={
   gltfLib:'dumul-js/obs/lib/GLTFLoader.js?v=1',
   glb:[],        /* model NASA (opsional): ['dumul-js/obs/img/ast/bennu.glb', ...]; kosong = batu procedural saja */
   dprMax:1.5,    /* resolusi render dibatasi: batu kecil + lembut, nggak perlu DPR penuh */
-  procVariants:6
+  procVariants:6,
+  lod:[[1,2.6],[2,4.2]]   /* LOD batu: [detail ikosahedron, batas _sz (px)]; batu dgn _sz di bawah batas pakai mesh detail itu, sisanya detail 3 (320 segitiga). Batu 1-4px nggak butuh 320 segitiga. [] = semua detail 3 seperti dulu */
 };
 try{
   if(/[?&]ast3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_ast3d')==='0')AST3D_CFG.on=false;
 }catch(eA3){}
-var AST3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
+var AST3D={tiers:[],state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
 
 /* Warm-up shader: render pertama sebuah renderer Three.js mengompilasi program shader (ratusan ms di HP) -> hitch pas drone/batu/teleskop pertama muncul; setSize pertama (realokasi framebuffer MSAA) juga mahal, jadi ukuran kanvas diset di build.
    compile() cuma MEMINDAHKAN stall itu; jadi dipanggil saat idle (layar boot, user belum main), satu renderer per giliran supaya tidak numpuk.
@@ -63,8 +64,8 @@ function ast3dLoad(){
 function ast3dMulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 
 /* Batu procedural: ikosahedron detail 3 (320 sisi) + deformasi halus + kawah + gepeng. Normal dihitung ulang -> tampak berfacet. */
-function ast3dRockGeo(seed){
-  var T=THREE,geo=new T.IcosahedronGeometry(1,3),pos=geo.attributes.position,v=new T.Vector3(),rnd=ast3dMulberry(seed*7919+13),i,c;
+function ast3dRockGeo(seed,detail){   /* detail dihilangkan = 3 (dipakai 17-planet3d.js apa adanya) */
+  var T=THREE,geo=new T.IcosahedronGeometry(1,detail==null?3:detail),pos=geo.attributes.position,v=new T.Vector3(),rnd=ast3dMulberry(seed*7919+13),i,c;
   var cr=[];
   for(i=0;i<7;i++)cr.push({d:new T.Vector3(rnd()-.5,rnd()-.5,rnd()-.5).normalize(),cosA:Math.cos(.20+rnd()*.30),dep:.10+rnd()*.14});
   var sy=.72+rnd()*.28,sz=.62+rnd()*.30,f1=1.6+rnd()*1.6,f2=3.1+rnd()*2.2,p1=rnd()*6.28,p2=rnd()*6.28,p3=rnd()*6.28,sum=0;
@@ -86,7 +87,7 @@ function ast3dRockGeo(seed){
 }
 
 /* satu varian = satu InstancedBufferGeometry + satu Mesh; atribut per-instance diisi ulang tiap frame (dipadatkan) */
-function ast3dAddVariant(geo){
+function ast3dAddVariant(geo,tier){
   var T=THREE,ig=new T.InstancedBufferGeometry(),cap=AST3D.cap,v={};
   ig.index=geo.index;
   ig.setAttribute('position',geo.attributes.position);
@@ -96,7 +97,9 @@ function ast3dAddVariant(geo){
   v.Z=new T.InstancedBufferAttribute(new Float32Array(cap),1).setUsage(T.DynamicDrawUsage);     /* kedalaman */
   ig.setAttribute('iA',v.A);ig.setAttribute('iB',v.B);ig.setAttribute('iZ',v.Z);
   ig.instanceCount=0;
-  v.geo=ig;v.base=geo;v.n=0;
+  if(tier==null)tier=AST3D_CFG.lod.length;   /* tanpa tier (GLB) = tier detail penuh */
+  v.geo=ig;v.base=geo;v.n=0;v.tier=tier;
+  (AST3D.tiers[tier]||(AST3D.tiers[tier]=[])).push(v);
   v.mesh=new T.Mesh(ig,AST3D.mat);
   v.mesh.frustumCulled=false;v.mesh.visible=false;
   AST3D.sc.add(v.mesh);
@@ -149,7 +152,9 @@ function ast3dBuild(){
     ].join('\n')
   });
   AST3D.cap=Math.max(128,(AST&&AST.length||0)+16);
-  for(var i=0;i<AST3D_CFG.procVariants;i++)ast3dAddVariant(ast3dRockGeo(i+1));
+  var LD=AST3D_CFG.lod,ti,i;
+  for(ti=0;ti<=LD.length;ti++)
+    for(i=0;i<AST3D_CFG.procVariants;i++)ast3dAddVariant(ast3dRockGeo(i+1,ti<LD.length?LD[ti][0]:3),ti);   /* seed sama per tier -> bentuk batu sama, cuma kerapatan mesh beda */
   AST3D.state=2;   /* siap dipakai segera dengan batu procedural */
   threeWarm(r,AST3D.sc,AST3D.cam,function(){ast3dResize();});   /* ukuran layar penuh dipasang di warm-up, bukan di frame batu pertama */
   if(AST3D_CFG.glb&&AST3D_CFG.glb.length)ast3dLoadGlb();
@@ -182,6 +187,15 @@ function ast3dLoadGlb(){
   else ast3dScript(AST3D_CFG.gltfLib,run,function(m){try{console.warn('[ast3d]',m);}catch(e){}});
 }
 
+/* pilih varian: tier menurut ukuran batu (_sz), lalu bentuk menurut sprite; tier kosong -> turun ke tier berikutnya yang ada */
+function ast3dPick(a){
+  var L=AST3D_CFG.lod,T=AST3D.tiers,t=L.length,i,l;
+  for(i=0;i<L.length;i++)if(a._sz<L[i][1]){t=i;break;}
+  for(i=t;i<=L.length;i++){l=T[i];if(l&&l.length)return l[(a.sprite|0)%l.length];}
+  for(i=t-1;i>=0;i--){l=T[i];if(l&&l.length)return l[(a.sprite|0)%l.length];}
+  return AST3D.vars[0];
+}
+
 function ast3dResize(){
   var pr=Math.min(DPR||1,AST3D_CFG.dprMax);
   if(AST3D.w===W&&AST3D.h===H&&AST3D.pr===pr)return;
@@ -201,10 +215,10 @@ function ast3dDraw(now,half){
     if(!nv)return false;
     if(nA+4>AST3D.cap){   /* jumlah batu bertambah (slider): bangun ulang varian dengan kapasitas baru */
       AST3D.cap=nA+32;
-      var bases=vars.map(function(b){return b.base;});
+      var bases=vars.map(function(b){return [b.base,b.tier];});
       for(i=0;i<nv;i++){AST3D.sc.remove(vars[i].mesh);vars[i].geo.dispose();}
-      vars.length=0;
-      bases.forEach(ast3dAddVariant);
+      vars.length=0;AST3D.tiers=[];
+      bases.forEach(function(q){ast3dAddVariant(q[0],q[1]);});
     }
     ast3dResize();
     for(i=0;i<nv;i++)vars[i].n=0;
@@ -220,7 +234,7 @@ function ast3dDraw(now,half){
         var th=(i*2.399963)%6.283185,cz=1-2*((i*.618034+.13)%1),sz2=Math.sqrt(Math.max(0,1-cz*cz));
         a._ax=sz2*Math.cos(th);a._ay=sz2*Math.sin(th);a._az=cz;
       }
-      v=vars[(a.sprite|0)%nv];k=v.n++;
+      v=ast3dPick(a);k=v.n++;
       var al=a._fl?.96:(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s));
       al*=(a._fa==null?1:a._fa);
       var A=v.A.array,B=v.B.array,o=k*4;

@@ -930,7 +930,7 @@ function astRingFrame(){
         bet=(typeof PT3D_CFG!=='undefined'&&PT3D_CFG.orb&&PT3D_CFG.orb.bet)||1,
         beta=Math.atan(dd/sq)*bet,cb=Math.cos(beta),sb=Math.sin(beta),cyo=gm.cy-sq,
         C=ptUp2Stage(cxo,cyo),Us=ptUp2Stage(cxo+cb,cyo+sb),Vs=ptUp2Stage(cxo-sb,cyo+cb),
-        lensOn=(typeof SECT!=='undefined'&&SECT.cur)?1:0,R=BH.Rr*(BHZ||1),lz=R*9.5+200;
+        lensOn=(typeof SECT!=='undefined'&&SECT.cur)?1:0,R=BH.Rr*(BHZ||1),lz=R*9.5+8;
     return {cx:cxo,cy:cyo,ux:cb,uy:sb,vx:-sb,vy:cb,
       sx:C[0],sy:C[1],sux:Us[0]-C[0],suy:Us[1]-C[1],svx:Vs[0]-C[0],svy:Vs[1]-C[1],
       gcx:gm.cx,gcy:gm.cy,R:gm.R,R2:R2,apex:Math.max(20,cyo-PH*AST_CFG.tp),   /* apex = tinggi maks busur di atas pusat (tidak lewat tepi atas layar) */
@@ -1159,6 +1159,7 @@ function drawAsteroids(now,half){
   if(!AST.length||!AST_CFG.on||(typeof PX!=='undefined'&&PX.ast))return;
   half=half|0;
   if(half<=0||AST._stamp!==now)astStep(now);
+  if(half>0&&AST_RING_LAST)return;   /* cincin limb: nggak ada batu depan */
   if(typeof ast3dDraw==='function'&&ast3dDraw(now,half))return;   /* batu 3D (12-ast3d.js, lazy); false = sprite 2D di bawah */
   var sprites=ensureAsteroidSprites(),bsp=sprites.back;
   /* Hemat panggilan canvas: 300 batu x (save+alpha+translate+rotate+drawImage+restore) = 1800 call/pass di WebView lemah.
