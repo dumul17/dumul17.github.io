@@ -318,17 +318,34 @@ function teleSectorLogic(dt){
   if(T.al>.985)T.al=1;
 }
 /* drawTxLines / drawTxTop didefinisikan di 08-tx-drone.js (stub lama dihapus di F9). */
-/* LED beacon teleskop: idle hijau neon, TX (sektor sumber, drone docked) cyan, RX (sektor lain, link ke BH mini) pink.
-   Warna dilerp halus (TELED) supaya perpindahan peran tidak loncat. Peran dari TXFX.role() (08-tx-drone.js). */
-var TELED_IDLE=TELE_LED[TELE_CFG.led].slice(),TELED_TX=[110,229,255],TELED_RX=[255,154,217],TELED_SBY=[255,214,102];   /* warna idle dari setelan teleskop */
-var TELED={c:TELED_IDLE.slice(),t:0};
+/* Dua LED beacon di antena teleskop (sama panjang, sama terang):
+   1) LED IDLE      = warna pilihan panel setelan (TELE_CFG.led / TELE_LED), selalu kedip pendek, tidak ikut peran apa pun.
+   2) LED INDIKATOR = state interlocking sektor (dari TXFX.role() di 08-tx-drone.js): kuning = drone di-drop dari teleskop (sby),
+                      biru/cyan = drone jadi transmitter SFX bintang di sektor sumber (src), pink = sektor selain sumber, drone dock jadi receiver (rcv),
+                      merah = Lost-in-Space. Tanpa state = padam (redup).
+   Warna dilerp halus supaya perpindahan tidak loncat. */
+var TELED_IDLE=TELE_LED[TELE_CFG.led].slice(),TELED_TX=[110,229,255],TELED_RX=[255,154,217],TELED_SBY=[255,214,102],TELED_LIS=[255,72,72];
+var TELEID={c:TELED_IDLE.slice(),t:0};          /* LED idle */
+var TELEI={c:TELED_SBY.slice(),a:0,t:0};         /* LED indikator: c = warna terakhir, a = 0..1 (menyala) */
 function teleLedSet(i){TELE_CFG.led=i;TELED_IDLE=TELE_LED[i].slice();}
-function teLedStep(now,role){
-  var tg=role==='src'?TELED_TX:role==='rcv'?TELED_RX:role==='sby'?TELED_SBY:TELED_IDLE,dt=TELED.t?Math.min(100,now-TELED.t):100,k=reduce?1:1-Math.exp(-dt/200),i;
-  if(now-TELED.t>400)k=1;
-  TELED.t=now;
-  for(i=0;i<3;i++)TELED.c[i]+=(tg[i]-TELED.c[i])*k;
-  return Math.round(TELED.c[0])+','+Math.round(TELED.c[1])+','+Math.round(TELED.c[2]);
+function teIdleStep(now){   /* [r,g,b] LED idle */
+  var stale=now-TELEID.t>400,dt=TELEID.t?Math.min(100,now-TELEID.t):100,k=(reduce||stale)?1:1-Math.exp(-dt/200),i,o=[0,0,0];
+  TELEID.t=now;
+  for(i=0;i<3;i++){TELEID.c[i]+=(TELED_IDLE[i]-TELEID.c[i])*k;o[i]=Math.round(TELEID.c[i]);}
+  return o;
+}
+function teIndStep(now,role,lis){   /* {c:[r,g,b],a:0..1} LED indikator; a turun ke 0 kalau tidak ada state */
+  var tg=lis?TELED_LIS:role==='src'?TELED_TX:role==='rcv'?TELED_RX:role==='sby'?TELED_SBY:null,
+      stale=now-TELEI.t>400,dt=TELEI.t?Math.min(100,now-TELEI.t):100,k=(reduce||stale)?1:1-Math.exp(-dt/200),i,o=[0,0,0];
+  TELEI.t=now;
+  if(tg){
+    var kc=(TELEI.a<.05)?1:k;   /* baru menyala dari padam: langsung warna target, jangan lewat warna lama */
+    for(i=0;i<3;i++)TELEI.c[i]+=(tg[i]-TELEI.c[i])*kc;
+    TELEI.a+=(1-TELEI.a)*k;
+  }else TELEI.a+=(0-TELEI.a)*k;
+  if(TELEI.a<.004)TELEI.a=0;
+  for(i=0;i<3;i++)o[i]=Math.round(TELEI.c[i]);
+  return {c:o,a:TELEI.a};
 }
 /* Badan teleskop (origin di titik pusat, sudah di-translate/rotate/scale oleh pemanggil, globalAlpha diatur pemanggil).
    Dipakai drawFloatingTelescope (canvas #sky) DAN 09-wormhole.js (digambar ulang di atas terowongan wormhole). */
@@ -435,17 +452,18 @@ function teleDrawBody(g,now){
     g.beginPath();g.ellipse(-22,0,4.5,12,0,0,6.283);g.fill();g.stroke();
     g.fillStyle='rgb(176,188,195)';
     g.fillRect(-27,-2,4,4);
-    g.strokeStyle='rgb(146,162,171)';g.lineWidth=.8;
-    g.beginPath();g.moveTo(-25,0);g.lineTo(-33,0);g.stroke();
-    /* Beacon LED status light on rear antenna tip (observatory satellite feel) */
-    var lisR=(typeof lisRed==='function')&&lisRed(now);   /* Lost-in-Space: LED merah selama star tracker belum pulih */
-    var _role=(typeof TXFX!=='undefined'&&TXFX.role)?TXFX.role():null,_lc=teLedStep(now,_role);
-    /* idle: kedip pendek seperti sebelumnya; TX/RX: menyala stabil dengan denyut halus + glow lebih kuat */
-    var beacon=lisR?(Math.sin(now*0.02)>-0.2?1:0.3):(_role?(.78+.22*Math.sin(now*0.008)):(Math.sin(now*0.006)>0.6?1:0.15));
-    if(lisR){g.fillStyle='rgba(255,60,60,'+(beacon*.35)+')';g.beginPath();g.arc(-34,0,6,0,6.283);g.fill();}
-    else{g.fillStyle='rgba('+_lc+','+(beacon*(_role?.42:.24))+')';g.beginPath();g.arc(-34,0,_role?7:5,0,6.283);g.fill();}
-    g.fillStyle=lisR?'rgba(255,72,72,'+beacon+')':'rgba('+_lc+','+beacon+')';
-    g.beginPath();g.arc(-34,0,lisR?2.8:(_role?2.2:1.8),0,6.283);g.fill();
+    g.strokeStyle='rgb(146,162,171)';g.lineWidth=.8;   /* dua antena sama panjang: atas = LED idle, bawah = LED indikator interlock */
+    g.beginPath();g.moveTo(-25,-5);g.lineTo(-33,-5);g.moveTo(-25,5);g.lineTo(-33,5);g.stroke();
+    var lisR=(typeof lisRed==='function')&&lisRed(now);   /* Lost-in-Space: LED indikator merah selama star tracker belum pulih */
+    var _role=(typeof TXFX!=='undefined'&&TXFX.role)?TXFX.role():null,_ic=teIdleStep(now),_in=teIndStep(now,_role,lisR);
+    var bkI=(Math.sin(now*0.006)>0.6?1:0.15),bkN=lisR?(Math.sin(now*0.02)>-0.2?1:0.3):(.78+.22*Math.sin(now*0.008));
+    g.fillStyle='rgba('+_ic.join(',')+','+(bkI*.3)+')';g.beginPath();g.arc(-34,-5,5,0,6.283);g.fill();
+    g.fillStyle='rgba('+_ic.join(',')+','+bkI+')';g.beginPath();g.arc(-34,-5,1.9,0,6.283);g.fill();
+    g.fillStyle='rgba(60,70,76,'+(1-_in.a)+')';g.beginPath();g.arc(-34,5,1.9,0,6.283);g.fill();   /* LED padam = kaca gelap (di bawah nyala) */
+    if(_in.a>0){
+      g.fillStyle='rgba('+_in.c.join(',')+','+(bkN*.3*_in.a)+')';g.beginPath();g.arc(-34,5,5,0,6.283);g.fill();
+      g.fillStyle='rgba('+_in.c.join(',')+','+(bkN*_in.a)+')';g.beginPath();g.arc(-34,5,1.9,0,6.283);g.fill();
+    }
 
     /* Small service-box details: opaque and restrained. */
     g.fillStyle='rgb(91,105,114)';g.fillRect(-4,-15,9,3);g.fillRect(-3,12,8,3);

@@ -7,7 +7,8 @@
         - RCV         : sektor lain → standby pink di teleskop (F8; dulu: Gargantua mini). SBY = kuning, standby di teleskop.
       Lepas (long-press lagi / recall) = drone balik ke teleskop. Pindah sektor = tanpa animasi (langsung posisi akhir).
    3. Di overview sektor: Gargantua = tunnel. Garis sumber → Gargantua → sektor penerima, paket cahaya ngalir searah sinyal.
-   Warna jalur/drone/ring mengikuti indikator interlocking sektornya (kuning/pink). F9: tether TIDAK permanen (cuma ±1,2 dtk setelah transisi + selama tahan); cincin cyan di teleskop = sektor ini interlocking (txLinked); cincin pink pulsa di drone = docked; mode cam: semua disembunyikan.
+   Warna jalur/drone/ring mengikuti indikator interlocking sektornya (kuning/pink). F9: tether TIDAK permanen (cuma ±1,2 dtk setelah transisi + selama tahan); mode cam: semua disembunyikan. Cincin pulse cyan di teleskop (txLinked) DIHAPUS: status interlock sekarang dibaca dari LED indikator di antena teleskop (13-scope3d.js).
+   Garis putus-putus (tether drone→teleskop + sinyal RX turun) TIDAK digambar saat drone docking jadi RECEIVER di sektor selain sumber; drop drone dari teleskop (kuning) dan TX di sektor sumber tetap menampilkannya (lalu hilang, tidak permanen).
    Dipanggil dari frame() lewat drawTxLines(now) (sudah ada di 04-render/05-sector-ui, tinggal didefinisikan).
    MENDARAT DI PLANET: di sektor, drone yang di-drop (tahan teleskop) terbang dari teleskop lalu MENDARAT di permukaan planet (17-planet3d.js: planetGroundAt),
    berdiri di tanah dan ikut berputar bersama permukaan (koordinat tanah ug/sg, bukan koordinat layar), pulse di kaki. TX/RX tetap berdiri di tanah:
@@ -154,23 +155,6 @@ var TXFX=(function(){
     return e<TETH_HOLD?1:(e<TETH_HOLD+TETH_FADE?1-(e-TETH_HOLD)/TETH_FADE:0);
   }
   function teleSize(){return typeof TELE_CFG!=='undefined'?Math.max(1,TELE_CFG.size):1;}
-  /* cincin cyan di teleskop: radius lebih besar dari orbit standby drone (42*size) supaya tidak bertumpuk dengan cincin pink drone */
-  function drawLinkRing(tp,now){
-    var C='110,229,255',R0=42*teleSize()+14;
-    g.save();g.lineWidth=1.3;
-    if(reduce||lite()){g.strokeStyle='rgba('+C+',.38)';g.beginPath();g.arc(tp[0],tp[1],R0+6,0,6.283);g.stroke();}
-    else{var f=(now%2400)/2400;g.strokeStyle='rgba('+C+','+(.42*(1-f))+')';g.beginPath();g.arc(tp[0],tp[1],R0+f*20,0,6.283);g.stroke();}
-    g.restore();
-  }
-  /* cincin pink di drone: drone docked (TX on). Fase digeser setengah siklus dari cincin cyan supaya tidak berkedip bersamaan. */
-  function drawDockRing(x,y,now){
-    var C=RCV;
-    g.save();g.lineWidth=1.2;
-    if(reduce||lite()){g.strokeStyle='rgba('+C+',.45)';g.beginPath();g.arc(x,y,15,0,6.283);g.stroke();}
-    else{var f=((now+1200)%2400)/2400;g.strokeStyle='rgba('+C+','+(.5*(1-f))+')';g.beginPath();g.arc(x,y,9+f*14,0,6.283);g.stroke();}
-    g.restore();
-  }
-
   /* pulse di kaki drone (elips di tanah; bidang tanah gepeng oleh perspektif). Kuning pelan = drone di-drop, pink cepat = TX/RX aktif. Digambar di ruang layar tegak. */
   function ell(x,y,rx,ry){if(g.ellipse)g.ellipse(x,y,rx,ry,0,0,6.283);else{g.save();g.translate(x,y);g.scale(1,ry/rx);g.arc(0,0,rx,0,6.283);g.restore();}}
   function drawFeet(fp,col,pink,now,d){
@@ -231,7 +215,6 @@ var TXFX=(function(){
     }else if(!mode&&(d.ph==='out'||d.ph==='dock')){
       d.from=d.pos?d.pos.slice():tp;d.ph='back';d.t0=now;d.tch=now;d.hop=false;
     }
-    if(typeof txLinked==='function'&&txLinked(s))drawLinkRing(tp,now);   /* cincin cyan: sektor ini interlocking (juga saat drone idle karena bintang sumber tak terlihat) */
     if(d.ph==='idle')return;
     var T=d.mode?targetOf(s,d.mode,d,now):null,pos,al=1,u,e,baseSc=fScale(),dsc=baseSc,landF=0;
     if(d.ph==='out'){
@@ -259,15 +242,17 @@ var TXFX=(function(){
     if(!reduce){var tl=d.trail,lp=tl.length?tl[tl.length-1]:null;if(!lp||Math.abs(lp[0]-pos[0])+Math.abs(lp[1]-pos[1])>1.2){tl.push([pos[0],pos[1],now]);if(tl.length>28)tl.shift();}}
     /* semua gambar drone ditunda ke drawTop() (setelah planet): trail, tether, berkas bintang, pulse kaki, sprite, label */
     var tx=TX.by[s.k],beam=null;
+    /* docking jadi receiver (sektor selain sumber): tanpa garis putus-putus. Berlaku saat sudah RX, dan selama menahan drone yang akan jadi RX. Drop drone dari teleskop (kuning) tetap bergaris. */
+    var rcvQuiet=(d.mode==='rcv')||!!(hold&&hold.tg==='drone'&&d.mode==='sby'&&!(typeof sfxSector==='function'&&sfxSector()===s));
     var bOn=!!(d.ph==='dock'&&tx&&tx.on);
     if(bOn&&(!d.bon||d.bkey!==curKey))d.bch=now;   /* berkas baru muncul (SFX mulai / mendarat / ganti bintang): mulai hitung tampil -> pudar */
     d.bon=bOn;d.bkey=curKey;
     if(bOn){
       if(!tx.recv){var sp0=txStarPos(tx.key),q0=sp0&&gravityPos(sp0[0],sp0[1]);if(q0)beam={a:[q0[0],q0[1]],rx:false};}   /* TX: berkas dari bintang SFX ke drone */
-      else beam={a:[pos[0],Math.max(6,pos[1]-H*.4)],rx:true};   /* RX: sinyal turun dari atas */
+      else if(!rcvQuiet)beam={a:[pos[0],Math.max(6,pos[1]-H*.4)],rx:true};   /* RX: sinyal turun dari atas (tidak di sektor selain sumber: docking receiver tanpa garis putus) */
     }
     TOP={x:pos[0],y:pos[1],col:col,al:al,txt:(tx&&tx.on)?(tx.recv?'RX':'TX'):'',d:d,tp:tp,sc:dsc,land:landF,beam:beam,
-         foot:(d.ph==='dock'&&T&&T.ground)?T.ground:null,pulse:!!(tx&&tx.on)};
+         foot:(d.ph==='dock'&&T&&T.ground)?T.ground:null,pulse:!!(tx&&tx.on),quiet:rcvQuiet};
   }
   /* Tahap atas: dipanggil SETELAH planet (05-sector-ui.js frame()), jadi drone yang mendarat berdiri DI ATAS permukaan planet, di atas Gargantua/reticle. */
   function drawTop(now){
@@ -278,7 +263,7 @@ var TXFX=(function(){
       if(T){
         drawTrail(T.d,T.col,now);
         if(T.beam)tether(T.beam.a,[T.x,T.y],T.col,(T.beam.rx?.7:1)*beamF(T.d,now),now,T.beam.rx?0:8,10);   /* memudar sendiri (beamF), bukan permanen */
-        tether([T.x,T.y],T.tp,T.col,T.al*tethF(T.d,now),now,6,15);   /* sinyal drone→teleskop: hanya saat transisi/tahan */
+        if(!T.quiet)tether([T.x,T.y],T.tp,T.col,T.al*tethF(T.d,now),now,6,15);   /* sinyal drone→teleskop: hanya saat transisi/tahan, dan tidak saat jadi receiver */
         if(T.foot)drawFeet(T.foot,T.col,T.pulse,now,T.d);
         if(typeof DR3D!=='undefined')DR3D.land=T.land;
         drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,T.sc);

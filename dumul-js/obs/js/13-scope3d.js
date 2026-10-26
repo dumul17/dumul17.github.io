@@ -7,7 +7,8 @@
    kokpit segi-8 bercahaya cyan, dua pod kaca transparan di sisi, antena di hidung, blok mesin dengan DUA thruster ion hijau.
    Pencahayaan: kunci hangat dari arah Gargantua (dihitung dari posisi teleskop -> BH, diputar balik ke frame badan) + fill cyan + rim magenta + env ungu kecil.
    Pose: roll/yaw pelan supaya terasa 3D walau gerak 2D-nya tetap. Api mesin ikut mode (drift tipis, orbit sedang, warp menyala).
-   LED beacon (ujung antena) ikut peran (idle / TX / RX / Lost-in-Space merah) lewat teLedStep() & TELED yang sudah ada.
+   DUA antena sama panjang, dua LED sama terang: LED atas = IDLE (warna dari panel setelan Tele), LED bawah = INDIKATOR interlocking
+   (kuning = drone di-drop, cyan/biru = TX di sektor sumber, pink = RX di sektor lain, merah = Lost-in-Space; padam kalau tidak ada state) lewat teIdleStep() / teIndStep() di 04-render.js.
    Lost-in-Space: sirkuit & tepi neon ikut berubah merah dan berkedip.
    Gagal apa pun (WebGL mati, context lost, file nggak termuat, potato, reduce motion) -> tele3dBody() return false -> badan 2D lama dipakai lagi.
    Matikan: ?scope3d=0 di URL atau localStorage dumul_scope3d=0. */
@@ -195,7 +196,8 @@ function scp3dBuild(){
   m.cyan=new T.MeshBasicMaterial({color:0x35f3ff,toneMapped:false});
   m.mag=new T.MeshBasicMaterial({color:0xff3fd8,toneMapped:false});
   m.green=new T.MeshBasicMaterial({color:0x56ff3e,toneMapped:false});
-  m.led=new T.MeshBasicMaterial({color:0x6bff9e,toneMapped:false});
+  m.led=new T.MeshBasicMaterial({color:0x6bff9e,toneMapped:false});    /* LED idle */
+  m.led2=new T.MeshBasicMaterial({color:0x3a4248,toneMapped:false});   /* LED indikator interlock (padam = kaca gelap) */
   m.ion=new T.MeshBasicMaterial({color:0x1fe81a,toneMapped:false,transparent:true,opacity:.85,depthWrite:false,blending:T.AdditiveBlending,side:DS});
   m.ionCore=new T.MeshBasicMaterial({color:0x9dff7a,toneMapped:false,transparent:true,opacity:.8,depthWrite:false,blending:T.AdditiveBlending,side:DS});
   var glowTex=scp3dGlowTex();
@@ -237,11 +239,12 @@ function scp3dBuild(){
   o.edgeMag=strip(pe(XA+2,1),pe(XN-1,1),.55,m.mag);root.add(o.edgeMag);
   root.add(strip(pe(XA+2,-1),pe(XN-1,-1),.35,m.cyan));
   /* tutup hidung + antena (LED beacon di ujung antena panjang) */
-  var ant1=hexCyl(.4,.4,9,6,m.dark);ant1.position.set(XN+4,3.4,0);root.add(ant1);
-  var ant2=hexCyl(.35,.35,6.5,6,m.dark);ant2.position.set(XN+2.8,-3.4,0);root.add(ant2);
-  o.led=new T.Mesh(new T.SphereGeometry(1.1,12,10),m.led);o.led.position.set(XN+8.8,3.4,0);root.add(o.led);
-  o.ledGlow=sprite(0x6bff9e,15);o.ledGlow.position.set(XN+8.8,3.4,3);root.add(o.ledGlow);
-  var dotB=new T.Mesh(new T.SphereGeometry(.6,8,6),m.cyan);dotB.position.set(XN+6.2,-3.4,0);root.add(dotB);
+  /* dua antena kembar (panjang, tebal, ukuran LED, glow semuanya sama): atas = LED idle, bawah = LED indikator interlock */
+  [[3.4,'led','led','ledGlow',0x6bff9e],[-3.4,'led2','led2','ledGlow2',0xffd666]].forEach(function(a){
+    var ant=hexCyl(.4,.4,9,6,m.dark);ant.position.set(XN+4,a[0],0);root.add(ant);
+    var lm=new T.Mesh(new T.SphereGeometry(1.1,12,10),m[a[2]]);lm.position.set(XN+8.8,a[0],0);root.add(lm);o[a[1]]=lm;
+    var lg=sprite(a[4],15);lg.position.set(XN+8.8,a[0],3);root.add(lg);o[a[3]]=lg;
+  });
 
   /* kokpit: bezel segi-8 + kaca berisi ruang bercahaya cyan */
   var wx=1.2,tilt=Math.atan((zf(XA)-zf(XN))/(XN-XA)),wg=new T.Group();
@@ -365,17 +368,22 @@ function scp3dUpdate(now,mm){
   }
   m.ion.opacity=.45+.35*th;m.ionCore.opacity=.35+.3*th;
 
-  /* LED beacon: sama dengan badan 2D (idle kedip, TX/RX stabil, Lost-in-Space merah) */
-  var lisR=(typeof lisRed==='function')&&lisRed(now),role=(typeof TXFX!=='undefined'&&TXFX.role)?TXFX.role():null,lc=teLedStep(now,role).split(','),
-      bk=lisR?(Math.sin(now*.02)>-.2?1:.3):(role?(.78+.22*Math.sin(now*.008)):(Math.sin(now*.006)>.6?1:.15)),
-      cr=lisR?1:(+lc[0])/255,cg=lisR?.28:(+lc[1])/255,cb=lisR?.28:(+lc[2])/255;
-  m.led.color.setRGB(cr*(.25+.75*bk),cg*(.25+.75*bk),cb*(.25+.75*bk));
-  o.ledGlow.material.color.setRGB(cr,cg,cb);o.ledGlow.material.opacity=bk*(role||lisR?.9:.6);
-  o.ledGlow.scale.set(role||lisR?18:13,role||lisR?18:13,1);
+  /* dua LED beacon: idle (warna panel setelan, kedip pendek) + indikator interlock (kuning / cyan / pink, merah saat LIS, padam kalau tidak ada state).
+     Kecerahan keduanya disamakan: warna x (.25+.75*kedip), glow ukuran + opasitas sama. */
+  var lisR=(typeof lisRed==='function')&&lisRed(now),role=(typeof TXFX!=='undefined'&&TXFX.role)?TXFX.role():null,
+      ic=teIdleStep(now),nd=teIndStep(now,role,lisR),
+      bkI=Math.sin(now*.006)>.6?1:.15,
+      bkN=lisR?(Math.sin(now*.02)>-.2?1:.3):(.78+.22*Math.sin(now*.008)),
+      cr=nd.c[0]/255,cg=nd.c[1]/255,cb=nd.c[2]/255,na=nd.a,LG=15,LO=.75;
+  m.led.color.setRGB(ic[0]/255*(.25+.75*bkI),ic[1]/255*(.25+.75*bkI),ic[2]/255*(.25+.75*bkI));
+  o.ledGlow.material.color.setRGB(ic[0]/255,ic[1]/255,ic[2]/255);o.ledGlow.material.opacity=bkI*LO;o.ledGlow.scale.set(LG,LG,1);
+  var lv=.25+.75*bkN;
+  m.led2.color.setRGB(.23+(cr*lv-.23)*na,.26+(cg*lv-.26)*na,.28+(cb*lv-.28)*na);   /* padam -> abu gelap, menyala -> warna state */
+  o.ledGlow2.material.color.setRGB(cr,cg,cb);o.ledGlow2.material.opacity=bkN*LO*na;o.ledGlow2.scale.set(LG,LG,1);
 
-  /* neon: normal = cyan/magenta; Lost-in-Space = merah berkedip; TX/RX = cahaya kokpit ikut warna LED */
+  /* neon: normal = cyan/magenta; Lost-in-Space = merah berkedip; TX/RX/standby = cahaya kokpit ikut warna LED indikator */
   if(lisR){
-    m.face.emissive.setRGB(1,.28,.28);m.face.emissiveIntensity=.9+.8*bk;
+    m.face.emissive.setRGB(1,.28,.28);m.face.emissiveIntensity=.9+.8*bkN;
     m.mag.color.setRGB(1,.18,.18);o.winGlow.material.color.setRGB(1,.3,.3);
   }else{
     m.face.emissive.setRGB(1,1,1);m.face.emissiveIntensity=1.45+.12*Math.sin(now*.003);
