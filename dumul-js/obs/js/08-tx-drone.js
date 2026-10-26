@@ -38,10 +38,10 @@ var TXFX=(function(){
   }
   function tele(){var p=telescopeScreenPos();return p?[p[0],p[1]]:null;}
   /* Warna jalur/drone = warna indikator interlocking sektornya (txInterlock + IL_COL di 05-sector-ui.js):
-     1 kuning, 2 pink (cyan pensiun). Lvl 0 (belum ada drone) = netral. Peran TX/RX tetap dibedakan lewat label & arah paket. */
+     1 kuning, 2 pink; KECUALI TX di sektor sumber = cyan (SRC), ikut LED indikator scope3d. Lvl 0 (belum ada drone) = netral. Peran TX/RX tetap dibedakan lewat label & arah paket. */
   function ilLvl(s){return(s&&typeof txInterlock==='function')?txInterlock(s).lvl:0;}
   function lvlCol(l){return(typeof IL_COL!=='undefined'&&IL_COL[l])||NEU;}
-  function ilCol(s){return lvlCol(ilLvl(s));}
+  function ilCol(s){return want(s)==='src'?SRC:lvlCol(ilLvl(s));}   /* TX di sektor sumber = cyan (sama dgn LED indikator scope3d); RX tetap pink, standby kuning */
   /* Fade warna: tiap jalur punya warna berjalan sendiri (key), dilerp ke target. Lama nggak digambar (>400 ms) = snap, bukan fade basi. */
   var CF={};
   function fcol(key,tgt,now){
