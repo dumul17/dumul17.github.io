@@ -132,11 +132,10 @@
     'tune.ast.count':{en:'Count',id:'Jumlah'},'tune.ast.count.s':{en:'rocks',id:'batu'},'tune.ast.size.s':{en:'rock scale',id:'skala batu'},
     'tune.ast.orbit':{en:'Orbit',id:'Orbit'},'tune.ast.orbit.s':{en:'width',id:'lebar'},'tune.ast.thick':{en:'Thickness',id:'Ketebalan'},'tune.ast.thick.s':{en:'ring density',id:'kerapatan cincin'},
     'tune.ast.spd.s':{en:'orbit',id:'orbit'},
+    'tune.sub.ast.o':{en:'Asteroid // Overview Tune',id:'Asteroid // Setelan Ringkasan'},'tune.sub.ast.sc':{en:'Asteroid // Sector Tune',id:'Asteroid // Setelan Sektor'},
     /* tab Asteroid: knob sabuk limb planet */
     'tune.ast.ring':{en:'Limb belt',id:'Sabuk limb'},'tune.ast.ring.s':{en:'belt on the planet limb',id:'sabuk di limb planet'},
-    'tune.ast.nk':{en:'Density',id:'Kerapatan'},'tune.ast.nk.s':{en:'count multiplier',id:'pengali jumlah'},
-    'tune.ast.mx':{en:'Max rocks',id:'Batas batu'},'tune.ast.mx.s':{en:'simulation cap',id:'batas simulasi'},
-    'tune.ast.z':{en:'Belt rock size',id:'Ukuran batu sabuk'},'tune.ast.z.s':{en:'limb belt only',id:'khusus sabuk limb'},
+    'tune.ast.mx':{en:'Max rocks',id:'Batas batu'},'tune.ast.mx.s':{en:'cap at wide orbit',id:'batas saat orbit lebar'},
     'tune.ast.ed':{en:'Edge fade',id:'Pudar ujung'},'tune.ast.ed.s':{en:'arc ends',id:'ujung busur'},
     'tune.ast.lm':{en:'Limb fade',id:'Pudar limb'},'tune.ast.lm.s':{en:'near horizon',id:'dekat horizon'},
     'tune.ast.tp':{en:'Top limit',id:'Batas atas'},'tune.ast.tp.s':{en:'arc peak vs screen top',id:'puncak busur dari tepi atas'},
