@@ -1798,10 +1798,14 @@ function sfxSector(){
    Jarak = selisih sudut sektor (SECTORS[].a) dengan sektor sumber, 0..180 derajat -> .50 .. .90. */
 function camStrain(s){
   if(!CAMERA_MODE||SECT.on||!SECT.cur||!s||s===SECT.cur)return 0;
-  var f=typeof camFocusId==='function'?camFocusId():null;
-  if(!f||f==='bh'||f==='free')return 0;
+  var f=typeof camFocusId==='function'?camFocusId():null,zk=1;
+  if(!f||f==='bh')return 0;
+  if(f==='free'){   /* BEBAS (tanpa kunci fokus): zoom manual lewat slider / pinch juga membebani teleskop. Naik mulus dari 1.05x sampai 1.5x supaya tidak loncat saat slider baru digeser */
+    zk=Math.max(0,Math.min(1,(skyZoom-1.05)/.45));
+    if(zk<=0)return 0;
+  }
   var d=Math.abs(((SECT.cur.a-s.a)%360+360)%360);if(d>180)d=360-d;
-  return .5+.4*(d/180);
+  return (.5+.4*(d/180))*zk;
 }
 /* Sektor sumber interlocking (pink): drone TX docked di sektor itu.
    Dipakai di overview supaya muffle selaras dengan ◉◉ di window menu (txInterlock). */
