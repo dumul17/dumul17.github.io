@@ -1371,7 +1371,7 @@ function mwAlpha(now){
   }
   if(!im._ok)return 0;
   if(MW.w<0)MW.w=tgt;                                      /* frame pertama: langsung di keadaan sebenarnya (tanpa fade dari overview kalau mulai di sektor) */
-  MW.w+=(tgt-MW.w)*.06;if(Math.abs(tgt-MW.w)<.004)MW.w=tgt;
+  MW.w+=(tgt-MW.w)*.3;if(Math.abs(tgt-MW.w)<.03)MW.w=tgt;   /* dulu .06 (~50 frame crossfade = Milky Way + plate digambar bareng); .3 = ~10 frame, overdraw singkat; kilat transisi sektor menutupi pergantiannya */
   MW.f+=(1-MW.f)*.05;if(MW.f>.996)MW.f=1;                   /* fade-in sekali setelah gambar siap */
   return MW.w*MW.f;
 }

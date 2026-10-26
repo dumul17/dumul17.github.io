@@ -886,6 +886,7 @@ function drawShooting(now){
     SS_WARM=true;
     try{g.save();g.globalAlpha=.004;g.drawImage(ssSprite('234,246,255','110,229,255'),0,0,8,2);g.drawImage(ssSprite(OFX.m0,OFX.m1),0,0,8,2);g.restore();}catch(eSSw){}
     try{if(!OFX.tc)OFX.tc=ofxMakeTint('c');if(!OFX.tk)OFX.tk=ofxMakeTint('k');}catch(eTn){}   /* tint BGM juga di-bake awal (dulu baru dibuat saat BGM pertama nyala) */
+    try{ensureAsteroidSprites();}catch(eAs){}   /* 8 sprite batu di-bake di frame awal (dulu di drawAsteroids pertama: jank js16-19ms di 'shoot+astB') */
   }
   /* Shooting stars stay alive during star SFX and constellation alignment too
      (they used to be gated by secondaryFxScale). */

@@ -856,6 +856,7 @@ function frame(now){
     }
     resetCanvasState();
     g.clearRect(0,0,W,H);
+    g.imageSmoothingEnabled=true;g.imageSmoothingQuality='low';   /* reset: teleskop/drone/portal 3D men-set 'high'; kalau bocor ke frame berikut, blit plate layar penuh ikut mahal */
     if(bgCanvas&&!PX.sky){
       // 1. Warna dasar ruang angkasa agar pinggiran layar tidak bocor saat background bergeser
       g.fillStyle='#050b12';
@@ -865,11 +866,11 @@ function frame(now){
       //    Deep (debu/galaksi) bergeser & zoom lebih lambat daripada mid (bintang) => kedalaman.
       var pM=plateM,pW=W+2*pM,pH=H+2*pM;
       var pmx=0,pmy=0;
-      var mwA=mwAlpha(now),mwK=1-mwA;   /* overview: Milky Way berputar menggantikan plateDeep + bgCanvas (fade lewat bobot); di sektor mwA=0 -> jalur lama utuh */
+      var mwA=mwAlpha(now),mwK=1-mwA,xfade=SECT.busy||(mwA>.01&&mwA<.99);   /* xfade = transisi masuk/keluar sektor: lapisan dekoratif (debu) dilewati supaya blit layar penuh tidak numpuk */   /* overview: Milky Way berputar menggantikan plateDeep + bgCanvas (fade lewat bobot); di sektor mwA=0 -> jalur lama utuh */
       if(mwK<1)g.globalAlpha=mwK;
       if(plateDeep&&mwK>.01)plateBlit(plateDeep,pM,pW,pH,1+(skyZoom-1)*.55,skyPan.x*.14+pmx*4,skyPan.y*.14+pmy*3);
       /* Drifting dust depth layers (static when prefers-reduced-motion). */
-      for(var dli=0;dli<plateDust.length&&mwK>.01;dli++){
+      for(var dli=0;dli<plateDust.length&&mwK>.01&&!xfade;dli++){
         var dl=plateDust[dli],dt2=reduce?0:now*.001,
             ddx=(reduce||SKY_DRIFT<=0)?0:Math.sin(dt2*6.2832/dl.per+dl.ph)*dl.amp*SKY_DRIFT,
             ddy=(reduce||SKY_DRIFT<=0)?0:Math.cos(dt2*6.2832/(dl.per*1.37)+dl.ph)*dl.amp*.6*SKY_DRIFT;
