@@ -221,7 +221,7 @@ function ast3dDraw(now,half){
         a._ax=sz2*Math.cos(th);a._ay=sz2*Math.sin(th);a._az=cz;
       }
       v=vars[(a.sprite|0)%nv];k=v.n++;
-      var al=a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s);
+      var al=a._fl?.96:(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s));
       al*=(a._fa==null?1:a._fa);
       var A=v.A.array,B=v.B.array,o=k*4;
       A[o]=a._x;A[o+1]=H-a._y;A[o+2]=a._sz;A[o+3]=al>1?1:(al<0?0:al);
@@ -235,7 +235,7 @@ function ast3dDraw(now,half){
     if(!total)return true;
     var bp=camBH();
     AST3D.uni.uBH.value.set(bp[0],H-bp[1]);
-    AST3D.uni.uBack.value=half<0?1:0;
+    AST3D.uni.uBack.value=(half<0&&!(AST.length&&AST[0]._fl))?1:0;   /* batu cincin limb (a._fl) tampil seperti batu depan: tanpa tint dingin pass belakang */
     for(i=0;i<nv;i++){
       v=vars[i];
       v.mesh.visible=v.n>0;

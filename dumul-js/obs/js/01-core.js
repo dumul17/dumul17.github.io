@@ -483,11 +483,48 @@ var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3]};
    jari-jari tetap (AST_K, pengali global), bidang miring ikut BH.ang. Toggle ada di panel tab Langit, disimpan di localStorage.dumul_ast_cfg. */
 var AST_K=1;
 /* AST_CFG: on = tampil, n = jumlah batu (-1 = otomatis dari ukuran layar), sz/w/spd = pengali ukuran / lebar orbit / kecepatan orbit, t = ketebalan cincin (sebaran radius + kemiringan elips; kecil = cincin tipis rapat). Disimpan di localStorage.dumul_ast_cfg */
-var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_RNG={n:[0,300],sz:[.4,2.5],w:[.3,4],spd:[0,3],t:[.1,3]},AST_CFG={on:1,n:-1,sz:1,w:1,spd:1,t:1},AST_AUTO=40,AST_T=0,AST_TL=0;
+var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1,ring:1,nk:.5,mx:600,ed:.07,lm:14,z:.95,tp:.06,arch:1,fi:450,fo:260},
+    AST_RNG={n:[0,300],sz:[.4,2.5],w:[.3,8],spd:[0,3],t:[.1,3],nk:[.1,2],mx:[50,1200],ed:[0,.3],lm:[0,60],z:[.3,2],tp:[0,.3],arch:[0,2],fi:[0,1500],fo:[0,1000]},
+    AST_CFG={},AST_AUTO=40,AST_T=0,AST_TL=0;
+/* knob sabuk di limb planet (tab Asteroid, ikut Save/Reset + terpisah overview vs sektor): ring = 1 sabuk di limb / 0 sabuk lama, nk = pengali jumlah batu (Jumlah x nk),
+   mx = batas atas jumlah batu simulasi, ed = lebar fade di dua ujung busur (fraksi), lm = px fade dekat limb, z = skala ukuran batu cincin, tp = batas puncak busur dari tepi atas layar (fraksi tinggi layar), arch = lengkung busur (1 = seperti semula, 0 = rata mengikuti lengkung horizon planet, 2 = lebih melambung), fi / fo = durasi fade masuk / keluar (ms) */
+var AST_KEYS=['sz','w','spd','t','nk','mx','ed','lm','z','tp','arch','fi','fo'];
+(function(){for(var k in AST_DEF)AST_CFG[k]=AST_DEF[k];})();
 function astClamp(k,v){v=+v;if(!isFinite(v))return AST_DEF[k];var r=AST_RNG[k];return Math.max(r[0],Math.min(r[1],k==='n'?Math.round(v):v));}
-function astNorm(o){var r={on:AST_DEF.on,n:AST_DEF.n,sz:AST_DEF.sz,w:AST_DEF.w,spd:AST_DEF.spd,t:AST_DEF.t};if(o&&typeof o==='object'){if(typeof o.on==='number')r.on=o.on>=.5?1:0;
-  if(typeof o.n==='number'&&o.n>=0)r.n=astClamp('n',o.n);['sz','w','spd','t'].forEach(function(k){if(typeof o[k]==='number')r[k]=astClamp(k,o[k]);});}return r;}
-try{AST_CFG=astNorm(JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null'));}catch(e){}
+function astNorm(o){var r={},k;for(k in AST_DEF)r[k]=AST_DEF[k];if(o&&typeof o==='object'){if(typeof o.on==='number')r.on=o.on>=.5?1:0;if(typeof o.ring==='number')r.ring=o.ring>=.5?1:0;
+  if(typeof o.n==='number'&&o.n>=0)r.n=astClamp('n',o.n);AST_KEYS.forEach(function(q){if(typeof o[q]==='number')r[q]=astClamp(q,o[q]);});}return r;}
+/* ===== Sabuk asteroid: set tune TERPISAH overview (0) vs sektor (1) =====
+   Sektor = kunci lama dumul_ast_cfg (nilai lama tetap dipakai); overview = dumul_ast_cfg_o (kalau belum ada: disalin dari kunci lama).
+   Ganti konteks (SECT.cur): AST_CFG diisi ulang dari set tujuan (objeknya tetap sama), sabuk mulai dari transparan lalu di-fade masuk (AST_MIX 0->1)
+   setelah transisi selesai (terowongan wormhole / SECT.busy). Keluar sektor lewat back: sabuk di-fade keluar dulu sebelum konteks berganti. */
+var AST_SETS=[null,null],AST_CTX=0,AST_MIX=1,AST_MIXT=0,AST_MIXL=0,astRepaint=null;   /* durasi fade = AST_CFG.fi / AST_CFG.fo (panel Asteroid) */
+function astKey(){return AST_CTX?'dumul_ast_cfg':'dumul_ast_cfg_o';}
+(function(){var s=null,o=null;
+  try{s=JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null');}catch(e){}
+  try{o=JSON.parse(localStorage.getItem('dumul_ast_cfg_o')||'null');}catch(e){}
+  AST_SETS[1]=astNorm(s);AST_SETS[0]=astNorm(o||s);
+  AST_CFG=astNorm(AST_SETS[0]);
+})();
+function astCtxSync(){
+  var cx=(typeof SECT!=='undefined'&&SECT.cur)?1:0;if(cx===AST_CTX)return;
+  var k,from=AST_SETS[AST_CTX],to=AST_SETS[cx];
+  for(k in AST_DEF)from[k]=AST_CFG[k];
+  for(k in AST_DEF)AST_CFG[k]=to[k];
+  AST_CTX=cx;AST_MIX=0;AST_MIXT=0;
+  try{if(typeof astResize==='function')astResize();}catch(e){}
+  try{if(astRepaint)astRepaint();}catch(e){}
+}
+/* satu langkah fade sabuk (dipanggil dari astStep): tahan 0 selama transisi sektor / terowongan wormhole, lalu naik mulus; keluar sektor (back) turun dulu */
+function astMixStep(now){
+  var dt=AST_MIXL?Math.min(100,Math.max(0,now-AST_MIXL)):16,busy=false,out=false;AST_MIXL=now;
+  try{busy=!!((typeof SECT!=='undefined'&&SECT.busy)||(typeof whBusy==='function'&&whBusy()));out=!!(typeof SECT!=='undefined'&&SECT.busy&&SECT.phase==='out');}catch(e){}
+  if(out&&AST_CTX===1){AST_MIX=Math.max(0,AST_MIX-dt/Math.max(1,AST_CFG.fo));AST_MIXT=0;}
+  else if(AST_MIX<1){
+    if(busy){AST_MIX=0;AST_MIXT=0;}
+    else{if(!AST_MIXT)AST_MIXT=now;var u=Math.min(1,(now-AST_MIXT)/Math.max(1,AST_CFG.fi));AST_MIX=u*u*(3-2*u);}
+  }
+  return AST_MIX;
+}
 function bhuClamp(k,v){var r=BHU_RNG[k];v=+v;if(!(v===v))v=BHU_DEF[k];return Math.max(r[0],Math.min(r[1],v));}
 try{var _bc=JSON.parse(localStorage.getItem('dumul_bh_cfg')||'null');if(_bc)for(var _bk in BHU_DEF)if(typeof _bc[_bk]==='number')BHU[_bk]=bhuClamp(_bk,_bc[_bk]);}catch(e){}
 /* ===== Tune terpisah: overview vs BH mini di dalam sector =====

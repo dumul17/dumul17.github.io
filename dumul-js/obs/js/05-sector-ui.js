@@ -115,6 +115,7 @@ function bhScaleTarget(){
 var _bhScV=0,_bhScT=0;
 function bhScaleStep(){
   bhuCtxSync();
+  astCtxSync();   /* sabuk asteroid: set tune overview <-> sektor */
   var t=bhScaleTarget();
   var now=performance.now();
   var dt=Math.min(50,_bhScT?now-_bhScT:16)/1000;_bhScT=now;
@@ -281,7 +282,9 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
 (function bhTune(){
   var panel=document.getElementById('bh-panel');
   if(!panel)return; /* mode-bhset removed — panel lives in owl Tune tab */
-  var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),AK=['n','sz','w','t','spd'],ain={},aout={},inp={},out={},
+  var body=document.body,keys=['size','str','bloom','speed'],allKeys=keys,astBtn=document.getElementById('bp-ast'),astRingBtn=document.getElementById('bp-astring'),AK=['n','sz','w','t','spd','nk','mx','z','ed','lm','tp','arch','fi','fo'],
+      ASC={n:1,sz:100,w:100,t:100,spd:100,nk:100,mx:1,z:100,ed:100,lm:1,tp:100,arch:100,fi:1,fo:1},   /* skala slider -> nilai AST_CFG */
+      ain={},aout={},inp={},out={},
       bSave=document.getElementById('bp-save'),bReset=document.getElementById('bp-reset'),sub=document.getElementById('bp-sub'),
       tabs=[].slice.call(panel.querySelectorAll('.bp-tab')),pages={},cur='bh',SKYK=['HAZE','BAND','DRIFT','A_OV','THICK','VIG'],SECK=['A_SEC','SDIM','SPREAD','ZF'],ALLK=SKYK.concat(SECK),sin={},sout={},bakeT=0,tintT=0;
   AK.forEach(function(k){ain[k]=document.getElementById('ap-'+k);aout[k]=document.getElementById('ap-'+k+'-v');});
@@ -304,17 +307,18 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   function skyOv(){return body.classList.contains('sect-ov')&&NEB.on&&!mwOn();}   /* slider nebula/kabut/vinyet LAMA: cuma kalau Milky Way tidak aktif (potato, ?mw=0, gambar gagal); selain itu plateDeep di-fade keluar dan slider ini tidak terasa */   /* baris kabut/nebula/vinyet: cuma overview (di sektor plate ini diredam + ditimpa nebula bertint, jadi slider-nya nggak terasa) */
   function skySect(){return body.classList.contains('sect-in')&&NEB.on;}   /* baris langit sektor: A_SEC/SDIM/SPREAD/ZF, disimpan terpisah (dumul_sky_cfg_s) */
   function secStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg_s')||'null');}catch(e){}var r={};SECK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEBS_TUNE[k].def;});return r;}
-  function astStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null');}catch(e){}return astNorm(o);}
-  function astFmt(k,v){return k==='n'?String(v):v.toFixed(2)+'\u00d7';}
+  function astStored(){var o=null;try{o=JSON.parse(localStorage.getItem(astKey())||'null');}catch(e){}return astNorm(o);}
+  function astFmt(k,v){return(k==='n'||k==='mx')?String(Math.round(v)):(k==='ed'||k==='tp')?Math.round(v*100)+'%':k==='lm'?Math.round(v)+'px':(k==='fi'||k==='fo')?Math.round(v)+'ms':v.toFixed(2)+'\u00d7';}
   function paintAst(){
     if(astBtn){var ao=!!AST_CFG.on;astBtn.setAttribute('aria-pressed',ao?'true':'false');astBtn.textContent=ao?T('tune.show'):T('tune.hide');astBtn.classList.toggle('off',!ao);}
+    if(astRingBtn){var ro=!!AST_CFG.ring;astRingBtn.setAttribute('aria-pressed',ro?'true':'false');astRingBtn.textContent=tx(ro?'tune.on':'tune.off',ro?'On':'Off');astRingBtn.classList.toggle('off',!ro);}
     AK.forEach(function(k){
       var v=k==='n'?(AST_CFG.n<0?AST_AUTO:AST_CFG.n):AST_CFG[k],el=ain[k];
-      if(el){el.value=String(k==='n'?v:Math.round(v*100));fill(el);}
+      if(el){el.value=String(Math.round(v*ASC[k]));fill(el);}
       if(aout[k])aout[k].textContent=astFmt(k,v);
     });
   }
-  function astDirty(){var st=astStored(),d=false;if(st.on!==AST_CFG.on)d=true;AK.forEach(function(k){if(k==='n'?st.n!==AST_CFG.n:Math.abs(st[k]-AST_CFG[k])>.004)d=true;});return d;}
+  function astDirty(){var st=astStored(),d=false;if(st.on!==AST_CFG.on||st.ring!==AST_CFG.ring)d=true;AK.forEach(function(k){if(k==='n'?st.n!==AST_CFG.n:Math.abs(st[k]-AST_CFG[k])>.5/ASC[k])d=true;});return d;}
   function paintSky(){ALLK.forEach(function(k){var v=NEB[k];if(sin[k]){sin[k].value=String(Math.round(v*100));fill(sin[k]);}if(sout[k])sout[k].textContent=skyFmt(k,v);});}
   function skyBake(){clearTimeout(bakeT);bakeT=setTimeout(function(){try{bakeAstroPlates();}catch(e){}},110);}   /* debounce: bake plate tidak tiap geseran */
   function sectChanged(k){if(k!=='SPREAD')return;clearTimeout(tintT);tintT=setTimeout(function(){nebSTuneChanged(k);},120);}   /* debounce: hue di-bake ulang cuma setelah geseran berhenti */
@@ -372,7 +376,29 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     panel.classList.toggle('on',on);panel.setAttribute('aria-hidden',on?'false':'true');
     if(on)refresh();
   }
+  /* ===== Snap semua slider panel (.bp-range): angka genap gampang didapat (kelipatan 5 / 10 / 15 / 20 ...) =====
+     Satu listener tangkap di panel -> jalan SEBELUM handler tiap slider, jadi semua tab (Gargantua, Langit, Asteroid, Tele, dan baris T3D yang dibuat belakangan) ikut.
+     Langkah dari lebar rentang (satuan slider): <=20 -> 1 (tanpa snap), <=1000 -> 5, lebih -> 50. Boleh ditimpa lewat data-snap="N" di elemennya.
+     Kelipatan dihitung dari 0 (bukan dari min), ujung min/max tetap bisa dicapai. Panah/PageUp/PageDown/Home/End di keyboard loncat per langkah snap. */
+  function snapStep(el){var d=+el.getAttribute('data-snap');if(d>0)return d;var sp=(+el.max)-(+el.min);return sp<=20?1:(sp<=1000?5:50);}
+  function snapVal(el,v){
+    var st=snapStep(el),mn=+el.min,mx=+el.max;if(st<=1)return Math.max(mn,Math.min(mx,Math.round(v)));
+    var q=Math.max(mn,Math.min(mx,Math.round(v/st)*st)),dq=Math.abs(v-q);
+    if(Math.abs(v-mn)<dq)return mn;if(Math.abs(v-mx)<dq)return mx;return q;
+  }
+  panel.addEventListener('input',function(e){var el=e.target;if(!el||!el.classList||!el.classList.contains('bp-range'))return;var v=snapVal(el,+el.value);if(v!==+el.value)el.value=String(v);},true);
+  panel.addEventListener('keydown',function(e){
+    var el=e.target;if(!el||!el.classList||!el.classList.contains('bp-range'))return;
+    var st=snapStep(el),mn=+el.min,mx=+el.max,v=+el.value,k=e.key,n;
+    if(k==='ArrowRight'||k==='ArrowUp')n=Math.min(mx,(Math.floor(v/st+1e-9)+1)*st);
+    else if(k==='ArrowLeft'||k==='ArrowDown')n=Math.max(mn,(Math.ceil(v/st-1e-9)-1)*st);
+    else if(k==='PageUp')n=Math.min(mx,(Math.floor(v/st+1e-9)+4)*st);
+    else if(k==='PageDown')n=Math.max(mn,(Math.ceil(v/st-1e-9)-4)*st);
+    else if(k==='Home')n=mn;else if(k==='End')n=mx;else return;
+    e.preventDefault();n=snapVal(el,n);if(n===v)return;el.value=String(n);el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
   bhuRepaint=paint;
+  astRepaint=paint;
   bhTuneSync=refresh;
   try{new MutationObserver(function(){if(panel.classList.contains('on'))refresh();}).observe(body,{attributes:true,attributeFilter:['class']});}catch(e){}
   tabs.forEach(function(tb){tb.addEventListener('click',function(e){e.stopPropagation();var id=tb.getAttribute('data-tab');if(!avail()[id])return;cur=id;refresh();haptic(6);});});
@@ -395,11 +421,12 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     tin[k].addEventListener('input',function(){TELE_CFG[k]=teleCfgClamp(k,tin[k].value/100);paint();});
   });
   if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();AST_CFG.on=AST_CFG.on?0:1;paint();haptic(6);});
+  if(astRingBtn)astRingBtn.addEventListener('click',function(e){e.stopPropagation();AST_CFG.ring=AST_CFG.ring?0:1;astResize();paint();haptic(6);});   /* 1 = sabuk di limb planet, 0 = sabuk lama */
   AK.forEach(function(k){
     if(!ain[k])return;
     ain[k].addEventListener('input',function(){
-      AST_CFG[k]=astClamp(k,k==='n'?ain[k].value:ain[k].value/100);
-      if(k==='n')astResize();
+      AST_CFG[k]=astClamp(k,ain[k].value/ASC[k]);
+      if(k==='n'||k==='w'||k==='nk'||k==='mx')astResize();   /* w: jumlah efektif ikut lebar orbit (kerapatan terlihat tetap); nk/mx: pengali + batas jumlah */
       paint();
     });
   });
@@ -413,7 +440,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     if(cur==='tele'){
       try{localStorage.setItem(TELE_CFG_KEY,JSON.stringify(TELE_CFG));}catch(er){}
     }else if(cur==='ast'){
-      try{localStorage.setItem('dumul_ast_cfg',JSON.stringify(AST_CFG));}catch(er){}
+      try{localStorage.setItem(astKey(),JSON.stringify(AST_CFG));}catch(er){}
     }else if(cur==='sky'){
       if(skyOv()){var o={};SKYK.forEach(function(k){o[k]=NEB[k];});
         try{localStorage.setItem('dumul_sky_cfg',JSON.stringify(o));}catch(er){}}
@@ -432,7 +459,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
       try{localStorage.removeItem(TELE_CFG_KEY);}catch(er){}
     }else if(cur==='ast'){
       AST_CFG=astNorm(null);astResize();
-      try{localStorage.removeItem('dumul_ast_cfg');}catch(er){}
+      try{localStorage.removeItem(astKey());}catch(er){}
     }else if(cur==='sky'){
       if(skyOv()){
         SKYK.forEach(function(k){nebTuneApply(k,NEB_TUNE[k].def);nebTuneChanged(k);});

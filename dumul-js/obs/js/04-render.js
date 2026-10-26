@@ -905,6 +905,86 @@ function astPlace(a,now,c,out){
   return out;
 }
 var _astP={x:0,y:0,s:0};
+
+/* ===== Sabuk di limb planet (overview + sektor) =====
+   Cincin elips berpusat di limb planet (x = home BH, sama dengan orbit portal di 15-portal3d.js), sumbu panjang sejajar tangen limb (PT3D_CFG.orb.bet).
+   Cuma BUSUR BELAKANG yang hidup: fase u 0..1 = separuh belakang (sin t < 0), kiri -> kanan. Lewat ujung, batu didaur ulang ke ujung masuk dengan radius/kemiringan baru
+   (alpha dipudarkan di dua ujung, jadi loncatan tak kelihatan) -> semua batu yang disimulasi memang kelihatan, batu depan tidak pernah ada.
+   Batu di bawah limb disembunyikan (planet digambar paling atas, jadi tertutup juga; ini cuma hemat gambar). Tampilan = sprite/shader DEPAN (a._fl=1), tapi tetap di pass belakang (di bawah rasi/portal).
+   Overview: tanpa lensing. Sektor: lensing BH mini tetap jalan untuk batu yang lewat dekat BH (zona R*9.5) - BH mini digambar di belakang planet, jadi cuma batu di atas limb yang terlihat terlensa.
+   Arah putar = kebalikan arah orbit portal. Planet gagal / belum ada geometri -> astRingFrame() null -> jalur lama (astPlace) dipakai lagi. Matikan: AST_RING_ON=false. */
+var AST_RING_ON=true,AST_RING_LAST=null;
+/* AST_RING_ON = saklar keras (false = selalu sabuk lama). Knob lain ada di AST_CFG (01-core.js, tab Asteroid): ring (saklar), nk (pengali jumlah; 0.5 = kerapatan sama dengan sabuk lama), mx, ed, lm, z, tp, fi, fo. */
+function astRingDir(){
+  var pd=1;
+  try{var O=PT3D_CFG.orb;if(O&&O.counter)pd=(PL3D_CFG.live.rot>0)?-1:1;}catch(e){}
+  return -pd;   /* kebalikan arah orbit portal (portalOrbit: dir) */
+}
+function astRingFrame(){
+  if(!AST_RING_ON||!AST_CFG.ring)return null;
+  if(typeof pl3dGeom!=='function'||typeof pl3dSync!=='function'||typeof pl3dScr!=='function'||typeof ptUp2Stage!=='function'||typeof PL3D==='undefined')return null;
+  try{
+    pl3dSync();if(!PW||!PH)return null;
+    var gm=pl3dGeom(),R2=gm.R*gm.R,an=astAnchor(),hu=pl3dScr(an[0],an[1]),
+        cxo=Math.max(PW*.2,Math.min(PW*.8,hu[0])),dd=cxo-gm.cx,sq=Math.sqrt(Math.max(1,R2-dd*dd)),
+        bet=(typeof PT3D_CFG!=='undefined'&&PT3D_CFG.orb&&PT3D_CFG.orb.bet)||1,
+        beta=Math.atan(dd/sq)*bet,cb=Math.cos(beta),sb=Math.sin(beta),cyo=gm.cy-sq,
+        C=ptUp2Stage(cxo,cyo),Us=ptUp2Stage(cxo+cb,cyo+sb),Vs=ptUp2Stage(cxo-sb,cyo+cb),
+        lensOn=(typeof SECT!=='undefined'&&SECT.cur)?1:0,R=BH.Rr*(BHZ||1),lz=R*9.5+200;
+    return {cx:cxo,cy:cyo,ux:cb,uy:sb,vx:-sb,vy:cb,
+      sx:C[0],sy:C[1],sux:Us[0]-C[0],suy:Us[1]-C[1],svx:Vs[0]-C[0],svy:Vs[1]-C[1],
+      gcx:gm.cx,gcy:gm.cy,R:gm.R,R2:R2,apex:Math.max(20,cyo-PH*AST_CFG.tp),   /* apex = tinggi maks busur di atas pusat (tidak lewat tepi atas layar) */
+      dir:astRingDir(),lens:lensOn&&R>=1?1:0,bp:camBH(),lz:lz*lz};
+  }catch(e){return null;}
+}
+/* Satu batu pada cincin limb. Mengisi field yang sama dengan jalur lama (_x,_y,_sz,_back,_s,_vis,_fa) + _fl=1 (tampil seperti batu depan). */
+function astRingRock(a,i,now,dtc,F,mix){
+  var T=AST_CFG.t,mg=200;
+  if(a.u==null)a.u=((a.seed||0)/6.283185)%1;
+  a.u+=F.dir*dtc*AST_CFG.spd*Math.abs(a.spd)/Math.PI;
+  if(a.u>=1||a.u<0){   /* daur ulang: ke ujung masuk, radius + kemiringan baru (sebaran ketebalan ikut segar) */
+    a.u=a.u>=1?a.u-1:a.u+1;if(a.u>=1||a.u<0)a.u=0;
+    a.k=.26+Math.random()*.74;a.e=.32+Math.random()*.16;
+    a.ox=a.oy=a.vx=a.vy=0;a.kick=0;
+  }
+  var rk=a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*T):a.r,ee=Math.max(.12,Math.min(.75,.40+(a.e-.40)*T)),
+      rr=rk*AST_CFG.w*(1+.035*Math.sin(now*.0007+a.seed))*skyZoom,
+      AA=AST_CFG.arch,eeE=Math.min(ee*AA,F.apex/Math.max(1,rr)),t=Math.PI*(1+a.u),ex=Math.cos(t)*rr,
+      ey=Math.sin(t)*rr*eeE+(AA<1?(1-AA)*(F.R-Math.sqrt(Math.max(0,F.R2-ex*ex))-Math.max(6,rr*ee*.12)):0),   /* arch<1: busur dirata lalu ditekuk mengikuti lengkung limb (turun 'drop' di ujung, naik 'lift' di atas limb) */
+      ux=F.cx+ex*F.ux+ey*F.vx,uy=F.cy+ex*F.uy+ey*F.vy,
+      hh=F.gcy-Math.sqrt(Math.max(0,F.R2-(ux-F.gcx)*(ux-F.gcx)))-uy;   /* tinggi di atas limb (px) */
+  if(hh<=0){a._vis=0;a._fa=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;return;}
+  var fa=1;
+  if(skyZoom>6){   /* sama dengan jalur lama: zoom tinggi -> sebagian batu pudar */
+    var zk=Math.min(1,(skyZoom-6)/4);
+    fa=Math.max(0,Math.min(1,(1.15-.85*zk-(i*.618034)%1)/.15));
+  }
+  var fe=Math.min(a.u,1-a.u)/Math.max(.001,AST_CFG.ed);fe=fe>=1?1:fe*fe*(3-2*fe);
+  var lf=hh>=AST_CFG.lm?1:(hh/AST_CFG.lm);lf=lf*lf*(3-2*lf);
+  fa*=fe*lf*mix;
+  if(fa<=.01){a._vis=0;a._fa=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;return;}
+  var x=F.sx+ex*F.sux+ey*F.svx,y=F.sy+ex*F.suy+ey*F.svy,
+      sz=a.sz*AST_CFG.z*(skyZoom<=3?skyZoom:3*Math.sqrt(skyZoom/3))*AST_CFG.sz,vis=1;
+  if(F.lens){   /* sektor: lensing BH mini (cuma batu belakang, yaitu semua batu cincin ini) */
+    var bp=F.bp,dx0=x-bp[0],dy0=y-bp[1];
+    if(dx0*dx0+dy0*dy0>F.lz){
+      if(x<-mg||x>W+mg||y<-mg||y>H+mg){a._vis=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;return;}
+    }else{
+      var L=lens(x,y);
+      if(L){var d0=Math.sqrt(dx0*dx0+dy0*dy0)||1,f=Math.hypot(L[0]-bp[0],L[1]-bp[1])/d0;x=L[0];y=L[1];sz*=1+.35*Math.min(1,f-1);}
+      else vis=0;   /* di dalam horizon BH mini */
+    }
+  }else if(x<-mg||x>W+mg||y<-mg||y>H+mg){a._vis=0;a.ox=a.oy=a.vx=a.vy=0;a.kick=0;a._lastNow=now;return;}
+  var last=a._lastNow||now,dt=Math.min(.032,Math.max(.001,(now-last)/1000));
+  a._lastNow=now;
+  var spring=5.0,damper=4.5;
+  a.vx+=(-spring*a.ox-damper*a.vx)*dt;
+  a.vy+=(-spring*a.oy-damper*a.vy)*dt;
+  a.ox+=a.vx*dt;a.oy+=a.vy*dt;
+  if(a.kick&&now>a.kickUntil)a.kick=0;
+  if(Math.abs(a.ox)+Math.abs(a.oy)<.12&&Math.abs(a.vx)+Math.abs(a.vy)<1.2){a.ox=a.oy=a.vx=a.vy=0;a.kick=0;}
+  a._x=x+a.ox;a._y=y+a.oy;a._sz=sz;a._back=true;a._fl=1;a._s=Math.sin(t);a._vis=vis;a._fa=fa;
+}
 /* Mode kamera: batu cuma dekorasi dan area pandang sempit (ketutup kartu/panel), jadi hanya AST_CAM_MAX batu pertama yang di-step, digambar, dan bisa di-tap.
    Sisanya dibekukan (bukan dihapus) dan lanjut lagi begitu kamera mati. Batu memang sudah berupa sprite ter-bake (drawImage), bukan poligon. */
 var AST_CAM_MAX=12;
@@ -1021,12 +1101,17 @@ function astSlow(rk,R){
    Batu di luar layar (cincin seluruhnya di luar, atau posisinya di luar + bukan zona lensing) = a._vis 0: nggak dihitung lens/spring, nggak digambar. */
 function astStep(now){
   var dtc=AST_TL?Math.min(100,Math.max(0,now-AST_TL)):0;AST_TL=now;AST_T+=dtc*AST_CFG.spd; /* AST_T cuma dipakai sbg fase awal batu baru */
+  var mix=astMixStep(now),RF=astRingFrame();
+  if((!!RF)!==AST_RING_LAST){AST_RING_LAST=!!RF;astResize();}   /* cincin limb <-> jalur lama: jumlah batu efektif berubah */
+  if(RF&&mix<.004){for(var iz=0,nz=astN();iz<nz;iz++){AST[iz]._vis=0;AST[iz]._fa=0;}AST._stamp=now;return;}   /* sepenuhnya transparan (transisi): lewati semua hitungan */
   var c=astAnchor(),p=_astP,bp=camBH(),R=BH.Rr*(BHZ||1),T=AST_CFG.t,mg=200,
       dmax=Math.max(Math.hypot(c[0],c[1]),Math.hypot(W-c[0],c[1]),Math.hypot(c[0],H-c[1]),Math.hypot(W-c[0],H-c[1]))+mg,
       lz=R*9.5+mg;lz*=lz;
   var nAst=astN();
   for(var i=0;i<nAst;i++){
-    var a=AST[i],rk=astRk(a);
+    var a=AST[i];
+    if(RF){astRingRock(a,i,now,dtc,RF,mix);continue;}
+    var rk=astRk(a);
     /* fase per batu (diintegrasi): ganti slider / zoom / ukuran BH nggak bikin batu loncat */
     a.ph=(a.ph==null?AST_T*a.spd:a.ph)+dtc*AST_CFG.spd*a.spd*astSlow(rk,R);
       /* cull tingkat cincin: titik terdekat cincin ke pusat = rr*ee; kalau sudah lewat sudut layar terjauh, tak ada bagian cincin yang kelihatan */
@@ -1064,7 +1149,7 @@ function astStep(now){
     a.ox+=a.vx*dt;a.oy+=a.vy*dt;
     if(a.kick&&now>a.kickUntil)a.kick=0;
     if(Math.abs(a.ox)+Math.abs(a.oy)<.12&&Math.abs(a.vx)+Math.abs(a.vy)<1.2){a.ox=a.oy=a.vx=a.vy=0;a.kick=0;}
-    a._x=x+a.ox;a._y=y+a.oy;a._sz=sz;a._back=p.s<0;a._s=p.s;a._vis=vis;
+    a._x=x+a.ox;a._y=y+a.oy;a._sz=sz;a._back=p.s<0;a._fl=0;a._s=p.s;a._vis=vis;
   }
   AST._stamp=now;
 }
@@ -1087,9 +1172,9 @@ function drawAsteroids(now,half){
       if(!a0._vis)continue;
       if(half<0&&!a0._back)continue;
       if(half>0&&a0._back)continue;
-      var sj=(a0.sprite|0)%sprites.length,sq=a0._back?bsp[sj]:sprites[sj],hq=sq.pad*(a0._sz/sq.R);
+      var sj=(a0.sprite|0)%sprites.length,sq=(a0._back&&!a0._fl)?bsp[sj]:sprites[sj],hq=sq.pad*(a0._sz/sq.R);
       g.save();
-      if(a0._back)g.globalAlpha*=.86+.36*a0._s; else g.globalAlpha*=Math.min(1,.9+.1*a0._s);
+      if(a0._fl)g.globalAlpha*=.96; else if(a0._back)g.globalAlpha*=.86+.36*a0._s; else g.globalAlpha*=Math.min(1,.9+.1*a0._s);
       g.globalAlpha*=(a0._fa==null?1:a0._fa);
       g.translate(a0._x,a0._y);g.rotate(a0.rot+now*a0.rs);
       g.drawImage(sq.c,-hq,-hq,hq*2,hq*2);
@@ -1103,13 +1188,13 @@ function drawAsteroids(now,half){
     if(!a._vis)continue;
     if(half<0&&!a._back)continue;
     if(half>0&&a._back)continue;
-    var si2=(a.sprite|0)%sprites.length,sp=a._back?bsp[si2]:sprites[si2];
+    var si2=(a.sprite|0)%sprites.length,sp=(a._back&&!a._fl)?bsp[si2]:sprites[si2];
     var scale=a._sz/sp.R,hf=sp.pad*scale;
     /* Cull layar ketat: margin cull di astStep (200px) cuma buat hitung lensing; batu yang kotaknya sepenuhnya di luar kanvas tidak kelihatan -> jangan digambar. */
     if(a._x+hf<0||a._x-hf>W||a._y+hf<0||a._y-hf>H)continue;
     AST_DRAWN++;
     /* belakang: makin jauh (sin t -> -1) makin redup + kecil; depan: sedikit lebih terang saat paling dekat */
-    g.globalAlpha=A0*(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s))*(a._fa==null?1:a._fa);
+    g.globalAlpha=A0*(a._fl?.96:(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s)))*(a._fa==null?1:a._fa);
     var th=a.rot+now*a.rs,co=Math.cos(th),si=Math.sin(th),x=a._x,y=a._y;
     g.setTransform(ma*co+mc*si,mb*co+md*si,mc*co-ma*si,md*co-mb*si,ma*x+mc*y+me,mb*x+md*y+mf);
     g.drawImage(sp.c,-hf,-hf,hf*2,hf*2);
