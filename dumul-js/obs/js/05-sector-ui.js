@@ -365,7 +365,9 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   function t3(id){return typeof T3D!=='undefined'&&T3D.ok(id);}
   function mwOn(){return typeof mwReady==='function'&&mwReady();}   /* overview memakai Milky Way (bukan nebula lama) */
   function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:any&&t3('dr'),pt:any&&t3('pt')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
-  function refresh(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
+  var RF_T=0,RF_Q=0;   /* buka panel = __bhTuneShow + MutationObserver body.class -> refresh() 2x (paint semua slider) di frame yang sama: yg kedua digabung ke 1 rAF */
+  function refresh(){var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
+  function refreshNow(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
     if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':(a.ast?'ast':(a.tele?'tele':cur)));
@@ -896,7 +898,7 @@ function frame(now){
     teleGreetFollow();
     updateClockDilation(now);
     pmk('tint+tele');
-    drawShooting(now);
+    drawShooting(now);pmk('shoot');
     try{drawAsteroids(now,-1);}catch(err){window.__hub.renderError='drawAsteroidsBack: '+(err&&err.message||err);} /* separuh belakang: di belakang Rasi & BH */
     pmk('shoot+astB');
     cullBegin();

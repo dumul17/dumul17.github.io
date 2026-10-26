@@ -859,17 +859,41 @@ function drawTargetLock(now){
   uprEnd(_upT);
 }
 
+/* A/B meteor acak (diagnosa hitch tiap meteor lewat): ?ss=1 (garis gradient stroke seperti dulu), ?ss=0 (meteor acak TIDAK muncul; komet/Konami tetap), ?ss=2 (DEFAULT: meteor = sprite goresan ter-bake, drawImage).
+   Atau localStorage dumul_ss. Sprite per pasangan warna (OFX m0/m1 bisa ganti), dibatasi 8. */
+var SS_MODE=2;   /* default = sprite (mode 1 = gradient lama, bisa lewat ?ss=1) */
+try{var _ssm=/[?&]ss=(\d)/.exec(location.search);if(_ssm)SS_MODE=+_ssm[1];else{var _ssl=localStorage.getItem('dumul_ss');if(_ssl!=null&&_ssl!=='')SS_MODE=+_ssl;}}catch(eSSm){}
+var SS_SPR={},SS_SPR_N=0;
+function ssSprite(c0,c1){
+  var k=c0+'|'+c1,c=SS_SPR[k];if(c)return c;
+  if(SS_SPR_N>=8){SS_SPR={};SS_SPR_N=0;}
+  c=document.createElement('canvas');c.width=64;c.height=8;
+  var x=c.getContext('2d'),gr=x.createLinearGradient(64,0,0,0),vg;   /* kepala di kanan -> ekor di kiri */
+  gr.addColorStop(0,'rgba('+c0+',1)');gr.addColorStop(1,'rgba('+c1+',0)');
+  x.fillStyle=gr;x.fillRect(0,0,64,8);
+  x.globalCompositeOperation='destination-in';
+  vg=x.createLinearGradient(0,0,0,8);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(.5,'rgba(0,0,0,1)');vg.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=vg;x.fillRect(0,0,64,8);
+  SS_SPR[k]=c;SS_SPR_N++;return c;
+}
+var SS_WAS_IDLE=false,SS_WARM=false;
 function drawShooting(now){
   if(reduce||IS_POTATO)return;
   if(!idleMode&&(now-lastActivity)>IDLE_MS)idleMode=true;
-  if(idleMode)return; /* Energy saver: no new shooting stars while idle */
+  if(idleMode){SS_WAS_IDLE=true;return;} /* Energy saver: no new shooting stars while idle */
+  if(SS_WAS_IDLE){SS_WAS_IDLE=false;nextSS=now+1800+Math.random()*3200;}   /* nextSS basi selama idle -> tanpa ini meteor langsung spawn di frame tap pertama yg membangunkan */
+  if(SS_MODE===2&&!SS_WARM){   /* pra-bake sprite + 1 drawImage nyaris transparan di frame awal: upload tekstur terjadi di sini, bukan di meteor pertama */
+    SS_WARM=true;
+    try{g.save();g.globalAlpha=.004;g.drawImage(ssSprite('234,246,255','110,229,255'),0,0,8,2);g.drawImage(ssSprite(OFX.m0,OFX.m1),0,0,8,2);g.restore();}catch(eSSw){}
+    try{if(!OFX.tc)OFX.tc=ofxMakeTint('c');if(!OFX.tk)OFX.tk=ofxMakeTint('k');}catch(eTn){}   /* tint BGM juga di-bake awal (dulu baru dibuat saat BGM pertama nyala) */
+  }
   /* Shooting stars stay alive during star SFX and constellation alignment too
      (they used to be gated by secondaryFxScale). */
   if(now>nextSS&&!SW){
     /* BGM on: jarak acak tapi lebih sering; jumlah meteor aktif dibatasi (lebih ketat di HP kecil). */
     var ofxOn=OFX.p>.35,ofxCap=W<500?2:4;
     nextSS=now+(ofxOn?(W<500?3300+Math.random()*3700:2000+Math.random()*3200):6000+Math.random()*7000);
-    if(!(ofxOn&&SS.length>=ofxCap)){
+    if(SS_MODE!==0&&!(ofxOn&&SS.length>=ofxCap)){
       var ang=(.14+Math.random()*.14)*Math.PI,sp=560+Math.random()*320,dir=Math.random()<.5?1:-1;
       var nm={x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850};
       nm.c0=OFX.m0;nm.c1=OFX.m1;
@@ -881,6 +905,12 @@ function drawShooting(now){
     if(s.comet){
       if(!s.frag&&!s.split&&u>=s.splitU)cometSplit(s,now,x,y);
       drawComet(s,now,u,x,y);continue;
+    }
+    if(SS_MODE===2){   /* sprite goresan: 1 drawImage, tanpa createLinearGradient/stroke per frame */
+      var sL=Math.hypot(s.vx,s.vy)*tl,sH=Math.max(3,(s.lw||1.4)*2.6);
+      g.save();g.translate(x,y);g.rotate(Math.atan2(s.vy,s.vx));g.globalAlpha*=(1-u);
+      g.drawImage(ssSprite(s.c0||'234,246,255',s.c1||'110,229,255'),-sL,-sH*.5,sL,sH);
+      g.restore();continue;
     }
     var gr=g.createLinearGradient(x,y,x-s.vx*tl,y-s.vy*tl);
     gr.addColorStop(0,'rgba('+(s.c0||'234,246,255')+','+(1-u)+')');gr.addColorStop(1,'rgba('+(s.c1||'110,229,255')+',0)');
