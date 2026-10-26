@@ -999,6 +999,7 @@ document.addEventListener('visibilitychange',function(){
     /* Particle / pulse / supernova burst timestamps */
     for(var i=0;i<PU.length;i++)PU[i].t+=pause;
     for(var j=0;j<SN_BURSTS.length;j++)SN_BURSTS[j].t+=pause;
+    for(var jf=0;jf<SN_FLASHES.length;jf++)SN_FLASHES[jf].t+=pause;
     for(var k=0;k<SS.length;k++)SS[k].t+=pause;
 
     /* Transient FX introduced later: gravitational shockwaves */
@@ -1754,6 +1755,7 @@ activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
   SN_BURSTS.length=0;
 
   /* 1. Supernova flash & particle burst */
+  if(!snFlash(q[0],q[1],tr.rgb)){   /* SNFX: flash = sprite di canvas (tanpa layer DOM fullscreen / repaint gradient / reflow paksa); false = jalur DOM lama */
   flash.style.setProperty('--sx',Math.round(q[0])+'px');
   flash.style.setProperty('--sy',Math.round(q[1])+'px');
   flash.style.setProperty('--sn-rgb',tr.rgb);
@@ -1761,27 +1763,44 @@ activeSfx=null;setAVColor(null,false);audioVizOff();tdRelease();
   /* Failsafe: kalau animationend nggak kepanggil (WebView RAM kecil), paksa overlay mati. */
   clearTimeout(flash._snT);
   flash._snT=setTimeout(function(){flash.classList.remove('on');},1000);
+  }
 
   var t0=performance.now();
   var busy=!!(drag.on||(activeSfx&&!activeSfx.paused&&!activeSfx.ended));
   var count=IS_POTATO?(busy?5:7):(busy?10:16);
-  var puCap=IS_POTATO?36:56;
+  var puCap=IS_POTATO?36:56,snPs=null;
+  if(SNFX.on){   /* partikel hidup di objek burst (digambar sbg goresan sprite di drawSupernovaBursts), bukan lagi entri PU */
+    snPs=[];
+    for(var si=0;si<count;si++){
+      var sa=Math.random()*6.283;
+      snPs.push({ang:sa,c:Math.cos(sa),s:Math.sin(sa),sp:38+Math.random()*(busy?80:105)});
+    }
+  }else{
   /* Hard safety net: oldest particles drop first so work never accumulates. */
   if(PU.length+count>puCap)PU.splice(0,Math.max(0,PU.length+count-puCap));
   for(var i=0;i<count;i++){
     var a=Math.random()*6.283,sp=38+Math.random()*(busy?80:105);
     PU.push({c:c,a:tr.star,b:tr.star,t:t0,d:640+Math.random()*160,shock:true,snKey:key,ang:a,sp:sp,i:i});
   }
+  }
   /* One core burst at a time — stacking SN_BURSTS was pure overdraw. */
   if(SN_BURSTS.length>=1)SN_BURSTS.length=0;
-  SN_BURSTS.push({key:key,t:t0,d:busy?620:760});
+  SN_BURSTS.push({key:key,t:t0,d:busy?620:760,ps:snPs});
 
   /* Fase 4: teleskop tidak lagi auto-warp/orbit ke SFX. SFX langsung play. */
   sfxArrive(key);
 }
+/* SNFX.defer: 0 = semua sinkron (lama); 1 (default) = playSfx+haptic langsung, sisanya (toast tutorial, Stellar Memory + renderStellarRecord = kerja DOM) frame berikutnya
+   supaya frame pertama burst nggak ikut keblok; 2 = playSfx juga ditunda satu frame (eksperimen kalau profiler menunjuk start audio; sebagian WebView minta play() di dalam gestur). */
 function sfxArrive(key){
-    playSfx(SFX[key]);
-    haptic(key==='betel'?20:18);
+  var d=SNFX.on?SNFX.defer:0,raf=typeof requestAnimationFrame==='function';
+  if(d>=2&&raf){requestAnimationFrame(function(){try{playSfx(SFX[key]);haptic(key==='betel'?20:18);}catch(e){}try{sfxArriveRest(key);}catch(e2){}});return;}
+  playSfx(SFX[key]);
+  haptic(key==='betel'?20:18);
+  if(d>=1&&raf){requestAnimationFrame(function(){try{sfxArriveRest(key);}catch(e){}});return;}
+  sfxArriveRest(key);
+}
+function sfxArriveRest(key){
     /* Tutorial: panggil drone (tahan teleskop), lalu dock (tahan drone). Tidak auto-dock. */
     try{
       var _src=typeof sfxSector==='function'?sfxSector():null;
@@ -1803,7 +1822,7 @@ function sfxArrive(key){
   if(fl)fl.addEventListener('animationend',function(){fl.classList.remove('on');});
 })();
 var SN_BURSTS=[];
-function drawSupernovaBursts(now){
+function drawSupernovaBurstsOld(now){
   if(!SN_BURSTS.length)return;
   for(var i=SN_BURSTS.length-1;i>=0;i--){
     var b=SN_BURSTS[i],u=(now-b.t)/b.d;
@@ -1825,6 +1844,126 @@ function drawSupernovaBursts(now){
     g.restore();
   }
 }
+/* ===== SNFX: supernova burst ringan =====
+   Semua gambar = drawImage sprite yang di-bake SEKALI per warna (pre-bake saat idle) -> nggak ada createRadialGradient / stroke / rgba-string per frame.
+   - flash fullscreen yang dulu div DOM (#sn-flash: gradient di-raster ulang tiap ganti --sx/--sy, reflow paksa offsetWidth, layer fullscreen baru) = 1 sprite radial di canvas
+   - core + flare silang/diagonal = 1 sprite; gelombang kejut = 1 sprite cincin dipakai 2x (cincin kedua menyusul lebih besar);
+   - partikel = goresan (streak) searah ledakan, bukan titik: biaya sama (1 drawImage), tampil lebih bertenaga.
+   Matikan / A-B: ?snfx=0 (jalur lama utuh) ; ?snfx=1 (default, tunda sisa sfxArrive) ; ?snfx=2 (playSfx juga ditunda). Atau localStorage dumul_snfx. */
+var SNFX={on:true,defer:1,spr:{}};
+try{
+  var _sm=/[?&]snfx=(\d)/.exec(location.search),_sv=_sm?_sm[1]:localStorage.getItem('dumul_snfx');
+  if(_sv!=null&&_sv!==''){_sv=+_sv;if(_sv===0)SNFX.on=false;else SNFX.defer=Math.min(2,_sv);}
+}catch(eSn){}
+var SN_FLASHES=[];
+function snMk(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function snBake(rgb){
+  var S=SNFX.spr[rgb];if(S)return S;
+  S=SNFX.spr[rgb]={};
+  var c=snMk(128,128),x=c.getContext('2d'),gr=x.createRadialGradient(64,64,0,64,64,64),k,arm=[[0,46,.6],[1.5708,46,.6],[.7854,28,.3],[2.3562,28,.3]];
+  gr.addColorStop(0,'rgba(255,255,255,.82)');gr.addColorStop(.18,'rgba('+rgb+',.48)');gr.addColorStop(1,'rgba('+rgb+',0)');
+  x.fillStyle=gr;x.fillRect(0,0,128,128);
+  for(k=0;k<arm.length;k++){   /* flare: 4 lengan, ujungnya meruncing */
+    x.save();x.translate(64,64);x.rotate(arm[k][0]);
+    var ag=x.createLinearGradient(-arm[k][1],0,arm[k][1],0);
+    ag.addColorStop(0,'rgba(255,255,255,0)');ag.addColorStop(.5,'rgba(255,255,255,'+arm[k][2]+')');ag.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=ag;x.fillRect(-arm[k][1],-.75,arm[k][1]*2,1.5);x.restore();
+  }
+  S.core=c;   /* radius sprite 64 <-> base*2.6 */
+  c=snMk(128,128);x=c.getContext('2d');gr=x.createRadialGradient(64,64,0,64,64,64);
+  gr.addColorStop(0,'rgba('+rgb+',0)');gr.addColorStop(.8,'rgba('+rgb+',0)');gr.addColorStop(.9,'rgba('+rgb+',.85)');gr.addColorStop(.93,'rgba(255,255,255,.5)');gr.addColorStop(1,'rgba('+rgb+',0)');
+  x.fillStyle=gr;x.fillRect(0,0,128,128);
+  S.ring=c;   /* puncak cincin di radius 58 dari 64 */
+  c=snMk(48,12);x=c.getContext('2d');
+  gr=x.createLinearGradient(0,0,48,0);gr.addColorStop(0,'rgba('+rgb+',0)');gr.addColorStop(.6,'rgba('+rgb+',.55)');gr.addColorStop(1,'rgba(255,255,255,.95)');
+  x.fillStyle=gr;x.fillRect(0,0,48,12);
+  x.globalCompositeOperation='destination-in';
+  gr=x.createLinearGradient(0,0,0,12);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(.5,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=gr;x.fillRect(0,0,48,12);
+  S.streak=c;   /* kepala di sisi kanan */
+  c=snMk(192,192);x=c.getContext('2d');gr=x.createRadialGradient(96,96,0,96,96,96);   /* sama dgn gradient CSS .supernova-flash: putih -> warna -> transparan di 42% */
+  gr.addColorStop(0,'rgba(255,255,255,.98)');gr.addColorStop(.095,'rgba('+rgb+',.82)');gr.addColorStop(.31,'rgba('+rgb+',.24)');gr.addColorStop(1,'rgba('+rgb+',0)');
+  x.fillStyle=gr;x.fillRect(0,0,192,192);
+  S.flash=c;
+  return S;
+}
+/* true = flash ditangani canvas; false = pemanggil pakai overlay DOM lama */
+function snFlash(x,y,rgb,d){
+  if(!SNFX.on)return false;
+  try{
+    var D=Math.hypot(Math.max(x,W-x),Math.max(y,H-y)),R=Math.min(.42*D,.4*Math.max(W,H))*(IS_POTATO?.7:1);
+    if(SN_FLASHES.length>=2)SN_FLASHES.shift();
+    snBake(rgb);
+    SN_FLASHES.push({x:x,y:y,rgb:rgb,t:performance.now(),d:d||850,R:Math.max(40,R)});
+    return true;
+  }catch(e){return false;}
+}
+var _snM=null;
+function snStreak(img,x,y,th,len,wid){   /* goresan: kepala di (x,y), ekor ke belakang searah th */
+  var co=Math.cos(th),si=Math.sin(th);
+  if(_snM){
+    g.setTransform(_snM.a*co+_snM.c*si,_snM.b*co+_snM.d*si,_snM.c*co-_snM.a*si,_snM.d*co-_snM.b*si,_snM.a*x+_snM.c*y+_snM.e,_snM.b*x+_snM.d*y+_snM.f);
+    g.drawImage(img,-len,-wid*.5,len,wid);
+  }else{g.save();g.translate(x,y);g.rotate(th);g.drawImage(img,-len,-wid*.5,len,wid);g.restore();}
+}
+function drawSupernovaBursts(now){
+  if(!SNFX.on)return drawSupernovaBurstsOld(now);
+  var nf=SN_FLASHES.length,nb=SN_BURSTS.length;
+  if(!nf&&!nb)return;
+  var A0=g.globalAlpha,i,j,u,S,al;
+  g.save();g.globalCompositeOperation='lighter';
+  for(i=nf-1;i>=0;i--){   /* flash: kurva sama dgn @keyframes snflash (naik cepat ke 1 di 12%, 0.78 di 30%, lalu memudar) */
+    var f=SN_FLASHES[i];u=(now-f.t)/f.d;
+    if(u>=1){SN_FLASHES.splice(i,1);continue;}
+    if(u<0)u=0;
+    al=u<.12?u/.12:(u<.30?1-.22*(u-.12)/.18:.78*Math.pow(1-(u-.30)/.70,1.7));
+    if(al<.01)continue;
+    S=snBake(f.rgb);g.globalAlpha=A0*al;
+    g.drawImage(S.flash,f.x-f.R,f.y-f.R,f.R*2,f.R*2);
+  }
+  _snM=g.getTransform?g.getTransform():null;
+  for(i=nb-1;i>=0;i--){
+    var b=SN_BURSTS[i];u=(now-b.t)/b.d;
+    if(u>1){SN_BURSTS.splice(i,1);continue;}
+    if(u<0)u=0;
+    if(SECT.on||!sectShow(TRIGGERS[b.key].cons))continue;
+    var tr=TRIGGERS[b.key],c=tr.cons==='pleiades'?PLEIADES:cons(tr.cons),s=tr.cons==='pleiades'?plStarByName(tr.star):c.stars[tr.star],
+        sx=tr.cons==='pleiades'?(PLEIADES.x+s.x*PLEIADES.scale+mouse.x*1.4+skyPan.x):(s.x+c.ox),
+        sy=tr.cons==='pleiades'?(PLEIADES.y+s.y*PLEIADES.scale+mouse.y*1.0+skyPan.y):(s.y+c.oy),q=gSky(sx,sy);
+    if(!q||q[2]>=1)continue;
+    var fade=1-.85*q[2],easeOut=1-Math.pow(1-u,3),sr=(s&&s.r)||1.9,base=sr*(2.5+9*easeOut),inv=(1-u)*fade,hs,rs;
+    S=snBake(tr.rgb);
+    hs=base*2.6;g.globalAlpha=A0*inv;                       /* core + flare */
+    g.drawImage(S.core,q[0]-hs,q[1]-hs,hs*2,hs*2);
+    rs=base*1.1034;g.globalAlpha=A0*inv*.85;                /* cincin 1: radius = base */
+    g.drawImage(S.ring,q[0]-rs,q[1]-rs,rs*2,rs*2);
+    if(u>.08){                                              /* cincin 2: gelombang kejut menyusul, lebih besar + cepat pudar */
+      var u2=(u-.08)/.92,e2=1-Math.pow(1-u2,3);
+      rs=base*(1.3+1.9*e2)*1.1034;g.globalAlpha=A0*Math.pow(1-u2,1.6)*fade*.5;
+      g.drawImage(S.ring,q[0]-rs,q[1]-rs,rs*2,rs*2);
+    }
+    var ps=b.ps;
+    if(ps&&ps.length){                                      /* partikel = goresan */
+      var k=1-.35*q[2],pa=(1-u)*.72*(1-.7*q[2]),wd=2.6*(1-.4*u);
+      g.globalAlpha=A0*Math.min(1,pa*1.35);
+      for(j=0;j<ps.length;j++){
+        var p=ps[j],dd=p.sp*u*k;
+        snStreak(S.streak,q[0]+p.c*dd,q[1]+p.s*dd,p.ang,(5+p.sp*.12)*(1-.55*u),wd);
+      }
+      if(_snM)g.setTransform(_snM.a,_snM.b,_snM.c,_snM.d,_snM.e,_snM.f);
+    }
+  }
+  g.restore();
+}
+/* pre-bake sprite semua warna saat idle (satu per giliran): tap pertama nggak bayar bake */
+(function(){
+  if(!SNFX.on)return;
+  var keys=[],seen={},k,r,ric=typeof requestIdleCallback==='function';
+  try{for(k in TRIGGERS){r=TRIGGERS[k]&&TRIGGERS[k].rgb;if(r&&!seen[r]){seen[r]=1;keys.push(r);}}}catch(e){}
+  ['110,229,255','255,80,120'].forEach(function(x){if(!seen[x])keys.push(x);});
+  var step=function(){var r2=keys.shift();if(!r2)return;try{snBake(r2);}catch(e){}if(keys.length)(ric?requestIdleCallback(step,{timeout:3000}):setTimeout(step,200));};
+  if(ric)requestIdleCallback(step,{timeout:4000});else setTimeout(step,800);
+})();
 /* F4 (D6): efek masuk dumul.html lewat sabuk Orion. Posisi Alnilam diambil tiap frame (kamera lagi zoom/pan), jadi ledakan menempel ke bintangnya. */
 function drawBeltFx(now){
   var B=BELT;if(!B||!B.s||!B.c)return;

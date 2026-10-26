@@ -260,7 +260,8 @@ function beltEnter(href){
   try{haptic(22);}catch(e){}
   try{   /* kilat supernova (overlay yang sama dgn triggerSupernova) di posisi Alnilam */
     var fl=$('#sn-flash'),q=gSky(s.x+c.ox,s.y+c.oy);
-    if(fl&&q){
+    if(q&&typeof snFlash==='function'&&snFlash(q[0],q[1],BELT.rgb)){}   /* SNFX: flash sprite di canvas */
+    else if(fl&&q){
       fl.style.setProperty('--sx',Math.round(q[0])+'px');fl.style.setProperty('--sy',Math.round(q[1])+'px');
       fl.style.setProperty('--sn-rgb',BELT.rgb);
       fl.classList.remove('on');void fl.offsetWidth;fl.classList.add('on');

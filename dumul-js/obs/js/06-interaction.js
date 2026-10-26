@@ -655,7 +655,8 @@ function cometSplit(s,now,x,y){
   haptic(16);
   try{
     var fl=document.getElementById('sn-flash');
-    if(fl){
+    if(typeof snFlash==='function'&&snFlash(x,y,'255,80,120')){}   /* SNFX: flash sprite di canvas */
+    else if(fl){
       fl.style.setProperty('--sx',Math.round(x)+'px');fl.style.setProperty('--sy',Math.round(y)+'px');
       fl.style.setProperty('--sn-rgb','255,80,120');
       fl.classList.remove('on');void fl.offsetWidth;fl.classList.add('on');
