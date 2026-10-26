@@ -265,7 +265,7 @@
 <div id="cam-zoom" aria-live="polite" aria-hidden="true">
   <div id="cam-zrow"><span class="cz-label">CAM</span><div id="cam-zwrap"><input type="range" id="cam-zslider" min="0" max="1000" step="1" value="0" aria-label="Camera zoom" data-i18n-aria="cam.zoom.aria"></div><span class="cz-val" id="cam-zoom-val">1×</span></div>
   <span class="cz-hint" data-i18n="cam.hint">TAP ‹ › TO ZOOM TO A CONSTELLATION</span>
-  <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous constellation" data-i18n-aria="cam.prev.aria">‹</button><button type="button" id="cf-name" aria-pressed="false" data-off="1" aria-label="Toggle springback">SPRINGBACK · OFF</button><button type="button" id="cf-next" aria-label="Next constellation" data-i18n-aria="cam.next.aria">›</button></div>
+  <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous constellation" data-i18n-aria="cam.prev.aria">‹</button><button type="button" id="cf-name" aria-pressed="false" data-off="1" aria-label="Toggle focus lock">FOCUS LOCK · OFF</button><button type="button" id="cf-next" aria-label="Next constellation" data-i18n-aria="cam.next.aria">›</button></div>
   <div id="cam-band"><button type="button" id="cb-btn" data-band="vis" aria-pressed="false" aria-label="Spectral band filter: visible, ultraviolet, infrared">BAND · VIS</button><button type="button" id="cl-btn" data-off="0" aria-pressed="false" aria-label="Toggle constellation lines" data-i18n-aria="cam.lines.aria">LINES · ON</button><button type="button" id="ca-btn" aria-label="Constellation log" data-i18n="ach.btn" data-i18n-aria="ach.aria">LOG</button></div>
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
@@ -300,10 +300,10 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=30"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=30"></script>
+<script defer src="dumul-js/obs/i18n.js?v=31"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=133"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=134"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=132"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=109"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=133"></script>
