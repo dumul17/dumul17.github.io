@@ -295,11 +295,11 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   ALLK.forEach(function(k){sin[k]=document.getElementById('sp-'+k);sout[k]=document.getElementById('sp-'+k+'-v');
     if(sin[k]){sin[k].min=String(Math.round(nt(k).min*100));sin[k].max=String(Math.round(nt(k).max*100));}});
   function fill(el){if(!el)return;var mn=+el.min,mx=+el.max;el.style.setProperty('--p',((+el.value-mn)/((mx-mn)||1)*100)+'%');}   /* isi track slider */
-  function skyFmt(k,v){return k==='VIG'?v.toFixed(2)+'\u00d7':Math.round(v*100)+'%';}
+  function skyFmt(k,v){return Math.round(v*100)+'%';}
   /* ---- tab Gargantua ---- */
   function stored(){var o=null;try{o=JSON.parse(localStorage.getItem(bhuKey())||'null');}catch(e){}var r={},df=bhuDef();allKeys.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?bhuClamp(k,o[k]):df[k];});return r;}
   function paintBH(){
-    keys.forEach(function(k){if(inp[k]){inp[k].value=String(Math.round(BHU[k]*100));fill(inp[k]);}if(out[k])out[k].textContent=BHU[k].toFixed(2)+'\u00d7';});
+    keys.forEach(function(k){if(inp[k]){inp[k].value=String(Math.round(BHU[k]*100));fill(inp[k]);}if(out[k])out[k].textContent=Math.round(BHU[k]*100)+'%';});
   }
   /* ---- tab Langit ---- */
   function skyStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg')||'null');}catch(e){}var r={};SKYK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEB_TUNE[k].def;});return r;}
@@ -308,7 +308,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   function skySect(){return body.classList.contains('sect-in')&&NEB.on;}   /* baris langit sektor: A_SEC/SDIM/SPREAD/ZF, disimpan terpisah (dumul_sky_cfg_s) */
   function secStored(){var o=null;try{o=JSON.parse(localStorage.getItem('dumul_sky_cfg_s')||'null');}catch(e){}var r={};SECK.forEach(function(k){r[k]=(o&&typeof o[k]==='number')?o[k]:NEBS_TUNE[k].def;});return r;}
   function astStored(){var o=null;try{o=JSON.parse(localStorage.getItem(astKey())||'null');}catch(e){}return astNorm(o);}
-  function astFmt(k,v){return(k==='n'||k==='mx')?String(Math.round(v)):(k==='ed'||k==='tp')?Math.round(v*100)+'%':k==='lm'?Math.round(v)+'px':(k==='fi'||k==='fo')?Math.round(v)+'ms':v.toFixed(2)+'\u00d7';}
+  function astFmt(k,v){return(k==='n'||k==='mx')?String(Math.round(v)):(k==='ed'||k==='tp')?Math.round(v*100)+'%':k==='lm'?Math.round(v)+'px':(k==='fi'||k==='fo')?Math.round(v)+'ms':Math.round(v*100)+'%';}
   function paintAst(){
     if(astBtn){var ao=!!AST_CFG.on;astBtn.setAttribute('aria-pressed',ao?'true':'false');astBtn.textContent=ao?T('tune.show'):T('tune.hide');astBtn.classList.toggle('off',!ao);}
     if(astRingBtn){var ro=!!AST_CFG.ring;astRingBtn.setAttribute('aria-pressed',ro?'true':'false');astRingBtn.textContent=tx(ro?'tune.on':'tune.off',ro?'On':'Off');astRingBtn.classList.toggle('off',!ro);}
@@ -339,7 +339,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     if(tBub){var bo=!!TELE_CFG.bubble;tBub.setAttribute('aria-pressed',bo?'true':'false');tBub.textContent=tx(bo?'tune.on':'tune.off',bo?'On':'Off');tBub.classList.toggle('off',!bo);}
     try{lisAutoSync();}catch(e){}
     tLeds.forEach(function(b,i){var on=i===TELE_CFG.led;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');});
-    TK.forEach(function(k){var el=tin[k];if(el){el.value=String(Math.round(TELE_CFG[k]*100));fill(el);}if(tout[k])tout[k].textContent=TELE_CFG[k].toFixed(2)+'\u00d7';});
+    TK.forEach(function(k){var el=tin[k];if(el){el.value=String(Math.round(TELE_CFG[k]*100));fill(el);}if(tout[k])tout[k].textContent=Math.round(TELE_CFG[k]*100)+'%';});
   }
   /* ---- umum ---- */
   function paint(){
@@ -361,10 +361,16 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   function ctxRows(){
     var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in');
     [].slice.call(panel.querySelectorAll('[data-ctx]')).forEach(function(el){var x=el.getAttribute('data-ctx');el.hidden=(x==='ov')?!ov:!sc;});
+    /* judul seksi T3D (.t3-sec) ikut hilang kalau semua barisnya disembunyikan di konteks ini (mis. ORBIT portal di sektor); judul ber-data-ov/data-sc diurus refreshNow */
+    [].slice.call(panel.querySelectorAll('.bp-sec.t3-sec:not([data-ov]):not([data-sc])')).forEach(function(h){
+      var n=h.nextElementSibling,any=false;
+      while(n&&!n.classList.contains('bp-sec')){if(!n.hidden){any=true;break;}n=n.nextElementSibling;}
+      h.hidden=!any;
+    });
   }
   function t3(id){return typeof T3D!=='undefined'&&T3D.ok(id);}
   function mwOn(){return typeof mwReady==='function'&&mwReady();}   /* overview memakai Milky Way (bukan nebula lama) */
-  function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:any&&t3('dr'),pt:any&&t3('pt')};}   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
+  function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:sc&&t3('dr'),pt:any&&t3('pt')};}   /* Drone: cuma di sektor (di overview drone tidak bisa di-drop) */   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
   var RF_T=0,RF_Q=0;   /* buka panel = __bhTuneShow + MutationObserver body.class -> refresh() 2x (paint semua slider) di frame yang sama: yg kedua digabung ke 1 rAF */
   function refresh(){var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
   function refreshNow(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */

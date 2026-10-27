@@ -24,7 +24,7 @@ var PT3D_CFG={
   inR:.86,          /* radius tepi dalam plat (radius luar = 1). Makin besar = cincin makin tipis. Mulut/petir/percikan pakai PT_IN (= inR-.015); 09-wormhole.js ikut PT_IN */
   ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */
   plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
-  mouthStars:34,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
+  mouthStars:35,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
   glow:1.3,         /* pengali terang garis sirkuit emissive */
   boltMax:9,       /* petir bersamaan (potato: 1) */
   boltCd:17,        /* jeda minimum per pita (ms), potato 90 */
@@ -39,20 +39,21 @@ var PT3D_CFG={
   idleMin:220,idleMax:560,   /* jeda kilat redup saat tanpa musik (ms) */
   /* P4: kemiringan cincin overview, mengikuti gambar referensi (cincin dilihat 3/4: elips agak tegak, miring ke kanan). Radian. Urutan rotasi: yaw (y) -> pitch (x) -> roll (z, di bidang layar).
      y = seberapa 'menyamping' (0 = hadap penuh; .9 = elips lebar ~62%). x = condong ke atas/bawah. z = roll (negatif = puncak cincin condong ke kanan). Window menu sektor + wormhole TIDAK memakai ini (datar). */
-  tilt:{x:.2,y:.9,z:-.22},
-  spin:.08,        /* kecepatan putar plat di bidang cincin, rad/dtk (.05 = ±2 menit/putaran, .2 = ±31 dtk, .6 = ±10 dtk). Berlaku di semua cincin (overview, menu sektor, wormhole); 0 = diam */
+  tilt:{x:.1745,y:.8727,z:-.1745},   /* = 10 / 50 / -10 derajat (kelipatan 5 supaya kena snap slider panel tuning; dulu .2 / .9 / -.22) */
+  spin:.0873,      /* = 5 derajat/dtk (dulu .08) */ /* kecepatan putar plat di bidang cincin, rad/dtk (.05 = ±2 menit/putaran, .2 = ±31 dtk, .6 = ±10 dtk). Berlaku di semua cincin (overview, menu sektor, wormhole); 0 = diam */
   tiltOv:1,       /* 0..1 pengali kemiringan di overview (0 = datar seperti dulu) */
   /* P4: orbit portal overview = orbit biasa (elips penuh, tanpa terbit/tenggelam): sumbu panjang sejajar kemiringan horizon planet (17-planet3d.js), pusat di home BH.
      Selama di-drag, orbit berhenti (portal ikut jari) lalu springback seperti dulu. reduce motion = portal diam di home. */
   orb:{on:true,
     ax:.30,        /* setengah sumbu panjang terhadap lebar layar (dijepit supaya cincin tetap di dalam layar) */
-    ay:.085,       /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
+    ay:.09,        /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
     per:90,        /* detik per satu putaran orbit (dulu 26). Pelan: gaya orbit drone di atmosfer (08-tx-drone.js) tapi jauh lebih lambat */
     depth:.05,     /* cincin sedikit lebih besar di sisi dekat (bawah elips) dan lebih kecil di sisi jauh (atas), +-sekian x radius. 0 = ukuran tetap */
     bob:1.5,         /* naik-turun ringan (px CSS), seperti drone. 0 = mati */
     counter:1,     /* 1 = arah orbit MELAWAN rotasi permukaan planet (PL3D_CFG.live.rot), 0 = selalu searah jarum jam */
     bet:1,         /* pengali kemiringan sumbu terhadap tangen limb (1 = sejajar horizon; >1 lebih curam) */
-    gap:.5        /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
+    gap:.5,       /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
+    near:1        /* 0..1 seberapa jauh pusat orbit DITURUNKAN ke arah limb (x ruang kosong antara titik terendah orbit dan limb). 0 = pusat tetap di home BH (tengah layar, portal tidak pernah dekat planet, flare tidak muncul); 1 = titik terendah orbit tepat di jarak 'gap' dari limb (menyusuri horizon, flare tiap putaran) */
   }
 };
 try{
@@ -649,9 +650,10 @@ function ptOrbAt(phi,bp){
   if(xm>PW-m&&xm>cxo+1)ax*=Math.max(.35,(PW-m-cxo)/(xm-cxo));
   if(xn<m&&xn<cxo-1)ax*=Math.max(.35,(cxo-m)/(cxo-xn));
   /* titik terendah orbit tidak boleh menyentuh limb: geser pusat naik kalau perlu */
-  var need=0,y;
+  var need=-1e9,y;
   for(k=0;k<24;k++){c=Math.cos(k*.2618);s2=Math.sin(k*.2618);x=cxo+c*ax*cb+s2*ay*sb;y=cyo+c*ax*sb-s2*ay*cb;need=Math.max(need,y+Rp*O.gap-limb(x));}
-  cyo-=need;
+  /* need > 0: orbit menyentuh limb -> naik sebesar itu (seperti dulu). need < 0: ada ruang kosong di bawah orbit -> pusat turun near x ruang itu (orbit mendekati/menyusuri horizon) */
+  cyo-=need>0?need:need*Math.max(0,Math.min(1,O.near==null?0:O.near));
   var cp=Math.cos(phi),sp=Math.sin(phi),lx=-cp*ax,lu=sp*ay,px=cxo+lx*cb+lu*sb,py=cyo+lx*sb-lu*cb,st=ptUp2Stage(px,py);   /* phi=pi/2 = puncak; bertambah = searah jarum jam */
   return {x:(bp?bp[0]:an[0])+(st[0]-an[0]),y:(bp?bp[1]:an[1])+(st[1]-an[1])};   /* bp - an = geseran drag BH overview */
 }

@@ -506,7 +506,7 @@ function drawFloatingTelescope(now){
   }
   if(TELESCOPE.mode==='warp'||TELESCOPE.mode==='orbit'){
     /* planet (17-planet3d.js): bintang tujuan yang ada di balik planet -> titik tujuan teleskop dijepit di atas limb, jadi warp tetap "sampai" (dist<25) dan orbit tidak tenggelam */
-    try{if(typeof planetObjClamp==='function'){var ptc=planetObjClamp(TELESCOPE.targetX,TELESCOPE.targetY,telescopeHitRadius()*.7,PL3D_CFG.teleSink);TELESCOPE.targetX=ptc[0];TELESCOPE.targetY=ptc[1];}}catch(ePt){}
+    try{if(typeof planetObjClamp==='function'){var ptc=planetObjClamp(TELESCOPE.targetX,TELESCOPE.targetY,telescopeHitRadius()*.7,PL3D_CFG.teleSink*PL3D_CFG.sinkK);TELESCOPE.targetX=ptc[0];TELESCOPE.targetY=ptc[1];}}catch(ePt){}
   }
   if(TELESCOPE.mode==='warp'){
     /* Fast glide toward the target star */
@@ -579,7 +579,7 @@ function drawFloatingTelescope(now){
      Cuma menggeser posisi: state tether TX (d.tch di 08-tx-drone.js) tidak disentuh, garis drone-teleskop tetap pudar sendiri. */
   try{
     if(typeof planetObjClamp==='function'){
-      var pcl=planetObjClamp(TELESCOPE.x,TELESCOPE.y,telescopeHitRadius()*.7,PL3D_CFG.teleSink),pdx=pcl[0]-TELESCOPE.x,pdy=pcl[1]-TELESCOPE.y;
+      var pcl=planetObjClamp(TELESCOPE.x,TELESCOPE.y,telescopeHitRadius()*.7,PL3D_CFG.teleSink*PL3D_CFG.sinkK),pdx=pcl[0]-TELESCOPE.x,pdy=pcl[1]-TELESCOPE.y;
       if(pdx||pdy){
         var pks=TELESCOPE.mode==='orbit'?1:Math.min(1,dt*8);
         TELESCOPE.x+=pdx*pks;TELESCOPE.y+=pdy*pks;
