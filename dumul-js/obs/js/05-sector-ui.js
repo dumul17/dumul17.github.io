@@ -766,9 +766,10 @@ var PX_MODES=['normal','panel HIDDEN','asteroid OFF','bintang OFF','SEMUA OFF (l
 var PX_PANEL={'panel HIDDEN':{visibility:'hidden'},'panel OPAQUE':{background:'#040a10'},'panel NO-CLIP':{overflow:'visible',contain:'none',borderRadius:'0'},'panel NO-WILLCHANGE':{willChange:'auto'},'panel NO-SHADOW':{boxShadow:'none'}};
 var PERF=false;try{PERF=/[?&](perf|probe)=1(&|$)/.test(location.search)||localStorage.getItem('dumul_perf')==='1';}catch(ePf){}
 var PP={fs:0,t0:0,last:0,cur:{},tot:{},n:0,isum:0,jsum:0,jank:0,ev:[],el:null,upd:0,pnl:null,imax:0};
-/* PROBE OTOMATIS v2 (?probe=1, otomatis menyalakan PERF). Masuk sektor -> tunggu 3 dtk -> urutan: normal, TES1, normal, TES2, normal, ... (tiap tes diapit 'normal').
-   Tiap langkah: 1,2 dtk settle + 3 dtk ukur. Statistik pakai MEDIAN interval (kebal terhadap sekali-dua stall), bukan rata-rata. Selisih tiap tes dibanding rata-rata 'normal' di kiri-kanannya;
-   kalau selisih lebih kecil dari noise (beda dua 'normal' tetangga) ditandai '~' (tidak bisa dipercaya), kalau banyak stall (p90 > 1,6x median) ditandai '!'. Semua config dikembalikan di akhir. */
+/* PROBE OTOMATIS v3 (?probe=1, otomatis menyalakan PERF). Masuk sektor -> tunggu 3 dtk -> urutan: normal, TES1, normal, TES2, normal, ... (tiap tes diapit 'normal').
+   Tiap langkah: 1,2 dtk settle + 3 dtk ukur. Angka ms = rata-rata terpangkas (buang 10% terkecil & 10% terbesar), supaya stall tidak merusak dan selisih kecil tetap terlihat
+   (median murni cuma bisa loncat per 16,6 ms = 1 vsync). Selisih tiap tes dibanding rata-rata 'normal' kiri-kanannya. '~' = selisih di dalam noise (noise = median selisih antar-'normal'),
+   '!' = banyak stall. Hasil: overlay rapi + tombol SALIN, disimpan di localStorage (dumul_probe_last) untuk dibandingkan dengan run berikutnya. Semua config dikembalikan di akhir. */
 var PROBE={arm:false,on:false,done:false,i:0,t0:0,iv:[],js:[],el:null,S:null,inS:0,txu:0,res:[]};
 try{PROBE.arm=/[?&]probe=1(&|$)/.test(location.search);}catch(ePr){}
 var PROBE_TESTS=[
@@ -788,9 +789,68 @@ var PROBE_SEQ=[['normal',function(){}]];
 (function(){for(var k=0;k<PROBE_TESTS.length;k++){PROBE_SEQ.push(PROBE_TESTS[k]);PROBE_SEQ.push(['normal',function(){}]);}})();
 function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true)};}
 function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;PX.sky=0;PX.pulse=0;PX.hole=0;}
-function probeShow(t){
-  if(!PROBE.el){var d=document.createElement('pre');d.style.cssText='position:fixed;left:4px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:99998;margin:0;padding:4px 6px;font:9px/1.25 monospace;color:#ffd27f;background:rgba(0,0,0,.8);pointer-events:none;white-space:pre';document.body.appendChild(d);PROBE.el=d;}
+function probeP(x,n){x=String(x);while(x.length<n)x+=' ';return x;}
+function probeL(x,n){x=String(x);while(x.length<n)x=' '+x;return x;}
+function probeSg(v,d){return (v>=0?'+':'')+v.toFixed(d);}
+function probeCopy(btn){
+  var t=PROBE.txt||'';
+  function ok(){btn.textContent='TERSALIN';setTimeout(function(){btn.textContent='SALIN';},1500);}
+  function fb(){try{var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0;left:0;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);ok();}catch(e){btn.textContent='GAGAL';}}
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb);return;}}catch(e){}
+  fb();
+}
+function probeUi(){
+  if(PROBE.box)return;
+  var bx=document.createElement('div'),pr=document.createElement('pre'),row=document.createElement('div'),b1=document.createElement('button'),b2=document.createElement('button'),bs='font:inherit;color:inherit;background:rgba(255,210,127,.1);border:1px solid rgba(255,210,127,.5);border-radius:4px;padding:5px 12px;';
+  bx.style.cssText='position:fixed;left:4px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:99998;max-width:calc(100vw - 8px);box-sizing:border-box;padding:6px 8px;background:rgba(2,8,14,.9);border:1px solid rgba(255,210,127,.3);border-radius:6px;font:10px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#ffd27f;pointer-events:none';
+  pr.style.cssText='margin:0;font:inherit;white-space:pre;overflow:hidden';
+  row.style.cssText='display:none;gap:8px;margin-top:6px';
+  b1.textContent='SALIN';b1.style.cssText=bs;b1.onclick=function(){probeCopy(b1);};
+  b2.textContent='TUTUP';b2.style.cssText=bs;b2.onclick=function(){bx.style.display='none';};
+  row.appendChild(b1);row.appendChild(b2);bx.appendChild(pr);bx.appendChild(row);document.body.appendChild(bx);
+  PROBE.box=bx;PROBE.el=pr;PROBE.row=row;
+}
+/* fin=true: hasil akhir (tombol aktif, simpan teks untuk SALIN). fin=false: status jalan (tidak menangkap sentuhan). */
+function probeShow(t,fin){
+  probeUi();
+  PROBE.box.style.display='block';
   PROBE.el.textContent=t;
+  PROBE.row.style.display=fin?'flex':'none';
+  PROBE.box.style.pointerEvents=fin?'auto':'none';
+  if(fin)PROBE.txt=t;
+}
+function probeTrim(a){
+  if(!a.length)return 0;
+  var b=a.slice().sort(function(x,y){return x-y;}),lo=Math.floor(b.length*.1),hi=Math.max(lo+1,Math.ceil(b.length*.9)),s=0,k;
+  for(k=lo;k<hi;k++)s+=b[k];
+  return s/(hi-lo);
+}
+function probeReport(R){
+  var k,bs=[],dl=[],nz=0,base=0,t,b0,b1,bm,d,fl,tx,rows=[],qs='',prev=null,best=null,nOk=0,df;
+  for(k=0;k<R.length;k+=2)bs.push(R[k][1]);
+  for(k=0;k+1<bs.length;k++)dl.push(Math.abs(bs[k]-bs[k+1]));
+  dl.sort(function(x,y){return x-y;});nz=dl.length?dl[Math.floor(dl.length/2)]:0;
+  for(k=0;k<bs.length;k++)base+=bs[k];base/=Math.max(1,bs.length);
+  try{qs=location.search.replace(/^\?/,'');}catch(e){}
+  tx='HASIL PROBE   dpr x'+(+DPR).toFixed(2)+'   kanvas '+cv.width+'x'+cv.height+'\n'+
+     'normal '+base.toFixed(1)+' ms = '+(1000/base).toFixed(0)+' fps   (noise +-'+nz.toFixed(1)+' ms)\n'+
+     '------------------------------------------\n'+
+     probeP('tes (dimatikan)',19)+probeL('ms',6)+probeL('hemat',8)+probeL('fps',7)+'\n';
+  for(k=0;k<PROBE_TESTS.length;k++){
+    t=R[2*k+1];b0=R[2*k][1];b1=R[2*k+2][1];bm=(b0+b1)/2;d=bm-t[1];df=1000/t[1]-1000/bm;
+    fl=(Math.abs(d)<Math.max(nz,2)?'~':' ')+(t[2]>t[1]*1.6?'!':' ');
+    tx+=probeP(PROBE_TESTS[k][0],19)+probeL(t[1].toFixed(1),6)+probeL(probeSg(d,1),8)+probeL(probeSg(df,1),7)+' '+fl+'\n';
+    if(fl.charAt(0)!=='~'&&PROBE_TESTS[k][0].indexOf('SEMUA')<0){nOk++;if(!best||d>best.d)best={n:PROBE_TESTS[k][0],d:d};}
+  }
+  tx+='------------------------------------------\n'+
+      '+ hemat saat dimatikan   ~ dalam noise\n'+
+      '! banyak stall (angka kurang pasti)\n';
+  tx+=best?('Menonjol: '+best.n+' ('+probeSg(best.d,1)+' ms)\n'):'Tidak ada komponen tunggal yang menonjol\n(biaya tersebar rata)\n';
+  try{prev=JSON.parse(localStorage.getItem('dumul_probe_last')||'null');}catch(e){}
+  if(prev&&prev.base)tx+='Run lalu: dpr x'+(+prev.dpr).toFixed(2)+'  '+prev.base.toFixed(1)+' ms  ('+probeSg(base-prev.base,1)+' ms sekarang)\n';
+  try{localStorage.setItem('dumul_probe_last',JSON.stringify({dpr:+DPR,base:base,nz:nz,q:qs,ts:Date.now()}));}catch(e){}
+  tx+='?'+qs;
+  return tx;
 }
 function probeBegin(now){probeRestore();try{PROBE_SEQ[PROBE.i][1]();}catch(e){}PROBE.t0=now;PROBE.iv=[];PROBE.js=[];}
 function probeMed(a,q){if(!a.length)return 0;var b=a.slice().sort(function(x,y){return x-y;});return b[Math.min(b.length-1,Math.floor(b.length*q))];}
@@ -803,26 +863,16 @@ function probeTick(now,iv,js){
     if(now-PROBE.inS<3000)return;
     probeSave();PROBE.on=true;PROBE.i=0;PROBE.res=[];probeBegin(now);return;
   }
-  if(!inSec&&!PX.all){PROBE.on=false;PROBE.inS=0;probeRestore();probeShow('PROBE dibatalkan (keluar sektor). Masuk sektor lagi, otomatis mulai ulang.');return;}
+  if(!inSec&&!PX.all){PROBE.on=false;PROBE.inS=0;probeRestore();probeShow('PROBE dibatalkan (keluar sektor).\nMasuk sektor lagi, otomatis mulai ulang.',false);return;}
   var el=now-PROBE.t0;
   if(el>1200&&iv>0&&iv<1000){PROBE.iv.push(iv);PROBE.js.push(js);}
-  if(now-PROBE.txu>400){PROBE.txu=now;probeShow('PROBE '+(PROBE.i+1)+'/'+PROBE_SEQ.length+'  '+PROBE_SEQ[PROBE.i][0]+'\n(jangan sentuh layar, ~'+Math.max(0,Math.round((PROBE_SEQ.length-PROBE.i)*4.2-el/1000))+' dtk lagi)');}
+  if(now-PROBE.txu>400){PROBE.txu=now;probeShow('PROBE '+(PROBE.i+1)+'/'+PROBE_SEQ.length+'   '+PROBE_SEQ[PROBE.i][0]+'\nsisa +-'+Math.max(0,Math.round((PROBE_SEQ.length-PROBE.i)*4.2-el/1000))+' dtk   (jangan sentuh layar)',false);}
   if(el<4200)return;
-  PROBE.res.push([PROBE_SEQ[PROBE.i][0],probeMed(PROBE.iv,.5),probeMed(PROBE.iv,.9),probeMed(PROBE.js,.5)]);
+  PROBE.res.push([PROBE_SEQ[PROBE.i][0],probeTrim(PROBE.iv),probeMed(PROBE.iv,.9),probeMed(PROBE.js,.5)]);
   PROBE.i++;
   if(PROBE.i<PROBE_SEQ.length){probeBegin(now);return;}
   probeRestore();PROBE.done=true;PROBE.on=false;
-  var R=PROBE.res,k,bs=[],nz=0,tx,t,b0,b1,bm,d,fl,lb;
-  for(k=0;k<R.length;k+=2)bs.push(R[k][1]);
-  for(k=0;k+1<bs.length;k++)nz=Math.max(nz,Math.abs(bs[k]-bs[k+1]));
-  bm=0;for(k=0;k<bs.length;k++)bm+=bs[k];bm/=bs.length;
-  tx='PROBE selesai. normal median '+bm.toFixed(1)+'ms ('+(1000/bm).toFixed(0)+'fps), noise +-'+nz.toFixed(1)+'ms\n(+ = hemat ms/fps saat dimatikan; ~ = di dalam noise; ! = banyak stall)\n';
-  for(k=0;k<PROBE_TESTS.length;k++){
-    t=R[2*k+1];b0=R[2*k][1];b1=R[2*k+2][1];bm=(b0+b1)/2;d=bm-t[1];fl=(Math.abs(d)<Math.max(nz,2)?'~':'')+(t[2]>t[1]*1.6?'!':'');
-    lb=(t[0]+'                         ').slice(0,22);
-    tx+=lb+' '+t[1].toFixed(1)+'ms '+(d>=0?'+':'')+d.toFixed(1)+'ms '+(1000/t[1]-1000/bm>=0?'+':'')+(1000/t[1]-1000/bm).toFixed(1)+'fps '+fl+'\n';
-  }
-  probeShow(tx);
+  probeShow(probeReport(PROBE.res),true);
 }
 function pmk(n){if(!PERF)return;var t=performance.now();PP.cur[n]=(PP.cur[n]||0)+(t-PP.t0);PP.t0=t;}
 function pBegin(){if(!PERF)return;PP.fs=PP.t0=performance.now();PP.cur={};AST_DRAWN=0;}

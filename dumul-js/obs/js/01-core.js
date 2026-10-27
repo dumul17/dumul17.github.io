@@ -33,6 +33,8 @@ try{
     else if(_qs==='low')IS_POTATO=true;
   }
 }catch(e){}
+/* TES RESOLUSI: ?dpr=0.75 mengalikan DPR kanvas utama (layout() membaca window.__dprMul). Tanpa parameter = 1 (tidak berubah). */
+try{var _dm=/[?&]dpr=([0-9.]+)/.exec(location.search);if(_dm){var _dv=parseFloat(_dm[1]);if(_dv>=.4&&_dv<=1)window.__dprMul=_dv;}}catch(eDm){}
 try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');else document.documentElement.classList.remove('perf-tier-0');}catch(e){}
 var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
