@@ -245,6 +245,11 @@ function ast3dReuse(now,half){
   try{
     if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return 0;
     var same=ast3dFrameSig(now),C=AST3D.cache,per=1000/Math.max(1,AST3D_CFG.fps),ok=!!(C[ci]&&C[ci].ver===AST3D.ver);
+    var fsl=(typeof FS!=='undefined'&&FS.slow)?FS:null;
+    if(fsl){   /* HP lambat (05-sector-ui.js FS): jeda render = 2x interval frame (maks 140 ms), pass belakang cuma di frame genap, depan cuma di ganjil -> tiap frame paling banyak satu pass GL */
+      per=Math.max(per,Math.min(140,fsl.ema*2));
+      if(ok&&ci<2&&((fsl.n&1)!==ci)){U[ci]=now;AST3D.reused++;return 1;}
+    }
     if(ok&&now<AST3D.nx[ci]-8){U[ci]=now;AST3D.reused++;return 1;}   /* -8ms: toleransi jitter rAF */
     AST3D.nx[ci]=now+((ci===1&&AST3D.rd[0]===now)?per*.5:per);
     AST3D.rd[ci]=now;AST3D.rendered++;

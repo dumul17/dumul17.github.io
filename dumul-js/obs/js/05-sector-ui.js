@@ -849,7 +849,7 @@ function probeReport(R){
   try{prev=JSON.parse(localStorage.getItem('dumul_probe_last')||'null');}catch(e){}
   if(prev&&prev.base)tx+='Run lalu: dpr x'+(+prev.dpr).toFixed(2)+'  '+prev.base.toFixed(1)+' ms  ('+probeSg(base-prev.base,1)+' ms sekarang)\n';
   try{localStorage.setItem('dumul_probe_last',JSON.stringify({dpr:+DPR,base:base,nz:nz,q:qs,ts:Date.now()}));}catch(e){}
-  tx+='?'+qs;
+  tx+='fs: '+['off','auto','paksa slow'][FS.mode]+(FS.slow?' (slow aktif)':'')+'   ?'+qs;
   return tx;
 }
 function probeBegin(now){probeRestore();try{PROBE_SEQ[PROBE.i][1]();}catch(e){}PROBE.t0=now;PROBE.iv=[];PROBE.js=[];}
@@ -918,6 +918,24 @@ function pEnd(now){
    di layar 60Hz pun aman: ambang (~12ms) tetap di bawah interval 16.7ms, jadi tidak ada frame yang dibuang. */
 var CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
 
+/* FPS ADAPTIF (governor). Ukur interval frame (EMA, stall diklem 120 ms). HP lambat (> 40 ms = < 25 fps selama 2 dtk) -> FS.slow=true: kerja periodik berat dijarangkan dan digantian
+   antar-frame genap/ganjil: asteroid GL (pass belakang di frame genap, depan di ganjil, jeda = 2x interval, maks 140 ms) dan bake aurora planet (frame ganjil, jeda 2x).
+   Keluar dari slow cuma kalau frame < 20 ms selama 5 dtk (histeresis lebar: saat slow beban memang turun, jangan bolak-balik). Interaksi (pan/zoom/tap) tetap tiap frame:
+   cache asteroid dibatalkan sendiri oleh AST3D.ver, aurora ikut parallax saat blit.
+   ?fs=0 mati, ?fs=2 paksa slow (tes), default auto. Di ?probe=1 default MATI (supaya tidak mengacaukan ukuran) kecuali ?fs= diisi. */
+var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0};
+try{var _fm=/[?&]fs=([012])(&|$)/.exec(location.search);if(_fm)FS.mode=+_fm[1];else if(/[?&]probe=1(&|$)/.test(location.search))FS.mode=0;}catch(eFs){}
+function fsTick(now){
+  var iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
+  if(iv>0&&iv<250)FS.ema+=(Math.min(iv,120)-FS.ema)*.08;
+  if(FS.mode===0){FS.slow=false;return;}
+  if(FS.mode===2){FS.slow=true;return;}
+  if(!FS.slow){
+    if(FS.ema>40){if(!FS.t)FS.t=now;else if(now-FS.t>2000){FS.slow=true;FS.t=0;}}else FS.t=0;
+  }else{
+    if(FS.ema<20){if(!FS.t)FS.t=now;else if(now-FS.t>5000){FS.slow=false;FS.t=0;}}else FS.t=0;
+  }
+}
 function frame(now){
   /* Capture generation at entry. If a watchdog/visibility restart bumped
      renderGeneration while this callback was already queued, bail out so
@@ -928,7 +946,7 @@ function frame(now){
   var cd=now-capPrev;capPrev=now;
   if(cd>2&&cd<50&&cd<capVs)capVs=cd;
   if(capVs<9&&now-capLast<CAP_MS-capVs*.5){renderRAF=requestAnimationFrame(frame);return;}   /* frame ini dilewati; dicek SETELAH gen supaya callback stale tidak nge-reschedule */
-  capLast=now;
+  capLast=now;fsTick(now);
   /* The whole frame is now one safety net: whatever throws, wherever, the
      loop always reschedules itself in the finally block below. A single
      bad frame can no longer freeze the page until a manual reload - at

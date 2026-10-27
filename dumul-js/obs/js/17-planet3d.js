@@ -795,8 +795,8 @@ function pl3dFxAurora(g,F){
   }
   if(!F.aurCx)return;
   /* bake jarang: sinar bergeser cuma ~1.5 px/dtk, jadi 5-6x/dtk sudah tak terlihat beda dari 22x/dtk. Paksa bake ulang kalau radius berubah atau cahaya (portal/BH) bergeser >12px (batas terang-gelap ikut). Blit tetap tiap frame. */
-  var aIv=F.pot?300:180;
-  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||F.t-F.aurR>=aIv){pl3dMk('pl.pre');pl3dAurBake(F,A);pl3dMk('pl.bake');}
+  var fsl=(typeof FS!=='undefined'&&FS.slow),aIv=(F.pot?300:180)*(fsl?2:1);   /* HP lambat (FS): bake aurora 2x lebih jarang + cuma di frame ganjil (asteroid GL belakang di genap) */
+  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||(F.t-F.aurR>=aIv&&(!fsl||(FS.n&1)))){pl3dMk('pl.pre');pl3dAurBake(F,A);pl3dMk('pl.bake');}
   if(F.aurB1<=F.aurB0)return;
   var dx=gm.cx-F.aurG.cx,dy=gm.cy-F.aurG.cy;   /* parallax murni = geser: aurora tetap menempel di limb walau bake lebih jarang dari frame */
   g.globalAlpha=ba*F.aur;
