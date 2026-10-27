@@ -29,7 +29,7 @@ var PL3D_CFG={
   cloudH:20,     /* tinggi lapisan awan = cloudH x haze (px dari horizon ke bawah, memudar halus); ikut berubah kalau haze diubah. 0 = tanpa batas tinggi (awan menutup seluruh tanah, seperti dulu) */
   rocks:true,   /* batu = mesh 3D asli (ast3dRockGeo dari 12-ast3d.js, sama dgn asteroid). false = tanpa batu */
   rockSz:.25,  /* skala mesh batu terhadap sel (1 = pas ukuran sel) */
-  lod:.25,         /* detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
+  lod:1,         /* (DEFAULT 1; nilai < .5 DIABAIKAN: dijepit ke .5 di pl3dUniforms, karena sel < ~.6px tinggi di layar = aliasing -> garis horizontal lurus yang makin kasar ke horizon) detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:2,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
@@ -59,8 +59,8 @@ var PL3D_CFG={
   rimLit:1,       /* rim glow condong ke sisi yang kena cahaya (BH mini / portal) + hangat sedikit. 0 = rata seperti dulu, 1 = penuh, 2 = lebih ekstrem */
   rimHalo:.45,    /* halo lebar tipis di luar limb (x opasitas atmosfer); 0 = tanpa halo */
   cloudDrift:4,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
-  cloudDMax:20000,   /* daur ulang awan: total geseran awan (px) yang boleh menumpuk sebelum awan memudar, posisi di-reset kecil, lalu muncul lagi (±3 dtk keluar + ±3 dtk masuk). Koordinat noise di shader tidak boleh tumbuh tanpa batas: makin besar, presisi float32 hilang -> tekstur jadi strip lurus. 4 px/dtk = ±83 menit per siklus, 20 px/dtk = ±17 menit. 0 = tanpa daur ulang (perilaku lama) */
-  phMax:20000,    /* batas fase permukaan tanah (px) sebelum di-reset ke 0, dilakukan hanya saat overview (bobot sektor 0). Cuma relevan kalau rotK != 0. 0 = tanpa batas */
+  cloudDMax:5000,   /* daur ulang awan: total geseran awan (px) yang boleh menumpuk sebelum awan memudar, posisi di-reset kecil, lalu muncul lagi (±3 dtk keluar + ±3 dtk masuk). Koordinat noise di shader tidak boleh tumbuh tanpa batas: makin besar, presisi float32 hilang -> tekstur jadi strip lurus. 4 px/dtk = ±21 menit per siklus, 20 px/dtk = ±4 menit. Direset juga tiap wormhole menutup layar (lompat sektor). 0 = tanpa daur ulang (perilaku lama) */
+  phMax:3000,    /* batas fase permukaan tanah (px) sebelum di-reset ke 0, dilakukan hanya saat overview (bobot sektor 0). Cuma relevan kalau rotK != 0. 0 = tanpa batas */
   cloudShd:.5,    /* bayangan awan di tanah, jatuh menjauhi cahaya (0 = tanpa bayangan) */
   cityA:1.1,      /* kecerahan lampu kota di sisi gelap (0 = mati) */
   cityD:.55,      /* kepadatan lampu kota di area permukiman 0..1 */
@@ -128,7 +128,10 @@ function pl3dPhase(now){
   dt=Math.max(0,Math.min(100,now-PL3D.phT));
   if(now>PL3D.phT)PL3D.phT=now;
   if(!rd)PL3D.ph+=dt*.001*PL3D_CFG.live.rot*PL3D_CFG.rotK;
-  if(PL3D_CFG.phMax>0&&Math.abs(PL3D.ph)>PL3D_CFG.phMax&&PL3D.secW<=.001)PL3D.ph=0;   /* fase tumbuh tanpa batas = presisi float32 hilang di shader (strip lurus); reset di overview supaya lompatan pola tidak terlihat di sektor */
+  if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.arrive&&WORMHOLE.arrive()<.15){   /* wormhole menutup layar: planet tidak kelihatan -> saat paling aman mereset fase tanah & geseran awan ke 0 (lompatan pola tersembunyi) */
+    PL3D.ph=0;if(PL3D.cT!=null)PL3D.cd=0;
+  }
+  else if(PL3D_CFG.phMax>0&&Math.abs(PL3D.ph)>PL3D_CFG.phMax&&PL3D.secW<=.001)PL3D.ph=0;   /* fase tumbuh tanpa batas = presisi float32 hilang di shader (strip lurus); reset di overview supaya lompatan pola tidak terlihat di sektor */
   return PL3D.ph;
 }
 /* jam awan: geseran awan (px) DIINTEGRASI (ganti slider Drift tidak membuat awan melompat) dan dibatasi. Lewat batas cloudDMax: faktor opasitas turun ke 0, geseran di-reset ke nilai kecil yang berbeda tiap siklus (pola awan beda), lalu naik lagi.
@@ -602,7 +605,8 @@ function pl3dUniforms(now,nobolt){
   U.uRot.value=pl3dPhase(now)/gm.R;
   U.uSeed.value.set(PL3D_CFG.live.sx,PL3D_CFG.live.sy);
   var cl=pl3dCloud(now);U.uCOff.value=cl[0];
-  U.uHaze.value=PL3D_CFG.haze;U.uHazeA.value=PL3D_CFG.hazeA;U.uCloud.value=PL3D_CFG.cloud*cl[1];U.uLod.value=PL3D_CFG.lod;U.uFadeS.value=PL3D_CFG.fadeS;U.uCloudCov.value=PL3D_CFG.cloudCov;U.uCloudH.value=PL3D_CFG.cloudH;   /* knob kabut bisa diubah live (console/panel tuning) */
+  U.uHaze.value=PL3D_CFG.haze;U.uHazeA.value=PL3D_CFG.hazeA;U.uCloud.value=PL3D_CFG.cloud*cl[1];U.uLod.value=Math.max(.5,PL3D_CFG.lod);   /* jepit: lod < .5 mempertahankan sel sub-piksel (tinggi < ~.6px) -> tiap baris layar kebagian nilai acak sendiri, memanjang di X = strip lurus */
+  U.uFadeS.value=PL3D_CFG.fadeS;U.uCloudCov.value=PL3D_CFG.cloudCov;U.uCloudH.value=PL3D_CFG.cloudH;   /* knob kabut bisa diubah live (console/panel tuning) */
   U.uT.value=(now*.001)%(Math.PI*2/2.1*100);U.uCDrift.value=PL3D_CFG.cloudDrift;U.uShd.value=PL3D_CFG.cloudShd*cl[1];   /* uT cuma dipakai kedip lampu kota sin(uT*2.1+..): di-mod kelipatan periodenya (seamless) supaya tidak tumbuh */
   U.uRimLit.value=PL3D_CFG.rimLit;U.uRimHalo.value=PL3D_CFG.rimHalo;
   U.uCityA.value=PL3D_CFG.cityA;U.uCityD.value=PL3D_CFG.cityD;U.uCityTw.value=PL3D_CFG.cityTw;U.uCrat.value=PL3D_CFG.craterA;U.uCany.value=PL3D_CFG.canyonA;U.uCratS.value=Math.max(.2,PL3D_CFG.craterS);U.uCanyS.value=Math.max(.2,PL3D_CFG.canyonS);   /* knob dekorasi, bisa diubah live */
