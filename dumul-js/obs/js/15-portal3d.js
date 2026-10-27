@@ -26,7 +26,8 @@ var PT3D_CFG={
   plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
   mouthStars:35,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
   glow:1.3,         /* pengali terang garis sirkuit emissive */
-  boltMax:9,       /* petir bersamaan (potato: 1) */
+  boltMax:3,       /* petir bersamaan: cuma yang TERBARU yang hidup, yang tertua dibuang saat petir baru lahir (potato: 1). Dulu 9 */
+  boltGlow:.5,     /* pendar petir (2 goresan lebar di bawah inti putih): 1 = seperti dulu, .5 = lebar x.5 + sedikit lebih redup, 0 = tanpa pendar (inti saja) */
   boltCd:17,        /* jeda minimum per pita (ms), potato 90 */
   boltCap:6,        /* maks petir baru per frame dari onset pita (potato 1) */
   onFlux:.09,       /* ambang lonjakan mentah per pita buat memicu petir (makin kecil = makin sensitif; fallback tanpa analyser pakai .14) */
@@ -530,7 +531,7 @@ function ptPathTo(g,P,Rin,f){
 }
 /* g sudah di-translate ke pusat portal; Rin = radius mulut (px). Dipanggil SETELAH ptMouth dan SEBELUM cincin: ujung petir tertutup tepi cincin. Percikan digambar belakangan (ptSparksDraw) di ATAS cincin. */
 function ptBoltsDraw(g,Rin,now,c){
-  var B=PT3D.bolts,i,j,k,b,u,fl,al,P,sc,mf,f,e,W=PT3D_CFG.boltW,rim=!!(PT3D.rim&&PT3D.fl&&typeof AVB!=='undefined'&&AVB.v&&AVB.n===PT3D.fl.length),sk=(now-PT3D.spkT)/180;
+  var B=PT3D.bolts,i,j,k,b,u,fl,al,P,sc,mf,f,e,W=PT3D_CFG.boltW,GL=Math.max(0,Math.min(1,PT3D_CFG.boltGlow==null?1:PT3D_CFG.boltGlow)),rim=!!(PT3D.rim&&PT3D.fl&&typeof AVB!=='undefined'&&AVB.v&&AVB.n===PT3D.fl.length),sk=(now-PT3D.spkT)/180;
   if(!B.length&&!rim&&!(sk>=0&&sk<1))return;
   g.save();g.beginPath();g.arc(0,0,Rin,0,6.2832);g.clip();
   g.globalCompositeOperation='lighter';g.lineCap='round';g.lineJoin='round';
@@ -557,8 +558,10 @@ function ptBoltsDraw(g,Rin,now,c){
       if(j){e=b.br[j-1];P=e.p;sc=e.s;f=(mf-e.at)/e.den;if(f<=0)continue;if(f>1)f=1;}
       else{P=b.p;sc=1;f=mf;}
       g.beginPath();ptPathTo(g,P,Rin,f);
-      g.strokeStyle='rgba('+c+','+(.22*al)+')';g.lineWidth=Math.max(1.6,Rin*.11*W*sc);g.stroke();
-      g.strokeStyle='rgba('+c+','+(.55*al)+')';g.lineWidth=Math.max(1.1,Rin*.045*W*sc);g.stroke();
+      if(GL>.02){   /* pendar: lebar + terang ikut boltGlow (floor px ikut diskalakan, supaya portal kecil juga menipis) */
+        g.strokeStyle='rgba('+c+','+(.22*al*(.5+.5*GL))+')';g.lineWidth=Math.max(.6,Math.max(1.6,Rin*.11*W*sc)*GL);g.stroke();
+        g.strokeStyle='rgba('+c+','+(.55*al)+')';g.lineWidth=Math.max(.6,Math.max(1.1,Rin*.045*W*sc)*(.5+.5*GL));g.stroke();
+      }
       g.strokeStyle='rgba(255,255,255,'+(.95*al)+')';g.lineWidth=Math.max(.7,Rin*.016*sc);g.stroke();
     }
   }

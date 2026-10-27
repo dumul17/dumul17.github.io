@@ -127,7 +127,8 @@ var T3D=(function(){
       /* Petir */
       ['mouthStars','Stars','Bintang',0,80,1,0,'','','bolt'],
       ['boltMax','Bolts','Jumlah petir',0,16,1,0,'','','bolt'],
-      ['boltW','Bolt W','Tebal petir',.1,1.2,100,0,'%','','bolt','boltMax']
+      ['boltW','Bolt W','Tebal petir',.1,1.2,100,0,'%','','bolt','boltMax'],
+      ['boltGlow','Glow','Pendar petir',0,1,100,0,'%','','bolt','boltMax']
     ]});
 
   /* Milky Way overview: nilai default + loader ada di 02-sky-logic.js (MW_DEF / mwTuneSet), jadi di sini tidak dimuat ulang */
