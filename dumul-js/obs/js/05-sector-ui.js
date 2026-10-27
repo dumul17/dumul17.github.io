@@ -949,8 +949,9 @@ function frame(now){
     try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* seluruh orbit asteroid (separuh depan juga) di BELAKANG planet: digambar sebelum planet3dDraw, jadi permukaan planet menutupinya */
     try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
+    pmk('planet');   /* hanya planet3dDraw (shader band + efek 2D) */
     try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
-    pmk('planet');
+    pmk('txTop');   /* drone TX/RX 3D (14-drone3d) + planetGroundAt */
     pmk('astFront');
     drawSectFlash(now);
     try{sectorScanUpdate(now);}catch(err){window.__hub.renderError='sectorScan: '+(err&&err.message||err);}

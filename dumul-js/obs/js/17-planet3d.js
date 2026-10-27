@@ -1123,9 +1123,11 @@ function planetGroundOk(){
   if(typeof smenuHidesSky==='function'&&smenuHidesSky())return false;
   pl3dSync();return !!(PW&&PH);
 }
-function pl3dGroundFrame(){
-  var gm=pl3dGeom(),R=gm.R,dx=PW*.5-gm.cx;
-  return {gm:gm,R:R,cxs:gm.cx,cys:PH-gm.cy,phi0:Math.atan2(Math.sqrt(Math.max(0,R*R-dx*dx)),dx)};
+function pl3dGroundFrame(now){   /* now diberikan = hasil di-cache per frame (targetOf 08-tx-drone.js memanggil planetGroundAt 3x per frame; pl3dGeom cukup dihitung sekali) */
+  if(now!=null&&PL3D.gfN===now&&PL3D.gfF)return PL3D.gfF;
+  var gm=pl3dGeom(),R=gm.R,dx=PW*.5-gm.cx,F={gm:gm,R:R,cxs:gm.cx,cys:PH-gm.cy,phi0:Math.atan2(Math.sqrt(Math.max(0,R*R-dx*dx)),dx)};
+  if(now!=null){PL3D.gfN=now;PL3D.gfF=F;}
+  return F;
 }
 function pl3dRotAng(now,R){   /* sudut putar permukaan (rad); sama dgn uRot di pl3dUniforms. Fallback 2D tidak berputar -> 0 */
   return (PL3D.state===2&&!(typeof reduce!=='undefined'&&reduce))?pl3dPhase(now)/R:0;
@@ -1136,7 +1138,7 @@ function pl3dStage(xu,yu){return PL3D.rot<0?[STG.ih-yu,xu]:(PL3D.rot>0?[yu,STG.i
    Hasil: x,y = titik kaki (stage); lx,ly = titik pusat badan (stage); ux,uy = titik kaki di ruang layar tegak; k = sg (skala perspektif); off = sudah keluar layar. */
 function planetGroundAt(ug,sg,now,lift){
   if(!planetGroundOk())return null;
-  var F=pl3dGroundFrame(),R=F.R,phi=F.phi0+ug/R-pl3dRotAng(now,R)*sg/PL3D_CFG.rotRef,rr=R-sg,   /* geser tanah perspektif-benar (uWg di shader): kecepatan layar ∝ sg/rotRef */
+  var F=pl3dGroundFrame(now),R=F.R,phi=F.phi0+ug/R-pl3dRotAng(now,R)*sg/PL3D_CFG.rotRef,rr=R-sg,   /* geser tanah perspektif-benar (uWg di shader): kecepatan layar ∝ sg/rotRef */
      
       xu=F.cxs+rr*Math.cos(phi),yu=PH-(F.cys+rr*Math.sin(phi)),a=pl3dStage(xu,yu),b=pl3dStage(xu,yu-(lift||0));
   return {x:a[0],y:a[1],lx:b[0],ly:b[1],ux:xu,uy:yu,k:sg,off:(xu<10||xu>PW-10||yu>PH-8)};

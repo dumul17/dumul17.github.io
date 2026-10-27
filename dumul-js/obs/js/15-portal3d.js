@@ -25,6 +25,8 @@ var PT3D_CFG={
   ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */
   plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
   mouthStars:35,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
+  starAdapt:true,   /* governor adaptif: kalau FPS < ~46, jumlah bintang aktif turun pelan sampai starMin x mouthStars, naik lagi kalau FPS pulih. false = selalu penuh */
+  starMin:.5,       /* batas bawah governor (0.5 = paling sedikit separuh bintang) */
   glow:1.3,         /* pengali terang garis sirkuit emissive */
   boltMax:3,       /* petir bersamaan: cuma yang TERBARU yang hidup, yang tertua dibuang saat petir baru lahir (potato: 1). Dulu 9 */
   boltGlow:.5,     /* pendar petir (2 goresan lebar di bawah inti putih): 1 = seperti dulu, .5 = lebar x.5 + sedikit lebih redup, 0 = tanpa pendar (inti saja) */
@@ -323,14 +325,25 @@ function pttStep(dt){
 /* streak bintang tajam di mulut idle: melesat dari tengah ke tepi (makin dekat tepi makin cepat dan makin panjang ekornya), ikut berputar pelan seperti terowongannya */
 var PTT_STAR=[[255,255,255],[175,205,255],[150,125,255],[255,125,205],[255,175,95],[95,225,255],[255,238,170]];
 function ptStarNew(init){return{th:Math.random()*6.2832,p:init?Math.random():0,v:.28+Math.random()*.5,ci:Math.random()<.65?(Math.random()<.5?0:1):((Math.random()*7)|0),L:(Math.random()*3)|0,al:.55+.45*Math.random()};}
+function pttStarGov(dt){   /* governor adaptif: FPS sehat -> k=1 (identik dgn dulu, nol trade-off); FPS jatuh -> jumlah bintang AKTIF turun pelan ke starMin, naik lagi saat pulih. Ukur interval frame asli (bukan dt yang di-clamp) */
+  var C=PT3D_CFG,now=performance.now(),iv,k=PTT.k===undefined?1:PTT.k;
+  if(!C.starAdapt){PTT.k=1;return 1;}
+  if(PTT.t0){iv=(now-PTT.t0)/1000;if(iv<.5){PTT.ft=PTT.ft?PTT.ft+(iv-PTT.ft)*.08:iv;}}   /* EMA ~12 frame; lompatan >0.5 dtk (tab di-pause) diabaikan */
+  PTT.t0=now;
+  if(PTT.ft>.0215)k-=dt*.5;else if(PTT.ft<.0185)k+=dt*.15;   /* ambang ~46 fps turun / ~54 fps naik (hysteresis); turun cepat 2 dtk, naik lambat 7 dtk */
+  k=k<(C.starMin||.5)?(C.starMin||.5):(k>1?1:k);PTT.k=k;return k;
+}
 function pttStars(g,Rin,dt){
   var n=PT3D_CFG.mouthStars|0;if(n<=0)return;
-  var A=PTT.st,i,s,rh,rt,pt,ca,sa,a,w,col,hx,hy;
+  var A=PTT.st,i,s,rh,rt,pt,ca,sa,a,w,col,hx,hy,nE;
   if(!A||A.length!==n){A=PTT.st=[];for(i=0;i<n;i++)A.push(ptStarNew(true));}
+  nE=Math.ceil(n*pttStarGov(dt));   /* bintang aktif; indeks >= nE berhenti respawn setelah selesai terbang (tanpa pop) */
   g.save();g.globalCompositeOperation='lighter';g.lineCap='round';
   for(i=0;i<n;i++){
-    s=A[i];s.p+=s.v*dt*(1+s.p*1.6);s.th+=.22*dt;
-    if(s.p>=1){A[i]=s=ptStarNew(false);}
+    s=A[i];
+    if(s.off){if(i<nE){A[i]=s=ptStarNew(false);}else continue;}
+    s.p+=s.v*dt*(1+s.p*1.6);s.th+=.22*dt;
+    if(s.p>=1){if(i>=nE){s.off=1;continue;}A[i]=s=ptStarNew(false);}
     a=Math.min(1,s.p*3)*(s.p>.85?1-(s.p-.85)/.15*.5:1)*s.al;
     if(a<.03)continue;
     rh=Rin*(.2+.85*Math.pow(s.p,1.7));pt=Math.max(0,s.p-.08-.14*s.p);rt=Rin*(.2+.85*Math.pow(pt,1.7));

@@ -19,6 +19,7 @@ var DR3D_CFG={
   size:30,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini. Kelipatan 5 supaya kena snap slider panel tuning (dulu 28) */
   half:15,        /* setengah lebar kamera ortho (satuan model) */
   resMin:128,resMax:160,
+  minDt:40,       /* jeda minimum antar render GPU (ms). Sprite cuma ~30 px dan gerakannya pelan, jadi 40 ms (~25 fps) tidak terlihat bedanya; posisi tetap 60 fps karena digambar 2D. 0 = render tiap frame (perilaku lama) */
   /* knob tuning (tab Drone di panel owl; 1 = perilaku asli, ini = DEFAULT): */
   spin:1,         /* kecepatan putar jari-jari muka */
   bob:1,          /* amplitudo melayang naik-turun + goyang badan */
@@ -34,7 +35,7 @@ try{
   if(/[?&]drone3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_drone3d')==='0')DR3D_CFG.on=false;
 }catch(eD3){}
 var DR3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,yaw:null,lean:null,mdl:null,res:0,err:'',m:{},o:{},
-  px:0,py:0,pt:0,vx:0,vy:0,yawA:0,hasV:false,lastNow:-1,lastCol:'',ar:.43,ag:.9,ab:1};
+  px:0,py:0,pt:0,vx:0,vy:0,yawA:0,hasV:false,lastNow:-1,lastR:-1e9,c2:null,x2:null,dirty:false,lastCol:'',ar:.43,ag:.9,ab:1};
 
 function dr3dFail(why){DR3D.state=3;DR3D.err=String(why||'');try{console.warn('[drone3d] fallback ke drone 2D:',DR3D.err);}catch(e){}}
 
@@ -70,6 +71,50 @@ function dr3dBodyTex(){
   for(i=0;i<34;i++){x.strokeStyle='rgba(205,215,225,'+(.06+rnd()*.12).toFixed(2)+')';x.lineWidth=1;x.beginPath();var sx=rnd()*256,sy=rnd()*128;x.moveTo(sx,sy);x.lineTo(sx+rnd()*18-9,sy+rnd()*8-4);x.stroke();}
   for(i=0;i<16;i++){x.fillStyle='rgba('+(150+(rnd()*50|0))+','+(70+(rnd()*40|0))+',30,'+(.2+rnd()*.3).toFixed(2)+')';x.fillRect(rnd()*256,rnd()*128,3+rnd()*9,2+rnd()*6);}
   var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=2;return t;
+}
+
+
+/* Gabung semua mesh STATIS per material jadi 1 mesh per material: ratusan draw call -> belasan. Bentuk, warna, cahaya identik.
+   Biaya render three.js di HP didominasi overhead per-objek di CPU (js naik ~6 ms saat drone muncul), bukan piksel (sprite cuma 128 px).
+   sc = scene, root = grup yang digabung, skip = subtree yang jangan disentuh (mis. o.spin). Mesh dengan userData.keep (api thruster) tetap sendiri. */
+function dr3dMerge(sc,root,skip){
+  var T=THREE,inv=new T.Matrix4(),mm=new T.Matrix4(),v=new T.Vector3(),list=[],bk={},order=[],i,j,b;
+  sc.updateMatrixWorld(true);
+  inv.copy(root.matrixWorld).invert();
+  (function walk(n){
+    if(n===skip)return;
+    if(n.isMesh&&!n.userData.keep)list.push(n);
+    for(var c=0;c<n.children.length;c++)walk(n.children[c]);
+  })(root);
+  var done=[];
+  for(i=0;i<list.length;i++){
+    var me=list[i],geo=me.geometry,pa=geo.attributes.position,na=geo.attributes.normal,ua=geo.attributes.uv;
+    if(!pa||!na||Array.isArray(me.material))continue;
+    mm.multiplyMatrices(inv,me.matrixWorld);
+    var nm=new T.Matrix3().getNormalMatrix(mm),n=pa.count,idx=[],ic=geo.index?geo.index.count:n;
+    b=bk[me.material.uuid];if(!b){b=bk[me.material.uuid]={mat:me.material,p:[],n:[],u:[],i:[],v:0};order.push(b);}
+    for(j=0;j<n;j++){
+      v.set(pa.getX(j),pa.getY(j),pa.getZ(j)).applyMatrix4(mm);b.p.push(v.x,v.y,v.z);
+      v.set(na.getX(j),na.getY(j),na.getZ(j)).applyMatrix3(nm).normalize();b.n.push(v.x,v.y,v.z);
+      if(ua)b.u.push(ua.getX(j),ua.getY(j));else b.u.push(0,0);
+    }
+    for(j=0;j<ic;j++)idx.push(geo.index?geo.index.getX(j):j);
+    if(mm.determinant()<0){for(j=0;j+2<ic;j+=3){var tt=idx[j+1];idx[j+1]=idx[j+2];idx[j+2]=tt;}}   /* cermin (scale -1, mis. sayap kiri): balik urutan sisi supaya muka depan tetap muka depan */
+    for(j=0;j<ic;j++)b.i.push(idx[j]+b.v);
+    b.v+=n;done.push(me);
+  }
+  for(i=0;i<order.length;i++){
+    b=order[i];
+    var gm=new T.BufferGeometry();
+    gm.setAttribute('position',new T.Float32BufferAttribute(b.p,3));
+    gm.setAttribute('normal',new T.Float32BufferAttribute(b.n,3));
+    gm.setAttribute('uv',new T.Float32BufferAttribute(b.u,2));
+    gm.setIndex(b.v>65535?new T.Uint32BufferAttribute(b.i,1):new T.Uint16BufferAttribute(b.i,1));
+    var mesh=new T.Mesh(gm,b.mat);mesh.frustumCulled=false;mesh.matrixAutoUpdate=false;root.add(mesh);
+  }
+  for(i=0;i<done.length;i++)if(done[i].parent)done[i].parent.remove(done[i]);
+  (function prune(n){for(var c=n.children.length-1;c>=0;c--){var k=n.children[c];prune(k);if(!k.isMesh&&!k.children.length&&k!==skip)n.remove(k);}})(root);
+  return order.length;
 }
 
 /* ---------- model ---------- */
@@ -215,12 +260,19 @@ function dr3dBuild(){
     lg.add(mk(legCone,m.steel,0,0,-3.2));
     [-1.4,-.9,.9,1.4].forEach(function(zz){lg.add(mk(legRing,m.orange,0,0,zz));});
     lg.add(mk(coreG,m.ionCore,0,0,2.62));
-    var fl=mk(flG,m.ion,0,0,2.63);lg.add(fl);o.flames.push(fl);
+    var fl=mk(flG,m.ion,0,0,2.63);fl.userData.keep=true;lg.add(fl);o.flames.push(fl);   /* keep = dianimasikan (scale.z), jangan ikut digabung */
     mdl.add(strip(V(sx*2.3,-2.9,0),V(sx*3.1,-4.6,0),.22,m.dark));
     mdl.add(strip(V(sx*2.3,-2.9,1.4),V(sx*3.1,-4.6,1.4),.22,m.dark));
   });
   mdl.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([V(3.1,-5.4,2.7),V(2.3,-6.9,3.5),V(.9,-5.3,3.7),V(.5,-3.8,2.3)]),14,.13,5,false),m.black));
 
+  /* gabung mesh statis (lihat dr3dMerge). Gagal apa pun -> model tetap utuh seperti sebelumnya. Cek hasil: DR3D.stat / DR3D.r.info.render.calls di console */
+  try{
+    var c0=0;sc.traverse(function(n){if(n.isMesh)c0++;});
+    dr3dMerge(sc,o.spin,null);dr3dMerge(sc,mdl,o.spin);
+    var c1=0;sc.traverse(function(n){if(n.isMesh)c1++;});
+    DR3D.stat={meshSebelum:c0,meshSesudah:c1};
+  }catch(eM){try{console.warn('[drone3d] gabung mesh dilewati:',eM&&eM.message||eM);}catch(e){}}
   /* cahaya */
   o.key=new T.DirectionalLight(0xffc88c,1.4);o.key.position.set(0,45,60);sc.add(o.key);
   o.rim=new T.DirectionalLight(0xff4fd8,1.1);o.rim.position.set(-30,40,-55);sc.add(o.rim);
@@ -242,7 +294,7 @@ function dr3dUpdate(now,x,y,col){
   var T=THREE,r=DR3D.r,o=DR3D.o,m=DR3D.m,sc=DR3D.sc;
   /* resolusi render mengikuti ukuran di layar */
   var res=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*(DR3D.scale||1)*Math.min(2,DPR||1)*1.2/32)*32));
-  if(res!==DR3D.res){DR3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);}
+  if(res!==DR3D.res){DR3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);DR3D.dirty=true;}
 
   /* kecepatan (px/ms) dari posisi frame sebelumnya; loncatan/jeda panjang = reset */
   var dt=now-DR3D.pt,vx=0,vy=0,sp=0;
@@ -287,7 +339,13 @@ function dr3dUpdate(now,x,y,col){
     o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*fall*DR3D_CFG.light*DR3D_CFG.glowK;
   }catch(eL){}
   var lk=DR3D_CFG.light*DR3D_CFG.glowK;o.rim.intensity=1.1*lk;o.hemi.intensity=.45*lk;o.fill.intensity=.55*lk;
-  r.render(sc,DR3D.cam);
+  /* render GPU dibatasi (minDt); hasil disalin ke kanvas 2D kecil supaya frame yang dilewati tinggal drawImage (isi buffer WebGL tidak dijamin utuh antar frame) */
+  if(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt){
+    r.render(sc,DR3D.cam);
+    if(!DR3D.c2||DR3D.c2.width!==res){DR3D.c2=document.createElement('canvas');DR3D.c2.width=DR3D.c2.height=res;DR3D.x2=DR3D.c2.getContext('2d');}
+    DR3D.x2.clearRect(0,0,res,res);DR3D.x2.drawImage(r.domElement,0,0);
+    DR3D.lastR=now;DR3D.dirty=false;
+  }
 }
 
 /* Dipanggil dari drawDrone() (08-tx-drone.js). true = drone 3D sudah digambar (2D dilewati); false = pakai drone 2D. */
@@ -307,7 +365,7 @@ function drone3dDraw(g,x,y,col,a,now,sc){
     g.fillStyle='rgba('+col+','+Math.min(1,.14*a*hk)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();}
     g.globalAlpha=a>1?1:(a<0?0:a);
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-    g.drawImage(DR3D.r.domElement,x-S/2,y-S/2,S,S);
+    g.drawImage(DR3D.c2||DR3D.r.domElement,x-S/2,y-S/2,S,S);
     g.restore();
     return true;
   }catch(e){
