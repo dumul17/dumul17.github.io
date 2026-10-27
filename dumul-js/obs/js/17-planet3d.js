@@ -723,7 +723,7 @@ function pl3dFxOn(){var C=PL3D_CFG,F=PL3D.fx;return !!(C.auroraOn||C.flareOn||C.
    Lapisan: 0 = kabut lebar tipis (tanpa sinar), 1 = tirai utama (sinar vertikal lembut), 2 = tirai kedua lebih pendek (potato: tanpa lapisan 2).
    Warna dari palette hidup: bawah = atm geser hue +38 (lebih terang), tengah = atm, atas = atm geser hue -32 (lebih gelap). Tepi bawah memudar SEDIKIT ke dalam atmosfer (tidak ada garis keras di limb). */
 var PL3D_AUR=[   /* s = sprite (0 kabut, 1 tirai), H = tinggi relatif x Hb, lift = px di atas limb, a = alpha relatif, ry = kekuatan sinar 0..1, k/w/ph + k2/w2/ph2 = dua gelombang tinggi (siklus selebar layar, rad/dtk, fase) */
-  {s:0,H:2.1,lift:0,a:.38,ry:0,k:1.3,w:.12,ph:0,k2:2.6,w2:-.10,ph2:1.3},
+  {s:0,H:1.5,lift:0,a:.38,ry:0,k:1.3,w:.12,ph:0,k2:2.6,w2:-.10,ph2:1.3},   /* H 2.1->1.5: 40% atas sprite kabut alpha-nya ~0 tapi tetap kena biaya blit */
   {s:1,H:1.1,lift:0,a:1,ry:1,k:2.1,w:.22,ph:.7,k2:3.7,w2:-.15,ph2:1.3},
   {s:1,H:.75,lift:8,a:.55,ry:1,k:3.3,w:-.17,ph:2.1,k2:5.1,w2:.2,ph2:.4}];
 function pl3dHue(c,deg){   /* putar hue rgb 0..1 (matriks YIQ standar) */
@@ -750,10 +750,11 @@ function pl3dAurSpr(F){   /* 2 sprite gradient vertikal 1x64 (kabut, tirai); ata
   F.aurKey=key;F.aurSp=sp;return sp;
 }
 function pl3dAurEnv(x,lx){var t=(Math.abs(x-lx)/PW-.08)/.6;t=t<0?0:(t>1?1:t);return t*t*(3-2*t);}   /* 0 di dekat cahaya, 1 di sisi gelap (transisi lebar = tidak ada batas tegas) */
-var PL3D_AUR_SC=.5;   /* skala kanvas offscreen terhadap layar */
+var PL3D_AUR_SC=.5;
+var PL3D_AUR_HK=1;   /* pengali tinggi semua lapisan aurora. .8 = 20% lebih pendek (blit + bake lebih murah). 1 = default */   /* skala kanvas offscreen terhadap layar */
 function pl3dAurBake(F,A){
   var gm=F.gm,SC=PL3D_AUR_SC,W=F.aurCv.width,Hh=F.aurCv.height,c=F.aurCx,sp=pl3dAurSpr(F),pot=F.pot,st=pot?4:2,N=Math.ceil(PW/st),
-      nL=pot?2:3,Hb=Math.min(150,.15*Math.max(PW,PH)),t=F.t*.001,TP=6.2832/PW,lx=F.lx,cw=st*SC,yMin=1e9,yMax=-1e9,
+      nL=pot?2:3,Hb=PL3D_AUR_HK*Math.min(150,.15*Math.max(PW,PH)),t=F.t*.001,TP=6.2832/PW,lx=F.lx,cw=st*SC,yMin=1e9,yMax=-1e9,
       rk1=6.2832/30,rk2=6.2832/17,i,j,x,L,m,ray,a1,b1,al,h,yb,env,mm,lay,R;
   c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,W,Hh);c.globalCompositeOperation='lighter';c.globalAlpha=1;
   for(i=0;i<nL;i++){
@@ -776,7 +777,7 @@ function pl3dAurBake(F,A){
   c.globalAlpha=1;
   F.aurB0=Math.max(0,Math.floor(yMin*SC)-1);F.aurB1=Math.min(Hh,Math.ceil(yMax*SC)+1);
   if(!(F.aurB1>F.aurB0)){F.aurB0=0;F.aurB1=0;}
-  F.aurG={cx:gm.cx,cy:gm.cy,R:gm.R};F.aurR=F.t;
+  F.aurG={cx:gm.cx,cy:gm.cy,R:gm.R};F.aurR=F.t;F.aurLx=lx;
 }
 function pl3dFxAurora(g,F){
   var C=PL3D_CFG,P=F.pal,gm=F.gm,ba=g.globalAlpha,SC=PL3D_AUR_SC;
@@ -789,8 +790,9 @@ function pl3dFxAurora(g,F){
     F.aurCv=document.createElement('canvas');F.aurCv.width=W;F.aurCv.height=Hh;F.aurCx=F.aurCv.getContext('2d');F.aurG=null;
   }
   if(!F.aurCx)return;
-  var afps=F.pot?12:22;
-  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||F.t-F.aurR>=1000/afps)pl3dAurBake(F,A);
+  /* bake jarang: sinar bergeser cuma ~1.5 px/dtk, jadi 5-6x/dtk sudah tak terlihat beda dari 22x/dtk. Paksa bake ulang kalau radius berubah atau cahaya (portal/BH) bergeser >12px (batas terang-gelap ikut). Blit tetap tiap frame. */
+  var aIv=F.pot?300:180;
+  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||F.t-F.aurR>=aIv)pl3dAurBake(F,A);
   if(F.aurB1<=F.aurB0)return;
   var dx=gm.cx-F.aurG.cx,dy=gm.cy-F.aurG.cy;   /* parallax murni = geser: aurora tetap menempel di limb walau bake lebih jarang dari frame */
   g.globalAlpha=ba*F.aur;
