@@ -764,14 +764,62 @@ var PX={sky:0,lines:0,stars:0,pulse:0,ast:0,hole:0,all:0,pa:0,pw:0,pb:0,slow:0};
 var PX_MODES=['normal','panel HIDDEN','asteroid OFF','bintang OFF','SEMUA OFF (loop kosong)'];
 /* override style inline pada #music-player untuk diagnosa biaya render panel (dikembalikan ke '' tiap ganti mode) */
 var PX_PANEL={'panel HIDDEN':{visibility:'hidden'},'panel OPAQUE':{background:'#040a10'},'panel NO-CLIP':{overflow:'visible',contain:'none',borderRadius:'0'},'panel NO-WILLCHANGE':{willChange:'auto'},'panel NO-SHADOW':{boxShadow:'none'}};
-var PERF=false;try{PERF=/[?&]perf=1(&|$)/.test(location.search)||localStorage.getItem('dumul_perf')==='1';}catch(ePf){}
+var PERF=false;try{PERF=/[?&](perf|probe)=1(&|$)/.test(location.search)||localStorage.getItem('dumul_perf')==='1';}catch(ePf){}
 var PP={fs:0,t0:0,last:0,cur:{},tot:{},n:0,isum:0,jsum:0,jank:0,ev:[],el:null,upd:0,pnl:null,imax:0};
+/* PROBE OTOMATIS (?probe=1, otomatis menyalakan PERF): masuk sektor -> tunggu 3 dtk -> tiap langkah mematikan SATU komponen, ukur interval frame asli
+   (1,5 dtk settle + 4 dtk ukur), lalu tampilkan tabel dampak tiap komponen ke fps. Semua config dikembalikan di akhir. Cuma jalan di mode PERF; nol biaya di luar itu. */
+var PROBE={arm:false,on:false,done:false,i:0,t0:0,sum:0,n:0,js:0,res:[],el:null,S:null,inS:0,txu:0};
+try{PROBE.arm=/[?&]probe=1(&|$)/.test(location.search);}catch(ePr){}
+var PROBE_STEPS=[
+  ['normal',function(){}],
+  ['aurora OFF',function(){PL3D_CFG.auroraOn=false;}],
+  ['efek planet OFF (4 efek)',function(){var C=PL3D_CFG;C.auroraOn=C.flareOn=C.debrisOn=C.boltOn=false;}],
+  ['rotasi planet OFF (rotK=0)',function(){PL3D_CFG.rotK=0;}],
+  ['drone 3D OFF',function(){DR3D_CFG.on=false;}],
+  ['PLANET OFF total',function(){PL3D_CFG.on=false;}],
+  ['asteroid OFF',function(){PX.ast=1;}],
+  ['bintang OFF',function(){PX.stars=1;}],
+  ['garis rasi OFF',function(){PX.lines=1;}],
+  ['SEMUA OFF (loop kosong)',function(){PX.all=1;}],
+  ['normal (ulang)',function(){}]];
+function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true)};}
+function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;}
+function probeShow(t){
+  if(!PROBE.el){var d=document.createElement('pre');d.style.cssText='position:fixed;left:4px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:99998;margin:0;padding:4px 6px;font:9px/1.25 monospace;color:#ffd27f;background:rgba(0,0,0,.8);pointer-events:none;white-space:pre';document.body.appendChild(d);PROBE.el=d;}
+  PROBE.el.textContent=t;
+}
+function probeBegin(now){var st=PROBE_STEPS[PROBE.i];probeRestore();try{st[1]();}catch(e){}PROBE.t0=now;PROBE.sum=PROBE.n=PROBE.js=0;}
+function probeTick(now,iv,js){
+  if(!PROBE.arm||PROBE.done)return;
+  var inSec=!!(typeof SECT!=='undefined'&&SECT.cur&&!SECT.on&&typeof PL3D_CFG!=='undefined');
+  if(!PROBE.on){
+    if(now<12000||!inSec){PROBE.inS=0;return;}
+    if(!PROBE.inS)PROBE.inS=now;
+    if(now-PROBE.inS<3000)return;
+    probeSave();PROBE.on=true;PROBE.i=0;PROBE.res=[];probeBegin(now);return;
+  }
+  if(!inSec&&PROBE.i<PROBE_STEPS.length-1&&!PX.all){PROBE.on=false;PROBE.inS=0;probeRestore();probeShow('PROBE dibatalkan (keluar sektor). Masuk sektor lagi, otomatis mulai ulang.');return;}
+  var el=now-PROBE.t0;
+  if(el>1500&&iv>0&&iv<1000){PROBE.sum+=iv;PROBE.n++;PROBE.js+=js;}
+  if(now-PROBE.txu>400){PROBE.txu=now;probeShow('PROBE '+(PROBE.i+1)+'/'+PROBE_STEPS.length+'  '+PROBE_STEPS[PROBE.i][0]+'\n(jangan sentuh layar, ~'+Math.max(0,Math.round(((PROBE_STEPS.length-PROBE.i)*5.5)-el/1000))+' dtk lagi)');}
+  if(el>=5500){
+    PROBE.res.push([PROBE_STEPS[PROBE.i][0],PROBE.n?PROBE.sum/PROBE.n:0,PROBE.n?PROBE.js/PROBE.n:0]);
+    PROBE.i++;
+    if(PROBE.i>=PROBE_STEPS.length){
+      probeRestore();PROBE.done=true;PROBE.on=false;
+      var R=PROBE.res,b=(R[0][1]+R[R.length-1][1])/2,tx='PROBE selesai (base int '+b.toFixed(1)+'ms = '+(1000/b).toFixed(0)+'fps)\n',k,r,f;
+      for(k=0;k<R.length;k++){r=R[k];f=1000/r[1];tx+=(r[0]+'                                        ').slice(0,30)+' '+r[1].toFixed(1)+'ms '+f.toFixed(0)+'fps '+(f>=1000/b?'+':'')+(f-1000/b).toFixed(1)+'  js'+r[2].toFixed(1)+'\n';}
+      probeShow(tx);
+    }else probeBegin(now);
+  }
+}
+
 function pmk(n){if(!PERF)return;var t=performance.now();PP.cur[n]=(PP.cur[n]||0)+(t-PP.t0);PP.t0=t;}
 function pBegin(){if(!PERF)return;PP.fs=PP.t0=performance.now();PP.cur={};AST_DRAWN=0;}
 function pEnd(now){
   if(!PERF)return;
   pmk('end');
-  var js=performance.now()-PP.fs,iv=PP.last?now-PP.last:0;PP.last=now;PP.ad=AST_DRAWN;
+  var js=performance.now()-PP.fs,iv=PP.last?now-PP.last:0;PP.last=now;PP.ad=AST_DRAWN;try{probeTick(now,iv,js);}catch(ePt){}
   if(iv>0&&iv<1000){
     PP.n++;PP.isum+=iv;PP.jsum+=js;if(iv>PP.imax)PP.imax=iv;
     for(var k in PP.cur)PP.tot[k]=(PP.tot[k]||0)+PP.cur[k];
