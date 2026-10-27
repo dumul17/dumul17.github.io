@@ -120,6 +120,7 @@ function smenuBuild(){
   a.addEventListener('pointercancel',smenuUp,true);
   a.addEventListener('click',function(e){
     e.stopPropagation();
+    if(performance.now()-SMENU.t<350){e.preventDefault();return;}   /* klik susulan dari tap yang MEMBUKA window (pointerup di 06-interaction.js -> menu muncul -> browser kirim click ke elemen di bawah jari, mis. tombol MASUK): abaikan semua target, bukan cuma backdrop */
     var t=e.target,b=t.closest&&t.closest('[data-a]'),k=b&&b.getAttribute('data-a');
     if(!b){   /* tap di luar kartu = tutup (abaikan klik susulan dari tap yang membuka window) */
       if(!(t.closest&&t.closest('.sm-card'))&&performance.now()-SMENU.t>350)smenuClose();
@@ -268,7 +269,7 @@ function smenuKey(e){
   if(k==='Escape'){e.preventDefault();smenuClose();}
   else if(k==='ArrowLeft'){e.preventDefault();smenuGo(SMENU.idx-1,true);}
   else if(k==='ArrowRight'){e.preventDefault();smenuGo(SMENU.idx+1,true);}
-  else if(k==='Enter'&&!(e.target&&e.target.tagName==='BUTTON')){e.preventDefault();smenuEnter();}
+  else if(k==='Enter'&&!(e.target&&e.target.tagName==='BUTTON')){e.preventDefault();if(!e.repeat&&performance.now()-SMENU.t>350)smenuEnter();}   /* Enter yang membuka menu (link keyboard) jangan ikut memicu MASUK */
   else if(k==='Tab'){   /* jebakan fokus sederhana */
     var f=[].slice.call(a.querySelectorAll('button:not([disabled]),input:not([disabled])')),first=f[0],last=f[f.length-1];
     if(!f.length)return;

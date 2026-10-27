@@ -59,6 +59,8 @@ var PL3D_CFG={
   rimLit:1,       /* rim glow condong ke sisi yang kena cahaya (BH mini / portal) + hangat sedikit. 0 = rata seperti dulu, 1 = penuh, 2 = lebih ekstrem */
   rimHalo:.45,    /* halo lebar tipis di luar limb (x opasitas atmosfer); 0 = tanpa halo */
   cloudDrift:4,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
+  cloudDMax:20000,   /* daur ulang awan: total geseran awan (px) yang boleh menumpuk sebelum awan memudar, posisi di-reset kecil, lalu muncul lagi (±3 dtk keluar + ±3 dtk masuk). Koordinat noise di shader tidak boleh tumbuh tanpa batas: makin besar, presisi float32 hilang -> tekstur jadi strip lurus. 4 px/dtk = ±83 menit per siklus, 20 px/dtk = ±17 menit. 0 = tanpa daur ulang (perilaku lama) */
+  phMax:20000,    /* batas fase permukaan tanah (px) sebelum di-reset ke 0, dilakukan hanya saat overview (bobot sektor 0). Cuma relevan kalau rotK != 0. 0 = tanpa batas */
   cloudShd:.5,    /* bayangan awan di tanah, jatuh menjauhi cahaya (0 = tanpa bayangan) */
   cityA:1.1,      /* kecerahan lampu kota di sisi gelap (0 = mati) */
   cityD:.55,      /* kepadatan lampu kota di area permukiman 0..1 */
@@ -126,7 +128,25 @@ function pl3dPhase(now){
   dt=Math.max(0,Math.min(100,now-PL3D.phT));
   if(now>PL3D.phT)PL3D.phT=now;
   if(!rd)PL3D.ph+=dt*.001*PL3D_CFG.live.rot*PL3D_CFG.rotK;
+  if(PL3D_CFG.phMax>0&&Math.abs(PL3D.ph)>PL3D_CFG.phMax&&PL3D.secW<=.001)PL3D.ph=0;   /* fase tumbuh tanpa batas = presisi float32 hilang di shader (strip lurus); reset di overview supaya lompatan pola tidak terlihat di sektor */
   return PL3D.ph;
+}
+/* jam awan: geseran awan (px) DIINTEGRASI (ganti slider Drift tidak membuat awan melompat) dan dibatasi. Lewat batas cloudDMax: faktor opasitas turun ke 0, geseran di-reset ke nilai kecil yang berbeda tiap siklus (pola awan beda), lalu naik lagi.
+   Dipanggil dari pl3dUniforms (bisa lebih dari sekali per `now`, aman: dt = 0). Hasil: [geseran px, faktor opasitas 0..1 (smoothstep)] */
+function pl3dCloud(now){
+  var C=PL3D_CFG,rd=(typeof reduce!=='undefined'&&reduce),dt,mx=C.cloudDMax;
+  if(PL3D.cT==null){PL3D.cT=now;PL3D.cd=0;PL3D.cf=1;PL3D.cm=0;PL3D.cn=0;}
+  dt=Math.max(0,Math.min(1000,now-PL3D.cT));   /* uniform diperbarui ±4x/dtk saja (render periodik), jadi batas dt jangan sekecil pl3dPhase */
+  if(now>PL3D.cT)PL3D.cT=now;
+  if(!rd)PL3D.cd+=dt*.001*C.cloudDrift;
+  if(!(mx>0)){PL3D.cm=0;PL3D.cf=1;}
+  else{
+    if(PL3D.cm===0&&Math.abs(PL3D.cd)>mx)PL3D.cm=1;
+    if(PL3D.cm===1){PL3D.cf-=dt/3000;if(PL3D.cf<=0){PL3D.cf=0;PL3D.cn++;PL3D.cd=((PL3D.cn*1597)%4093)*(C.cloudDrift<0?-1:1);PL3D.cm=2;}}   /* pop posisi terjadi saat awan & bayangannya 0% */
+    else if(PL3D.cm===2){PL3D.cf+=dt/3000;if(PL3D.cf>=1){PL3D.cf=1;PL3D.cm=0;}}
+  }
+  var f=Math.max(0,Math.min(1,PL3D.cf));
+  return [PL3D.cd,f*f*(3-2*f)];
 }
 /* librasi: offset horizon (pecahan tinggi layar) kiri/kanan pada waktu sekarang. Diredam bobot sektor (PL3D.secW, 0 di overview). Waktu = jam fase (PL3D.phT) */
 function pl3dLib(){
@@ -244,7 +264,7 @@ var PL3D_FS=[
   'uniform vec2 uLight;uniform float uFall;uniform vec3 uWarm;',
   'uniform vec3 uLo;uniform vec3 uMid;uniform vec3 uHi;uniform vec3 uAtm;uniform float uAtmA;',
   'uniform vec2 uSeed;uniform float uLod;uniform float uFadeS;uniform float uHazeA;uniform float uCloudCov;uniform float uCloudH;uniform float uCloud;uniform float uPhi0;uniform float uFx;uniform float uPer;uniform float uHaze;uniform float uRock;',
-  'uniform float uT;uniform float uCDrift;uniform float uShd;uniform float uRimLit;uniform float uRimHalo;uniform float uCityA;uniform float uCityD;uniform float uCityTw;uniform float uCrat;uniform float uCany;uniform float uCratS;uniform float uCanyS;',
+  'uniform float uT;uniform float uCDrift;uniform float uCOff;uniform float uShd;uniform float uRimLit;uniform float uRimHalo;uniform float uCityA;uniform float uCityD;uniform float uCityTw;uniform float uCrat;uniform float uCany;uniform float uCratS;uniform float uCanyS;',
   'uniform float uCloudLit;uniform float uCloudDet;uniform float uCityGlow;uniform vec4 uBolt;uniform float uBoltAsp;',
   'uniform sampler2D uNoise;',
   /* value noise 2D: 1 fetch, f di-smooth lalu bilinear hardware = interpolasi smoothstep */
@@ -331,7 +351,7 @@ var PL3D_FS=[
   '  return tn;',
   '}',
   'float cloudAt(float u,float s){',
-  '  vec2 G=vec2(u+uT*uCDrift,uPer)/s*uFx;',
+  '  vec2 G=vec2(u+uCOff,uPer)/s*uFx;',
   '  float pv=s*s/(uPer*uFx);',
   '  vec2 Gs=G*vec2(.34,.50);float pvs=pv/.50;',
   '  vec2 wp=vec2(vn2(Gs*.7+vec2(5.2,1.3)+uSeed),vn2(Gs*.7+vec2(8.3,2.8)+uSeed))-.5;',
@@ -509,7 +529,7 @@ function pl3dBuild(){
     uLo:{value:new T.Vector3(P.lo[0],P.lo[1],P.lo[2])},uMid:{value:new T.Vector3(P.mid[0],P.mid[1],P.mid[2])},uHi:{value:new T.Vector3(P.hi[0],P.hi[1],P.hi[2])},
     uAtm:{value:new T.Vector3(P.atm[0],P.atm[1],P.atm[2])},uAtmA:{value:P.atmA},
     uSeed:{value:new T.Vector2(PL3D_CFG.live.sx,PL3D_CFG.live.sy)},uCloud:{value:PL3D_CFG.cloud},uPhi0:{value:1.5707963},uFx:{value:1.4},uPer:{value:PL3D_CFG.persp},uHaze:{value:PL3D_CFG.haze},uLod:{value:PL3D_CFG.lod},uFadeS:{value:PL3D_CFG.fadeS},uCloudCov:{value:PL3D_CFG.cloudCov},uCloudH:{value:PL3D_CFG.cloudH},uHazeA:{value:PL3D_CFG.hazeA},uRock:{value:PL3D_CFG.rockD},uNoise:{value:ntex},
-    uT:{value:0},uCDrift:{value:PL3D_CFG.cloudDrift},uShd:{value:PL3D_CFG.cloudShd},uRimLit:{value:PL3D_CFG.rimLit},uRimHalo:{value:PL3D_CFG.rimHalo},uCityA:{value:PL3D_CFG.cityA},uCityD:{value:PL3D_CFG.cityD},uCityTw:{value:PL3D_CFG.cityTw},uCrat:{value:PL3D_CFG.craterA},uCany:{value:PL3D_CFG.canyonA},uCratS:{value:PL3D_CFG.craterS},uCanyS:{value:PL3D_CFG.canyonS},uCloudLit:{value:PL3D_CFG.cloudLit},uCloudDet:{value:PL3D_CFG.cloudDet},uCityGlow:{value:PL3D_CFG.cityGlow},uBolt:{value:new T.Vector4(0,0,1,0)},uBoltAsp:{value:.4}
+    uT:{value:0},uCDrift:{value:PL3D_CFG.cloudDrift},uCOff:{value:0},uShd:{value:PL3D_CFG.cloudShd},uRimLit:{value:PL3D_CFG.rimLit},uRimHalo:{value:PL3D_CFG.rimHalo},uCityA:{value:PL3D_CFG.cityA},uCityD:{value:PL3D_CFG.cityD},uCityTw:{value:PL3D_CFG.cityTw},uCrat:{value:PL3D_CFG.craterA},uCany:{value:PL3D_CFG.canyonA},uCratS:{value:PL3D_CFG.craterS},uCanyS:{value:PL3D_CFG.canyonS},uCloudLit:{value:PL3D_CFG.cloudLit},uCloudDet:{value:PL3D_CFG.cloudDet},uCityGlow:{value:PL3D_CFG.cityGlow},uBolt:{value:new T.Vector4(0,0,1,0)},uBoltAsp:{value:.4}
   };
   PL3D.mat=new T.ShaderMaterial({uniforms:PL3D.uni,vertexShader:PL3D_VS,fragmentShader:PL3D_FS,transparent:false,depthTest:false,depthWrite:false,blending:T.NoBlending});
   var mesh=new T.Mesh(new T.PlaneBufferGeometry(2,2),PL3D.mat);
@@ -581,8 +601,10 @@ function pl3dUniforms(now,nobolt){
   U.uPhi0.value=Math.atan2(Math.sqrt(Math.max(0,gm.R*gm.R-(PW*.5-gm.cx)*(PW*.5-gm.cx))),PW*.5-gm.cx);   /* arah titik horizon di tengah layar = titik hilang perspektif */
   U.uRot.value=pl3dPhase(now)/gm.R;
   U.uSeed.value.set(PL3D_CFG.live.sx,PL3D_CFG.live.sy);
-  U.uHaze.value=PL3D_CFG.haze;U.uHazeA.value=PL3D_CFG.hazeA;U.uCloud.value=PL3D_CFG.cloud;U.uLod.value=PL3D_CFG.lod;U.uFadeS.value=PL3D_CFG.fadeS;U.uCloudCov.value=PL3D_CFG.cloudCov;U.uCloudH.value=PL3D_CFG.cloudH;   /* knob kabut bisa diubah live (console/panel tuning) */
-  U.uT.value=now*.001;U.uCDrift.value=PL3D_CFG.cloudDrift;U.uShd.value=PL3D_CFG.cloudShd;U.uRimLit.value=PL3D_CFG.rimLit;U.uRimHalo.value=PL3D_CFG.rimHalo;
+  var cl=pl3dCloud(now);U.uCOff.value=cl[0];
+  U.uHaze.value=PL3D_CFG.haze;U.uHazeA.value=PL3D_CFG.hazeA;U.uCloud.value=PL3D_CFG.cloud*cl[1];U.uLod.value=PL3D_CFG.lod;U.uFadeS.value=PL3D_CFG.fadeS;U.uCloudCov.value=PL3D_CFG.cloudCov;U.uCloudH.value=PL3D_CFG.cloudH;   /* knob kabut bisa diubah live (console/panel tuning) */
+  U.uT.value=(now*.001)%(Math.PI*2/2.1*100);U.uCDrift.value=PL3D_CFG.cloudDrift;U.uShd.value=PL3D_CFG.cloudShd*cl[1];   /* uT cuma dipakai kedip lampu kota sin(uT*2.1+..): di-mod kelipatan periodenya (seamless) supaya tidak tumbuh */
+  U.uRimLit.value=PL3D_CFG.rimLit;U.uRimHalo.value=PL3D_CFG.rimHalo;
   U.uCityA.value=PL3D_CFG.cityA;U.uCityD.value=PL3D_CFG.cityD;U.uCityTw.value=PL3D_CFG.cityTw;U.uCrat.value=PL3D_CFG.craterA;U.uCany.value=PL3D_CFG.canyonA;U.uCratS.value=Math.max(.2,PL3D_CFG.craterS);U.uCanyS.value=Math.max(.2,PL3D_CFG.canyonS);   /* knob dekorasi, bisa diubah live */
   U.uLight.value.set(bp[0],PH-bp[1]+gm.bo);
   U.uCloudLit.value=PL3D_CFG.cloudLit;U.uCloudDet.value=PL3D_CFG.cloudDet;U.uCityGlow.value=PL3D_CFG.cityGlow;
