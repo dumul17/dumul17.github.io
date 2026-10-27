@@ -824,6 +824,7 @@ function probeTick(now,iv,js){
   }
   probeShow(tx);
 }
+function pmk(n){if(!PERF)return;var t=performance.now();PP.cur[n]=(PP.cur[n]||0)+(t-PP.t0);PP.t0=t;}
 function pBegin(){if(!PERF)return;PP.fs=PP.t0=performance.now();PP.cur={};AST_DRAWN=0;}
 function pEnd(now){
   if(!PERF)return;
