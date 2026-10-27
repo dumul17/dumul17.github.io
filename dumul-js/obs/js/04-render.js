@@ -1190,7 +1190,8 @@ var AST_DRAWN=0;   /* jumlah batu yang benar-benar di-drawImage pada frame ini (
 function drawAsteroids(now,half){
   if(!AST.length||!AST_CFG.on||(typeof PX!=='undefined'&&PX.ast))return;
   half=half|0;
-  if(half<=0||AST._stamp!==now)astStep(now);
+  var rp=(typeof ast3dReuse==='function')?ast3dReuse(now,half):0;   /* 12-ast3d.js: 1 = pakai cache (astStep + GL dilewati), 2 = render tanpa astStep (pass depan gantian dgn belakang), 0 = normal */
+  if(rp===0&&(half<=0||AST._stamp!==now))astStep(now);
   if(half>0&&AST_RING_LAST)return;   /* cincin limb: nggak ada batu depan */
   if(typeof ast3dDraw==='function'&&ast3dDraw(now,half))return;   /* batu 3D (12-ast3d.js, lazy); false = sprite 2D di bawah */
   var sprites=ensureAsteroidSprites(),bsp=sprites.back;

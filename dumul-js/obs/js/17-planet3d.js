@@ -5,6 +5,7 @@
    Cara kerja: satu renderer WebGL offscreen kecil (strip bawah layar, setengah resolusi) merender satu quad; fragment shader menghitung bola
    secara analitik (permukaan = noise prosedural, bukan tekstur), lalu hasilnya disalin ke kanvas 2D (cv2) dan di-drawImage tiap frame.
    Cahaya = sama dengan asteroid (12-ast3d.js): lampu titik di posisi BH (camBH()), hangat, meredup menurut jarak.
+   RENDER DIPECAH: tiap refresh strip dibagi PL3D_CFG.bands pita, 1 pita per frame (scissor, kanvas belakang cv3, tukar saat selesai) -> tidak ada lonjakan GPU. Petir: render parsial cuma kotak kecil di sekitar kilau (pl3dBoltWin).
    Gagal apa pun (WebGL mati / shader error / context lost / potato / reduce motion) -> strip 2D statis (fallback), tanpa error.
    Matikan total: ?planet3d=0 atau localStorage dumul_planet3d=0.  Paksa fallback 2D (untuk tes): ?planet3d=2d atau localStorage dumul_planet3d=2d.
    P1: bola + tanah berperspektif + batu mesh, satu palette. P3: parallax kecil dari skyPan (+ springback otomatis), zoom ringan, landscape ROT (planet tetap di dasar layar NYATA),
@@ -32,7 +33,8 @@ var PL3D_CFG={
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:2,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
-  fps:4,          /* render ulang maks per detik; rotasi cuma 0.5 px/dtk jadi 4 fps tak terlihat bedanya. Gerak cahaya BH punya trigger sendiri di planet3dDraw */
+  fps:8,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
+  bands:4,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
   ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
       hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:0,seed:[0,0]},   /* geometri OVERVIEW (rot 0 = planet DIAM di overview; langit yang berputar, lihat MW di 02-sky-logic.js): kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */
@@ -86,7 +88,7 @@ try{
   if(_pq==='0')PL3D_CFG.on=false;else if(_pq==='2d')PL3D_CFG.force2d=true;
 }catch(ePL0){}
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
-  rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0};
+  rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0,cv3:null,c3:null,cyc:null,full:true,bwR:null};
 
 /* ---- palette (P2) ----
    Bobot per sektor = SKYT[k].v (04-render.js; sudah diperhalus .06/frame di sectDrawSky, 1 = sedang di sektor itu, semua 0 = overview).
@@ -164,7 +166,7 @@ function pl3dPalSnap(){   /* catat palette yang barusan dirender / dibake */
 }
 
 function pl3dFail(why){
-  PL3D.state=3;PL3D.err=String(why||'');PL3D.dirty=true;PL3D.fb=null;
+  PL3D.state=3;PL3D.err=String(why||'');PL3D.dirty=true;PL3D.fb=null;PL3D.cyc=null;PL3D.bwR=null;
   try{console.warn('[planet3d] fallback ke strip 2D:',PL3D.err);}catch(e){}
 }
 
@@ -556,6 +558,8 @@ function pl3dResize(){
   PL3D.W=PW;PL3D.H=PH;PL3D.rw=rw;PL3D.rh=rh;PL3D.stripH=gm.stripH;PL3D.dirty=true;
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
   PL3D.cv2.width=rw;PL3D.cv2.height=rh;
+  if(!PL3D.cv3){PL3D.cv3=document.createElement('canvas');PL3D.c3=PL3D.cv3.getContext('2d');}   /* kanvas belakang: pita dirender ke sini, ditukar ke cv2 saat siklus selesai */
+  PL3D.cv3.width=rw;PL3D.cv3.height=rh;PL3D.cyc=null;PL3D.full=true;PL3D.bwR=null;   /* ukuran berubah: render penuh sekali jalan dulu */
   PL3D.fb=null;
   if(PL3D.r){PL3D.r.setSize(rw,rh,false);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
 }
@@ -567,7 +571,7 @@ function pl3dLightPos(){
   if(!p)p=camBH();
   return pl3dScr(p[0],p[1]);
 }
-function pl3dUniforms(now){
+function pl3dUniforms(now,nobolt){
   pl3dSync();
   var gm=pl3dGeom(false,false,true),U=PL3D.uni,bp=pl3dLightPos();   /* geometri RENDER tanpa ayunan; ayunan = transformasi saat drawImage */
   U.uSize.value.set(PW,gm.stripH);
@@ -582,7 +586,7 @@ function pl3dUniforms(now){
   U.uCityA.value=PL3D_CFG.cityA;U.uCityD.value=PL3D_CFG.cityD;U.uCityTw.value=PL3D_CFG.cityTw;U.uCrat.value=PL3D_CFG.craterA;U.uCany.value=PL3D_CFG.canyonA;U.uCratS.value=Math.max(.2,PL3D_CFG.craterS);U.uCanyS.value=Math.max(.2,PL3D_CFG.canyonS);   /* knob dekorasi, bisa diubah live */
   U.uLight.value.set(bp[0],PH-bp[1]+gm.bo);
   U.uCloudLit.value=PL3D_CFG.cloudLit;U.uCloudDet.value=PL3D_CFG.cloudDet;U.uCityGlow.value=PL3D_CFG.cityGlow;
-  var bu=PL3D.bu;if(bu&&bu.a>.002){U.uBolt.value.set(bu.x,PH-bu.y+gm.bo,bu.r,bu.a);U.uBoltAsp.value=bu.asp;}else U.uBolt.value.w=0;   /* kilat aktif: posisi (ruang layar tegak -> strip), jari-jari x, kekuatan; elips tinggi = x asp */
+  var bu=PL3D.bu;if(bu&&bu.a>.002&&!nobolt){U.uBolt.value.set(bu.x,PH-bu.y+gm.bo,bu.r,bu.a);U.uBoltAsp.value=bu.asp;}else U.uBolt.value.w=0;   /* kilat aktif: posisi (ruang layar tegak -> strip), jari-jari x, kekuatan; elips tinggi = x asp */
   PL3D.bo=gm.bo;PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;   /* parallax/zoom yang baru dirender: selisihnya ke posisi sekarang digeser saat drawImage */
   pl3dPalUpdate();var P=PL3D_CFG.pal;   /* palette hidup (crossfade sektor) */
   U.uLo.value.set(P.lo[0],P.lo[1],P.lo[2]);U.uMid.value.set(P.mid[0],P.mid[1],P.mid[2]);U.uHi.value.set(P.hi[0],P.hi[1],P.hi[2]);
@@ -628,6 +632,53 @@ function pl3dRocks(gm){
     v.S.updateRange.offset=0;v.S.updateRange.count=v.n;v.S.needsUpdate=true;
     v.mesh.visible=v.n>0;
   }
+}
+
+/* ---- RENDER DIPECAH (anti-lonjakan GPU) ----
+   Satu refresh strip = `bands` pita horizontal, 1 pita per frame (gl scissor). Uniform + batu dibekukan di awal siklus, jadi semua pita sama waktu/cahaya/palette.
+   Hasil ditulis ke kanvas belakang (cv3); setelah pita terakhir, cv2 <-> cv3 ditukar -> yang tampil selalu satu gambar utuh (tanpa sambungan antar pita). */
+function pl3dCycleStart(now,lx,ly,nb){
+  var pv={x:PL3D.rox,y:PL3D.roy,f:PL3D.rf};   /* parallax yang sedang TAMPIL di cv2 */
+  pl3dRocks(pl3dUniforms(now,true));
+  PL3D.cyc={t:now,i:0,n:nb,rox:PL3D.rox,roy:PL3D.roy,rf:PL3D.rf};
+  PL3D.rox=pv.x;PL3D.roy=pv.y;PL3D.rf=pv.f;   /* offset baru baru berlaku saat tukar buffer */
+  PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;
+}
+function pl3dCycleStep(){
+  var c=PL3D.cyc,r=PL3D.r,rw=PL3D.rw,rh=PL3D.rh,n=c.n,k=c.i,y0=Math.round(rh*k/n),y1=Math.round(rh*(k+1)/n),h=y1-y0,t;
+  if(h>0){
+    PL3D.uni.uBolt.value.w=0;   /* kilau petir TIDAK dibake ke dasar; petir punya jendela sendiri (pl3dBoltWin) */
+    r.setScissorTest(true);r.setScissor(0,rh-y1,rw,h);   /* y scissor dari BAWAH */
+    r.render(PL3D.sc,PL3D.cam);
+    r.setScissorTest(false);
+    PL3D.c3.clearRect(0,y0,rw,h);
+    PL3D.c3.drawImage(r.domElement,0,y0,rw,h,0,y0,rw,h);
+  }
+  if(++c.i>=n){
+    t=PL3D.cv2;PL3D.cv2=PL3D.cv3;PL3D.cv3=t;t=PL3D.c2;PL3D.c2=PL3D.c3;PL3D.c3=t;
+    PL3D.rox=c.rox;PL3D.roy=c.roy;PL3D.rf=c.rf;PL3D.cyc=null;PL3D.renders++;
+  }
+}
+/* PETIR: render ulang cuma kotak kecil di sekitar kilau (shader yang sama, uniform terakhir), ditimpa ke cv2 yang sedang tampil. Kilat berakhir -> kotak yang sama
+   dirender sekali lagi tanpa kilau (mengembalikan dasar). Dipanggil SETELAH langkah siklus di frame yang sama, jadi tukar buffer tidak menghapus kilau. */
+function pl3dBoltWin(){
+  var bu=PL3D.bu,U=PL3D.uni,r=PL3D.r,act=!!(bu&&bu.a>.002),W=PL3D.bwR,q=PL3D_CFG.q,rw=PL3D.rw,rh=PL3D.rh,cy,hx,hy,x0,y0,x1,y1,w,h;
+  if(!r||!U||!PL3D.c2||(!act&&!W))return;
+  if(act){
+    cy=PH-bu.y+(PL3D.bo||0);hx=bu.r*2.2+2;hy=bu.r*bu.asp*2.2+2;   /* exp(-1.7*d^2) < .001 di d = 2.2 */
+    x0=(bu.x-hx)*q;x1=(bu.x+hx)*q;y0=(cy-hy)*q;y1=(cy+hy)*q;
+    if(W){x0=Math.min(x0,W[0]);y0=Math.min(y0,W[1]);x1=Math.max(x1,W[2]);y1=Math.max(y1,W[3]);}
+    PL3D.bwR=[x0,y0,x1,y1];
+    U.uBolt.value.set(bu.x,cy,bu.r,bu.a);U.uBoltAsp.value=bu.asp;
+  }else{x0=W[0];y0=W[1];x1=W[2];y1=W[3];PL3D.bwR=null;U.uBolt.value.w=0;}
+  x0=Math.max(0,Math.floor(x0));y0=Math.max(0,Math.floor(y0));x1=Math.min(rw,Math.ceil(x1));y1=Math.min(rh,Math.ceil(y1));
+  w=x1-x0;h=y1-y0;
+  if(!(w>0&&h>0))return;
+  r.setScissorTest(true);r.setScissor(x0,y0,w,h);
+  r.render(PL3D.sc,PL3D.cam);
+  r.setScissorTest(false);
+  PL3D.c2.clearRect(x0,rh-y1,w,h);
+  PL3D.c2.drawImage(r.domElement,x0,rh-y1,w,h,x0,rh-y1,w,h);
 }
 
 /* fallback 2D: strip dibake sekali (gradien limb + pita noise + rim atmosfer), lalu cuma di-drawImage */
@@ -874,9 +925,9 @@ function pl3dFxBolt(g,F){
       }
     }
   }else if(!B&&!C.boltOn)F.boltNext=null;
-  if(!B){if(bu&&bu.a>0){bu.a=0;PL3D.dirty=true;}return;}
+  if(!B){if(bu&&bu.a>0)bu.a=0;return;}   /* jendela petir (pl3dBoltWin) yang memulihkan dasar */
   B.t+=F.dt*1000;t=B.t;
-  if(t>=280){F.bolt=null;if(bu&&bu.a>0){bu.a=0;PL3D.dirty=true;}return;}
+  if(t>=280){F.bolt=null;if(bu&&bu.a>0)bu.a=0;return;}
   n1=t<90?(t<20?t/20:1-(t-20)/70):0;                                  /* kilau 1: 0..1 */
   n2=(t>=150&&t<240)?((t-150)<20?(t-150)/20:1-(t-170)/70):0;          /* kilau 2 */
   fa=n1*.26+n2*.15;
@@ -887,8 +938,7 @@ function pl3dFxBolt(g,F){
   if(fa*cf>.004){
     if(sh){                                                            /* 3D: shader menyalakan awan; render ulang tiap frame selama kilau */
       bu=PL3D.bu||(PL3D.bu={x:0,y:0,r:1,a:0,asp:.4});
-      bu.x=B.cx;bu.y=B.fy;bu.r=B.r;bu.asp=B.asp;bu.a=fa*cf*hzf*4;
-      PL3D.dirty=true;
+      bu.x=B.cx;bu.y=B.fy;bu.r=B.r;bu.asp=B.asp;bu.a=fa*cf*hzf*4;   /* render ulang cuma kotak kecil di sekitar kilau (pl3dBoltWin), bukan seluruh strip */
     }else if(fa*cf>.01){                                               /* fallback 2D: elips gradien di bidang tanah, dipotong ke bola planet (+14px atmosfer) */
       g.save();g.beginPath();g.arc(gm.cx,gm.cy,gm.R+14,0,6.2832);g.clip();
       r=B.r;g.translate(B.cx,B.fy);g.scale(1,B.asp);
@@ -897,7 +947,7 @@ function pl3dFxBolt(g,F){
       g.globalAlpha=ba;g.fillStyle=gr;g.fillRect(-r,-r,r*2,r*2);
       g.restore();
     }
-  }else if(bu&&bu.a>0){bu.a=0;PL3D.dirty=true;}
+  }else if(bu&&bu.a>0)bu.a=0;
   if(la>.01){
     u=Math.min(1,t/40);np=Math.max(2,Math.ceil(u*B.P.length/2));      /* jalur tumbuh 40ms */
     pw=Math.pow(B.ps,.6);                                              /* tebal garis ikut kedalaman (lebih halus dari ukuran, supaya yang jauh tidak hilang) */
@@ -973,20 +1023,29 @@ function planet3dDraw(now){
       var lMv=Math.abs(lx-PL3D.lastLx)+Math.abs(ly-PL3D.lastLy);
       var settle=!!PL3D.wasCh&&!palCh;PL3D.wasCh=palCh;
       var due=PL3D.dirty||(!still&&(rotMov||animOn)&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
-      if(due){
-        pl3dRocks(pl3dUniforms(now));
-        PL3D.r.render(PL3D.sc,PL3D.cam);
-        if(!PL3D.chk){   /* sekali: piksel dasar-tengah harus terisi (di dalam bola). Program yang tidak jalan tapi lolos diagnostics -> fallback 2D */
-          PL3D.chk=1;
-          var gl=PL3D.r.getContext(),px=new Uint8Array(4);
-          gl.readPixels(PL3D.rw>>1,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
-          if(px[3]<200){pl3dFail('render kosong (alpha '+px[3]+')');return;}
-        }
-        PL3D.c2.clearRect(0,0,PL3D.rw,PL3D.rh);
-        PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh);
-        PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.renders++;
+      var nb=Math.max(1,Math.min(8,PL3D_CFG.bands|0));
+      if(PL3D.cyc&&settle)PL3D.dirty=true;   /* "settle" cuma sekali: jangan hilang selagi siklus jalan */
+      if(PL3D.cyc){   /* siklus pecah sedang jalan: 1 pita per frame */
+        if(now-PL3D.cyc.t>600){PL3D.cyc=null;PL3D.dirty=true;}   /* basi (render ditahan lama oleh menu/tab) */
+        else pl3dCycleStep();
+      }else if(due){
+        if(nb<=1||PL3D.full||!PL3D.chk||!PL3D.cv3){   /* render penuh sekali jalan: pertama kali, ukuran berubah, atau bands=1 */
+          pl3dRocks(pl3dUniforms(now,true));
+          PL3D.r.setScissorTest(false);
+          PL3D.r.render(PL3D.sc,PL3D.cam);
+          if(!PL3D.chk){   /* sekali: piksel dasar-tengah harus terisi (di dalam bola). Program yang tidak jalan tapi lolos diagnostics -> fallback 2D */
+            PL3D.chk=1;
+            var gl=PL3D.r.getContext(),px=new Uint8Array(4);
+            gl.readPixels(PL3D.rw>>1,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+            if(px[3]<200){pl3dFail('render kosong (alpha '+px[3]+')');return;}
+          }
+          PL3D.c2.clearRect(0,0,PL3D.rw,PL3D.rh);
+          PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh);
+          PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.renders++;
+        }else{pl3dCycleStart(now,lx,ly,nb);pl3dCycleStep();}
       }
-    }else if(PL3D.state===3||PL3D.state===0||PL3D.state===1){
+      pl3dBoltWin();   /* petir: render parsial kotak kecil, di atas hasil siklus frame ini */
+        }else if(PL3D.state===3||PL3D.state===0||PL3D.state===1){
       /* fallback 2D / sementara 3D belum siap (supaya tidak ada "pop" kosong -> planet): bake ulang kalau perlu, dan selama crossfade palette (maks ~11x/dtk, murah) */
       var s3=PL3D.state===3,p2=pl3dPar(),parC=Math.abs(p2.x-PL3D.rox)+Math.abs(p2.y-PL3D.roy)>6||Math.abs(p2.f-PL3D.rf)>.01;   /* 2D: selisih kecil cukup digeser saat drawImage, bake ulang kalau jauh */
       if((s3&&PL3D.dirty)||!PL3D.fb||((palCh||parC)&&now-PL3D.lastB>=90)){pl3dBake2D();PL3D.fb=true;PL3D.lastB=now;pl3dPalSnap();if(s3)PL3D.dirty=false;}

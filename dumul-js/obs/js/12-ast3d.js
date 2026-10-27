@@ -20,7 +20,7 @@ var AST3D_CFG={
 try{
   if(/[?&]ast3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_ast3d')==='0')AST3D_CFG.on=false;
 }catch(eA3){}
-var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,hotF:false,sigA:[],sigB:[],reused:0,rendered:0,tiers:[],state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
+var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,nx:[-1e9,-1e9,-1e9],ru:[-1,-1,-1],rd:[-1,-1,-1],sgT:-1,sgSame:false,hotF:false,sigA:[],sigB:[],reused:0,rendered:0,tiers:[],state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
 
 /* Warm-up shader: render pertama sebuah renderer Three.js mengompilasi program shader (ratusan ms di HP) -> hitch pas drone/batu/teleskop pertama muncul; setSize pertama (realokasi framebuffer MSAA) juga mahal, jadi ukuran kanvas diset di build.
    compile() cuma MEMINDAHKAN stall itu; jadi dipanggil saat idle (layar boot, user belum main), satu renderer per giliran supaya tidak numpuk.
@@ -224,21 +224,33 @@ function ast3dSig(){
   AST3D.sigA=s;AST3D.sigB=p;   /* tukar: sigA = terbaru */
   return same;
 }
-/* true = frame ini pakai cache (astStep + render GL dilewati). Dipanggil drawAsteroids SEBELUM astStep; keputusan dibuat sekali di pass belakang, pass depan mengikuti. */
+/* Signature dicek SEKALI per frame (pass mana pun yang pertama): ada yang berubah / batu masih terpental -> ver naik -> semua cache basi. */
+function ast3dFrameSig(now){
+  if(AST3D.sgT===now)return AST3D.sgSame;
+  AST3D.sgT=now;
+  var same=ast3dSig();
+  if(!same||AST3D.hotF)AST3D.ver++;
+  AST3D.hotF=false;   /* diisi ulang oleh loop render di ast3dDraw */
+  AST3D.sgSame=same;
+  return same;
+}
+/* Rencana per pass, dipanggil drawAsteroids (04-render.js) SEBELUM astStep. Tiap pass (belakang / depan) punya jadwal sendiri:
+     0 = normal (astStep + render GL)   1 = pakai cache (blit; astStep + GL dilewati)   2 = render GL TANPA astStep (pakai posisi astStep terakhir)
+   GANTIAN: kalau pass belakang dan depan jatuh tempo di frame yang sama, pass depan dimajukan setengah periode (jatuh tempo lagi di tengah) -> saat diam tiap frame cuma
+   satu pass yang merender (beban rata, tidak ada frame berat-ringan). Pass depan di frame sendiri memakai posisi dari astStep pass belakang (usia <= 1 periode, sama dgn cache). */
 function ast3dReuse(now,half){
-  if(!AST3D_CFG.reuse||AST3D.state!==2||!AST3D_CFG.on)return false;
-  if(half>0)return AST3D.reuseNow===now;
-  AST3D.reuseNow=-1;
+  var ci=half<0?0:(half>0?1:2),U=AST3D.ru;
+  U[ci]=-1;
+  if(!AST3D_CFG.reuse||AST3D.state!==2||!AST3D_CFG.on)return 0;
   try{
-    if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
-    var same=ast3dSig();
-    if(!same||AST3D.hotF)AST3D.ver++;   /* ada yang berubah / batu masih terpental: cache lama basi */
-    AST3D.hotF=false;   /* diisi ulang oleh loop render di bawah */
-    var C=AST3D.cache,ok=half<0?(C[0]&&C[0].ver===AST3D.ver&&(AST_RING_LAST||(C[1]&&C[1].ver===AST3D.ver))):(C[2]&&C[2].ver===AST3D.ver);   /* sabuk limb: pass depan nggak pernah jalan -> cukup cache belakang */
-    if(ok&&now>=AST3D.rT&&now-AST3D.rT<1000/Math.max(1,AST3D_CFG.fps)-8){AST3D.reuseNow=now;AST3D.reused++;return true;}   /* -8ms: toleransi jitter rAF (16.7ms @60Hz -> render tiap 2 frame) */
-    AST3D.rT=now;AST3D.rendered++;
+    if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return 0;
+    var same=ast3dFrameSig(now),C=AST3D.cache,per=1000/Math.max(1,AST3D_CFG.fps),ok=!!(C[ci]&&C[ci].ver===AST3D.ver);
+    if(ok&&now<AST3D.nx[ci]-8){U[ci]=now;AST3D.reused++;return 1;}   /* -8ms: toleransi jitter rAF */
+    AST3D.nx[ci]=now+((ci===1&&AST3D.rd[0]===now)?per*.5:per);
+    AST3D.rd[ci]=now;AST3D.rendered++;
+    if(ci===1&&ok&&same&&typeof AST._stamp==='number'&&AST._stamp!==now&&now-AST._stamp<120)return 2;   /* depan jatuh tempo, belakang nggak jalan astStep di frame ini */
   }catch(e){}
-  return false;
+  return 0;
 }
 function ast3dStore(ci,sx,sy,sw,sh,dx,dy,dw,dh,n){
   var c=AST3D.cache[ci];
@@ -261,7 +273,7 @@ function ast3dDraw(now,half){
   if(!AST3D_CFG.on||(typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
   try{
     var ci=half<0?0:(half>0?1:2);
-    if(AST3D.reuseNow===now&&ast3dBlitCache(ci))return true;   /* frame cache: nggak ada GL, nggak ada astStep */
+    if(AST3D.ru[ci]===now&&ast3dBlitCache(ci))return true;   /* frame cache: nggak ada GL, nggak ada astStep */
     var vars=AST3D.vars,nv=vars.length,nA=astN(),i,a,v,k,total=0;
     if(!nv)return false;
     if(nA+4>AST3D.cap){   /* jumlah batu bertambah (slider): bangun ulang varian dengan kapasitas baru */
