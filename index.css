@@ -1345,7 +1345,7 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 
 /* Scrub mode: panel nyusut, cuma slider + angka; sky kelihatan */
 #owl-panel.owl-scrub{
-  top:auto;bottom:max(18px,env(safe-area-inset-bottom,0px));left:50%;
+  top:max(14px,env(safe-area-inset-top,0px));bottom:auto;left:50%;   /* scrub di ATAS layar supaya planet (dasar layar) tidak tertutup slider */
   transform:translate(-50%,0)!important;
   width:min(92vw,320px);max-width:calc(100vw - 20px);
   padding:10px 12px;border-radius:10px;
@@ -1488,3 +1488,11 @@ body.sect-in{--np-n:2}
 @media (max-width:520px){:root{--hud-r:10px;--hud-b:31px}}
 @media (orientation:landscape) and (max-height:520px){:root{--hud-r:8px;--hud-b:28px;--hud-g:5px}}
 #mp-now-playing{right:calc(var(--hud-r) + var(--hud-b) + var(--hud-g) + var(--np-n) * var(--hud-b) + (var(--np-n) - 1) * var(--hud-g) + 8px)!important}
+/* panel tuning (18-tune3d.js): judul seksi tab Planet tetap tampil walau .bp-page .bp-sec disembunyikan; baris yang induknya 0 diredupkan */
+.bp-page .bp-sec.t3-sec:not([hidden]){display:flex;margin:6px 2px 0}
+.bp-row.t3-dim{opacity:.38}
+/* bar preset tab Planet (18-tune3d.js): menempel di puncak area scroll supaya tidak ikut tergulung / ter-snap bersama baris slider; scroll-padding menjaga baris yang ter-snap tidak tertutup bar */
+.bp-page .t3-presets{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:0 0 2px;padding:2px 2px 4px;background:rgba(2,8,13,.95);scroll-snap-align:none}
+.bp-page .t3-presets .bp-switch{grid-column:auto;justify-self:stretch;min-width:0;padding:0 2px;font-size:8px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bp-page[data-page="pl"]{scroll-padding-top:32px}
+#owl-panel.owl-scrub .bp-page .t3-presets{display:none!important}   /* mode scrub: cuma baris yang digeser + angka */
