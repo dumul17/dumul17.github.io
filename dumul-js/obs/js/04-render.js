@@ -1423,7 +1423,7 @@ function animFrame(now){
   AT.bgm=OFX.pC>.25;   /* constellation.opus nyala (eased) dan efek visual diizinkan (bukan potato / reduce / radio silence) */
   AT.pK=OFX.pK;        /* collapsars.opus: tanpa garis/napas, bintang lebih redup dan kedip lebih lambat (cuma di luar cam) */
   AT.twT+=dt*1000*(CAMERA_MODE?1:(1-.6*AT.pK));
-  tg=AT.calm?0:1;
+  tg=AT.calm?0:AT.pK;   /* sway rasi: HANYA saat collapsars.opus main (AT.pK eased 0..1); idle / constellation.opus / SFX = rasi diam */
   if(reduce)AT.swayK=tg;else{AT.swayK+=(tg-AT.swayK)*Math.min(1,dt*5);if(Math.abs(tg-AT.swayK)<.003)AT.swayK=tg;}
 }
 function clusterSfxOn(){return !!(activeSfx&&SFX.pleione&&activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended);}
@@ -1464,7 +1464,7 @@ function drawCons(c,age,now){
   var audioFocus=potatoAudioFocus();
   var focus=constellationFocus(c);
   var fK=consFullK(c,now);   /* faktor FULL rasi ini (animTier) */
-  var sway=((reduce||audioFocus)?0:1)*AT.swayK;   /* sway tetap jalan di semua tier; berhenti halus cuma di fokus cam */
+  var sway=((reduce||audioFocus)?0:1)*AT.swayK;   /* sway cuma nyala saat collapsars.opus (AT.swayK mengikuti AT.pK); mati halus di fokus cam / BGM lain / idle */
   var wildField=(drag.on&&drag.moved)?1:0;
   var ld=c.lead||c,tp=now-(TD.lag[ld.id]||0); /* rasi gabungan (Taurus+Auriga) pakai jam & fase yang sama => titik Elnath nggak lepas */
   var ox=Math.sin(tp*.00031+ld.phase)*3*sway+mouse.x*(7+wildField*32)+skyPan.x,oy=Math.cos(tp*.00027+ld.phase)*3*sway+mouse.y*(5+wildField*26)+skyPan.y;

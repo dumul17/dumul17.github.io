@@ -26,14 +26,14 @@ var T3D=(function(){
     en:'PLANET SETTINGS SAVED',idt:'SETELAN PLANET TERSIMPAN',
     /* PRESET (tombol di atas tab Planet): cuma knob "tampilan" (PKEYS); bentuk (Curve/Horizon/Cell/Persp), Sway, Sink, Spin, Rate tidak disentuh.
        v = nilai CFG mentah; semua kelipatan snap. 'def' = nilai default CFG (snapshot saat file ini jalan). Pilih preset = nilai berubah live, Save baru menyimpan. */
-    pkeys:['haze','hazeA','fadeS','groundSkip','lod','craterA','craterS','canyonA','canyonS','cloud','cloudCov','cloudH','cloudSkip','cloudShd','cloudLit','cloudDet','cloudDrift','atmK','rimLit','rimHalo','fallK','cityA','cityD','cityTw','cityGlow','auroraOn','flareOn','debrisOn','boltOn','evK','par','zoomK'],
+    pkeys:['haze','hazeA','fadeS','groundSkip','lod','craterA','craterS','canyonA','canyonS','bioA','bioCol','bioSea','bioMtn','bioFor','bioUrb','earthK','cloud','cloudCov','cloudH','cloudSkip','cloudShd','cloudLit','cloudDet','cloudDrift','atmK','rimLit','rimHalo','fallK','cityA','cityD','cityTw','cityGlow','auroraOn','flareOn','debrisOn','boltOn','evK','par','zoomK'],
     presets:[
       {k:'def',en:'Default',id:'Bawaan'},
-      {k:'clean',en:'Clean',id:'Bersih',v:{haze:80,hazeA:.3,fadeS:20,lod:.5,craterA:.2,craterS:1,canyonA:0,canyonS:1,cloud:.3,cloudCov:.5,cloudH:20,cloudShd:.3,cloudLit:.6,cloudDet:.3,cloudDrift:1,atmK:.8,rimLit:1,rimHalo:.3,fallK:1,cityA:0,cityD:.55,cityTw:.25,cityGlow:.3,auroraOn:0,flareOn:1,debrisOn:0,boltOn:0,evK:1,par:.05,zoomK:.1}},
-      {k:'lively',en:'Lively',id:'Hidup',v:{haze:95,hazeA:.4,fadeS:10,lod:.5,craterA:.6,craterS:.8,canyonA:.4,canyonS:1,cloud:.6,cloudCov:.8,cloudH:20,cloudShd:.6,cloudLit:.9,cloudDet:.6,cloudDrift:8,atmK:1.3,rimLit:1.5,rimHalo:.6,fallK:1.3,cityA:1.5,cityD:.7,cityTw:.4,cityGlow:.6,auroraOn:1,flareOn:1,debrisOn:1,boltOn:1,evK:1.5,par:.08,zoomK:.15}},
-      {k:'cine',en:'Cinematic',id:'Sinematik',v:{haze:140,hazeA:.6,fadeS:30,lod:.5,craterA:.8,craterS:1.5,canyonA:.6,canyonS:1.5,cloud:.4,cloudCov:.6,cloudH:30,cloudShd:.7,cloudLit:1,cloudDet:.5,cloudDrift:2,atmK:1.5,rimLit:2,rimHalo:.8,fallK:1.5,cityA:2,cityD:.4,cityTw:.2,cityGlow:.5,auroraOn:1,flareOn:1,debrisOn:0,boltOn:1,evK:.5,par:.1,zoomK:.2}}
+      {k:'clean',en:'Clean',id:'Bersih',v:{haze:80,hazeA:.3,fadeS:20,lod:.5,craterA:.2,craterS:1,canyonA:0,canyonS:1,bioA:.5,bioCol:1,bioSea:.5,bioMtn:.3,bioFor:.4,bioUrb:.3,earthK:1,cloud:.3,cloudCov:.5,cloudH:20,cloudShd:.3,cloudLit:.6,cloudDet:.3,cloudDrift:1,atmK:.8,rimLit:1,rimHalo:.3,fallK:1,cityA:0,cityD:.55,cityTw:.25,cityGlow:.3,auroraOn:0,flareOn:1,debrisOn:0,boltOn:0,evK:1,par:.05,zoomK:.1}},
+      {k:'lively',en:'Lively',id:'Hidup',v:{haze:95,hazeA:.4,fadeS:10,lod:.5,craterA:.6,craterS:.8,canyonA:.4,canyonS:1,bioA:1,bioCol:1,bioSea:.55,bioMtn:.5,bioFor:.6,bioUrb:.7,earthK:1,cloud:.6,cloudCov:.8,cloudH:20,cloudShd:.6,cloudLit:.9,cloudDet:.6,cloudDrift:8,atmK:1.3,rimLit:1.5,rimHalo:.6,fallK:1.3,cityA:1.5,cityD:.7,cityTw:.4,cityGlow:.6,auroraOn:1,flareOn:1,debrisOn:1,boltOn:1,evK:1.5,par:.08,zoomK:.15}},
+      {k:'cine',en:'Cinematic',id:'Sinematik',v:{haze:140,hazeA:.6,fadeS:30,lod:.5,craterA:.8,craterS:1.5,canyonA:.6,canyonS:1.5,bioA:.8,bioCol:1,bioSea:.5,bioMtn:.6,bioFor:.4,bioUrb:.4,earthK:1,cloud:.4,cloudCov:.6,cloudH:30,cloudShd:.7,cloudLit:1,cloudDet:.5,cloudDrift:2,atmK:1.5,rimLit:2,rimHalo:.8,fallK:1.5,cityA:2,cityD:.4,cityTw:.2,cityGlow:.5,auroraOn:1,flareOn:1,debrisOn:0,boltOn:1,evK:.5,par:.1,zoomK:.2}}
     ],
-    secs:{shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK']},
+    secs:{shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],bio:['BIOMES','BIOME'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK']},
     after:function(p){try{if(p==='auroraOn'||p==='flareOn'||p==='debrisOn'||p==='boltOn'||p==='evK'||p==='boltK')return;PL3D.dirty=true;if(p==='hzDy')PL3D.topC=null;}catch(e){}},   /* efek 2D digambar tiap frame: tidak perlu render ulang shader */
     rows:[
       /* Bentuk */
@@ -49,6 +49,14 @@ var T3D=(function(){
       ['craterS','Crater size','Ukuran kawah',.4,2,100,0,'%','','ground','craterA'],
       ['canyonA','Canyons','Kanyon',0,1,100,0,'%','','ground'],
       ['canyonS','Canyon size','Ukuran kanyon',.4,2,100,0,'%','','ground','canyonA'],
+      /* Biome (warna dikunci, cuma di area biome; bioCol 0 = ngikut tema sektor) */
+      ['bioA','Biomes','Biome',0,1,100,0,'%','','bio'],
+      ['bioCol','Biome color','Warna biome',0,1,100,0,'%','','bio','bioA'],
+      ['bioSea','Sea','Laut',0,1,100,0,'%','','bio','bioA'],
+      ['bioMtn','Mountains','Gunung',0,1,100,0,'%','','bio','bioA'],
+      ['bioFor','Forest','Hutan',0,1,100,0,'%','','bio','bioA'],
+      ['bioUrb','Cyber city','Kota cyber',0,1,100,0,'%','','bio','bioA'],
+      ['earthK','Earth','Bumi',0,1,100,0,'%','o','bio','bioA'],   /* cuma overview: laut luas + benua + awan putih; hilang mulus saat masuk sektor */
       /* Kabut */
       ['haze','Haze','Kabut',0,240,1,0,'px','','haze'],
       ['hazeA','Haze α','Kabut α',0,1,100,0,'%','','haze'],
