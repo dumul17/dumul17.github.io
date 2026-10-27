@@ -19,7 +19,7 @@ var PT3D_CFG={
   ovMenu:.5,    /* ukuran portal overview = ovMenu x ukuran cincin di window menu sektor (16-sector-menu.js, smenuRingD). .5 = setengahnya */
   secK:0.50,       /* dasar ukuran R mulut wormhole keluar sektor (ptSecR) = secK x BH.R x .62 */
   half:1.5,       /* setengah lebar kamera ortho (satuan model; radius luar cincin = 1) */
-  resMin:128,resMax:384,
+  resMin:128,resMax:256,
   ringCol:'53,243,255',    /* warna cincin (emissive 12 plat + garis cahaya + tepi mulut + denyut petunjuk), DIKUNCI tema scope3d (cyan #35f3ff, 13-scope3d.js); tidak ikut warna SFX */
   inR:.86,          /* radius tepi dalam plat (radius luar = 1). Makin besar = cincin makin tipis. Mulut/petir/percikan pakai PT_IN (= inR-.015); 09-wormhole.js ikut PT_IN */
   ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */

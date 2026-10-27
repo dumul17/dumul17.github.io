@@ -29,9 +29,9 @@ var PL3D_CFG={
   lod:1,         /* (DEFAULT 1; nilai < .5 DIABAIKAN: dijepit ke .5 di pl3dUniforms, karena sel < ~.6px tinggi di layar = aliasing -> garis horizontal lurus yang makin kasar ke horizon) detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
-  q:2,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
+  q:1.5,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
   fps:8,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
-  bands:4,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
+  bands:6,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
   ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
       hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:0,seed:[0,0]},   /* geometri OVERVIEW (rot 0 = planet DIAM di overview; langit yang berputar, lihat MW di 02-sky-logic.js): kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */

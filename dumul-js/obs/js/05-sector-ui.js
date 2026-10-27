@@ -805,6 +805,11 @@ function pEnd(now){
   }
 }
 
+/* Cap 60fps untuk layar >=110Hz (120/144): tanpa ini sky berat dirender 2x lebih sering dari yang bisa dilihat.
+   Layar 60Hz tidak tersentuh. capVs = interval vsync terkecil yang teramati (estimasi refresh). Kalau estimasi meleset
+   di layar 60Hz pun aman: ambang (~12ms) tetap di bawah interval 16.7ms, jadi tidak ada frame yang dibuang. */
+var CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
+
 function frame(now){
   /* Capture generation at entry. If a watchdog/visibility restart bumped
      renderGeneration while this callback was already queued, bail out so
@@ -812,6 +817,10 @@ function frame(now){
   var gen=renderGeneration;
   renderRAF=0;
   if(pageHidden||gen!==renderGeneration)return;
+  var cd=now-capPrev;capPrev=now;
+  if(cd>2&&cd<50&&cd<capVs)capVs=cd;
+  if(capVs<9&&now-capLast<CAP_MS-capVs*.5){renderRAF=requestAnimationFrame(frame);return;}   /* frame ini dilewati; dicek SETELAH gen supaya callback stale tidak nge-reschedule */
+  capLast=now;
   /* The whole frame is now one safety net: whatever throws, wherever, the
      loop always reschedules itself in the finally block below. A single
      bad frame can no longer freeze the page until a manual reload - at
