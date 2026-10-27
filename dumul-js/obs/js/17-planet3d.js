@@ -652,10 +652,10 @@ function pl3dCycleStep(){
   if(h>0){
     PL3D.uni.uBolt.value.w=0;   /* kilau petir TIDAK dibake ke dasar; petir punya jendela sendiri (pl3dBoltWin) */
     r.setScissorTest(true);r.setScissor(0,rh-y1,rw,h);   /* y scissor dari BAWAH */
-    r.render(PL3D.sc,PL3D.cam);
+    r.render(PL3D.sc,PL3D.cam);pl3dMkGpu(r);
     r.setScissorTest(false);
     PL3D.c3.clearRect(0,y0,rw,h);
-    PL3D.c3.drawImage(r.domElement,0,y0,rw,h,0,y0,rw,h);
+    PL3D.c3.drawImage(r.domElement,0,y0,rw,h,0,y0,rw,h);pl3dMk('pl.copy');
   }
   if(++c.i>=n){
     t=PL3D.cv2;PL3D.cv2=PL3D.cv3;PL3D.cv3=t;t=PL3D.c2;PL3D.c2=PL3D.c3;PL3D.c3=t;
@@ -714,6 +714,10 @@ function pl3dBake2D(){
 /* ---- EFEK 2D (F1: kerangka). Semua di ruang layar TEGAK, di dalam save/restore planet3dDraw -> otomatis ikut ROT, ayunan libr, dan PL3D.al.
    Geometri = pl3dGeom(false,false,true), SAMA dgn yang dipakai render shader (ayunan = transform g, bukan di geometri). ---- */
 function pl3dLimbY(gm,x){var dx=x-gm.cx,r2=gm.R*gm.R-dx*dx;return gm.cy-Math.sqrt(r2>0?r2:0);}   /* y limb (layar tegak) di kolom x */
+/* PROFIL (cuma aktif kalau overlay PERF hidup, nol biaya di luar itu). pl3dMk = tandai waktu sejak tanda sebelumnya ke bucket n (pmk di 05-sector-ui.js).
+   pl3dMkGpu = paksa gl.finish() lalu tandai: 'pl.sub' = CPU kirim perintah, 'pl.gpu' = waktu TUNGGU GPU menyelesaikan shader (ini yang tak kelihatan di js ms biasa). Efek samping: di mode PERF saja, GPU dipaksa sinkron. */
+function pl3dMk(n){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function')pmk(n);}catch(eM){}}
+function pl3dMkGpu(r){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function'){pmk('pl.sub');r.getContext().finish();pmk('pl.gpu');}}catch(eM){}}
 function pl3dFxOn(){var C=PL3D_CFG,F=PL3D.fx;return !!(C.auroraOn||C.flareOn||C.debrisOn||C.boltOn||C.fxDebug||(F&&(F.aur>.001||F.flv>.001||(F.deb&&F.deb.length)||F.bolt)));}   /* F.aur>0: aurora masih memudar keluar setelah toggle dimatikan */
 /* stub per efek: diisi di fase berikutnya (F2 aurora, F3 flare, F4 puing, F5 petir). F = PL3D.fx (konteks per frame) */
 /* AURORA (F2 v2): tirai KONTINU di atas limb, HANYA sisi gelap (memudar mulus ke sisi terang).
@@ -792,13 +796,13 @@ function pl3dFxAurora(g,F){
   if(!F.aurCx)return;
   /* bake jarang: sinar bergeser cuma ~1.5 px/dtk, jadi 5-6x/dtk sudah tak terlihat beda dari 22x/dtk. Paksa bake ulang kalau radius berubah atau cahaya (portal/BH) bergeser >12px (batas terang-gelap ikut). Blit tetap tiap frame. */
   var aIv=F.pot?300:180;
-  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||F.t-F.aurR>=aIv)pl3dAurBake(F,A);
+  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||F.t-F.aurR>=aIv){pl3dMk('pl.pre');pl3dAurBake(F,A);pl3dMk('pl.bake');}
   if(F.aurB1<=F.aurB0)return;
   var dx=gm.cx-F.aurG.cx,dy=gm.cy-F.aurG.cy;   /* parallax murni = geser: aurora tetap menempel di limb walau bake lebih jarang dari frame */
   g.globalAlpha=ba*F.aur;
   g.imageSmoothingEnabled=true;
   g.drawImage(F.aurCv,0,F.aurB0,W,F.aurB1-F.aurB0,dx,F.aurB0/SC+dy,W/SC,(F.aurB1-F.aurB0)/SC);
-  g.globalAlpha=ba;
+  g.globalAlpha=ba;pl3dMk('pl.aur');
 }
 /* PUING (F4 v2): TANPA ekor (versi pertama terlihat seperti kecebong). Dua jenis benda, sama-sama cuma titik/garis kecil yang berkedip:
    k=0 SATELIT: titik kecil stabil + lampu strobo (nyala singkat, pendar kecil, jeda panjang), kedip sekitar .35-.75 Hz.
@@ -1067,9 +1071,10 @@ function planet3dDraw(now){
       var th=Math.atan2((lb[1]-lb[0])*PH,PW),sc=1+Math.abs(Math.tan(th))*2*Math.max(0,PH+(PL3D.bo||0)-yc)/PW;   /* sc: lebarkan sedikit supaya sudut bawah yang terangkat karena miring tidak membuka celah di tepi kiri/kanan */
       g.translate(PW*.5,yc);g.scale(sc,1);g.rotate(th);g.translate(-PW*.5,-yc+(lb[0]+lb[1])*.5*PH);
     }
-    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
+    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
     if(!PL3D.fxOff&&!(typeof reduce!=='undefined'&&reduce)&&pl3dFxOn()){   /* efek 2D: error di sini TIDAK boleh mematikan planet 3D (pl3dFail) */
       try{pl3dFx(g,now,cp);}catch(eFx){PL3D.fxOff=1;try{console.warn('[planet3d] efek 2D dimatikan:',eFx&&eFx.message);}catch(eW){}}
+      pl3dMk('pl.fx');
     }
     g.restore();
     PL3D.frames++;
@@ -1123,11 +1128,9 @@ function planetGroundOk(){
   if(typeof smenuHidesSky==='function'&&smenuHidesSky())return false;
   pl3dSync();return !!(PW&&PH);
 }
-function pl3dGroundFrame(now){   /* now diberikan = hasil di-cache per frame (targetOf 08-tx-drone.js memanggil planetGroundAt 3x per frame; pl3dGeom cukup dihitung sekali) */
-  if(now!=null&&PL3D.gfN===now&&PL3D.gfF)return PL3D.gfF;
-  var gm=pl3dGeom(),R=gm.R,dx=PW*.5-gm.cx,F={gm:gm,R:R,cxs:gm.cx,cys:PH-gm.cy,phi0:Math.atan2(Math.sqrt(Math.max(0,R*R-dx*dx)),dx)};
-  if(now!=null){PL3D.gfN=now;PL3D.gfF=F;}
-  return F;
+function pl3dGroundFrame(){
+  var gm=pl3dGeom(),R=gm.R,dx=PW*.5-gm.cx;
+  return {gm:gm,R:R,cxs:gm.cx,cys:PH-gm.cy,phi0:Math.atan2(Math.sqrt(Math.max(0,R*R-dx*dx)),dx)};
 }
 function pl3dRotAng(now,R){   /* sudut putar permukaan (rad); sama dgn uRot di pl3dUniforms. Fallback 2D tidak berputar -> 0 */
   return (PL3D.state===2&&!(typeof reduce!=='undefined'&&reduce))?pl3dPhase(now)/R:0;
@@ -1138,7 +1141,7 @@ function pl3dStage(xu,yu){return PL3D.rot<0?[STG.ih-yu,xu]:(PL3D.rot>0?[yu,STG.i
    Hasil: x,y = titik kaki (stage); lx,ly = titik pusat badan (stage); ux,uy = titik kaki di ruang layar tegak; k = sg (skala perspektif); off = sudah keluar layar. */
 function planetGroundAt(ug,sg,now,lift){
   if(!planetGroundOk())return null;
-  var F=pl3dGroundFrame(now),R=F.R,phi=F.phi0+ug/R-pl3dRotAng(now,R)*sg/PL3D_CFG.rotRef,rr=R-sg,   /* geser tanah perspektif-benar (uWg di shader): kecepatan layar ∝ sg/rotRef */
+  var F=pl3dGroundFrame(),R=F.R,phi=F.phi0+ug/R-pl3dRotAng(now,R)*sg/PL3D_CFG.rotRef,rr=R-sg,   /* geser tanah perspektif-benar (uWg di shader): kecepatan layar ∝ sg/rotRef */
      
       xu=F.cxs+rr*Math.cos(phi),yu=PH-(F.cys+rr*Math.sin(phi)),a=pl3dStage(xu,yu),b=pl3dStage(xu,yu-(lift||0));
   return {x:a[0],y:a[1],lx:b[0],ly:b[1],ux:xu,uy:yu,k:sg,off:(xu<10||xu>PW-10||yu>PH-8)};
