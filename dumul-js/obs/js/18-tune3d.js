@@ -26,12 +26,12 @@ var T3D=(function(){
     en:'PLANET SETTINGS SAVED',idt:'SETELAN PLANET TERSIMPAN',
     /* PRESET (tombol di atas tab Planet): cuma knob "tampilan" (PKEYS); bentuk (Curve/Horizon/Cell/Persp), Sway, Sink, Spin, Rate tidak disentuh.
        v = nilai CFG mentah; semua kelipatan snap. 'def' = nilai default CFG (snapshot saat file ini jalan). Pilih preset = nilai berubah live, Save baru menyimpan. */
-    pkeys:['haze','hazeA','fadeS','lod','rockD','rockSz','craterA','craterS','canyonA','canyonS','cloud','cloudCov','cloudH','cloudShd','cloudLit','cloudDet','cloudDrift','atmK','rimLit','rimHalo','fallK','cityA','cityD','cityTw','cityGlow','auroraOn','flareOn','debrisOn','boltOn','evK','par','zoomK'],
+    pkeys:['haze','hazeA','fadeS','groundSkip','lod','craterA','craterS','canyonA','canyonS','cloud','cloudCov','cloudH','cloudSkip','cloudShd','cloudLit','cloudDet','cloudDrift','atmK','rimLit','rimHalo','fallK','cityA','cityD','cityTw','cityGlow','auroraOn','flareOn','debrisOn','boltOn','evK','par','zoomK'],
     presets:[
       {k:'def',en:'Default',id:'Bawaan'},
-      {k:'clean',en:'Clean',id:'Bersih',v:{haze:80,hazeA:.3,fadeS:20,lod:.5,rockD:1,rockSz:.25,craterA:.2,craterS:1,canyonA:0,canyonS:1,cloud:.3,cloudCov:.5,cloudH:20,cloudShd:.3,cloudLit:.6,cloudDet:.3,cloudDrift:1,atmK:.8,rimLit:1,rimHalo:.3,fallK:1,cityA:0,cityD:.55,cityTw:.25,cityGlow:.3,auroraOn:0,flareOn:1,debrisOn:0,boltOn:0,evK:1,par:.05,zoomK:.1}},
-      {k:'lively',en:'Lively',id:'Hidup',v:{haze:95,hazeA:.4,fadeS:10,lod:.5,rockD:.6,rockSz:.25,craterA:.6,craterS:.8,canyonA:.4,canyonS:1,cloud:.6,cloudCov:.8,cloudH:20,cloudShd:.6,cloudLit:.9,cloudDet:.6,cloudDrift:8,atmK:1.3,rimLit:1.5,rimHalo:.6,fallK:1.3,cityA:1.5,cityD:.7,cityTw:.4,cityGlow:.6,auroraOn:1,flareOn:1,debrisOn:1,boltOn:1,evK:1.5,par:.08,zoomK:.15}},
-      {k:'cine',en:'Cinematic',id:'Sinematik',v:{haze:140,hazeA:.6,fadeS:30,lod:.5,rockD:.8,rockSz:.3,craterA:.8,craterS:1.5,canyonA:.6,canyonS:1.5,cloud:.4,cloudCov:.6,cloudH:30,cloudShd:.7,cloudLit:1,cloudDet:.5,cloudDrift:2,atmK:1.5,rimLit:2,rimHalo:.8,fallK:1.5,cityA:2,cityD:.4,cityTw:.2,cityGlow:.5,auroraOn:1,flareOn:1,debrisOn:0,boltOn:1,evK:.5,par:.1,zoomK:.2}}
+      {k:'clean',en:'Clean',id:'Bersih',v:{haze:80,hazeA:.3,fadeS:20,lod:.5,craterA:.2,craterS:1,canyonA:0,canyonS:1,cloud:.3,cloudCov:.5,cloudH:20,cloudShd:.3,cloudLit:.6,cloudDet:.3,cloudDrift:1,atmK:.8,rimLit:1,rimHalo:.3,fallK:1,cityA:0,cityD:.55,cityTw:.25,cityGlow:.3,auroraOn:0,flareOn:1,debrisOn:0,boltOn:0,evK:1,par:.05,zoomK:.1}},
+      {k:'lively',en:'Lively',id:'Hidup',v:{haze:95,hazeA:.4,fadeS:10,lod:.5,craterA:.6,craterS:.8,canyonA:.4,canyonS:1,cloud:.6,cloudCov:.8,cloudH:20,cloudShd:.6,cloudLit:.9,cloudDet:.6,cloudDrift:8,atmK:1.3,rimLit:1.5,rimHalo:.6,fallK:1.3,cityA:1.5,cityD:.7,cityTw:.4,cityGlow:.6,auroraOn:1,flareOn:1,debrisOn:1,boltOn:1,evK:1.5,par:.08,zoomK:.15}},
+      {k:'cine',en:'Cinematic',id:'Sinematik',v:{haze:140,hazeA:.6,fadeS:30,lod:.5,craterA:.8,craterS:1.5,canyonA:.6,canyonS:1.5,cloud:.4,cloudCov:.6,cloudH:30,cloudShd:.7,cloudLit:1,cloudDet:.5,cloudDrift:2,atmK:1.5,rimLit:2,rimHalo:.8,fallK:1.5,cityA:2,cityD:.4,cityTw:.2,cityGlow:.5,auroraOn:1,flareOn:1,debrisOn:0,boltOn:1,evK:.5,par:.1,zoomK:.2}}
     ],
     secs:{shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK']},
     after:function(p){try{if(p==='auroraOn'||p==='flareOn'||p==='debrisOn'||p==='boltOn'||p==='evK'||p==='boltK')return;PL3D.dirty=true;if(p==='hzDy')PL3D.topC=null;}catch(e){}},   /* efek 2D digambar tiap frame: tidak perlu render ulang shader */
@@ -44,8 +44,7 @@ var T3D=(function(){
       /* Tanah */
       ['lod','Detail','Detail',.5,3,100,0,'%','','ground'],   /* 50%..300%: di bawah 50% sel tanah sub-piksel -> strip lurus makin kasar ke horizon; makin besar = pita mulus dekat horizon makin lebar */
       ['fadeS','Fade','Pudar',0,80,1,0,'px','','ground'],
-      ['rockD','Rocks','Batu',0,1,100,0,'%','i','ground'],                 /* 0% = gurun tanpa batu, 100% = rapat (tampil = kepadatan, bukan nilai mentah) */
-      ['rockSz','Rock size','Ukuran batu',.05,1.5,100,0,'%','','ground','rockD'],
+      ['groundSkip','Flat','Datar horizon',0,200,1,0,'px','','ground'],   /* tanah memudar rata menuju horizon (zona sel gepeng = strip lurus); 0 = tekstur sampai horizon */
       ['craterA','Craters','Kawah',0,1,100,0,'%','','ground'],
       ['craterS','Crater size','Ukuran kawah',.4,2,100,0,'%','','ground','craterA'],
       ['canyonA','Canyons','Kanyon',0,1,100,0,'%','','ground'],
@@ -57,6 +56,7 @@ var T3D=(function(){
       ['cloud','Cloud','Awan',0,1,100,0,'%','','cloud'],
       ['cloudCov','Cover','Sebaran',0,1,100,0,'%','','cloud','cloud'],
       ['cloudH','Height','Tinggi',0,60,1,0,'×','','cloud','cloud'],
+      ['cloudSkip','Skip','Lewati horizon',0,200,1,0,'px','','cloud','cloud'],   /* awan memudar menuju horizon (zona sel gepeng = strip lurus); 0 = sampai horizon */
       ['cloudShd','Shade','Bayangan',0,1,100,0,'%','','cloud','cloud'],
       ['cloudLit','Lit','Cahaya awan',0,1.5,100,0,'%','','cloud','cloud'],     /* cahaya sendiri awan: tepi terang / dasar gelap (0 = warna datar) */
       ['cloudDet','Wisps','Serat awan',0,1,100,0,'%','','cloud','cloud'],      /* serat halus di dalam awan (0 = mulus) */
