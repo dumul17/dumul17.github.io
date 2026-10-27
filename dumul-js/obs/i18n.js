@@ -112,7 +112,8 @@
 
     /* tuning panel */
     'tune.bh':{en:'Gargantua',id:'Gargantua'},'tune.sky':{en:'Sky',id:'Langit'},
-    'tune.shape':{en:'Shape',id:'Bentuk'},'tune.light':{en:'Light',id:'Cahaya'},'tune.surr':{en:'Surroundings',id:'Sekitar'},
+    'tune.shape':{en:'Shape',id:'Bentuk'},
+    'tune.sec.move':{en:'Motion',id:'Gerak'},'tune.sec.show':{en:'Display',id:'Tampil'},'tune.sec.count':{en:'Count & size',id:'Jumlah & ukuran'},'tune.sec.orbit':{en:'Orbit',id:'Orbit'},'tune.sec.fade':{en:'Fade',id:'Pudar'},'tune.sec.beh':{en:'Behavior',id:'Perilaku'},'tune.sec.body':{en:'Body',id:'Badan'},'tune.light':{en:'Light',id:'Cahaya'},'tune.surr':{en:'Surroundings',id:'Sekitar'},
     'tune.size':{en:'Size',id:'Ukuran'},'tune.size.s':{en:'scale',id:'skala'},'tune.str':{en:'Strength',id:'Kekuatan'},'tune.str.s':{en:'lensing',id:'lensa gravitasi'},
     'tune.bloom':{en:'Bloom',id:'Pendar'},'tune.bloom.s':{en:'warm glow',id:'cahaya hangat'},'tune.speed':{en:'Speed',id:'Kecepatan'},'tune.speed.s':{en:'animation',id:'animasi'},
     'tune.ast':{en:'Asteroids',id:'Asteroid'},'tune.ast.s':{en:'orbiting rocks',id:'batu mengorbit'},
