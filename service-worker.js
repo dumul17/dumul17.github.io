@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v227'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v228'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -16,7 +16,7 @@ const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, se
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
 
 /* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
-importScripts('dumul-js/obs/sky-data.js?v=30');
+importScripts('dumul-js/obs/sky-data.js?v=31');
 const ALL_AUDIO = SKY.audioFiles();
 
 /* Harus sama persis dengan yang dipanggil HTML (termasuk ?v=) */
@@ -26,7 +26,7 @@ const SHELL = [
   'dumul.html',
   'index.css?v=77',
   /* harus sama persis dengan <script src> di index.html */
-  'dumul-js/obs/sky-data.js?v=30',
+  'dumul-js/obs/sky-data.js?v=31',
   'dumul-js/obs/texts.js?v=1',
   'dumul-js/obs/i18n.js?v=32',
   'dumul-js/obs/i18n-sky.js?v=2',
