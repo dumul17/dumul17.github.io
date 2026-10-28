@@ -774,6 +774,9 @@ var PP={fs:0,t0:0,last:0,cur:{},tot:{},n:0,isum:0,jsum:0,jank:0,ev:[],el:null,up
    tiap konteks cukup sekali per muat halaman (PROBE.dn). Pindah konteks di tengah jalan = dibatalkan, mulai ulang otomatis di konteks baru. SALIN hasil overview dulu sebelum masuk sektor (overlay diganti). */
 var PROBE={arm:false,on:false,done:false,i:0,t0:0,iv:[],js:[],el:null,S:null,inS:0,txu:0,res:[],ctx:'',c0:'',dn:{},tests:null,seq:null};
 try{PROBE.arm=/[?&]probe=1(&|$)/.test(location.search);}catch(ePr){}
+/* ?pin=1 = orbit portal dikunci di puncak (sisi jauh dari planet), ?pin=2 = dikunci di titik terendah (dekat limb, terburuk: flare + puing). Tanpa pin orbit jalan (90 dtk/putaran) dan tiap tes kena fase beda -> flag '!'. Hanya overview. */
+var PROBE_PIN=0;try{var _pm=/[?&]pin=([12])(&|$)/.exec(location.search);if(_pm)PROBE_PIN=+_pm[1];}catch(ePn){}
+function probeFreeze(on){try{if(typeof PT3D==='undefined')return;if(on&&PROBE_PIN&&PROBE.ctx==='ov'){PT3D.orbFreeze=1;PT3D.orbPhi=PROBE_PIN===2?4.712389:1.5708;}else PT3D.orbFreeze=0;}catch(e){}}
 var PROBE_TESTS_SEC=[
   ['aurora OFF',function(){PL3D_CFG.auroraOn=false;}],
   ['efek planet OFF (4)',function(){var C=PL3D_CFG;C.auroraOn=C.flareOn=C.debrisOn=C.boltOn=false;}],
@@ -853,7 +856,7 @@ function probeReport(R){
   dl.sort(function(x,y){return x-y;});nz=dl.length?dl[Math.floor(dl.length/2)]:0;
   for(k=0;k<bs.length;k++)base+=bs[k];base/=Math.max(1,bs.length);
   try{qs=location.search.replace(/^\?/,'');}catch(e){}
-  tx='HASIL PROBE ['+(ctx==='ov'?'OVERVIEW':'SEKTOR')+']   dpr x'+(+DPR).toFixed(2)+'   kanvas '+cv.width+'x'+cv.height+'\n'+
+  tx='HASIL PROBE ['+(ctx==='ov'?'OVERVIEW':'SEKTOR')+(ctx==='ov'&&PROBE_PIN?(PROBE_PIN===2?' orbit DEKAT limb':' orbit JAUH'):'')+']   dpr x'+(+DPR).toFixed(2)+'   kanvas '+cv.width+'x'+cv.height+'\n'+
      'normal '+base.toFixed(1)+' ms = '+(1000/base).toFixed(0)+' fps   (noise +-'+nz.toFixed(1)+' ms)\n'+
      '------------------------------------------\n'+
      probeP('tes (dimatikan)',19)+probeL('ms',6)+probeL('hemat',8)+probeL('fps',7)+'\n';
@@ -885,9 +888,9 @@ function probeTick(now,iv,js){
     if(!PROBE.inS)PROBE.inS=now;
     if(now-PROBE.inS<3000)return;
     PROBE.ctx=cx;PROBE.tests=cx==='ov'?PROBE_TESTS_OV:PROBE_TESTS_SEC;PROBE.seq=probeSeqOf(PROBE.tests);
-    probeSave();PROBE.on=true;PROBE.i=0;PROBE.res=[];probeBegin(now);return;
+    probeSave();probeFreeze(true);PROBE.on=true;PROBE.i=0;PROBE.res=[];probeBegin(now);return;
   }
-  if(cx!==PROBE.ctx&&!PX.all){PROBE.on=false;PROBE.inS=0;PROBE.c0='';probeRestore();probeShow('PROBE dibatalkan (pindah '+(PROBE.ctx==='ov'?'dari overview':'dari sektor')+').\nDiam di overview / sektor 3 dtk, otomatis mulai ulang.',false);return;}
+  if(cx!==PROBE.ctx&&!PX.all){PROBE.on=false;PROBE.inS=0;PROBE.c0='';probeRestore();probeFreeze(false);probeShow('PROBE dibatalkan (pindah '+(PROBE.ctx==='ov'?'dari overview':'dari sektor')+').\nDiam di overview / sektor 3 dtk, otomatis mulai ulang.',false);return;}
   var el=now-PROBE.t0;
   if(el>1200&&iv>0&&iv<1000){PROBE.iv.push(iv);PROBE.js.push(js);}
   if(now-PROBE.txu>400){PROBE.txu=now;probeShow('PROBE ['+(PROBE.ctx==='ov'?'OVERVIEW':'SEKTOR')+'] '+(PROBE.i+1)+'/'+PROBE.seq.length+'   '+PROBE.seq[PROBE.i][0]+'\nsisa +-'+Math.max(0,Math.round((PROBE.seq.length-PROBE.i)*4.2-el/1000))+' dtk   (jangan sentuh layar)',false);}
@@ -895,7 +898,7 @@ function probeTick(now,iv,js){
   PROBE.res.push([PROBE.seq[PROBE.i][0],probeTrim(PROBE.iv),probeMed(PROBE.iv,.9),probeMed(PROBE.js,.5)]);
   PROBE.i++;
   if(PROBE.i<PROBE.seq.length){probeBegin(now);return;}
-  probeRestore();PROBE.dn[PROBE.ctx]=1;PROBE.on=false;PROBE.c0='';PROBE.inS=0;
+  probeRestore();probeFreeze(false);PROBE.dn[PROBE.ctx]=1;PROBE.on=false;PROBE.c0='';PROBE.inS=0;
   probeShow(probeReport(PROBE.res),true);
 }
 function pmk(n){if(!PERF)return;var t=performance.now();PP.cur[n]=(PP.cur[n]||0)+(t-PP.t0);PP.t0=t;}

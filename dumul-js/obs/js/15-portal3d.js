@@ -701,7 +701,7 @@ function portalOrbit(now,bp,Rp){
   var busy=(typeof SECT!=='undefined'&&SECT.busy)||(typeof whBusy==='function'&&whBusy())||(typeof drag!=='undefined'&&drag.on)||pin&&(typeof ARV!=='undefined'&&ARV<.999);
   var dir=1;
   if(O.counter){try{dir=(PL3D_CFG.live.rot>0)?-1:1;}catch(eD){}}   /* lawan rotasi planet */
-  if(!busy)phi=(phi+dir*dt*6.283185/O.per+6.283185)%6.283185;
+  if(!busy&&!PT3D.orbFreeze)phi=(phi+dir*dt*6.283185/O.per+6.283185)%6.283185;   /* orbFreeze: dipakai probe (?pin=) supaya semua tes mengukur fase orbit yang sama */
   PT3D.orbPhi=phi;
   var p=ptOrbAt(phi,bp);if(!p)return out;
   out.x=p.x;out.y=p.y+(O.bob?Math.sin(now*.0013)*O.bob:0);out.on=1;out.w=1;
