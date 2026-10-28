@@ -359,6 +359,27 @@ function pttStars(g,Rin,dt){
   }
   g.restore();
 }
+/* Selang-seling mulut (FS.slow): mulut penuh (tekstur + bintang + lubang hitam + bayangan) dirender ke kanvas cache 2D di frame ganjil, frame genap cuma drawImage cache.
+   Cincin GL render di frame genap, jadi dua pekerjaan ini saling bergantian (beban tidak numpuk di satu frame). Tampilan sama (cache dirender dgn skala DPR yang sama); bintang/tekstur jalan ~half rate. */
+function pttDrawAlt(g,Rin,now,alt){
+  if(!alt){PTT.mcOK=0;return pttDraw(g,Rin,now);}
+  var s=Math.min(1.5,(typeof DPR!=='undefined'&&DPR)||1),res=Math.max(32,Math.ceil(2*Rin*s/16)*16);
+  var reuse=PTT.mcOK&&PTT.mc&&PTT.mcRes===res&&(FS.n&1)===0&&now-PTT.mcT<140;
+  if(!reuse){
+    if(!PTT.ok&&!PTT.fail)pttInit();
+    if(!PTT.ok)return false;
+    var mc=PTT.mc||(PTT.mc=document.createElement('canvas'));
+    if(mc.width!==res||mc.height!==res){mc.width=res;mc.height=res;}
+    var cg=mc.getContext('2d'),k=res/(2*Rin);
+    cg.setTransform(1,0,0,1,0,0);cg.clearRect(0,0,res,res);
+    cg.setTransform(k,0,0,k,res/2,res/2);
+    if(!pttDraw(cg,Rin,now)){PTT.mcOK=0;return false;}
+    cg.setTransform(1,0,0,1,0,0);
+    PTT.mcOK=1;PTT.mcRes=res;PTT.mcT=now;
+  }
+  g.imageSmoothingEnabled=true;g.drawImage(PTT.mc,-Rin,-Rin,2*Rin,2*Rin);
+  return true;
+}
 /* g sudah di-translate ke pusat portal; Rin = radius mulut (px). true = tergambar */
 function pttDraw(g,Rin,now){
   if(!PTT.ok&&!PTT.fail)pttInit();
@@ -617,7 +638,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(tk>0.001){tm=ptTiltMat(ptTiltAng(now,tk));}   /* P4: elemen 2D (mulut, petir, percikan, kilau muatan) digambar di bidang cincin = affine yang sama dengan kemiringan 3D */
   var r2d=function(){if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}ptRing2D(g,Rp,now,playing);if(tm)g.restore();};   /* cadangan 2D ikut miring */
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
-  if(!opts.noMouth&&!PXo.ptm){if(still||!pttDraw(g,Rp*PT_IN,now))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
+  if(!opts.noMouth&&!PXo.ptm){if(still||!pttDrawAlt(g,Rp*PT_IN,now,!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.big&&!(ch>0))))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
   /* visualizer = kilatan petir di dalam cincin (debu + pulse elips visualizer BH lama dibuang). updateAVColor / avbUpdate dulu dipanggil lewat drawAudioVisualizer, sekarang dari sini. */
   try{
     if(typeof updateAVColor==='function')updateAVColor(now);
