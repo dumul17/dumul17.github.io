@@ -1348,7 +1348,7 @@ function nebBase(EW,EH,ds){
    transisi overview <-> sektor mulus (bobot disusul .06/frame, sama dengan SKYT). Gagal dimuat / IS_POTATO -> overview lama persis.
    Tuning: scale = tinggi gambar x tinggi layar tegak (>= 1 supaya tepi atas/bawah tak kelihatan; ganti gambar yang lebih lebar = otomatis lebih panjang gulungannya), vx = px/dtk (+ ke kanan di landscape / ke atas di portrait, 0 = diam), mirror = tile bergantian dicerminkan (sambungan mulus walau gambar tidak seamless),
    A = kuat gambar, zf/pf = zoom/parallax (sama dgn plateDeep: .55 / .14). Matikan: ?mw=0 atau localStorage dumul_mw=0. ?v= di src HARUS sama dengan SHELL service-worker. */
-var MW={on:!IS_POTATO,src:'dumul-js/obs/img/milky-way.webp?v=3',A:1,scale:1,vx:2.5,mirror:false,zf:.55,pf:.15,img:null,off:0,t:0,w:-1,f:0};
+var MW={on:!IS_POTATO,src:'dumul-js/obs/img/milky-way.webp?v=3',A:.5,scale:1,vx:2.5,mirror:false,zf:.55,pf:.15,img:null,off:0,t:0,w:-1,f:0};
 try{var _mq=(location.search.match(/[?&]mw=(\w+)/)||[])[1]||localStorage.getItem('dumul_mw')||'';if(_mq==='0')MW.on=false;}catch(eMW){}
 /* Tuning Milky Way overview (tab Sky di panel owl): angka di literal MW di atas = DEFAULT (MW_DEF); hasil Save masuk localStorage.dumul_mw_cfg dan dimuat di sini. */
 var MW_DEF={A:MW.A,scale:MW.scale,vx:MW.vx,zf:MW.zf,pf:MW.pf,mirror:MW.mirror?1:0};

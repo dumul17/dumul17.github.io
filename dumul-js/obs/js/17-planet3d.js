@@ -12,25 +12,26 @@
    BH mini boleh terbenam (planetBhOk/planetBhClamp, dipakai sumSpot + moveBHDrag), berhenti render saat wormhole menutup layar. P2: palette + geometri (hL/hR, rot, seed) per sektor (SECTORS[].planet di sky-data.js) di-crossfade lewat bobot SKYT (04-render.js, cuma DIBACA);
    overview (semua bobot 0) = PL3D_CFG.ov. P4: di overview lampu = portal yang mengorbit (15-portal3d.js portalOrbit), portal tenggelam di balik limb planet ini. */
 var PL3D_CFG={
+  /* DEFAULT angka di bawah = hasil COPY TUNE 2026-10-28 (komentar angka lama bisa kadaluarsa) */
   on:true,
   force2d:false,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   /* GEOMETRI PER SEKTOR: hL/hR (garis horizon, x tinggi layar dari atas, di tepi kiri/kanan), rot (px/dtk, + = geser ke kanan, - = ke kiri) dan seed
      (pasangan integer, geser pola noise) ada di ov (overview) dan di SECTORS[].planet (sky-data.js). Landscape (PW>PH): hLLand/hRLand kalau diisi,
      kalau tidak diturunkan dari hL/hR (h+(1-h)*.4). Nilai hidup = blend ov + sektor menurut bobot SKYT (PL3D_CFG.live), sama seperti palette. */
-  rK:15,          /* radius bola = rK x lebar layar. Makin besar = horizon makin datar (15 = nyaris lurus). Default kelipatan 5 supaya kena snap slider panel tuning */
-  cell:100,        /* lebar 1 sel batu/medan (px CSS) saat 100px di bawah horizon; makin dekat horizon makin kecil (perspektif) */
-  persp:120,      /* kekuatan perspektif tanah: makin besar = batu makin gepeng/rapat ke arah horizon */
-  haze:95,        /* lebar kabut atmosfer di atas permukaan dekat horizon (px CSS) */
-  hazeA:.45,     /* opasitas kabut di horizon 0..1 (tanah + batu). .78 = tebal (lama), .45 = agak transparan, .3 = tipis, 0 = tanpa kabut */
-  cloud:.5,     /* opasitas lapisan awan/debu tipis kebiruan di atas tanah (0 = mati) */
-  cloudCov:.8,  /* luas area awan 0..1: .5 = seperti dulu, makin besar makin luas/menyambung, .8 = hampir menutup, 0 = bercak kecil */
-  cloudH:20,     /* tinggi lapisan awan = cloudH x haze (px dari horizon ke bawah, memudar halus); ikut berubah kalau haze diubah. 0 = tanpa batas tinggi (awan menutup seluruh tanah, seperti dulu) */
-  lod:1,         /* (DEFAULT 1; nilai < .5 DIABAIKAN: dijepit ke .5 di pl3dUniforms, karena sel < ~.6px tinggi di layar = aliasing -> garis horizontal lurus yang makin kasar ke horizon) detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
+  rK:5,          /* radius bola = rK x lebar layar. Makin besar = horizon makin datar (15 = nyaris lurus). Default kelipatan 5 supaya kena snap slider panel tuning */
+  cell:40,        /* lebar 1 sel batu/medan (px CSS) saat 100px di bawah horizon; makin dekat horizon makin kecil (perspektif) */
+  persp:300,      /* kekuatan perspektif tanah: makin besar = batu makin gepeng/rapat ke arah horizon */
+  haze:0,        /* lebar kabut atmosfer di atas permukaan dekat horizon (px CSS) */
+  hazeA:1,     /* opasitas kabut di horizon 0..1 (tanah + batu). .78 = tebal (lama), .45 = agak transparan, .3 = tipis, 0 = tanpa kabut */
+  cloud:.7,     /* opasitas lapisan awan/debu tipis kebiruan di atas tanah (0 = mati) */
+  cloudCov:.7,  /* luas area awan 0..1: .5 = seperti dulu, makin besar makin luas/menyambung, .8 = hampir menutup, 0 = bercak kecil */
+  cloudH:50,     /* tinggi lapisan awan = cloudH x haze (px dari horizon ke bawah, memudar halus); ikut berubah kalau haze diubah. 0 = tanpa batas tinggi (awan menutup seluruh tanah, seperti dulu) */
+  lod:.5,         /* (DEFAULT 1; nilai < .5 DIABAIKAN: dijepit ke .5 di pl3dUniforms, karena sel < ~.6px tinggi di layar = aliasing -> garis horizontal lurus yang makin kasar ke horizon) detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:1.5,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
-  fps:8,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
+  fps:6,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
   slowAur:1,      /* HP lambat (FS.slow): pengali jeda bake aurora (1 = sama dgn normal, 2 = dulu: 2x lebih jarang, patah). */
   slowAurAlt:0,   /* 1 = di HP lambat bake aurora cuma di frame ganjil (dulu); 0 = boleh di frame mana pun */
   bandMin:3,      /* batas bawah pita ADAPTIF: satu refresh penuh butuh `bands` frame, jadi di HP 15 fps bands 6 = cuma ~2,5 refresh/dtk (lampu kota + awan patah-patah). Pita dikurangi otomatis supaya satu refresh muat di 1000/fps ms, tapi tidak di bawah nilai ini. 6 (= bands) = tanpa adaptasi */
@@ -42,53 +43,53 @@ var PL3D_CFG={
      + sedikit naik-turun bersama (lat). Dua periode yang tidak berkelipatan -> tidak pernah persis berulang. Amplitudo = pecahan tinggi layar, periode = detik.
      DIGAMBAR SEBAGAI TRANSFORMASI 2D (geser + miring) pada strip yang sudah dirender, tiap frame penuh (60fps) -> mulus; shader TIDAK dirender ulang (tetap 4 fps).
      on:false / lat:0,tilt:0 = mati. Clamp BH/teleskop + drone ikut (pl3dGeom). */
-  libr:{on:true,lat:.004,tilt:.012,pLat:170,pTilt:120,k:1},   /* k = pengali amplitudo lat+tilt (satu slider 'Sway' di panel tuning; 1 = seperti lat/tilt di atas, 0 = diam) */
-  rotK:0,         /* pengali kecepatan rotasi tanah (SECTORS[].planet.rot). 0 = permukaan tanah DIAM (itu-itu saja), 1 = menggeser seperti dulu */
+  libr:{on:true,lat:.004,tilt:.012,pLat:170,pTilt:120,k:1.05},   /* k = pengali amplitudo lat+tilt (satu slider 'Sway' di panel tuning; 1 = seperti lat/tilt di atas, 0 = diam) */
+  rotK:3,         /* pengali kecepatan rotasi tanah (SECTORS[].planet.rot). 0 = permukaan tanah DIAM (itu-itu saja), 1 = menggeser seperti dulu */
   live:null,      /* geometri HIDUP (blend ov + sektor): hL,hR,hLL,hRL,rot,sx,sy; diisi di bawah, jangan diedit */
-  par:.05,        /* parallax: px planet per px skyPan (disengaja kecil, lebih pelan dari plateDeep .14; planet paling depan tapi nyaris diam) */
+  par:.08,        /* parallax: px planet per px skyPan (disengaja kecil, lebih pelan dari plateDeep .14; planet paling depan tapi nyaris diam) */
   parMax:24,      /* batas geser parallax (px CSS); juga margin strip supaya strip tidak berubah ukuran */
-  zoomK:.1,       /* planet membesar cuma .1x dari skyZoom (diklem di zoom 4; di atas itu planet keluar layar) */
+  zoomK:.2,       /* planet membesar cuma .1x dari skyZoom (diklem di zoom 4; di atas itu planet keluar layar) */
   sinkK:1,        /* pengali bhSink + teleSink (satu slider 'Sink' di panel tuning; 1 = apa adanya, 0 = tidak boleh menyentuh limb) */
   bhSink:.5,      /* BH mini boleh terbenam di balik limb sedalam sekian x radiusnya (0 = tidak boleh menyentuh limb) */
   teleSink:.35,   /* teleskop: idem bhSink (planetObjClamp). Radius yang dipakai = .7 x radius hit teleskop (04-render.js). 0 = tidak boleh menyentuh limb */
   /* knob tuning tambahan (tab Planet di panel owl; angka ini = DEFAULT): */
   atmK:1,         /* pengali opasitas atmosfer/glow limb (palette tetap per sektor) */
-  fallK:1,        /* pengali jangkauan cahaya BH/portal di tanah (>1 = cahaya sampai lebih jauh) */
-  hzDy:0,         /* geser horizon GLOBAL: overview + semua sektor (pecahan tinggi layar; + = turun). Dulu 'ovDy' (cuma overview) */
+  fallK:.3,        /* pengali jangkauan cahaya BH/portal di tanah (>1 = cahaya sampai lebih jauh) */
+  hzDy:-.2,         /* geser horizon GLOBAL: overview + semua sektor (pecahan tinggi layar; + = turun). Dulu 'ovDy' (cuma overview) */
   /* DEKORASI (rim glow / awan / lampu kota; semua prosedural, tanpa aset). Angka 0 = mati. */
   rimLit:1,       /* rim glow condong ke sisi yang kena cahaya (BH mini / portal) + hangat sedikit. 0 = rata seperti dulu, 1 = penuh, 2 = lebih ekstrem */
-  rimHalo:.45,    /* halo lebar tipis di luar limb (x opasitas atmosfer); 0 = tanpa halo */
-  cloudDrift:4,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
-  groundSkip:40,  /* tanah 'melewati' zona horizon: tinggi permukaan memudar ke rata-rata menuju horizon (penuh mulai groundSkip px x persp/120 dari limb). Sel tanah di sana gepeng ekstrem (lebar:tinggi = persp/s) -> strip lurus yang ikut tergeser saat rotasi (rotK). Relief/bayangan ikut mendatar. 0 = mati (seperti dulu) */
-  cloudSkip:60,   /* awan 'melewati' zona horizon: awan memudar ke 0 menuju horizon, penuh mulai cloudSkip px (x persp/120) dari limb. Di zona ini sel awan sangat gepeng (lebar >> tinggi, makin dekat horizon makin ekstrem) -> jadi strip lurus yang ikut hanyut. 0 = mati (awan sampai ke horizon seperti dulu) */
+  rimHalo:.75,    /* halo lebar tipis di luar limb (x opasitas atmosfer); 0 = tanpa halo */
+  cloudDrift:1,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
+  groundSkip:5,  /* tanah 'melewati' zona horizon: tinggi permukaan memudar ke rata-rata menuju horizon (penuh mulai groundSkip px x persp/120 dari limb). Sel tanah di sana gepeng ekstrem (lebar:tinggi = persp/s) -> strip lurus yang ikut tergeser saat rotasi (rotK). Relief/bayangan ikut mendatar. 0 = mati (seperti dulu) */
+  cloudSkip:10,   /* awan 'melewati' zona horizon: awan memudar ke 0 menuju horizon, penuh mulai cloudSkip px (x persp/120) dari limb. Di zona ini sel awan sangat gepeng (lebar >> tinggi, makin dekat horizon makin ekstrem) -> jadi strip lurus yang ikut hanyut. 0 = mati (awan sampai ke horizon seperti dulu) */
   rotRef:100,     /* kedalaman (px di bawah limb) tempat kecepatan Spin (SECTORS[].planet.rot x rotK) dan Drift awan berlaku persis. Geser tanah/awan sekarang PERSPEKTIF BENAR: kecepatan layar ∝ jarak ke horizon (horizon pelan, tanah dekat cepat), jadi tekstur gepeng di horizon tidak ikut meluncur secepat tanah dekat. Makin besar = semua baris makin cepat */
   cloudDMax:100000,   /* daur ulang awan: total geseran awan (px) yang boleh menumpuk sebelum awan memudar, posisi di-reset kecil, lalu muncul lagi (±3 dtk keluar + ±3 dtk masuk). Koordinat noise di shader tidak boleh tumbuh tanpa batas: makin besar, presisi float32 hilang -> tekstur jadi strip lurus. (geser dunia = px/rotRef sel, jadi presisi aman jauh lebih lama) 4 px/dtk = ±7 jam per siklus. Direset juga tiap wormhole menutup layar (lompat sektor). 0 = tanpa daur ulang (perilaku lama) */
   phMax:100000,    /* batas fase permukaan tanah (px) sebelum di-reset ke 0, dilakukan hanya saat overview (bobot sektor 0). Cuma relevan kalau rotK != 0. 0 = tanpa batas */
-  cloudShd:.5,    /* bayangan awan di tanah, jatuh menjauhi cahaya (0 = tanpa bayangan) */
-  cityA:1.1,      /* kecerahan lampu kota di sisi gelap (0 = mati) */
-  cityD:.55,      /* kepadatan lampu kota di area permukiman 0..1 */
-  cityTw:.25,     /* kedip lampu kota 0..1 (0 = tidak kedip; render periodik berhenti kalau drift awan juga 0) */
-  cloudLit:.8,    /* cahaya sendiri awan: tepi yang menghadap cahaya terang, bagian yang terhalang awan lain gelap, inti tebal sedikit gelap (0 = warna datar seperti dulu) */
+  cloudShd:1,    /* bayangan awan di tanah, jatuh menjauhi cahaya (0 = tanpa bayangan) */
+  cityA:3,      /* kecerahan lampu kota di sisi gelap (0 = mati) */
+  cityD:1,      /* kepadatan lampu kota di area permukiman 0..1 */
+  cityTw:1,     /* kedip lampu kota 0..1 (0 = tidak kedip; render periodik berhenti kalau drift awan juga 0) */
+  cloudLit:1,    /* cahaya sendiri awan: tepi yang menghadap cahaya terang, bagian yang terhalang awan lain gelap, inti tebal sedikit gelap (0 = warna datar seperti dulu) */
   cloudDet:.5,    /* serat/gumpalan halus di dalam awan (0 = mulus, 1 = berserat kuat); rata-rata kepadatan tidak berubah */
-  cityGlow:.5,    /* pendar lampu kota: tanah di kawasan kota ikut menyala tipis + dasar awan di atas kota berpendar hangat (0 = titik saja) */
-  craterA:.4,     /* kawah di tanah (kubah terbalik + bibir terang), posisi ikut seed sektor. 0 = tanpa kawah. Memudar menuju horizon (anti-moire) */
-  canyonA:.3,     /* kanyon: alur panjang berkelok yang menggelapkan tanah (dalam, cuma di area tertentu). 0 = tanpa kanyon */
-  craterS:1,      /* ukuran kawah (pengali; 1 = normal, >1 = lebih besar + lebih jarang, <1 = lebih kecil + lebih rapat) */
-  canyonS:1,      /* ukuran kanyon (pengali skala alur: >1 = alur lebih lebar dan panjang, <1 = lebih halus dan rapat) */
+  cityGlow:1,    /* pendar lampu kota: tanah di kawasan kota ikut menyala tipis + dasar awan di atas kota berpendar hangat (0 = titik saja) */
+  craterA:.8,     /* kawah di tanah (kubah terbalik + bibir terang), posisi ikut seed sektor. 0 = tanpa kawah. Memudar menuju horizon (anti-moire) */
+  canyonA:.6,     /* kanyon: alur panjang berkelok yang menggelapkan tanah (dalam, cuma di area tertentu). 0 = tanpa kanyon */
+  craterS:1.5,      /* ukuran kawah (pengali; 1 = normal, >1 = lebih besar + lebih jarang, <1 = lebih kecil + lebih rapat) */
+  canyonS:.5,      /* ukuran kanyon (pengali skala alur: >1 = alur lebih lebar dan panjang, <1 = lebih halus dan rapat) */
   /* BIOME (laut / gunung / hutan / kota cyberpunk): bercak procedural di tanah, WARNA DIKUNCI (tidak ngikut tema sektor) tapi cuma di area biome-nya; di luar itu tanah tetap ngikut palette sektor.
      Semua turunan noise frekuensi rendah (sekitar 5 sel), memudar ke horizon seperti kawah (LOD + groundSkip). 0 = mati. bioA = 0: jalur shader sama persis seperti sebelum biome. */
   bioA:.8,        /* kekuatan biome keseluruhan (0 = mati total, 1 = penuh) */
-  bioCol:1,       /* 1 = warna biome DIKUNCI (laut biru, hutan hijau, dst); 0 = pakai kecerahan biome tapi warna ngikut palette sektor */
+  bioCol:.8,       /* 1 = warna biome DIKUNCI (laut biru, hutan hijau, dst); 0 = pakai kecerahan biome tapi warna ngikut palette sektor */
   bioSea:.5,      /* luas laut (0 = tanpa laut). Laut rata, ada kilau cahaya + garis pantai */
-  bioMtn:.4,      /* luas pegunungan (batu gelap + puncak salju, relief lebih tajam). 0 = tanpa gunung */
-  bioFor:.5,      /* luas hutan (bercak hijau gelap bertekstur). 0 = tanpa hutan */
-  bioUrb:.5,      /* luas kota cyberpunk (blok gelap + grid jalan neon magenta/cyan/amber, menyala di sisi malam). 0 = tanpa kota */
+  bioMtn:.05,      /* luas pegunungan (batu gelap + puncak salju, relief lebih tajam). 0 = tanpa gunung */
+  bioFor:.4,      /* luas hutan (bercak hijau gelap bertekstur). 0 = tanpa hutan */
+  bioUrb:.4,      /* luas kota cyberpunk (blok gelap + grid jalan neon magenta/cyan/amber, menyala di sisi malam). 0 = tanpa kota */
   earthK:1,       /* BUMI di OVERVIEW: laut luas biru, benua hijau/cokelat/gurun, awan putih; kekuatan x (1 - bobot sektor), jadi hilang mulus saat masuk sektor (sektor tetap biome biasa). 0 = overview seperti biome biasa */
   /* EFEK 2D (aurora / flare / puing / petir): overlay Canvas 2D di planet3dDraw, 60fps, ikut ROT + ayunan. Rancangan: rencana-dekor-planet.md. F1 = kerangka saja (belum ada gambar). */
   auroraOn:true,  /* tirai aurora di atas limb sisi gelap */
   flareOn:true,   /* kilau saat cahaya (portal / BH mini) lewat limb; tanpa acak */
   debrisOn:true,  /* puing / satelit kecil melintas di atas limb */
-  boltOn:false,   /* kilat di sisi gelap (mati dulu) */
+  boltOn:true,   /* kilat di sisi gelap (mati dulu) */
   evK:1,          /* pengali frekuensi kejadian acak (puing + petir); flare dan aurora tidak terpengaruh */
   boltK:1,        /* skala ukuran petir (panjang, tebal garis, jari-jari kilau). 1 = default kecil (panjang 10-28px); .3 = sangat kecil, 2 = dua kali lipat */
   fxDebug:false,  /* uji F1 lewat console: PL3D_CFG.fxDebug=true -> garis limb magenta + titik cahaya (kuning) + titik limb di bawah cahaya */

@@ -13,6 +13,7 @@
      (3) saat lompat, 09-wormhole.js memegang cincin (WORMHOLE.ringOwned) dan memanggil portal3dDraw(...,{noMouth:true,ch:1}) di kanvasnya sendiri: cincin membesar (zoom-in) dengan terowongan di dalamnya.
    Matikan 3D saja: ?portal3d=0 atau localStorage dumul_portal3d=0 (cincin 2D tetap tampil). */
 var PT3D_CFG={
+  /* DEFAULT angka di bawah = hasil COPY TUNE 2026-10-28 (komentar angka lama bisa kadaluarsa) */
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   ovK:2,        /* cadangan: radius luar cincin overview = ovK x horizon BH (BH.Rr), dipakai kalau ptOvK() tidak bisa menghitung */
@@ -28,17 +29,17 @@ var PT3D_CFG={
   idleMouth:1,      /* 1 = saat idle mulut wormhole HILANG TOTAL (tanpa gradien gelap, spiral, terowongan, bintang; cuma cincin + petir idle). Mulut muncul (fade mouthIn) saat audio/SFX main (ptPlaying), charge, zoom wormhole, atau transisi sektor (WORMHOLE.busy/SECT.busy), lalu hilang lagi (fade mouthOut). Potato / reduce motion: muncul statis. 0 = mulut selalu ada seperti dulu */
   mouthIn:.3,       /* detik: fade muncul mulut saat bangun dari idle */
   mouthOut:.6,      /* detik: fade hilang mulut setelah aktivitas berhenti */
-  mouthStars:35,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
+  mouthStars:30,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
   starAdapt:true,   /* governor adaptif: kalau FPS < ~46, jumlah bintang aktif turun pelan sampai starMin x mouthStars, naik lagi kalau FPS pulih. false = selalu penuh */
   starMin:.5,       /* batas bawah governor (0.5 = paling sedikit separuh bintang) */
-  glow:1.3,         /* pengali terang garis sirkuit emissive */
-  boltMax:3,       /* petir bersamaan: cuma yang TERBARU yang hidup, yang tertua dibuang saat petir baru lahir (potato: 1). Dulu 9 */
-  boltGlow:.5,     /* pendar petir (2 goresan lebar di bawah inti putih): 1 = seperti dulu, .5 = lebar x.5 + sedikit lebih redup, 0 = tanpa pendar (inti saja) */
+  glow:.2,         /* pengali terang garis sirkuit emissive */
+  boltMax:6,       /* petir bersamaan: cuma yang TERBARU yang hidup, yang tertua dibuang saat petir baru lahir (potato: 1). Dulu 9 */
+  boltGlow:0,     /* pendar petir (2 goresan lebar di bawah inti putih): 1 = seperti dulu, .5 = lebar x.5 + sedikit lebih redup, 0 = tanpa pendar (inti saja) */
   boltCd:17,        /* jeda minimum per pita (ms), potato 90 */
   boltCap:6,        /* maks petir baru per frame dari onset pita (potato 1) */
   onFlux:.09,       /* ambang lonjakan mentah per pita buat memicu petir (makin kecil = makin sensitif; fallback tanpa analyser pakai .14) */
   spikeK:6.3,       /* spike = flux total > rata-rata x spikeK (+.05). Naikkan kalau spike terlalu sering, turunkan kalau jarang */
-  boltW:.4,         /* ketebalan petir (tetap, tidak ikut kekuatan beat); .4 = setara petir idle */
+  boltW:.1,         /* ketebalan petir (tetap, tidak ikut kekuatan beat); .4 = setara petir idle */
   boltCol:'255,255,255',   /* warna petir + kilau tepi + kilat mulut + inti percikan (tetap putih, tidak ikut warna SFX) */
   sparkCol:'255,214,140',  /* warna ekor percikan api/listrik di titik sambaran */
   sparkMax:90,      /* percikan bersamaan (potato 14) */
@@ -46,17 +47,17 @@ var PT3D_CFG={
   idleMin:220,idleMax:560,   /* jeda kilat redup saat tanpa musik (ms) */
   /* P4: kemiringan cincin overview, mengikuti gambar referensi (cincin dilihat 3/4: elips agak tegak, miring ke kanan). Radian. Urutan rotasi: yaw (y) -> pitch (x) -> roll (z, di bidang layar).
      y = seberapa 'menyamping' (0 = hadap penuh; .9 = elips lebar ~62%). x = condong ke atas/bawah. z = roll (negatif = puncak cincin condong ke kanan). Window menu sektor + wormhole TIDAK memakai ini (datar). */
-  tilt:{x:.1745,y:.8727,z:-.1745},   /* = 10 / 50 / -10 derajat (kelipatan 5 supaya kena snap slider panel tuning; dulu .2 / .9 / -.22) */
+  tilt:{x:0,y:.8727,z:0},   /* = 10 / 50 / -10 derajat (kelipatan 5 supaya kena snap slider panel tuning; dulu .2 / .9 / -.22) */
   spin:.0873,      /* = 5 derajat/dtk (dulu .08) */ /* kecepatan putar plat di bidang cincin, rad/dtk (.05 = ±2 menit/putaran, .2 = ±31 dtk, .6 = ±10 dtk). Berlaku di semua cincin (overview, menu sektor, wormhole); 0 = diam */
   tiltOv:1,       /* 0..1 pengali kemiringan di overview (0 = datar seperti dulu) */
   /* P4: orbit portal overview = orbit biasa (elips penuh, tanpa terbit/tenggelam): sumbu panjang sejajar kemiringan horizon planet (17-planet3d.js), pusat di home BH.
      Selama di-drag, orbit berhenti (portal ikut jari) lalu springback seperti dulu. reduce motion = portal diam di home. */
   orb:{on:true,
-    ax:.30,        /* setengah sumbu panjang terhadap lebar layar (dijepit supaya cincin tetap di dalam layar) */
-    ay:.09,        /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
-    per:90,        /* detik per satu putaran orbit (dulu 26). Pelan: gaya orbit drone di atmosfer (08-tx-drone.js) tapi jauh lebih lambat */
-    depth:.05,     /* cincin sedikit lebih besar di sisi dekat (bawah elips) dan lebih kecil di sisi jauh (atas), +-sekian x radius. 0 = ukuran tetap */
-    bob:1.5,         /* naik-turun ringan (px CSS), seperti drone. 0 = mati */
+    ax:.45,        /* setengah sumbu panjang terhadap lebar layar (dijepit supaya cincin tetap di dalam layar) */
+    ay:.1,        /* setengah sumbu pendek terhadap tinggi layar (kecil = elips pipih menyusuri horizon) */
+    per:240,        /* detik per satu putaran orbit (dulu 26). Pelan: gaya orbit drone di atmosfer (08-tx-drone.js) tapi jauh lebih lambat */
+    depth:.1,     /* cincin sedikit lebih besar di sisi dekat (bawah elips) dan lebih kecil di sisi jauh (atas), +-sekian x radius. 0 = ukuran tetap */
+    bob:0,         /* naik-turun ringan (px CSS), seperti drone. 0 = mati */
     counter:1,     /* 1 = arah orbit MELAWAN rotasi permukaan planet (PL3D_CFG.live.rot), 0 = selalu searah jarum jam */
     bet:1,         /* pengali kemiringan sumbu terhadap tangen limb (1 = sejajar horizon; >1 lebih curam) */
     gap:.5,       /* jarak minimum titik terendah orbit ke limb, x radius cincin (pusat orbit digeser naik kalau perlu) */
