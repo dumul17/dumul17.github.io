@@ -15,7 +15,7 @@ var AST3D_CFG={
   procVariants:6,
   reuse:true,    /* cache hasil render per pass: kalau pan/zoom/posisi BH/layout nggak berubah, GL + astStep cuma jalan ~fps (bawah), frame lain tinggal blit cache. false = render tiap frame seperti dulu */
   slowAlt:0,     /* HP lambat (FS.slow): 1 = pass belakang cuma di frame genap & depan cuma di ganjil (hemat GL, tapi tiap pass cuma ~fps/2 -> orbit patah-patah). 0 = kedua pass boleh render tiap frame (mulus) */
-  slowMax:60,    /* HP lambat (FS.slow): batas atas jeda render batu (ms). Dulu min(140, 2 x interval frame) = ~8 update/dtk di HP 15 fps -> patah. 60 = tiap frame di HP lambat */
+  slowMax:0,     /* HP lambat (FS.slow): batas atas jeda render batu (ms); jeda = max(1000/fps, min(slowMax, 2 x interval frame)). Dulu 140 -> ~8 update/dtk. 60 pun masih bikin frame 50 ms (kuantisasi vsync 16,6 ms) kena cache selang-seling -> patah. 0 = jeda tidak dilebarkan (default, orbit mulus seperti ?fs=0) */
   fps:30,        /* laju render batu saat diam (cache dipakai ulang di antaranya). Saat pan/zoom/BH bergerak: tiap frame */
   lod:[[1,2.6],[2,4.2]]   /* LOD batu: [detail ikosahedron, batas _sz (px)]; batu dgn _sz di bawah batas pakai mesh detail itu, sisanya detail 3 (320 segitiga). Batu 1-4px nggak butuh 320 segitiga. [] = semua detail 3 seperti dulu */
 };
@@ -249,7 +249,7 @@ function ast3dReuse(now,half){
     var same=ast3dFrameSig(now),C=AST3D.cache,per=1000/Math.max(1,AST3D_CFG.fps),ok=!!(C[ci]&&C[ci].ver===AST3D.ver);
     var fsl=(typeof FS!=='undefined'&&FS.slow)?FS:null;
     if(fsl){   /* HP lambat (05-sector-ui.js FS): jeda render = 2x interval frame (maks 140 ms), pass belakang cuma di frame genap, depan cuma di ganjil -> tiap frame paling banyak satu pass GL */
-      per=Math.max(per,Math.min(AST3D_CFG.slowMax||140,fsl.ema*2));
+      if(AST3D_CFG.slowMax>0)per=Math.max(per,Math.min(AST3D_CFG.slowMax,fsl.ema*2));   /* slowMax 0 = jeda TIDAK dilebarkan (sama dgn governor mati) */
       if(AST3D_CFG.slowAlt&&ok&&ci<2&&((fsl.n&1)!==ci)){U[ci]=now;AST3D.reused++;return 1;}
     }
     if(ok&&now<AST3D.nx[ci]-8){U[ci]=now;AST3D.reused++;return 1;}   /* -8ms: toleransi jitter rAF */
