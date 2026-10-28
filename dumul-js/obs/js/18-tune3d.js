@@ -112,7 +112,7 @@ var T3D=(function(){
 
   defGroup('pt',{key:'dumul_tune_pt',root:function(){return window.PT3D_CFG;},
     en:'PORTAL SETTINGS SAVED',idt:'SETELAN PORTAL TERSIMPAN',
-    secs:{ring:['RING','CINCIN'],orbit:['ORBIT','ORBIT'],bolt:['LIGHTNING','PETIR']},
+    secs:{ring:['RING','CINCIN'],orbit:['ORBIT','ORBIT'],mouth:['WORMHOLE MOUTH','MULUT WORMHOLE'],bolt:['LIGHTNING','PETIR']},
     after:function(){},
     rows:[
       /* Cincin */
@@ -132,11 +132,17 @@ var T3D=(function(){
       ['orb.bob','Bob','Naik-turun',0,8,10,1,'px','o','orbit','orb.on'],
       ['orb.gap','Gap','Jarak limb',0,2,100,0,'%','o','orbit','orb.on'],
       ['orb.near','Near','Dekat planet',0,1,100,0,'%','o','orbit','orb.on'],   /* 0 = orbit di home BH (jauh dari planet), 1 = orbit menyusuri limb */
+      /* Mulut wormhole (hilang saat idle, muncul saat musik / charge / pindah sektor) */
+      ['idleMouth','Hide at idle','Sembunyi saat idle',0,1,1,0,'','t','mouth'],
+      ['mouthIn','Fade in','Muncul',.1,1.5,100,0,'s','','mouth','idleMouth'],
+      ['mouthOut','Fade out','Hilang',.1,1.5,100,0,'s','','mouth','idleMouth'],
+      ['mouthStars','Stars','Bintang',0,80,1,0,'','','mouth'],
       /* Petir */
-      ['mouthStars','Stars','Bintang',0,80,1,0,'','','bolt'],
       ['boltMax','Bolts','Jumlah petir',0,16,1,0,'','','bolt'],
       ['boltW','Bolt W','Tebal petir',.1,1.2,100,0,'%','','bolt','boltMax'],
-      ['boltGlow','Glow','Pendar petir',0,1,100,0,'%','','bolt','boltMax']
+      ['boltGlow','Glow','Pendar petir',0,1,100,0,'%','','bolt','boltMax'],
+      ['idleMin','Idle gap min','Jeda idle min',100,1000,1,0,'ms','','bolt'],
+      ['idleMax','Idle gap max','Jeda idle maks',100,1000,1,0,'ms','','bolt']
     ]});
 
   /* Milky Way overview: nilai default + loader ada di 02-sky-logic.js (MW_DEF / mwTuneSet), jadi di sini tidak dimuat ulang */

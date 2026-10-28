@@ -25,6 +25,9 @@ var PT3D_CFG={
   ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */
   plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
   alt:1,            /* HP lambat (governor FS.slow di 05-sector-ui.js): render GL cincin cuma tiap 2 frame (genap), frame ganjil memakai hasil terakhir dari kanvas cache 2D. 0 = selalu tiap frame. Petir/percikan/mulut/kilau tetap tiap frame (digambar 2D di luar GL); tidak berlaku saat charge (ch>0), zoom wormhole (big/noMouth) atau window menu */
+  idleMouth:1,      /* 1 = saat idle mulut wormhole HILANG TOTAL (tanpa gradien gelap, spiral, terowongan, bintang; cuma cincin + petir idle). Mulut muncul (fade mouthIn) saat audio/SFX main (ptPlaying), charge, zoom wormhole, atau transisi sektor (WORMHOLE.busy/SECT.busy), lalu hilang lagi (fade mouthOut). Potato / reduce motion: muncul statis. 0 = mulut selalu ada seperti dulu */
+  mouthIn:.3,       /* detik: fade muncul mulut saat bangun dari idle */
+  mouthOut:.6,      /* detik: fade hilang mulut setelah aktivitas berhenti */
   mouthStars:35,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
   starAdapt:true,   /* governor adaptif: kalau FPS < ~46, jumlah bintang aktif turun pelan sampai starMin x mouthStars, naik lagi kalau FPS pulih. false = selalu penuh */
   starMin:.5,       /* batas bawah governor (0.5 = paling sedikit separuh bintang) */
@@ -638,7 +641,20 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(tk>0.001){tm=ptTiltMat(ptTiltAng(now,tk));}   /* P4: elemen 2D (mulut, petir, percikan, kilau muatan) digambar di bidang cincin = affine yang sama dengan kemiringan 3D */
   var r2d=function(){if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}ptRing2D(g,Rp,now,playing);if(tm)g.restore();};   /* cadangan 2D ikut miring */
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
-  if(!opts.noMouth&&!PXo.ptm){if(still||!pttDrawAlt(g,Rp*PT_IN,now,!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.big&&!(ch>0))))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
+  if(!opts.noMouth&&!PXo.ptm){
+    var Rm=Rp*PT_IN,mAct=1;
+    if(PT3D_CFG.idleMouth){   /* mAct 0..1: 0 = idle (mulut TIDAK digambar sama sekali), 1 = mulut penuh; naik mouthIn dtk, turun mouthOut dtk */
+      var wake=!!(playing||ch>0||opts.big||(typeof WORMHOLE!=='undefined'&&WORMHOLE.busy)||(typeof SECT!=='undefined'&&SECT.busy)),
+          mdt=PT3D.mT?Math.min(.1,Math.max(0,(now-PT3D.mT)/1000)):.016;
+      PT3D.mT=now;PT3D.mA=Math.max(0,Math.min(1,(PT3D.mA||0)+(wake?mdt/Math.max(.05,PT3D_CFG.mouthIn):-mdt/Math.max(.05,PT3D_CFG.mouthOut))));mAct=PT3D.mA;
+    }else PT3D.mA=1;
+    if(mAct>.004){   /* idle: lewati semua (ptMouth, terowongan, pttStep, bintang) -> tengah cincin transparan, cuma petir */
+      var ga0=g.globalAlpha;
+      if(mAct<1)g.globalAlpha=ga0*mAct;
+      if(still||!pttDrawAlt(g,Rm,now,!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.big&&!(ch>0))))ptMouth(g,Rm,now,!still);   /* terowongan warp mini; statis kalau potato / reduce motion */
+      g.globalAlpha=ga0;
+    }
+  }
   /* visualizer = kilatan petir di dalam cincin (debu + pulse elips visualizer BH lama dibuang). updateAVColor / avbUpdate dulu dipanggil lewat drawAudioVisualizer, sekarang dari sini. */
   try{
     if(typeof updateAVColor==='function')updateAVColor(now);
