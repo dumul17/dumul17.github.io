@@ -1,5 +1,6 @@
 'use strict';
 /* 18-tune3d.js — tab tuning Planet / Drone / Portal (+ Milky Way overview) di panel owl > Settings (#bh-panel).
+   PLANET = slot per konteks (overview + tiap sektor, lihat 'slots'/'ui' di defGroup('pl')): Basic = kartu seksi lipat + saklar + slider master, Advanced = semua slider mentah.
    Dimuat PALING AKHIR (setelah 14-drone3d, 15-portal3d, 17-planet3d) supaya semua CFG-nya sudah ada.
    Cara kerja: tiap grup = satu objek CFG (PL3D_CFG / DR3D_CFG / PT3D_CFG / MW) + daftar baris. Angka di CFG saat file ini jalan = DEFAULT
    (snapshot sebelum nilai tersimpan dimuat). Slider dibuat dari daftar ini ke dalam .bp-page[data-page] (HTML-nya cuma wadah kosong), jadi gaya,
@@ -24,16 +25,23 @@ var T3D=(function(){
 
   defGroup('pl',{key:'dumul_tune_pl',root:function(){return window.PL3D_CFG;},
     en:'PLANET SETTINGS SAVED',idt:'SETELAN PLANET TERSIMPAN',
-    /* PRESET (tombol di atas tab Planet): cuma knob "tampilan" (PKEYS); bentuk (Curve/Horizon/Cell/Persp), Sway, Sink, Spin, Rate tidak disentuh.
-       v = nilai CFG mentah; semua kelipatan snap. 'def' = nilai default CFG (snapshot saat file ini jalan). Pilih preset = nilai berubah live, Save baru menyimpan. */
-    pkeys:['haze','hazeA','fadeS','groundSkip','lod','craterA','craterS','canyonA','canyonS','bioA','bioCol','bioSea','bioMtn','bioFor','bioUrb','earthK','cloud','cloudCov','cloudH','cloudSkip','cloudShd','cloudLit','cloudDet','cloudDrift','atmK','rimLit','rimHalo','fallK','cityA','cityD','cityTw','cityGlow','auroraOn','flareOn','debrisOn','boltOn','evK','par','zoomK'],
-    presets:[
-      {k:'def',en:'Default',id:'Bawaan'},
-      {k:'clean',en:'Clean',id:'Bersih',v:{haze:80,hazeA:.3,fadeS:20,lod:.5,craterA:.2,craterS:1,canyonA:0,canyonS:1,bioA:.5,bioCol:1,bioSea:.5,bioMtn:.3,bioFor:.4,bioUrb:.3,earthK:1,cloud:.3,cloudCov:.5,cloudH:20,cloudShd:.3,cloudLit:.6,cloudDet:.3,cloudDrift:1,atmK:.8,rimLit:1,rimHalo:.3,fallK:1,cityA:0,cityD:.55,cityTw:.25,cityGlow:.3,auroraOn:0,flareOn:1,debrisOn:0,boltOn:0,evK:1,par:.05,zoomK:.1}},
-      {k:'lively',en:'Lively',id:'Hidup',v:{haze:95,hazeA:.4,fadeS:10,lod:.5,craterA:.6,craterS:.8,canyonA:.4,canyonS:1,bioA:1,bioCol:1,bioSea:.55,bioMtn:.5,bioFor:.6,bioUrb:.7,earthK:1,cloud:.6,cloudCov:.8,cloudH:20,cloudShd:.6,cloudLit:.9,cloudDet:.6,cloudDrift:8,atmK:1.3,rimLit:1.5,rimHalo:.6,fallK:1.3,cityA:1.5,cityD:.7,cityTw:.4,cityGlow:.6,auroraOn:1,flareOn:1,debrisOn:1,boltOn:1,evK:1.5,par:.08,zoomK:.15}},
-      {k:'cine',en:'Cinematic',id:'Sinematik',v:{haze:140,hazeA:.6,fadeS:30,lod:.5,craterA:.8,craterS:1.5,canyonA:.6,canyonS:1.5,bioA:.8,bioCol:1,bioSea:.5,bioMtn:.6,bioFor:.4,bioUrb:.4,earthK:1,cloud:.4,cloudCov:.6,cloudH:30,cloudShd:.7,cloudLit:1,cloudDet:.5,cloudDrift:2,atmK:1.5,rimLit:2,rimHalo:.8,fallK:1.5,cityA:2,cityD:.4,cityTw:.2,cityGlow:.5,auroraOn:1,flareOn:1,debrisOn:0,boltOn:1,evK:.5,par:.1,zoomK:.2}}
+    /* SLOT per konteks (bukan preset lagi): overview + tiap sektor punya setelan sendiri (key dumul_tune_pl_<ov|k sektor>). Panel mengedit slot konteks yang LAGI AKTIF;
+       pindah konteks = nilai CFG di-lerp ke slot tujuan. Slot kosong / habis di-Reset = default CFG. fps + bandMin = setelan performa, GLOBAL (key dumul_tune_pl_perf), bukan per slot. */
+    slots:true,perf:{fps:1,bandMin:1},
+    /* UI Basic: tiap seksi = kartu yang bisa dilipat. mem = knob yang digabung jadi 1 slider master (nilai = default x master, 100% = tampilan bawaan, knob default<=0 tidak ikut),
+       tog = ada saklar on/off (= master 0 <-> terakhir), fx = saklar gabungan 4 efek 2D, raw = slider mentah yang tetap tampil di Basic. Sisanya masuk ADVANCED (semua slider mentah). */
+    ui:[
+      {id:'shape',raw:['rK','hzDy','cell','persp','lod']},
+      {id:'ground',mem:['craterA','canyonA'],tog:1,raw:['craterS','canyonS']},
+      {id:'bio',mem:['bioA','bioSea','bioMtn','bioFor','bioUrb','earthK'],tog:1},
+      {id:'haze',raw:['haze','hazeA']},
+      {id:'cloud',mem:['cloud','cloudCov','cloudShd','cloudLit','cloudDet'],tog:1,raw:['cloudH']},
+      {id:'atm',mem:['atmK','rimLit','rimHalo'],tog:1,raw:['fallK']},
+      {id:'city',mem:['cityA','cityD','cityTw','cityGlow'],tog:1},
+      {id:'fx',fx:1,raw:['evK']},
+      {id:'move',mem:['par','zoomK','rotK','sinkK','libr.k'],tog:1}
     ],
-    secs:{shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],bio:['BIOMES','BIOME'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK']},
+    secs:{adv:['ADVANCED','LANJUTAN'],shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],bio:['BIOMES','BIOME'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK'],perf:['PERFORMANCE (ALL SLOTS)','PERFORMA (SEMUA SLOT)']},
     after:function(p){try{if(p==='auroraOn'||p==='flareOn'||p==='debrisOn'||p==='boltOn'||p==='evK'||p==='boltK')return;PL3D.dirty=true;if(p==='hzDy')PL3D.topC=null;}catch(e){}},   /* efek 2D digambar tiap frame: tidak perlu render ulang shader */
     rows:[
       /* Bentuk */
@@ -56,7 +64,8 @@ var T3D=(function(){
       ['bioMtn','Mountains','Gunung',0,1,100,0,'%','','bio','bioA'],
       ['bioFor','Forest','Hutan',0,1,100,0,'%','','bio','bioA'],
       ['bioUrb','Cyber city','Kota cyber',0,1,100,0,'%','','bio','bioA'],
-      ['earthK','Earth','Bumi',0,1,100,0,'%','o','bio','bioA'],   /* cuma overview: laut luas + benua + awan putih; hilang mulus saat masuk sektor (satu-satunya baris planet yang beda konteks) */
+      ['urbSkip','City reach','Jangkauan kota',.2,1,100,0,'%','','bio','bioUrb'],   /* kota cuma di bagian jauh tanah; 100% = sampai dasar layar */
+      ['earthK','Earth','Bumi',0,1,100,0,'%','','bio','bioA'],   /* overview + sektor (sama): laut luas + benua + awan putih. Tab Planet sekarang IDENTIK di overview dan sektor */
       /* Kabut */
       ['haze','Haze','Kabut',0,240,1,0,'px','','haze'],
       ['hazeA','Haze α','Kabut α',0,1,100,0,'%','','haze'],
@@ -74,7 +83,7 @@ var T3D=(function(){
       ['rimHalo','Halo','Halo limb',0,1.5,100,0,'%','','atm'],
       ['fallK','Light','Jangkauan cahaya',.3,3,100,0,'%','','atm'],
       /* Kota */
-      ['cityA','City','Lampu kota',0,3,100,0,'%','','city'],
+      ['cityA','City','Lampu kota',0,3,100,0,'%','','city','bioUrb'],   /* lampu cuma di biome Cyber city: kalau Cyber city 0 baris ini diredupkan (percuma digeser) */
       ['cityD','Density','Padat',0,1,100,0,'%','','city','cityA'],
       ['cityTw','Twinkle','Kedip',0,1,100,0,'%','','city','cityA'],
       ['cityGlow','Glow','Pendar kota',0,1,100,0,'%','','city','cityA'],        /* pendar tanah kota + dasar awan di atas kota */
@@ -92,8 +101,8 @@ var T3D=(function(){
       ['sinkK','Sink','Terbenam',0,2,100,0,'%','','move'],                 /* gabungan BH sink + Tele sink (rasio tetap .5 : .35) */
       ['rotK','Spin','Putar',0,3,100,0,'%','','move'],                     /* tampil + berefek di overview dan sektor (ov.rot .5) */
       ['cloudDrift','Drift','Hanyut awan',-20,20,10,1,'px/s','','move','cloud'],
-      ['fps','Rate','Laju',1,15,1,0,'/s','','move'],
-      ['bandMin','Min bands','Pita min',1,6,1,0,'','','move']      /* 6 = tanpa pita adaptif; lebih kecil = refresh lampu kota/awan lebih rapat di HP lambat (beban per frame naik) */
+      ['fps','Rate','Laju',1,15,1,0,'/s','','perf'],
+      ['bandMin','Min bands','Pita min',1,6,1,0,'','','perf']      /* 6 = tanpa pita adaptif; lebih kecil = refresh lampu kota/awan lebih rapat di HP lambat (beban per frame naik) */
     ]});
 
   defGroup('dr',{key:'dumul_tune_dr',root:function(){return window.DR3D_CFG;},
@@ -189,59 +198,176 @@ var T3D=(function(){
   }
   function loadSaved(g){
     if(g.noLoad||g.dead)return;
+    if(g.slots){g.ctx=ctxKey();var sv=allVals(g,g.ctx);g.rows.forEach(function(r){if(typeof sv[r.p]==='number')vset(g,r,sv[r.p]);});return;}
     var o=lsGet(g.key);if(!o||typeof o!=='object')return;
     g.rows.forEach(function(r){var raw=o[r.p];if(typeof raw==='number'&&isFinite(raw))vset(g,r,r.t?raw:(r.inv?1-raw:raw));});   /* simpanan = nilai CFG apa adanya */
   }
   function rawGet(g,r){var v=g.get?g.get(r.p):pget(rootOf(g),r.p);return r.t?(v?1:0):+v;}
-  function stored(g){var o=lsGet(g.key),s={};g.rows.forEach(function(r){s[r.p]=(o&&typeof o[r.p]==='number')?o[r.p]:g.def[r.p];});return s;}
+  function stored(g){if(g.slots)return allVals(g,g.ctx||ctxKey());var o=lsGet(g.key),s={};g.rows.forEach(function(r){s[r.p]=(o&&typeof o[r.p]==='number')?o[r.p]:g.def[r.p];});return s;}
 
-  /* ---------- preset ---------- */
   function rowOf(g,p){var i;for(i=0;i<g.rows.length;i++)if(g.rows[i].p===p)return g.rows[i];return null;}
-  function presetVal(g,pr,p){return pr.v?pr.v[p]:g.def[p];}   /* preset 'def' = default CFG */
-  function applyPreset(id,k){
-    var g=G[id],pr=null,i;if(!g||g.dead||!g.presets)return;
-    for(i=0;i<g.presets.length;i++)if(g.presets[i].k===k)pr=g.presets[i];if(!pr)return;
-    g.pkeys.forEach(function(p){var r=rowOf(g,p),raw=presetVal(g,pr,p);if(!r||typeof raw!=='number')return;vset(g,r,r.inv?1-raw:raw);});
-    g.after('*');paint(id);
+
+  /* ---------- slot per konteks (planet) ---------- */
+  var LPMS=600,FXK=['auroraOn','flareOn','debrisOn','boltOn'];
+  function ctxKey(){try{if(typeof SECT==='undefined')return'ov';if(SECT.busy&&SECT.phase==='in'&&SECT.target)return SECT.target.k;return SECT.cur?SECT.cur.k:'ov';}catch(e){return'ov';}}   /* zoom-in: langsung konteks tujuan supaya lerp jalan bareng crossfade SKYT */
+  function sectList(){try{return(typeof SECT!=='undefined'&&SECT.list)||[];}catch(e){return[];}}
+  function ctxName(k){
+    if(k==='ov')return 'Overview';
+    var L=sectList(),i,s,nm;
+    for(i=0;i<L.length;i++)if(L[i].k===k){s=L[i];nm=s.name||s.title||s.nm||s.k;return 'S'+(i+1)+' \u00b7 '+String(nm).toUpperCase();}
+    return String(k);
   }
-  function presetOn(g,pr){var i,r,p;for(i=0;i<g.pkeys.length;i++){p=g.pkeys[i];r=rowOf(g,p);if(r&&Math.abs(rawGet(g,r)-presetVal(g,pr,p))>.5/r.sc)return false;}return true;}
+  function ctxShort(k){if(k==='ov')return 'Overview';var L=sectList(),i;for(i=0;i<L.length;i++)if(L[i].k===k)return 'S'+(i+1);return String(k);}
+  function slotKey(g,k){return g.key+'_'+k;}
+  function slotObj(g,k){var o=lsGet(slotKey(g,k));if(!o||typeof o!=='object')o=lsGet(g.key);return o||{};}   /* slot belum ada -> simpanan lama (dumul_tune_pl) -> default; slot {} (habis Reset) = default murni */
+  function slotSaved(g,k){var o=lsGet(slotKey(g,k));return !!o&&typeof o==='object'&&Object.keys(o).length>0;}
+  function valuesFor(g,k){var o=slotObj(g,k),s={};g.rows.forEach(function(r){if(g.perf[r.p])return;s[r.p]=(typeof o[r.p]==='number'&&isFinite(o[r.p]))?o[r.p]:g.def[r.p];});return s;}
+  function perfVals(g){var o=lsGet(slotKey(g,'perf'))||lsGet(g.key)||{},s={};Object.keys(g.perf).forEach(function(p){s[p]=(typeof o[p]==='number'&&isFinite(o[p]))?o[p]:g.def[p];});return s;}
+  function allVals(g,k){var s=valuesFor(g,k),p=perfVals(g),q;for(q in p)s[q]=p[q];return s;}
+  function cancelLerp(g){g.lp=null;}
+  function putRaw(g,r,v){if(r.t)pset(rootOf(g),r.p,!!v);else pset(rootOf(g),r.p,clamp(+v,r.min,r.max));}
+  function afterAll(g){g.after('hzDy');g.after('*');}
+  function applyVals(g,vals){cancelLerp(g);g.rows.forEach(function(r){if(typeof vals[r.p]==='number')putRaw(g,r,vals[r.p]);});afterAll(g);}
+  function startLerp(g,to){
+    cancelLerp(g);
+    var from={},rd=(typeof reduce!=='undefined'&&reduce);
+    g.rows.forEach(function(r){
+      if(typeof to[r.p]!=='number')return;
+      if(r.t||rd){putRaw(g,r,to[r.p]);return;}   /* saklar: langsung; lainnya: lerp (kecuali reduce-motion) */
+      from[r.p]=rawGet(g,r);
+    });
+    if(rd){afterAll(g);return;}
+    var L={t0:performance.now(),from:from,to:to};g.lp=L;
+    (function step(now){
+      if(g.lp!==L)return;
+      var u=Math.min(1,(now-L.t0)/LPMS),e=u*u*(3-2*u);
+      g.rows.forEach(function(r){if(!(r.p in L.from))return;putRaw(g,r,L.from[r.p]+(L.to[r.p]-L.from[r.p])*e);});
+      afterAll(g);
+      if(u>=1){g.lp=null;if(g.built)paint(g.id);try{bhuRepaint();}catch(e2){}}else requestAnimationFrame(step);
+    })(L.t0);
+  }
+  function ctxTick(){
+    var g=G.pl;if(!g||g.dead)return;
+    var k=ctxKey();if(k===g.ctx)return;
+    g.ctx=k;startLerp(g,valuesFor(g,k));
+    if(g.built)paint('pl');
+    try{bhuRepaint();}catch(e){}
+  }
+
+  /* ---------- master seksi (planet) ---------- */
+  function mOf(g,sec){var num=0,den=0;sec.mem.forEach(function(p){var r=rowOf(g,p),d=g.def[p];if(!r||!(d>0))return;num+=rawGet(g,r)*d;den+=d*d;});return den?num/den:1;}   /* proyeksi nilai mentah ke arah default -> posisi slider master selalu jujur walau knob mentah diubah di Advanced */
+  function mSet(g,sec,m){sec.mem.forEach(function(p){var r=rowOf(g,p),d=g.def[p];if(!r||!(d>0))return;pset(rootOf(g),p,clamp(d*m,r.min,r.max));});g.after('*');}
+  function mMax(g,sec){var mx=2;sec.mem.forEach(function(p){var r=rowOf(g,p),d=g.def[p];if(r&&d>0)mx=Math.min(mx,r.max/d);});return Math.max(1,mx);}
+  function fxOn(g){var on=false;FXK.forEach(function(p){if(pget(rootOf(g),p))on=true;});return on;}
+  function secToggle(g,sec){
+    if(sec.fx){
+      if(fxOn(g)){sec.keep=FXK.map(function(p){return pget(rootOf(g),p)?1:0;});FXK.forEach(function(p){pset(rootOf(g),p,false);});}
+      else FXK.forEach(function(p,i){pset(rootOf(g),p,sec.keep?!!sec.keep[i]:true);});
+      if(!fxOn(g))FXK.forEach(function(p){pset(rootOf(g),p,true);});
+      g.after('*');return;
+    }
+    var m=mOf(g,sec);
+    if(m>.004){sec.last=m;mSet(g,sec,0);}else mSet(g,sec,sec.last||1);
+  }
+  function secOn(g,sec){return sec.fx?fxOn(g):mOf(g,sec)>.004;}
 
   /* ---------- UI ---------- */
+  function inject(){
+    if(document.getElementById('t3-css'))return;
+    var st=document.createElement('style');st.id='t3-css';
+    st.textContent='.t3-head{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}.t3-head .t3-ttl{flex:1}.t3-head .t3-chev{opacity:.6;font-size:11px;width:12px;text-align:center}'
+      +'.t3-head .bp-switch{flex:none}.t3-shut{display:none!important}.t3-info{font-size:11px;opacity:.7;padding:2px 2px 6px}.t3-sub{font-size:11px;opacity:.6;padding:6px 2px 0}';
+    document.head.appendChild(st);
+  }
+  function makeRow(g,r){
+    var row=document.createElement(r.t?'div':'label'),k=document.createElement('span'),kt=document.createElement('span');
+    row.className=r.t?'bp-row bp-tog bp-wide':'bp-row';if(r.ctx)row.setAttribute('data-ctx',r.ctx);
+    k.className='bp-k';kt.textContent=lb(r.en,r.id);k.appendChild(kt);row.appendChild(k);
+    if(r.t){
+      var b=document.createElement('button');b.type='button';b.className='bp-switch';b.setAttribute('aria-pressed','true');
+      b.addEventListener('click',function(e){e.stopPropagation();cancelLerp(g);vset(g,r,vget(g,r)?0:1);paint(g.id);try{haptic(6);}catch(er){}try{bhuRepaint();}catch(er2){}});
+      row.appendChild(b);r.sw=b;
+    }else{
+      var inp=document.createElement('input'),out=document.createElement('output');
+      inp.type='range';inp.className='bp-range';inp.step='1';
+      inp.min=String(Math.round(r.min*r.sc));inp.max=String(Math.round(r.max*r.sc));   /* baris terbalik (inv): rentang min/max sudah dalam nilai TAMPIL */
+      inp.addEventListener('input',function(){cancelLerp(g);vset(g,r,(+inp.value)/r.sc);paint(g.id);try{bhuRepaint();}catch(er){}});
+      row.appendChild(inp);row.appendChild(out);r.el=inp;r.out=out;
+    }
+    r.rowEl=row;return row;
+  }
+  function makeMaster(g,sec){
+    var row=document.createElement('label'),k=document.createElement('span'),kt=document.createElement('span'),inp=document.createElement('input'),out=document.createElement('output');
+    row.className='bp-row';k.className='bp-k';kt.textContent=lb('Intensity','Intensitas');k.appendChild(kt);row.appendChild(k);
+    inp.type='range';inp.className='bp-range';inp.step='1';inp.min='0';inp.max=String(Math.round(mMax(g,sec)*100));   /* 100 = tampilan bawaan; atas = sampai knob pertama mentok */
+    inp.addEventListener('input',function(){cancelLerp(g);mSet(g,sec,(+inp.value)/100);paint(g.id);try{bhuRepaint();}catch(er){}});
+    row.appendChild(inp);row.appendChild(out);sec.el=inp;sec.out=out;sec.rowEl=row;return row;
+  }
+  function makeCard(g,frag,id,open,sec){
+    var h=document.createElement('div'),t=document.createElement('span'),ch=document.createElement('span'),body=document.createElement('div');
+    h.className='bp-sec t3-sec t3-head';t.className='t3-ttl';t.textContent=lb(g.secs[id][0],g.secs[id][1]);h.appendChild(t);
+    if(sec&&(sec.tog||sec.fx)){
+      var sw=document.createElement('button');sw.type='button';sw.className='bp-switch';sw.setAttribute('aria-pressed','true');
+      sw.addEventListener('click',function(e){e.stopPropagation();cancelLerp(g);secToggle(g,sec);paint(g.id);try{haptic(6);}catch(er){}try{bhuRepaint();}catch(er2){}});
+      h.appendChild(sw);sec.sw=sw;
+    }
+    ch.className='t3-chev';h.appendChild(ch);body.className='t3-body';
+    function sync(shut){body.classList.toggle('t3-shut',shut);ch.textContent=shut?'\u25b8':'\u25be';}
+    var shut=!open;sync(shut);
+    h.addEventListener('click',function(){shut=!shut;sync(shut);});
+    frag.appendChild(h);frag.appendChild(body);return body;
+  }
+  function buildSlots(g,host){
+    inject();
+    var frag=document.createDocumentFragment(),used={},adv;
+    g.bar=document.createElement('div');g.bar.className='t3-presets t3-ctx';
+    g.info=document.createElement('div');g.info.className='t3-info';
+    g.cbar=document.createElement('div');g.cbar.className='t3-presets t3-copy';
+    frag.appendChild(g.bar);frag.appendChild(g.info);frag.appendChild(g.cbar);
+    g.ui.forEach(function(sec,i){
+      var body=makeCard(g,frag,sec.id,i===0,sec);
+      if(sec.mem)body.appendChild(makeMaster(g,sec));
+      (sec.raw||[]).forEach(function(p){var r=rowOf(g,p);if(!r)return;used[p]=1;body.appendChild(makeRow(g,r));});
+    });
+    adv=makeCard(g,frag,'adv',false,null);
+    var last='';
+    g.rows.forEach(function(r){
+      if(used[r.p])return;
+      if(r.s&&r.s!==last&&g.secs[r.s]){var h=document.createElement('div');h.className='bp-sec t3-sec';h.textContent=lb(g.secs[r.s][0],g.secs[r.s][1]);adv.appendChild(h);}
+      last=r.s;adv.appendChild(makeRow(g,r));
+    });
+    host.appendChild(frag);
+  }
   function build(g){
     if(g.built||g.dead)return;
     var host=g.box?document.getElementById(g.box):document.querySelector('#bh-panel .bp-page[data-page="'+g.id+'"]');
     if(!host)return;
     g.built=1;g.host=host;
+    if(g.slots){buildSlots(g,host);return;}
     var frag=document.createDocumentFragment(),lastSec='';
-    if(g.presets){
-      var pbar=document.createElement('div');pbar.className='t3-presets';
-      g.presets.forEach(function(pr){
-        var b=document.createElement('button');b.type='button';b.className='bp-switch off';b.textContent=lb(pr.en,pr.id);
-        b.addEventListener('click',function(e){e.stopPropagation();applyPreset(g.id,pr.k);try{haptic(6);}catch(er){}try{bhuRepaint();}catch(er2){}});
-        pr.btn=b;pbar.appendChild(b);
-      });
-      frag.appendChild(pbar);
-    }
     g.rows.forEach(function(r){
       if(g.secs&&r.s&&r.s!==lastSec&&g.secs[r.s]){var h=document.createElement('div');h.className='bp-sec t3-sec';h.textContent=lb(g.secs[r.s][0],g.secs[r.s][1]);frag.appendChild(h);}
-      lastSec=r.s;
-      var row=document.createElement(r.t?'div':'label'),k=document.createElement('span'),kt=document.createElement('span');
-      row.className=r.t?'bp-row bp-tog bp-wide':'bp-row';if(r.ctx)row.setAttribute('data-ctx',r.ctx);
-      k.className='bp-k';kt.textContent=lb(r.en,r.id);k.appendChild(kt);row.appendChild(k);
-      if(r.t){
-        var b=document.createElement('button');b.type='button';b.className='bp-switch';b.setAttribute('aria-pressed','true');
-        b.addEventListener('click',function(e){e.stopPropagation();vset(g,r,vget(g,r)?0:1);paint(g.id);try{haptic(6);}catch(er){}try{bhuRepaint();}catch(er2){}});
-        row.appendChild(b);r.sw=b;
-      }else{
-        var inp=document.createElement('input'),out=document.createElement('output');
-        inp.type='range';inp.className='bp-range';inp.step='1';
-        inp.min=String(Math.round(r.min*r.sc));inp.max=String(Math.round(r.max*r.sc));   /* baris terbalik (inv): rentang min/max sudah dalam nilai TAMPIL */
-        inp.addEventListener('input',function(){vset(g,r,(+inp.value)/r.sc);paint(g.id);try{bhuRepaint();}catch(er){}});
-        row.appendChild(inp);row.appendChild(out);r.el=inp;r.out=out;
-      }
-      r.rowEl=row;frag.appendChild(row);
+      lastSec=r.s;frag.appendChild(makeRow(g,r));
     });
     host.appendChild(frag);
+  }
+  function chip(txt,on,fn){var b=document.createElement('button');b.type='button';b.className='bp-switch'+(on?'':' off');b.textContent=txt;b.setAttribute('aria-pressed',on?'true':'false');b.addEventListener('click',function(e){e.stopPropagation();fn();});return b;}
+  function paintBar(g){
+    var cur=g.ctx||ctxKey(),L=sectList(),ks=['ov'],i,sig;
+    for(i=0;i<L.length;i++)ks.push(L[i].k);
+    sig=ks.map(function(k){return k+(slotSaved(g,k)?'*':'');}).join(',')+'|'+cur;
+    if(g.sig!==sig){
+      g.sig=sig;g.bar.textContent='';g.cbar.textContent='';
+      ks.forEach(function(k){g.bar.appendChild(chip(ctxShort(k)+(slotSaved(g,k)?' \u2022':''),k===cur,function(){}));});   /* indikator saja: slot ikut konteks yang lagi aktif; \u2022 = sudah tersimpan */
+      var lab=document.createElement('span');lab.className='t3-sub';lab.textContent=lb('Copy from','Salin dari');g.cbar.appendChild(lab);
+      g.cbar.appendChild(chip(lb('Default','Bawaan'),false,function(){copyFrom(g,'def');}));
+      ks.forEach(function(k){if(k!==cur)g.cbar.appendChild(chip(ctxShort(k),false,function(){copyFrom(g,k);}));});
+    }
+    g.info.textContent=lb('Editing: ','Mengedit: ')+ctxName(cur);
+  }
+  function copyFrom(g,k){
+    var v=(k==='def')?(function(){var o={};g.rows.forEach(function(r){if(!g.perf[r.p])o[r.p]=g.def[r.p];});return o;})():valuesFor(g,k);
+    applyVals(g,v);paint(g.id);try{haptic(6);}catch(e){}try{bhuRepaint();}catch(e2){}   /* belum disimpan: tekan Save untuk mengunci ke slot ini */
   }
   /* baris terbalik (inv): tampil = 1 - nilai CFG, simpan = 1 - nilai slider (vget/vset yang membalik) */
   function paint(id){
@@ -253,7 +379,15 @@ var T3D=(function(){
       if(r.el){r.el.value=String(Math.round(v*r.sc));fill(r.el);}
       if(r.out)r.out.textContent=show(r,v);
     });
-    if(g.presets)g.presets.forEach(function(pr){if(!pr.btn)return;var on=presetOn(g,pr);pr.btn.classList.toggle('off',!on);pr.btn.setAttribute('aria-pressed',on?'true':'false');});   /* preset aktif = semua knob tampilan cocok */
+    if(g.slots&&g.built){
+      paintBar(g);
+      g.ui.forEach(function(sec){
+        if(!sec.mem&&!sec.fx)return;   /* Shape / Haze: cuma slider mentah, tidak ada master/saklar */
+        var on=secOn(g,sec);
+        if(sec.el){var m=mOf(g,sec);sec.el.value=String(Math.round(m*100));fill(sec.el);sec.out.textContent=Math.round(m*100)+'%';sec.rowEl.classList.toggle('t3-dim',!on);}
+        if(sec.sw){sec.sw.setAttribute('aria-pressed',on?'true':'false');sec.sw.textContent=ttxt(on);sec.sw.classList.toggle('off',!on);}
+      });
+    }
     g.rows.forEach(function(r){   /* baris tergantung: induk 0 -> diredupkan */
       if(!r.dep||!r.rowEl)return;
       var ps=r.dep.split('|'),fnd=false,any=false;   /* 'a|b' = diredupkan kalau SEMUA induk 0 */
@@ -267,15 +401,26 @@ var T3D=(function(){
     g.rows.forEach(function(r){var tol=r.t?.5:(.5/r.sc);if(Math.abs(rawGet(g,r)-st[r.p])>tol)d=true;});
     return d;
   }
-  function toast(g){try{if(typeof showModeToast==='function')showModeToast(ID?g.idt:g.en,null,1500);}catch(e){}}
+  function toast(g){try{if(typeof showModeToast==='function')showModeToast((ID?g.idt:g.en)+(g.slots?' \u00b7 '+ctxShort(g.ctx||ctxKey()):''),null,1500);}catch(e){}}
   function save(id){
     var g=G[id];if(!g||g.dead)return;
-    var o={};g.rows.forEach(function(r){o[r.p]=rawGet(g,r);});
-    try{localStorage.setItem(g.key,JSON.stringify(o));}catch(e){}
+    var o={},po={};
+    g.rows.forEach(function(r){if(g.slots&&g.perf[r.p])po[r.p]=rawGet(g,r);else o[r.p]=rawGet(g,r);});
+    try{
+      if(g.slots){localStorage.setItem(slotKey(g,g.ctx||ctxKey()),JSON.stringify(o));localStorage.setItem(slotKey(g,'perf'),JSON.stringify(po));g.sig=null;}
+      else localStorage.setItem(g.key,JSON.stringify(o));
+    }catch(e){}
     toast(g);
   }
   function reset(id){
     var g=G[id];if(!g||g.dead)return;
+    if(g.slots){   /* Reset = slot konteks aktif balik ke default (perf global tidak disentuh); {} supaya simpanan lama tidak muncul lagi */
+      cancelLerp(g);
+      g.rows.forEach(function(r){if(!g.perf[r.p])putRaw(g,r,g.def[r.p]);});
+      afterAll(g);
+      try{localStorage.setItem(slotKey(g,g.ctx||ctxKey()),'{}');}catch(e){}
+      g.sig=null;return;
+    }
     g.rows.forEach(function(r){
       var dv=g.def[r.p];
       if(g.set)g.set(r.p,dv);else if(r.t)pset(rootOf(g),r.p,!!dv);else pset(rootOf(g),r.p,dv);
@@ -287,6 +432,7 @@ var T3D=(function(){
   /* ---------- init ---------- */
   ORDER.forEach(function(id){var g=G[id];snapshot(g);if(g.dead)return;loadSaved(g);g.after('*');});
   function init(){ORDER.forEach(function(id){var g=G[id];if(!g.dead)build(g);});try{bhuRepaint();}catch(e){}}
+  if(G.pl&&!G.pl.dead)setInterval(ctxTick,100);   /* pantau konteks (overview / sektor) -> lerp ke slot tujuan */
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 
   /* ---------- export semua setelan (tombol COPY TUNE di menu editor ?layout=1, 07-boot.js) ----------
@@ -300,7 +446,8 @@ var T3D=(function(){
       var g=G[id];if(!g||g.dead)return;
       var o={},ch=0;
       g.rows.forEach(function(r){var v=r5(rawGet(g,r));o[r.p]=v;if(Math.abs(v-g.def[r.p])>(r.t?.5:.5/r.sc))ch++;});
-      L.push('','// '+TITLE[id]+' \u00b7 key '+g.key+' \u00b7 '+ch+' beda dari default',JSON.stringify(o));n++;
+      L.push('','// '+TITLE[id]+' \u00b7 key '+g.key+(g.slots?'_'+(g.ctx||ctxKey()):'')+' \u00b7 '+ch+' beda dari default',JSON.stringify(o));n++;
+      if(g.slots)['ov'].concat(sectList().map(function(x){return x.k;})).concat(['perf']).forEach(function(k){var so=lsGet(slotKey(g,k));if(so&&Object.keys(so).length)L.push('// slot '+k+' \u00b7 key '+slotKey(g,k),JSON.stringify(so));});
     });
     return n?L.join('\n'):'';
   }
