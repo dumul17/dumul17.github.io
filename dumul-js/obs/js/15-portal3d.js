@@ -720,7 +720,7 @@ function portal3dOverview(now,bp,R){
   var op=portalOrbit(now,bp,Rp),px=op.x,py=op.y,tk=PT3D_CFG.tiltOv||0;
   Rp*=op.s||1;   /* orbit ala drone: sedikit membesar di sisi dekat, mengecil di sisi jauh (PT3D_CFG.orb.depth); ovR (hit-test tap) ikut */
   var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
-  if(!smenuHidesSky())portal3dDraw(g,px,py,Rd,now,1,(ch>0||tk>0)?{ch:ch,tilt:tk}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
+  if(!smenuHidesSky()&&!(typeof PX!=='undefined'&&PX.pt))portal3dDraw(g,px,py,Rd,now,1,(ch>0||tk>0)?{ch:ch,tilt:tk}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
   PT3D.ovR=Rp;PT3D.ovT=now;PT3D.ovX=px;PT3D.ovY=py;PT3D.ovHid=op.hid;   /* F3: radius + posisi terakhir dipakai hit-test tap portal overview (06-interaction.js), jangkar wormhole (05), lampu planet (17) */
   /* F3 (D1): petunjuk idle — selama pengunjung belum pernah membuka menu sektor, cincin luar berdenyut pelan ("portal ini bisa di-tap"). */
   if(!OVSEL.seen&&!op.hid&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
