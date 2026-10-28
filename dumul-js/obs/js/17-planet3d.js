@@ -1036,7 +1036,7 @@ function planet3dDraw(now){
       var settle=!!PL3D.wasCh&&!palCh;PL3D.wasCh=palCh;
       var due=PL3D.dirty||(!still&&(rotMov||animOn)&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
       var nb=Math.max(1,Math.min(8,PL3D_CFG.bands|0));
-      if(nb>1&&typeof FS!=='undefined'&&FS.ema>0){   /* pita adaptif: satu refresh harus selesai dalam ~1000/fps ms; frame lambat -> pita lebih sedikit (min bandMin) */
+      if(nb>1&&typeof FS!=='undefined'&&FS.slow&&FS.ema>0){   /* pita adaptif (CUMA saat governor FS.slow; perangkat kuat / ?fs=0 = pita penuh): satu refresh harus selesai dalam ~1000/fps ms; frame lambat -> pita lebih sedikit (min bandMin) */
         var bmn=Math.max(1,Math.min(nb,(PL3D_CFG.bandMin|0)||nb)),bfit=Math.floor(1000/Math.max(1,PL3D_CFG.fps)/Math.max(16.7,FS.ema));
         nb=Math.max(bmn,Math.min(nb,bfit));
       }

@@ -930,7 +930,7 @@ function pEnd(now){
         PP.n=PP.isum=PP.jsum=PP.jank=PP.imax=0;PP.tot={};PP.ev=[];
       },true);}
     var n=PP.n||1,arr=[];for(var k3 in PP.tot)arr.push([k3,PP.tot[k3]/n]);arr.sort(function(a,b){return b[1]-a[1];});
-    var tx='['+PX_MODES[PP.mode|0]+'] ketuk=ganti\nfps '+(1000/(PP.isum/n)).toFixed(0)+'  int '+(PP.isum/n).toFixed(1)+'ms (max '+(PP.imax|0)+')  js '+(PP.jsum/n).toFixed(1)+'ms\njank>34ms: '+PP.jank+'/'+PP.n+'\n';
+    var tx='['+PX_MODES[PP.mode|0]+'] ketuk=ganti\nfps '+(1000/(PP.isum/n)).toFixed(0)+'  int '+(PP.isum/n).toFixed(1)+'ms (max '+(PP.imax|0)+')  js '+(PP.jsum/n).toFixed(1)+'ms\nfs: '+['off','auto','paksa'][FS.mode]+(FS.slow?' SLOW ('+(FS.why||'paksa')+')':' normal')+'  ema '+FS.ema.toFixed(0)+'ms\njank>34ms: '+PP.jank+'/'+PP.n+'\n';
     for(var i=0;i<Math.min(6,arr.length);i++)tx+=arr[i][0]+' '+arr[i][1].toFixed(2)+'\n';
     var av=0;for(var ai2=0;ai2<AST.length;ai2++)if(AST[ai2]._vis)av++;
     tx+='batu: gambar '+(PP.ad|0)+' / _vis '+av+' / total '+AST.length+'\n';
@@ -950,17 +950,29 @@ var CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
    Keluar dari slow cuma kalau frame < 20 ms selama 5 dtk (histeresis lebar: saat slow beban memang turun, jangan bolak-balik). Interaksi (pan/zoom/tap) tetap tiap frame:
    cache asteroid dibatalkan sendiri oleh AST3D.ver, aurora ikut parallax saat blit.
    ?fs=0 mati, ?fs=2 paksa slow (tes), default auto. Di ?probe=1 default MATI (supaya tidak mengacaukan ukuran) kecuali ?fs= diisi. */
-var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0};
+var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',cfg:{warm:8000,enter:40,hold:3000,leave:20,leaveHold:5000,clamp:80,resume:3000}};
+/* HARDENING (perangkat kuat TIDAK boleh masuk slow): keputusan slow ditunda sampai `warm` ms setelah boot (kompilasi shader / muat three.js / dekode gambar bikin frame panjang sesaat),
+   timer di-reset selama transisi sektor / wormhole, dan `resume` ms setelah tab kembali dari background (celah frame >= 250 ms). Stall tunggal diklem `clamp` ms (dulu 120)
+   supaya satu frame panjang tidak menggeser EMA. Masuk slow butuh EMA > `enter` ms terus-menerus `hold` ms. FS.why = alasan terakhir slow menyala / mati (tampil di HUD PERF). */
 try{var _fm=/[?&]fs=([012])(&|$)/.exec(location.search);if(_fm)FS.mode=+_fm[1];else if(/[?&]probe=1(&|$)/.test(location.search))FS.mode=0;}catch(eFs){}
+function fsBusy(){
+  try{if(document.hidden)return true;}catch(e){}
+  try{if(typeof SECT!=='undefined'&&SECT.busy)return true;}catch(e){}
+  try{if(typeof whBusy==='function'&&whBusy())return true;}catch(e){}
+  return false;
+}
 function fsTick(now){
-  var iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
-  if(iv>0&&iv<250)FS.ema+=(Math.min(iv,120)-FS.ema)*.08;
+  var C=FS.cfg,iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
+  if(iv>=250)FS.grace=now+C.resume;   /* celah panjang (tab background / render ditahan): tunda keputusan, EMA tidak diracuni */
+  if(iv>0&&iv<250)FS.ema+=(Math.min(iv,C.clamp)-FS.ema)*.08;
   if(FS.mode===0){FS.slow=false;return;}
   if(FS.mode===2){FS.slow=true;return;}
+  if(!FS.grace)FS.grace=now+C.warm;
+  if(now<FS.grace||fsBusy()){FS.t=0;return;}   /* belum waktunya memutuskan / lagi transisi: jangan hitung */
   if(!FS.slow){
-    if(FS.ema>40){if(!FS.t)FS.t=now;else if(now-FS.t>2000){FS.slow=true;FS.t=0;}}else FS.t=0;
+    if(FS.ema>C.enter){if(!FS.t)FS.t=now;else if(now-FS.t>C.hold){FS.slow=true;FS.t=0;FS.why='ema '+FS.ema.toFixed(0)+'>'+C.enter+'ms';}}else FS.t=0;
   }else{
-    if(FS.ema<20){if(!FS.t)FS.t=now;else if(now-FS.t>5000){FS.slow=false;FS.t=0;}}else FS.t=0;
+    if(FS.ema<C.leave){if(!FS.t)FS.t=now;else if(now-FS.t>C.leaveHold){FS.slow=false;FS.t=0;FS.why='pulih '+FS.ema.toFixed(0)+'ms';}}else FS.t=0;
   }
 }
 function frame(now){
