@@ -343,7 +343,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   }
   /* ---- umum ---- */
   function paint(){
-    if(sub)sub.textContent=cur==='pl'?tx('tune.sub.pl','Planet // Tune'):cur==='dr'?tx('tune.sub.dr','Drone // Tune'):cur==='pt'?tx('tune.sub.pt','Portal // Tune'):cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?(AST_CTX?tx('tune.sub.ast.sc','Asteroid // Sector Tune'):tx('tune.sub.ast.o','Asteroid // Overview Tune')):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
+    if(sub)sub.textContent=cur==='pl'?tx('tune.sub.pl','Planet // Tune'):cur==='dr'?tx('tune.sub.dr','Drone // Tune'):cur==='pt'?tx('tune.sub.pt','Portal // Tune'):cur==='tele'?tx('tune.sub.tele','Telescope // Tune'):cur==='ast'?tx('tune.sub.ast','Asteroid // Tune'):cur==='sky'?(skySect()?T('tune.sub.skys'):T('tune.sub.sky')):(BHU_CTX?T('tune.sub.sect'):T('tune.sub.bh'));
     paintBH();paintSky();paintAst();paintTele();
     var d=false,st;
     if(typeof T3D!=='undefined'){if(T3D.has(cur)&&t3(cur))T3D.paint(cur);if(skyMw())T3D.paint('mw');}
@@ -370,7 +370,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   }
   function t3(id){return typeof T3D!=='undefined'&&T3D.ok(id);}
   function mwOn(){return typeof mwReady==='function'&&mwReady();}   /* overview memakai Milky Way (bukan nebula lama) */
-  function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:sc&&t3('dr'),pt:any&&t3('pt')};}   /* Drone: cuma di sektor (di overview drone tidak bisa di-drop) */   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
+  function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:sc&&t3('dr'),pt:ov&&t3('pt')};}   /* Drone: cuma di sektor (di overview drone tidak bisa di-drop). Portal: cuma overview (di sektor portal sudah pensiun, drone jadi pusatnya) */   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
   var RF_T=0,RF_Q=0;   /* buka panel = __bhTuneShow + MutationObserver body.class -> refresh() 2x (paint semua slider) di frame yang sama: yg kedua digabung ke 1 rAF */
   function refresh(){var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
   function refreshNow(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
@@ -947,10 +947,10 @@ var CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
 
 /* FPS ADAPTIF (governor). Ukur interval frame (EMA, stall diklem 120 ms). HP lambat (> 40 ms = < 25 fps selama 2 dtk) -> FS.slow=true: kerja periodik berat dijarangkan dan digantian
    antar-frame genap/ganjil: asteroid GL (pass belakang di frame genap, depan di ganjil, jeda = 2x interval, maks 140 ms) dan bake aurora planet (frame ganjil, jeda 2x).
-   Keluar dari slow cuma kalau frame < 20 ms selama 5 dtk (histeresis lebar: saat slow beban memang turun, jangan bolak-balik). Interaksi (pan/zoom/tap) tetap tiap frame:
+   Keluar dari slow cuma kalau frame < 23 ms selama 5 dtk (histeresis lebar: saat slow beban memang turun, jangan bolak-balik). Interaksi (pan/zoom/tap) tetap tiap frame:
    cache asteroid dibatalkan sendiri oleh AST3D.ver, aurora ikut parallax saat blit.
    ?fs=0 mati, ?fs=2 paksa slow (tes), default auto. Di ?probe=1 default MATI (supaya tidak mengacaukan ukuran) kecuali ?fs= diisi. */
-var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',cfg:{warm:8000,enter:40,hold:3000,leave:20,leaveHold:5000,clamp:80,resume:3000}};
+var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',cfg:{warm:8000,enter:40,hold:3000,leave:23,leaveHold:5000,clamp:80,resume:3000}};
 /* HARDENING (perangkat kuat TIDAK boleh masuk slow): keputusan slow ditunda sampai `warm` ms setelah boot (kompilasi shader / muat three.js / dekode gambar bikin frame panjang sesaat),
    timer di-reset selama transisi sektor / wormhole, dan `resume` ms setelah tab kembali dari background (celah frame >= 250 ms). Stall tunggal diklem `clamp` ms (dulu 120)
    supaya satu frame panjang tidak menggeser EMA. Masuk slow butuh EMA > `enter` ms terus-menerus `hold` ms. FS.why = alasan terakhir slow menyala / mati (tampil di HUD PERF). */
@@ -961,8 +961,15 @@ function fsBusy(){
   try{if(typeof whBusy==='function'&&whBusy())return true;}catch(e){}
   return false;
 }
+function fsMenu(){   /* window menu sektor (16) terbuka/menutup: kanvas sky beku, interval frame = biaya compositor DOM menu, BUKAN beban sky */
+  try{if(typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing))return true;}catch(e){}
+  return false;
+}
 function fsTick(now){
   var C=FS.cfg,iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
+  var mn=fsMenu();
+  if(mn){FS.wasMenu=1;FS.t=0;return;}   /* menu terbuka: EMA tidak diracuni, keputusan slow/normal ditahan (dulu: interval compositor menu bikin SLOW nyangkut) */
+  if(FS.wasMenu){FS.wasMenu=0;FS.ema=16.7;FS.grace=now+C.resume;FS.t=0;return;}   /* menu baru tutup: buang EMA lama, ukur ulang dari frame sky nyata */
   if(iv>=250)FS.grace=now+C.resume;   /* celah panjang (tab background / render ditahan): tunda keputusan, EMA tidak diracuni */
   if(iv>0&&iv<250)FS.ema+=(Math.min(iv,C.clamp)-FS.ema)*.08;
   if(FS.mode===0){FS.slow=false;return;}

@@ -37,7 +37,7 @@ var PL3D_CFG={
   bands:6,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
   ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
-      hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:0,seed:[0,0]},   /* geometri OVERVIEW (rot 0 = planet DIAM di overview; langit yang berputar, lihat MW di 02-sky-logic.js): kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */
+      hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:.5,seed:[0,0]},   /* geometri OVERVIEW (rot .5 = planet ikut berputar seperti sektor, tuning Spin sama; Milky Way di 02-sky-logic.js tetap berputar sendiri): kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */
   /* AYUNAN HORIZON (librasi latitudinal + nutasi), cuma di sektor (overview = 0 lewat bobot SKYT): ujung horizon kiri/kanan naik-turun GANTIAN (tilt, seperti jungkat-jungkit)
      + sedikit naik-turun bersama (lat). Dua periode yang tidak berkelipatan -> tidak pernah persis berulang. Amplitudo = pecahan tinggi layar, periode = detik.
      DIGAMBAR SEBAGAI TRANSFORMASI 2D (geser + miring) pada strip yang sudah dirender, tiap frame penuh (60fps) -> mulus; shader TIDAK dirender ulang (tetap 4 fps).
@@ -163,10 +163,10 @@ function pl3dCloud(now){
   var f=Math.max(0,Math.min(1,PL3D.cf));
   return [PL3D.cd,f*f*(3-2*f)];
 }
-/* librasi: offset horizon (pecahan tinggi layar) kiri/kanan pada waktu sekarang. Diredam bobot sektor (PL3D.secW, 0 di overview). Waktu = jam fase (PL3D.phT) */
+/* librasi: offset horizon (pecahan tinggi layar) kiri/kanan pada waktu sekarang. Sama di overview + sektor (w=1; dulu diredam bobot sektor sehingga overview 0). Waktu = jam fase (PL3D.phT) */
 function pl3dLib(){
-  var c=PL3D_CFG.libr,w=PL3D.secW;
-  if(!c||!c.on||w<=.001||(typeof reduce!=='undefined'&&reduce)||PL3D.phT==null)return [0,0];
+  var c=PL3D_CFG.libr,w=1;
+  if(!c||!c.on||(typeof reduce!=='undefined'&&reduce)||PL3D.phT==null)return [0,0];
   var t=PL3D.phT*.001,kk=(c.k==null?1:c.k),la=c.lat*kk*Math.sin(t*6.2831853/c.pLat),ti=c.tilt*kk*Math.sin(t*6.2831853/c.pTilt+1.3);
   return [(la+ti)*w,(la-ti)*w];
 }

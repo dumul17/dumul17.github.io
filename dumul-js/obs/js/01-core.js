@@ -500,11 +500,11 @@ function astNorm(o){var r={},k;for(k in AST_DEF)r[k]=AST_DEF[k];if(o&&typeof o==
    Ganti konteks (SECT.cur): AST_CFG diisi ulang dari set tujuan (objeknya tetap sama), sabuk mulai dari transparan lalu di-fade masuk (AST_MIX 0->1)
    setelah transisi selesai (terowongan wormhole / SECT.busy). Keluar sektor lewat back: sabuk di-fade keluar dulu sebelum konteks berganti. */
 var AST_SETS=[null,null],AST_CTX=0,AST_MIX=1,AST_MIXT=0,AST_MIXL=0,astRepaint=null;   /* durasi fade = AST_CFG.fi / AST_CFG.fo (panel Asteroid) */
-function astKey(){return AST_CTX?'dumul_ast_cfg':'dumul_ast_cfg_o';}
+function astKey(){return 'dumul_ast_cfg';}   /* satu set tuning untuk overview + sektor (dulu terpisah: _o = overview) */
 (function(){var s=null,o=null;
   try{s=JSON.parse(localStorage.getItem('dumul_ast_cfg')||'null');}catch(e){}
   try{o=JSON.parse(localStorage.getItem('dumul_ast_cfg_o')||'null');}catch(e){}
-  AST_SETS[1]=astNorm(s);AST_SETS[0]=astNorm(o||s);
+  AST_SETS[1]=astNorm(s||o);AST_SETS[0]=AST_SETS[1];   /* objek SAMA: ganti konteks tidak menukar nilai; simpanan sektor menang, fallback overview lama */
   AST_CFG=astNorm(AST_SETS[0]);
 })();
 function astCtxSync(){

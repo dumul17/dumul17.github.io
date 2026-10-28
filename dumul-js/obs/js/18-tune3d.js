@@ -56,7 +56,7 @@ var T3D=(function(){
       ['bioMtn','Mountains','Gunung',0,1,100,0,'%','','bio','bioA'],
       ['bioFor','Forest','Hutan',0,1,100,0,'%','','bio','bioA'],
       ['bioUrb','Cyber city','Kota cyber',0,1,100,0,'%','','bio','bioA'],
-      ['earthK','Earth','Bumi',0,1,100,0,'%','o','bio','bioA'],   /* cuma overview: laut luas + benua + awan putih; hilang mulus saat masuk sektor */
+      ['earthK','Earth','Bumi',0,1,100,0,'%','o','bio','bioA'],   /* cuma overview: laut luas + benua + awan putih; hilang mulus saat masuk sektor (satu-satunya baris planet yang beda konteks) */
       /* Kabut */
       ['haze','Haze','Kabut',0,240,1,0,'px','','haze'],
       ['hazeA','Haze α','Kabut α',0,1,100,0,'%','','haze'],
@@ -88,9 +88,9 @@ var T3D=(function(){
       /* Gerak */
       ['par','Parallax','Paralaks',0,.15,100,0,'%','','move'],
       ['zoomK','Zoom','Zoom',0,.4,100,0,'%','','move'],
-      ['libr.k','Sway','Ayun',0,2,100,0,'%','s','move'],                   /* gabungan Sway Y + Sway tilt (rasio tetap 1:3), cuma sektor */
+      ['libr.k','Sway','Ayun',0,2,100,0,'%','','move'],                    /* gabungan Sway Y + Sway tilt (rasio tetap 1:3); tampil di overview + sektor */
       ['sinkK','Sink','Terbenam',0,2,100,0,'%','','move'],                 /* gabungan BH sink + Tele sink (rasio tetap .5 : .35) */
-      ['rotK','Spin','Putar',0,3,100,0,'%','s','move'],                    /* ov.rot = 0 -> tidak berefek di overview, jadi cuma sektor */
+      ['rotK','Spin','Putar',0,3,100,0,'%','','move'],                     /* tampil + berefek di overview dan sektor (ov.rot .5) */
       ['cloudDrift','Drift','Hanyut awan',-20,20,10,1,'px/s','','move','cloud'],
       ['fps','Rate','Laju',1,15,1,0,'/s','','move'],
       ['bandMin','Min bands','Pita min',1,6,1,0,'','','move']      /* 6 = tanpa pita adaptif; lebih kecil = refresh lampu kota/awan lebih rapat di HP lambat (beban per frame naik) */
@@ -117,22 +117,21 @@ var T3D=(function(){
     after:function(){},
     rows:[
       /* Cincin */
-      ['ovMenu','Size','Ukuran',.2,1.2,100,0,'%','o','ring'],
-      ['secK','Exit','Mulut keluar',.2,1.2,100,0,'%','s','ring'],
+      ['ovMenu','Size','Ukuran',.2,1.2,100,0,'%','','ring'],
       ['glow','Glow','Pendar',0,3,100,0,'%','','ring'],
       ['spin','Spin','Putar',0,45/RAD,RAD,0,'\u00b0/s','','ring'],      /* derajat per detik (CFG = rad/dtk) */
       ['tilt.x','Pitch','Pitch',-60/RAD,60/RAD,RAD,0,'\u00b0','','ring'],
       ['tilt.y','Yaw','Yaw',0,80/RAD,RAD,0,'\u00b0','','ring'],
       ['tilt.z','Roll','Roll',-60/RAD,60/RAD,RAD,0,'\u00b0','','ring'],
       /* Orbit (overview) */
-      ['orb.on','Orbit','Orbit',0,1,1,0,'','to','orbit'],
-      ['orb.per','Period','Periode',20,240,1,0,'s','o','orbit','orb.on'],
-      ['orb.ax','Width','Lebar',.05,.45,100,0,'%','o','orbit','orb.on'],
-      ['orb.ay','Height','Tinggi',0,.2,100,0,'%','o','orbit','orb.on'],
-      ['orb.depth','Depth','Kedalaman',0,.2,100,0,'%','o','orbit','orb.on'],
-      ['orb.bob','Bob','Naik-turun',0,8,10,1,'px','o','orbit','orb.on'],
-      ['orb.gap','Gap','Jarak limb',0,2,100,0,'%','o','orbit','orb.on'],
-      ['orb.near','Near','Dekat planet',0,1,100,0,'%','o','orbit','orb.on'],   /* 0 = orbit di home BH (jauh dari planet), 1 = orbit menyusuri limb */
+      ['orb.on','Orbit','Orbit',0,1,1,0,'','t','orbit'],
+      ['orb.per','Period','Periode',20,240,1,0,'s','','orbit','orb.on'],
+      ['orb.ax','Width','Lebar',.05,.45,100,0,'%','','orbit','orb.on'],
+      ['orb.ay','Height','Tinggi',0,.2,100,0,'%','','orbit','orb.on'],
+      ['orb.depth','Depth','Kedalaman',0,.2,100,0,'%','','orbit','orb.on'],
+      ['orb.bob','Bob','Naik-turun',0,8,10,1,'px','','orbit','orb.on'],
+      ['orb.gap','Gap','Jarak limb',0,2,100,0,'%','','orbit','orb.on'],
+      ['orb.near','Near','Dekat planet',0,1,100,0,'%','','orbit','orb.on'],   /* 0 = orbit di home BH (jauh dari planet), 1 = orbit menyusuri limb */
       /* Mulut wormhole (hilang saat idle, muncul saat musik / charge / pindah sektor) */
       ['idleMouth','Hide at idle','Sembunyi saat idle',0,1,1,0,'','t','mouth'],
       ['mouthIn','Fade in','Muncul',.1,1.5,100,0,'s','','mouth','idleMouth'],
