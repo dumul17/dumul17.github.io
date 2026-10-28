@@ -607,7 +607,7 @@ function ptSparksDraw(g,Rin,now){
 /* x,y = pusat di layar, Rp = radius luar cincin (px), a = alpha 0..1 */
 function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(!(Rp>2)||!(a>.01))return;
-  opts=opts||{};var ch=opts.ch||0,tk=Math.max(0,Math.min(1,opts.tilt||0)),tm=null;
+  opts=opts||{};var PXo=(typeof PX!=='undefined')?PX:{},ch=opts.ch||0,tk=Math.max(0,Math.min(1,opts.tilt||0)),tm=null;
   if(ch>0||opts.big)PT3D.big=1;
   var use3d=pt3dUsable(),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
   g.save();
@@ -617,15 +617,16 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(tk>0.001){tm=ptTiltMat(ptTiltAng(now,tk));}   /* P4: elemen 2D (mulut, petir, percikan, kilau muatan) digambar di bidang cincin = affine yang sama dengan kemiringan 3D */
   var r2d=function(){if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}ptRing2D(g,Rp,now,playing);if(tm)g.restore();};   /* cadangan 2D ikut miring */
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
-  if(!opts.noMouth){if(still||!pttDraw(g,Rp*PT_IN,now))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
+  if(!opts.noMouth&&!PXo.ptm){if(still||!pttDraw(g,Rp*PT_IN,now))ptMouth(g,Rp*PT_IN,now,!still);}   /* mulut idle = terowongan warp mini; statis kalau potato / reduce motion */
   /* visualizer = kilatan petir di dalam cincin (debu + pulse elips visualizer BH lama dibuang). updateAVColor / avbUpdate dulu dipanggil lewat drawAudioVisualizer, sekarang dari sini. */
   try{
     if(typeof updateAVColor==='function')updateAVColor(now);
     if(playing&&typeof avbUpdate==='function')avbUpdate(now);
-    if(!(typeof reduce!=='undefined'&&reduce)){ptBoltTick(now,playing,still&&!playing);ptBoltsDraw(g,Rp*PT_IN,now,PT3D_CFG.boltCol);}
+    if(!PXo.ptb&&!(typeof reduce!=='undefined'&&reduce)){ptBoltTick(now,playing,still&&!playing);ptBoltsDraw(g,Rp*PT_IN,now,PT3D_CFG.boltCol);}
   }catch(eV){}
   if(tm)g.restore();
-  if(use3d){
+  if(PXo.ptr){}   /* probe: cincin GL dimatikan */
+  else if(use3d){
     try{
       /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
       var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
@@ -646,8 +647,8 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
-  ptChargeGlow(g,Rp);
-  if(!(typeof reduce!=='undefined'&&reduce)){try{ptSparksDraw(g,Rp*PT_IN,now);}catch(eS){}}   /* percikan di atas cincin */
+  if(!PXo.ptb)ptChargeGlow(g,Rp);
+  if(!PXo.ptb&&!(typeof reduce!=='undefined'&&reduce)){try{ptSparksDraw(g,Rp*PT_IN,now);}catch(eS){}}   /* percikan di atas cincin */
   if(tm)g.restore();
   g.restore();
 }
