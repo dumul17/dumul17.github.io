@@ -31,6 +31,9 @@ var PL3D_CFG={
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:1.5,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
   fps:8,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
+  slowAur:1,      /* HP lambat (FS.slow): pengali jeda bake aurora (1 = sama dgn normal, 2 = dulu: 2x lebih jarang, patah). */
+  slowAurAlt:0,   /* 1 = di HP lambat bake aurora cuma di frame ganjil (dulu); 0 = boleh di frame mana pun */
+  bandMin:3,      /* batas bawah pita ADAPTIF: satu refresh penuh butuh `bands` frame, jadi di HP 15 fps bands 6 = cuma ~2,5 refresh/dtk (lampu kota + awan patah-patah). Pita dikurangi otomatis supaya satu refresh muat di 1000/fps ms, tapi tidak di bawah nilai ini. 6 (= bands) = tanpa adaptasi */
   bands:6,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
   ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
@@ -795,8 +798,8 @@ function pl3dFxAurora(g,F){
   }
   if(!F.aurCx)return;
   /* bake jarang: sinar bergeser cuma ~1.5 px/dtk, jadi 5-6x/dtk sudah tak terlihat beda dari 22x/dtk. Paksa bake ulang kalau radius berubah atau cahaya (portal/BH) bergeser >12px (batas terang-gelap ikut). Blit tetap tiap frame. */
-  var fsl=(typeof FS!=='undefined'&&FS.slow),aIv=(F.pot?300:180)*(fsl?2:1);   /* HP lambat (FS): bake aurora 2x lebih jarang + cuma di frame ganjil (asteroid GL belakang di genap) */
-  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||(F.t-F.aurR>=aIv&&(!fsl||(FS.n&1)))){pl3dMk('pl.pre');pl3dAurBake(F,A);pl3dMk('pl.bake');}
+  var fsl=(typeof FS!=='undefined'&&FS.slow),aIv=(F.pot?300:180)*(fsl?(PL3D_CFG.slowAur||1):1);   /* HP lambat (FS): pengali jeda bake aurora (slowAur; dulu 2 -> ~3 update/dtk, patah) */
+  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||(F.t-F.aurR>=aIv&&(!fsl||!PL3D_CFG.slowAurAlt||(FS.n&1)))){pl3dMk('pl.pre');pl3dAurBake(F,A);pl3dMk('pl.bake');}
   if(F.aurB1<=F.aurB0)return;
   var dx=gm.cx-F.aurG.cx,dy=gm.cy-F.aurG.cy;   /* parallax murni = geser: aurora tetap menempel di limb walau bake lebih jarang dari frame */
   g.globalAlpha=ba*F.aur;
@@ -1033,6 +1036,10 @@ function planet3dDraw(now){
       var settle=!!PL3D.wasCh&&!palCh;PL3D.wasCh=palCh;
       var due=PL3D.dirty||(!still&&(rotMov||animOn)&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
       var nb=Math.max(1,Math.min(8,PL3D_CFG.bands|0));
+      if(nb>1&&typeof FS!=='undefined'&&FS.ema>0){   /* pita adaptif: satu refresh harus selesai dalam ~1000/fps ms; frame lambat -> pita lebih sedikit (min bandMin) */
+        var bmn=Math.max(1,Math.min(nb,(PL3D_CFG.bandMin|0)||nb)),bfit=Math.floor(1000/Math.max(1,PL3D_CFG.fps)/Math.max(16.7,FS.ema));
+        nb=Math.max(bmn,Math.min(nb,bfit));
+      }
       if(PL3D.cyc&&settle)PL3D.dirty=true;   /* "settle" cuma sekali: jangan hilang selagi siklus jalan */
       if(PL3D.cyc){   /* siklus pecah sedang jalan: 1 pita per frame */
         if(now-PL3D.cyc.t>600){PL3D.cyc=null;PL3D.dirty=true;}   /* basi (render ditahan lama oleh menu/tab) */

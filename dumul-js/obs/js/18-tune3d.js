@@ -92,7 +92,8 @@ var T3D=(function(){
       ['sinkK','Sink','Terbenam',0,2,100,0,'%','','move'],                 /* gabungan BH sink + Tele sink (rasio tetap .5 : .35) */
       ['rotK','Spin','Putar',0,3,100,0,'%','s','move'],                    /* ov.rot = 0 -> tidak berefek di overview, jadi cuma sektor */
       ['cloudDrift','Drift','Hanyut awan',-20,20,10,1,'px/s','','move','cloud'],
-      ['fps','Rate','Laju',1,15,1,0,'/s','','move']
+      ['fps','Rate','Laju',1,15,1,0,'/s','','move'],
+      ['bandMin','Min bands','Pita min',1,6,1,0,'','','move']      /* 6 = tanpa pita adaptif; lebih kecil = refresh lampu kota/awan lebih rapat di HP lambat (beban per frame naik) */
     ]});
 
   defGroup('dr',{key:'dumul_tune_dr',root:function(){return window.DR3D_CFG;},
@@ -142,7 +143,7 @@ var T3D=(function(){
       ['boltW','Bolt W','Tebal petir',.1,1.2,100,0,'%','','bolt','boltMax'],
       ['boltGlow','Glow','Pendar petir',0,1,100,0,'%','','bolt','boltMax'],
       ['idleMin','Idle gap min','Jeda idle min',100,1000,1,0,'ms','','bolt'],
-      ['idleMax','Idle gap max','Jeda idle maks',100,1000,1,0,'ms','','bolt']
+      ['idleMax','Idle gap max','Jeda idle maks',100,2000,1,0,'ms','','bolt']
     ]});
 
   /* Milky Way overview: nilai default + loader ada di 02-sky-logic.js (MW_DEF / mwTuneSet), jadi di sini tidak dimuat ulang */
