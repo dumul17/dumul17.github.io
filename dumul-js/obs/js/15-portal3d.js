@@ -24,6 +24,7 @@ var PT3D_CFG={
   inR:.86,          /* radius tepi dalam plat (radius luar = 1). Makin besar = cincin makin tipis. Mulut/petir/percikan pakai PT_IN (= inR-.015); 09-wormhole.js ikut PT_IN */
   ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */
   plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
+  alt:1,            /* HP lambat (governor FS.slow di 05-sector-ui.js): render GL cincin cuma tiap 2 frame (genap), frame ganjil memakai hasil terakhir dari kanvas cache 2D. 0 = selalu tiap frame. Petir/percikan/mulut/kilau tetap tiap frame (digambar 2D di luar GL); tidak berlaku saat charge (ch>0), zoom wormhole (big/noMouth) atau window menu */
   mouthStars:35,    /* streak bintang tajam di mulut idle (0 = mati); versi mini dari N_STARS di 09-wormhole.js */
   starAdapt:true,   /* governor adaptif: kalau FPS < ~46, jumlah bintang aktif turun pelan sampai starMin x mouthStars, naik lagi kalau FPS pulih. false = selalu penuh */
   starMin:.5,       /* batas bawah governor (0.5 = paling sedikit separuh bintang) */
@@ -63,7 +64,7 @@ try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
 }catch(ePT0){}
 var PT_IN=PT3D_CFG.inR-.015;   /* rasio radius mulut terhadap Rp (dulu hard-code .745); dipakai juga 09-wormhole.js */
-var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0,tilt:null,lastTilt:-1,ovX:null,ovY:null,ovHid:0,orb:null,orbPhi:null,orbLast:0,orbInSect:0};
+var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0,tilt:null,lastTilt:-1,ovX:null,ovY:null,ovHid:0,orb:null,orbPhi:null,orbLast:0,orbInSect:0,cc:null,ccOK:0,ccRes:0,ccT:0};
 
 function pt3dFail(why){PT3D.state=3;PT3D.err=String(why||'');try{console.warn('[portal3d] fallback ke cincin 2D:',PT3D.err);}catch(e){}}
 function pt3dLoad(){
@@ -626,10 +627,22 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(tm)g.restore();
   if(use3d){
     try{
-      if(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001){PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);}
+      /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
+      var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
+      var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.noMouth&&!opts.big&&!(ch>0));
+      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(FS.n&1)===1&&now-PT3D.ccT<140&&PT3D.cc;
+      if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
+        PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);
+        if(alt){
+          var cc=PT3D.cc||(PT3D.cc=document.createElement('canvas')),rs=PT3D.res;
+          if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}
+          var cx2=cc.getContext('2d');cx2.globalCompositeOperation='copy';cx2.drawImage(PT3D.r.domElement,0,0,rs,rs);cx2.globalCompositeOperation='source-over';
+          PT3D.ccOK=1;PT3D.ccRes=rs;PT3D.ccT=now;
+        }else PT3D.ccOK=0;
+      }
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-      g.drawImage(PT3D.r.domElement,-S/2,-S/2,S,S);
+      g.drawImage(reuse?PT3D.cc:PT3D.r.domElement,-S/2,-S/2,S,S);
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
