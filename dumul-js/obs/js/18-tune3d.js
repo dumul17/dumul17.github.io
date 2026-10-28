@@ -289,7 +289,24 @@ var T3D=(function(){
   function init(){ORDER.forEach(function(id){var g=G[id];if(!g.dead)build(g);});try{bhuRepaint();}catch(e){}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 
+  /* ---------- export semua setelan (tombol COPY TUNE di menu editor ?layout=1, 07-boot.js) ----------
+     Nilai LIVE (yang lagi tampil), bukan cuma yang sudah di-Save. Format per grup = persis isi localStorage-nya (nilai CFG mentah),
+     jadi bisa ditempel balik: localStorage.setItem(key, '<json>'). Grup yang mati (CFG-nya tidak ada) dilewati. */
+  function r5(v){return Math.round(v*1e5)/1e5;}
+  var TITLE={pl:'PLANET',dr:'DRONE',pt:'PORTAL',mw:'SKY / MILKY WAY'};
+  function exportAll(){
+    var L=['// TUNE3D \u2014 semua setelan tuning (nilai LIVE di layar, belum tentu sudah di-Save)'],n=0;
+    ORDER.forEach(function(id){
+      var g=G[id];if(!g||g.dead)return;
+      var o={},ch=0;
+      g.rows.forEach(function(r){var v=r5(rawGet(g,r));o[r.p]=v;if(Math.abs(v-g.def[r.p])>(r.t?.5:.5/r.sc))ch++;});
+      L.push('','// '+TITLE[id]+' \u00b7 key '+g.key+' \u00b7 '+ch+' beda dari default',JSON.stringify(o));n++;
+    });
+    return n?L.join('\n'):'';
+  }
+
   return{
+    exportAll:exportAll,
     has:function(id){return !!G[id];},
     ok:function(id){var g=G[id];return !!g&&!g.dead;},
     paint:paint,dirty:dirty,save:save,reset:reset,

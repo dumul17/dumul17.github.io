@@ -876,6 +876,13 @@ window.__applyLayOV=function(){
       else prompt('Copy:',t);
       console.log('[layout export]\n'+t);return;
     }
+    if(a==='tune'){   /* copy semua setelan tuning 3D (Planet / Drone / Portal / Sky) dari 18-tune3d.js */
+      var tt=(typeof T3D!=='undefined'&&T3D.exportAll)?T3D.exportAll():'';
+      if(!tt){toast('TUNE3D BELUM SIAP');return;}
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(tt).then(function(){toast('COPIED \u2713 semua setelan tuning');}).catch(function(){prompt('Copy:',tt);});
+      else prompt('Copy:',tt);
+      console.log('[tune3d export]\n'+tt);return;
+    }
     if(a==='fit'){window.__scnRefit=true;hMark();refresh();toast('FIT ULANG dari anchor');return;}
     if(a==='rst'){
       if(!confirm('Buang draft layout & muat ulang dari sky-data.js?'))return;
@@ -1014,7 +1021,7 @@ window.__applyLayOV=function(){
         '<button type="button" data-a="step" title="Besar langkah (S1 kecil, S3 besar)">S2</button>'+
         B('menu','M5 12 h.01 M12 12 h.01 M19 12 h.01','a','Menu: save / copy / fit / reset',3.4)+
       '</div>'+
-      '<div id="lay-menu"><button type="button" data-a="save" class="a">SAVE</button><button type="button" data-a="copy" class="a">COPY</button><button type="button" data-a="fit">FIT ULANG</button><button type="button" data-a="rst">RESET DRAFT</button></div>';
+      '<div id="lay-menu"><button type="button" data-a="save" class="a">SAVE</button><button type="button" data-a="copy" class="a">COPY</button><button type="button" data-a="tune">COPY TUNE</button><button type="button" data-a="fit">FIT ULANG</button><button type="button" data-a="rst">RESET DRAFT</button></div>';
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
     var fab=document.createElement('button');fab.id='lay-fab';fab.type='button';fab.setAttribute('data-a','edit');fab.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M4 20 l1 -4.5 L16.5 4 a2 2 0 0 1 3 3 L8 18.5 Z"/><path d="M14.5 6 l3 3"/></svg>EDIT';document.body.appendChild(fab);
