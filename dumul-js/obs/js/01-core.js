@@ -485,7 +485,7 @@ var BHU_RNG={size:[.5,1.8],str:[0,2.5],bloom:[0,2],speed:[0,3]};
    jari-jari tetap (AST_K, pengali global), bidang miring ikut BH.ang. Toggle ada di panel tab Langit, disimpan di localStorage.dumul_ast_cfg. */
 var AST_K=1;
 /* AST_CFG: on = tampil, n = jumlah batu (-1 = otomatis dari ukuran layar), sz/w/spd = pengali ukuran / lebar orbit / kecepatan orbit, t = ketebalan cincin (sebaran radius + kemiringan elips; kecil = cincin tipis rapat). Disimpan di localStorage.dumul_ast_cfg */
-var AST_DEF={on:1,n:-1,sz:1,w:1,spd:1,t:1,ring:1,mx:600,ed:.05,lm:15,tp:.05,arch:1,fi:450,fo:260},
+var AST_DEF={on:1,n:120,sz:.5,w:2,spd:.4,t:.5,ring:1,mx:300,ed:.05,lm:15,tp:.05,arch:.3,fi:450,fo:260},   /* DEFAULT = hasil COPY TUNE 2026-10-29 (dulu n:-1 otomatis, sz/w/spd/t/arch 1, mx 600) */
     AST_RNG={n:[0,300],sz:[.4,2.5],w:[.3,8],spd:[0,3],t:[.1,3],mx:[50,1200],ed:[0,.3],lm:[0,60],tp:[0,.3],arch:[0,2],fi:[0,1500],fo:[0,1000]},
     AST_CFG={},AST_AUTO=40,AST_T=0,AST_TL=0;
 /* knob sabuk di limb planet (tab Asteroid, ikut Save/Reset + terpisah overview vs sektor): ring = 1 sabuk di limb / 0 sabuk lama, (pengali jumlah .5 dan skala batu .95 = konstanta AST_RING_NK / AST_RING_Z di 04-render.js, bukan slider: sudah diwakili Jumlah dan Ukuran),

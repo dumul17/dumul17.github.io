@@ -97,7 +97,12 @@ var PL3D_CFG={
   evK:1,          /* pengali frekuensi kejadian acak (puing + petir); flare dan aurora tidak terpengaruh */
   boltK:1,        /* skala ukuran petir (panjang, tebal garis, jari-jari kilau). 1 = default kecil (panjang 10-28px); .3 = sangat kecil, 2 = dua kali lipat */
   fxDebug:false,  /* uji F1 lewat console: PL3D_CFG.fxDebug=true -> garis limb magenta + titik cahaya (kuning) + titik limb di bawah cahaya */
-  ovDef:{groundSkip:100,bioSea:1,bioFor:.4,earthK:1,bioUrb:0,urbPatch:1,urbMin:8,urbMax:40,cityA:1,cityD:0,cityGlow:0,haze:30,hazeA:1,cloud:.7,cloudCov:.7,debrisOn:1,boltOn:1},   /* DEFAULT khusus slot OVERVIEW (hanya key yang beda dari default umum di atas; toggle 1/0). Dibaca 18-tune3d.js: slot ov yang belum di-Save / habis Reset pakai ini. Sektor tetap pakai default umum. */
+  slotDef:{   /* DEFAULT per konteks (hanya key yang beda dari default umum di atas; toggle 1/0; winter = default umum). Dibaca 18-tune3d.js: slot yang belum di-Save / habis Reset pakai ini. Hasil COPY TUNE 2026-10-29. */
+    ov:{groundSkip:100,bioSea:1,bioFor:.4,earthK:1,bioUrb:0,urbPatch:1,urbMin:8,urbMax:40,cityA:1,cityD:0,cityGlow:0,haze:30,hazeA:1,cloud:.7,cloudCov:.7,debrisOn:1,boltOn:1},
+    spring:{groundSkip:5,craterA:.3,canyonA:.3,bioSea:.5,bioMtn:.5,bioFor:.3,earthK:.3,haze:30,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.2,cloudLit:.4,cloudDet:1,atmK:.2,rimLit:0,rimHalo:0,boltOn:1,boltK:2},
+    summer:{craterA:1,craterS:.5,canyonA:.75,bioFor:-1,haze:65,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.75,cloudLit:1.5,cloudDet:1,atmK:.75,rimLit:.5,debrisOn:1,boltOn:1,boltK:1.5},
+    autumn:{haze:65,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.75,cloudLit:1.5,cloudDet:1,atmK:3,rimLit:2,rimHalo:1.5}
+  },
   palFps:20,      /* selama palette bergeser (crossfade sektor), render ulang sampai segini per detik supaya fade mulus; di luar itu pakai fps */
   pal:null        /* palette HIDUP (hasil blend overview + sektor); diisi di bawah, jangan diedit */
 };

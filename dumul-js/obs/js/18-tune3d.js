@@ -28,7 +28,7 @@ var T3D=(function(){
     /* SLOT per konteks (bukan preset lagi): overview + tiap sektor punya setelan sendiri (key dumul_tune_pl_<ov|k sektor>). Panel mengedit slot konteks yang LAGI AKTIF;
        pindah konteks = nilai CFG di-lerp ke slot tujuan. Slot kosong / habis di-Reset = default CFG. fps + bandMin = setelan performa, GLOBAL (key dumul_tune_pl_perf), bukan per slot. */
     slots:true,perf:{fps:1,bandMin:1},
-    ovDef:function(){var c=window.PL3D_CFG;return c&&c.ovDef;},   /* default khusus slot Overview (17-planet3d.js PL3D_CFG.ovDef) */
+    slotDef:function(){var c=window.PL3D_CFG;return c&&c.slotDef;},   /* default per konteks (17-planet3d.js PL3D_CFG.slotDef: ov + sektor) */
     /* UI Basic: tiap seksi = kartu yang bisa dilipat. mem = knob yang digabung jadi 1 slider master (nilai = default x master, 100% = tampilan bawaan, knob default<=0 tidak ikut),
        tog = ada saklar on/off (= master 0 <-> terakhir), fx = saklar gabungan 4 efek 2D, raw = slider mentah yang tetap tampil di Basic. Sisanya masuk ADVANCED (semua slider mentah). */
     ui:[
@@ -225,7 +225,7 @@ var T3D=(function(){
   function slotKey(g,k){return g.key+'_'+k;}
   function slotObj(g,k){var o=lsGet(slotKey(g,k));if(!o||typeof o!=='object')o=lsGet(g.key);return o||{};}   /* slot belum ada -> simpanan lama (dumul_tune_pl) -> default; slot {} (habis Reset) = default murni */
   function slotSaved(g,k){var o=lsGet(slotKey(g,k));return !!o&&typeof o==='object'&&Object.keys(o).length>0;}
-  function dOf(g,k,p){var od=(k==='ov'&&g.ovDef)?g.ovDef():null;return(od&&typeof od[p]==='number'&&isFinite(od[p]))?od[p]:g.def[p];}   /* default per konteks: ov bisa punya override, sektor = default umum */
+  function dOf(g,k,p){var sd=g.slotDef?g.slotDef():null,od=sd&&sd[k];return(od&&typeof od[p]==='number'&&isFinite(od[p]))?od[p]:g.def[p];}   /* default per konteks: ov / sektor bisa punya override, sisanya default umum */
   function cd(g,p){return g.slots?dOf(g,g.ctx||ctxKey(),p):g.def[p];}
   function valuesFor(g,k){var o=slotObj(g,k),s={};g.rows.forEach(function(r){if(g.perf[r.p])return;s[r.p]=(typeof o[r.p]==='number'&&isFinite(o[r.p]))?o[r.p]:dOf(g,k,r.p);});return s;}
   function perfVals(g){var o=lsGet(slotKey(g,'perf'))||lsGet(g.key)||{},s={};Object.keys(g.perf).forEach(function(p){s[p]=(typeof o[p]==='number'&&isFinite(o[p]))?o[p]:g.def[p];});return s;}
