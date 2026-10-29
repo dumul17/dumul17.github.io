@@ -17,7 +17,7 @@ var PT3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   ovK:2,        /* cadangan: radius luar cincin overview = ovK x horizon BH (BH.Rr), dipakai kalau ptOvK() tidak bisa menghitung */
-  ovMenu:.5,    /* ukuran portal overview = ovMenu x ukuran cincin di window menu sektor (16-sector-menu.js, smenuRingD). .5 = setengahnya */
+  ovMenu:.25,    /* ukuran portal overview = ovMenu x ukuran cincin di window menu sektor (16-sector-menu.js, smenuRingD). .5 = setengahnya */
   secK:0.50,       /* dasar ukuran R mulut wormhole keluar sektor (ptSecR) = secK x BH.R x .62 */
   half:1.5,       /* setengah lebar kamera ortho (satuan model; radius luar cincin = 1) */
   resMin:128,resMax:256,

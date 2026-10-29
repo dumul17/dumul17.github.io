@@ -30,8 +30,8 @@ var PL3D_CFG={
   lod:.5,         /* (DEFAULT 1; nilai < .5 DIABAIKAN: dijepit ke .5 di pl3dUniforms, karena sel < ~.6px tinggi di layar = aliasing -> garis horizontal lurus yang makin kasar ke horizon) detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
-  q:1.5,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
-  qSlow:1,        /* skala resolusi saat governor FS.slow (HP lambat): dipakai kalau 0 < qSlow < q. Probe: q 1,5 -> 1 hemat ±18 ms/frame di HP dpr 1,6 (GPU-bound), ±2 ms di HP dpr 2,0. 0 = mati (selalu pakai q) */
+  q:2,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
+  qSlow:1.5,        /* skala resolusi saat governor FS.slow (HP lambat): dipakai kalau 0 < qSlow < q. Probe: q 1,5 -> 1 hemat ±18 ms/frame di HP dpr 1,6 (GPU-bound), ±2 ms di HP dpr 2,0. 0 = mati (selalu pakai q) */
   fps:15,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
   slowAur:1,      /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe; jarak keyframe = PL3D_AUR_KF) */
   slowAurAlt:0,   /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe) */
@@ -39,7 +39,7 @@ var PL3D_CFG={
   bandMin:6,      /* batas bawah pita ADAPTIF: satu refresh penuh butuh `bands` frame, jadi di HP 15 fps bands 6 = cuma ~2,5 refresh/dtk (lampu kota + awan patah-patah). Pita dikurangi otomatis supaya satu refresh muat di 1000/fps ms, tapi tidak di bawah nilai ini. 6 (= bands) = tanpa adaptasi */
   bands:6,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
-  ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
+  ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.30,.58,1],atmA:.30,light:[1,.95,.88],   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
       hL:.86,hR:.95,hLLand:.915,hRLand:.97,rot:.5,seed:[0,0]},   /* geometri OVERVIEW (rot .5 = planet ikut berputar seperti sektor, tuning Spin sama; Milky Way di 02-sky-logic.js tetap berputar sendiri): kesan ekuator = horizon hampir datar (miring cuma .09, dulu .195) */
   /* AYUNAN HORIZON (librasi latitudinal + nutasi), cuma di sektor (overview = 0 lewat bobot SKYT): ujung horizon kiri/kanan naik-turun GANTIAN (tilt, seperti jungkat-jungkit)
      + sedikit naik-turun bersama (lat). Dua periode yang tidak berkelipatan -> tidak pernah persis berulang. Amplitudo = pecahan tinggi layar, periode = detik.
@@ -61,7 +61,7 @@ var PL3D_CFG={
   /* DEKORASI (rim glow / awan / lampu kota; semua prosedural, tanpa aset). Angka 0 = mati. */
   rimLit:1,       /* rim glow condong ke sisi yang kena cahaya (BH mini / portal) + hangat sedikit. 0 = rata seperti dulu, 1 = penuh, 2 = lebih ekstrem */
   rimHalo:.75,    /* halo lebar tipis di luar limb (x opasitas atmosfer); 0 = tanpa halo */
-  cloudDrift:1,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
+  cloudDrift:2,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
   groundSkip:0,  /* tanah 'melewati' zona horizon: tinggi permukaan memudar ke rata-rata menuju horizon (penuh mulai groundSkip px x persp/120 dari limb). Sel tanah di sana gepeng ekstrem (lebar:tinggi = persp/s) -> strip lurus yang ikut tergeser saat rotasi (rotK). Relief/bayangan ikut mendatar. 0 = mati (seperti dulu) */
   cloudSkip:10,   /* awan 'melewati' zona horizon: awan memudar ke 0 menuju horizon, penuh mulai cloudSkip px (x persp/120) dari limb. Di zona ini sel awan sangat gepeng (lebar >> tinggi, makin dekat horizon makin ekstrem) -> jadi strip lurus yang ikut hanyut. 0 = mati (awan sampai ke horizon seperti dulu) */
   rotRef:100,     /* kedalaman (px di bawah limb) tempat kecepatan Spin (SECTORS[].planet.rot x rotK) dan Drift awan berlaku persis. Geser tanah/awan sekarang PERSPEKTIF BENAR: kecepatan layar ∝ jarak ke horizon (horizon pelan, tanah dekat cepat), jadi tekstur gepeng di horizon tidak ikut meluncur secepat tanah dekat. Makin besar = semua baris makin cepat */
@@ -100,7 +100,7 @@ var PL3D_CFG={
   boltK:1,        /* skala ukuran petir (panjang, tebal garis, jari-jari kilau). 1 = default kecil (panjang 10-28px); .3 = sangat kecil, 2 = dua kali lipat */
   fxDebug:false,  /* uji F1 lewat console: PL3D_CFG.fxDebug=true -> garis limb magenta + titik cahaya (kuning) + titik limb di bawah cahaya */
   slotDef:{   /* DEFAULT per konteks (hanya key yang beda dari default umum di atas; toggle 1/0; winter = default umum). Dibaca 18-tune3d.js: slot yang belum di-Save / habis Reset pakai ini. Hasil COPY TUNE 2026-10-29. */
-    ov:{groundSkip:100,bioSea:1,bioFor:.4,earthK:1,bioUrb:0,urbPatch:1,urbMin:8,urbMax:40,cityA:1,cityD:0,cityGlow:0,haze:30,hazeA:1,cloud:.7,cloudCov:.7,debrisOn:1,boltOn:1},
+    ov:{cell:40,groundSkip:40,fallK:1.6,bioSea:1,bioFor:.6,bioMtn:.3,earthK:1,bioUrb:0,craterA:0,canyonA:.2,urbPatch:1,urbMin:8,urbMax:40,cityA:1,cityD:0,cityGlow:0,haze:40,hazeA:.5,cloud:.8,cloudCov:.45,cloudShd:.3,cloudLit:.4,cloudDet:.8,debrisOn:0,boltOn:0},   /* PRESET BUMI (2026-10-29): cell 40 = benua tidak buram; fallK 1.6 = sisi siang terang tapi awan tidak jebol; laut/awan/hutan/gunung penuh; kota & kawah mati; aurora tetap */
     spring:{groundSkip:5,craterA:.3,canyonA:.3,bioSea:.5,bioMtn:.5,bioFor:.3,earthK:.3,haze:30,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.2,cloudLit:.4,cloudDet:1,atmK:.2,rimLit:0,rimHalo:0,boltOn:1,boltK:2},
     summer:{craterA:1,craterS:.5,canyonA:.75,bioFor:-1,haze:65,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.75,cloudLit:1.5,cloudDet:1,atmK:.75,rimLit:.5,debrisOn:1,boltOn:1,boltK:1.5},
     autumn:{haze:65,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.75,cloudLit:1.5,cloudDet:1,atmK:3,rimLit:2,rimHalo:1.5}
@@ -782,6 +782,8 @@ function pl3dUniforms(now,nobolt){
   var bu=PL3D.bu;if(bu&&bu.a>.002&&!nobolt){U.uBolt.value.set(bu.x,PH-bu.y+gm.bo,bu.r,bu.a);U.uBoltAsp.value=bu.asp;}else U.uBolt.value.w=0;   /* kilat aktif: posisi (ruang layar tegak -> strip), jari-jari x, kekuatan; elips tinggi = x asp */
   PL3D.bo=gm.bo;PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;   /* parallax/zoom yang baru dirender: selisihnya ke posisi sekarang digeser saat drawImage */
   pl3dPalUpdate();var P=PL3D_CFG.pal;   /* palette hidup (crossfade sektor) */
+  var Lw=PL3D_CFG.lightCol,Lo=PL3D_CFG.ov.light,wo=Lo?1-PL3D.secW:0;   /* cahaya matahari overview (lebih putih, bukan hangat) di-crossfade ke lightCol sektor lewat bobot overview */
+  U.uWarm.value.set(Lw[0]+(Lo?(Lo[0]-Lw[0])*wo:0),Lw[1]+(Lo?(Lo[1]-Lw[1])*wo:0),Lw[2]+(Lo?(Lo[2]-Lw[2])*wo:0));
   U.uEarth.value=PL3D_CFG.earthK;   /* bumi di overview DAN sektor (dulu x (1 - bobot sektor): overview saja) */
   U.uLo.value.set(P.lo[0],P.lo[1],P.lo[2]);U.uMid.value.set(P.mid[0],P.mid[1],P.mid[2]);U.uHi.value.set(P.hi[0],P.hi[1],P.hi[2]);
   U.uAtm.value.set(P.atm[0],P.atm[1],P.atm[2]);U.uAtmA.value=P.atmA*PL3D_CFG.atmK;
