@@ -797,6 +797,7 @@ var PROBE_TESTS_BIO=[
   ['diam+kerlip OFF',function(){var C=PL3D_CFG;C.rotK=0;C.cloudDrift=0;C.cityTw=0;}],
   ['biome OFF',function(){PL3D_CFG.bioA=0;}],
   ['kota OFF',function(){PL3D_CFG.cityA=0;}],
+  ['bandMin 6 (no adapt)',function(){PL3D_CFG.bandMin=6;}],
   ['bands 3',function(){PL3D_CFG.bands=3;}],
   ['bands 1',function(){PL3D_CFG.bands=1;}],
   ['fps 30',function(){PL3D_CFG.fps=30;}],
@@ -822,8 +823,8 @@ function probeCtx(){
   }
   return '';
 }
-function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true),tw:C.cityTw,cd:C.cloudDrift,ba:C.bioA,ca:C.cityA,bn:C.bands,fp:C.fps};}
-function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(S.tw!==undefined){C.cityTw=S.tw;C.cloudDrift=S.cd;C.bioA=S.ba;C.cityA=S.ca;C.bands=S.bn;C.fps=S.fp;}if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;PX.sky=0;PX.pulse=0;PX.hole=0;PX.mw=0;PX.pt=0;PX.neb=0;PX.ptr=0;PX.ptm=0;PX.ptb=0;}
+function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true),tw:C.cityTw,cd:C.cloudDrift,ba:C.bioA,ca:C.cityA,bn:C.bands,fp:C.fps,bm:C.bandMin};}
+function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(S.tw!==undefined){C.cityTw=S.tw;C.cloudDrift=S.cd;C.bioA=S.ba;C.cityA=S.ca;C.bands=S.bn;C.fps=S.fp;C.bandMin=S.bm;}if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;PX.sky=0;PX.pulse=0;PX.hole=0;PX.mw=0;PX.pt=0;PX.neb=0;PX.ptr=0;PX.ptm=0;PX.ptb=0;}
 function probeP(x,n){x=String(x);while(x.length<n)x+=' ';return x;}
 function probeL(x,n){x=String(x);while(x.length<n)x=' '+x;return x;}
 function probeSg(v,d){return (v>=0?'+':'')+v.toFixed(d);}
@@ -907,7 +908,7 @@ function probeTick(now,iv,js){
   if(cx!==PROBE.ctx&&!PX.all){PROBE.on=false;PROBE.inS=0;PROBE.c0='';probeRestore();probeFreeze(false);probeShow('PROBE dibatalkan (pindah '+(PROBE.ctx==='ov'?'dari overview':'dari sektor')+').\nDiam di overview / sektor 3 dtk, otomatis mulai ulang.',false);return;}
   var el=now-PROBE.t0;
   if(el>1200&&iv>0&&iv<1000){PROBE.iv.push(iv);PROBE.js.push(js);var gq=(PP.cur&&PP.cur['pl.gpu'])||0;if(gq>0){PROBE.gs+=gq;PROBE.gn++;}}
-  if(el>1200&&!PROBE.pfR){PROBE.pfR=1;PROBE.pfT=performance.now();try{if(PL3D.pf){PL3D.pf.n=0;PL3D.pf.max=0;}}catch(ePf2){}}   /* mulai hitung refresh tanah setelah settle 1,2 dtk */
+  if(el>1200&&!PROBE.pfR){PROBE.pfR=1;PROBE.pfT=performance.now();try{if(PL3D.pf){PL3D.pf.n=0;PL3D.pf.max=0;PL3D.pf.last=0;}}catch(ePf2){}}   /* mulai hitung refresh tanah setelah settle 1,2 dtk */
   if(now-PROBE.txu>400){PROBE.txu=now;probeShow('PROBE ['+(PROBE.ctx==='ov'?'OVERVIEW':'SEKTOR')+'] '+(PROBE.i+1)+'/'+PROBE.seq.length+'   '+PROBE.seq[PROBE.i][0]+'\nsisa +-'+Math.max(0,Math.round((PROBE.seq.length-PROBE.i)*4.2-el/1000))+' dtk   (jangan sentuh layar)',false);}
   if(el<4200)return;
   var pfq=null,pfd=0;try{pfq=PL3D.pf||null;}catch(ePf3){}if(PROBE.pfT)pfd=(performance.now()-PROBE.pfT)/1000;
