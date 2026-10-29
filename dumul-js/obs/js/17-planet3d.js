@@ -20,12 +20,12 @@ var PL3D_CFG={
      (pasangan integer, geser pola noise) ada di ov (overview) dan di SECTORS[].planet (sky-data.js). Landscape (PW>PH): hLLand/hRLand kalau diisi,
      kalau tidak diturunkan dari hL/hR (h+(1-h)*.4). Nilai hidup = blend ov + sektor menurut bobot SKYT (PL3D_CFG.live), sama seperti palette. */
   rK:5,          /* radius bola = rK x lebar layar. Makin besar = horizon makin datar (15 = nyaris lurus). Default kelipatan 5 supaya kena snap slider panel tuning */
-  cell:80,        /* lebar 1 sel batu/medan (px CSS) saat 100px di bawah horizon; makin dekat horizon makin kecil (perspektif) */
+  cell:40,        /* lebar 1 sel batu/medan (px CSS) saat 100px di bawah horizon; makin dekat horizon makin kecil (perspektif) */
   persp:300,      /* kekuatan perspektif tanah: makin besar = batu makin gepeng/rapat ke arah horizon */
-  haze:0,        /* lebar kabut atmosfer di atas permukaan dekat horizon (px CSS) */
-  hazeA:0,     /* opasitas kabut di horizon 0..1 (tanah + batu). .78 = tebal (lama), .45 = agak transparan, .3 = tipis, 0 = tanpa kabut */
-  cloud:0,     /* opasitas lapisan awan/debu tipis kebiruan di atas tanah (0 = mati) */
-  cloudCov:0,  /* luas area awan 0..1: .5 = seperti dulu, makin besar makin luas/menyambung, .8 = hampir menutup, 0 = bercak kecil */
+  haze:40,        /* lebar kabut atmosfer di atas permukaan dekat horizon (px CSS) */
+  hazeA:.5,     /* opasitas kabut di horizon 0..1 (tanah + batu). .78 = tebal (lama), .45 = agak transparan, .3 = tipis, 0 = tanpa kabut */
+  cloud:.8,     /* opasitas lapisan awan/debu tipis kebiruan di atas tanah (0 = mati) */
+  cloudCov:.45,  /* luas area awan 0..1: .5 = seperti dulu, makin besar makin luas/menyambung, .8 = hampir menutup, 0 = bercak kecil */
   cloudH:50,     /* tinggi lapisan awan = cloudH x haze (px dari horizon ke bawah, memudar halus); ikut berubah kalau haze diubah. 0 = tanpa batas tinggi (awan menutup seluruh tanah, seperti dulu) */
   lod:.5,         /* (DEFAULT 1; nilai < .5 DIABAIKAN: dijepit ke .5 di pl3dUniforms, karena sel < ~.6px tinggi di layar = aliasing -> garis horizontal lurus yang makin kasar ke horizon) detail tanah dekat horizon: oktaf noise yang lebih halus dari ~1px layar di-fade ke rata-rata (anti-moire) -> pita MULUS tanpa tekstur di dekat horizon.
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
@@ -62,7 +62,7 @@ var PL3D_CFG={
   rimLit:1,       /* rim glow condong ke sisi yang kena cahaya (BH mini / portal) + hangat sedikit. 0 = rata seperti dulu, 1 = penuh, 2 = lebih ekstrem */
   rimHalo:.75,    /* halo lebar tipis di luar limb (x opasitas atmosfer); 0 = tanpa halo */
   cloudDrift:2,   /* awan hanyut pelan (px/dtk di limb; + = ke kanan, - = ke kiri). 0 = awan diam. Butuh render periodik (fps) selama != 0 */
-  groundSkip:0,  /* tanah 'melewati' zona horizon: tinggi permukaan memudar ke rata-rata menuju horizon (penuh mulai groundSkip px x persp/120 dari limb). Sel tanah di sana gepeng ekstrem (lebar:tinggi = persp/s) -> strip lurus yang ikut tergeser saat rotasi (rotK). Relief/bayangan ikut mendatar. 0 = mati (seperti dulu) */
+  groundSkip:40,  /* tanah 'melewati' zona horizon: tinggi permukaan memudar ke rata-rata menuju horizon (penuh mulai groundSkip px x persp/120 dari limb). Sel tanah di sana gepeng ekstrem (lebar:tinggi = persp/s) -> strip lurus yang ikut tergeser saat rotasi (rotK). Relief/bayangan ikut mendatar. 0 = mati (seperti dulu) */
   cloudSkip:10,   /* awan 'melewati' zona horizon: awan memudar ke 0 menuju horizon, penuh mulai cloudSkip px (x persp/120) dari limb. Di zona ini sel awan sangat gepeng (lebar >> tinggi, makin dekat horizon makin ekstrem) -> jadi strip lurus yang ikut hanyut. 0 = mati (awan sampai ke horizon seperti dulu) */
   rotRef:100,     /* kedalaman (px di bawah limb) tempat kecepatan Spin (SECTORS[].planet.rot x rotK) dan Drift awan berlaku persis. Geser tanah/awan sekarang PERSPEKTIF BENAR: kecepatan layar ∝ jarak ke horizon (horizon pelan, tanah dekat cepat), jadi tekstur gepeng di horizon tidak ikut meluncur secepat tanah dekat. Makin besar = semua baris makin cepat */
   cloudDMax:100000,   /* daur ulang awan: total geseran awan (px) yang boleh menumpuk sebelum awan memudar, posisi di-reset kecil, lalu muncul lagi (±3 dtk keluar + ±3 dtk masuk). Koordinat noise di shader tidak boleh tumbuh tanpa batas: makin besar, presisi float32 hilang -> tekstur jadi strip lurus. (geser dunia = px/rotRef sel, jadi presisi aman jauh lebih lama) 4 px/dtk = ±7 jam per siklus. Direset juga tiap wormhole menutup layar (lompat sektor). 0 = tanpa daur ulang (perilaku lama) */
@@ -82,9 +82,9 @@ var PL3D_CFG={
      Semua turunan noise frekuensi rendah (sekitar 5 sel), memudar ke horizon seperti kawah (LOD + groundSkip). 0 = mati. bioA = 0: jalur shader sama persis seperti sebelum biome. */
   bioA:1,        /* kekuatan biome keseluruhan (0 = mati total, 1 = penuh) */
   bioCol:1,       /* 1 = warna biome DIKUNCI (laut biru, hutan hijau, dst); 0 = pakai kecerahan biome tapi warna ngikut palette sektor */
-  bioSea:.1,      /* luas laut (0 = tanpa laut). Laut rata, ada kilau cahaya + garis pantai */
-  bioMtn:1,      /* lebar band gunung di sekitar alur canyon (bukan luas bercak). 0 = tanpa gunung; default .30 = titik mulai F6 */
-  bioFor:-.5,      /* FOOTHILLS bipolar: -1 = lava penuh di pita kaki, 0 = netral, +1 = hutan penuh. Default +.4 */
+  bioSea:.5,      /* luas laut (0 = tanpa laut). Laut rata, ada kilau cahaya + garis pantai */
+  bioMtn:.5,      /* lebar band gunung di sekitar alur canyon (bukan luas bercak). 0 = tanpa gunung; default .30 = titik mulai F6 */
+  bioFor:-1,      /* FOOTHILLS bipolar: -1 = lava penuh di pita kaki, 0 = netral, +1 = hutan penuh. Default +.4 */
   urbSkip:.5,     /* jangkauan kota cyber ke arah DEPAN: bagian kedalaman tanah (0..1, dihitung dari horizon ke dasar layar) tempat kota boleh ada. .5 = paruh depan (dekat layar) dilewati; 1 = tanpa batas (kota sampai dasar layar) */
   urbPatch:3,     /* SKALA BERCAK kota cyber (pengali ukuran gumpalan area kota; 1 = bawaan, >1 = gumpalan lebih besar + jarang, <1 = lebih kecil + banyak). Tepi bercak sekarang bergerigi organik + pudar lembut (bukan lagi bulatan/blok tajam) */
   urbMin:3,       /* ukuran MINIMUM sel grid kota di layar (px, perspektif). Sel lebih kecil dari ini digabung jadi sel 2x lebih besar (cross-fade) = jalan utama saja di kejauhan, bukan moire/noise halus */
@@ -99,11 +99,11 @@ var PL3D_CFG={
   evK:1,          /* pengali frekuensi kejadian acak (puing + petir); flare dan aurora tidak terpengaruh */
   boltK:1,        /* skala ukuran petir (panjang, tebal garis, jari-jari kilau). 1 = default kecil (panjang 10-28px); .3 = sangat kecil, 2 = dua kali lipat */
   fxDebug:false,  /* uji F1 lewat console: PL3D_CFG.fxDebug=true -> garis limb magenta + titik cahaya (kuning) + titik limb di bawah cahaya */
-  slotDef:{   /* DEFAULT per konteks (hanya key yang beda dari default umum di atas; toggle 1/0; winter = default umum). Dibaca 18-tune3d.js: slot yang belum di-Save / habis Reset pakai ini. Hasil COPY TUNE 2026-10-29. */
-    ov:{cell:40,groundSkip:40,fallK:1.6,bioSea:1,bioFor:.6,bioMtn:.3,earthK:1,bioUrb:0,craterA:0,canyonA:.2,urbPatch:1,urbMin:8,urbMax:40,cityA:1,cityD:0,cityGlow:0,haze:40,hazeA:.5,cloud:.8,cloudCov:.45,cloudShd:.3,cloudLit:.4,cloudDet:.8,debrisOn:0,boltOn:0},   /* PRESET BUMI (2026-10-29): cell 40 = benua tidak buram; fallK 1.6 = sisi siang terang tapi awan tidak jebol; laut/awan/hutan/gunung penuh; kota & kawah mati; aurora tetap */
-    spring:{groundSkip:5,craterA:.3,canyonA:.3,bioSea:.5,bioMtn:.5,bioFor:.3,earthK:.3,haze:30,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.2,cloudLit:.4,cloudDet:1,atmK:.2,rimLit:0,rimHalo:0,boltOn:1,boltK:2},
-    summer:{craterA:1,craterS:.5,canyonA:.75,bioFor:-1,haze:65,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.75,cloudLit:1.5,cloudDet:1,atmK:.75,rimLit:.5,debrisOn:1,boltOn:1,boltK:1.5},
-    autumn:{haze:65,hazeA:.5,cloud:1,cloudCov:.5,cloudShd:.75,cloudLit:1.5,cloudDet:1,atmK:3,rimLit:2,rimHalo:1.5}
+  slotDef:{   /* DEFAULT per konteks (hanya key yang beda dari default umum di atas; toggle 1/0; winter = default umum). Dibaca 18-tune3d.js: slot yang belum di-Save / habis Reset pakai ini. Hasil COPY TUNE 2026-10-30. */
+    ov:{craterA:0,canyonA:.2,bioSea:1,bioMtn:.3,bioFor:.6,earthK:1,bioUrb:0,urbPatch:1,urbMin:8,urbMax:40,cityA:1,cityD:0,cityGlow:0,hazeA:1,cloudCov:1,cloudShd:.3,cloudLit:.3,cloudDet:.3},
+    spring:{bioSea:.3,bioMtn:.3,bioFor:1,earthK:.3,cloudShd:0,cloudLit:0,cloudDet:0,boltOn:1},
+    summer:{craterA:.75,craterS:2,canyonA:.75,canyonS:2,bioFor:-.05,urbSkip:.35,cloudShd:0,cloudLit:0,cloudDet:0,debrisOn:1,boltOn:1},
+    autumn:{bioFor:0,cloudShd:0,cloudLit:0,cloudDet:0,debrisOn:1}
   },
   palFps:20,      /* selama palette bergeser (crossfade sektor), render ulang sampai segini per detik supaya fade mulus; di luar itu pakai fps */
   pal:null        /* palette HIDUP (hasil blend overview + sektor); diisi di bawah, jangan diedit */
