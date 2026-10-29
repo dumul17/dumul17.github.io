@@ -84,6 +84,9 @@ var PL3D_CFG={
   bioMtn:.05,      /* luas pegunungan (batu gelap + puncak salju, relief lebih tajam). 0 = tanpa gunung */
   bioFor:.4,      /* luas hutan (bercak hijau gelap bertekstur). 0 = tanpa hutan */
   urbSkip:.5,     /* jangkauan kota cyber ke arah DEPAN: bagian kedalaman tanah (0..1, dihitung dari horizon ke dasar layar) tempat kota boleh ada. .5 = paruh depan (dekat layar) dilewati; 1 = tanpa batas (kota sampai dasar layar) */
+  urbPatch:1,     /* SKALA BERCAK kota cyber (pengali ukuran gumpalan area kota; 1 = bawaan, >1 = gumpalan lebih besar + jarang, <1 = lebih kecil + banyak). Tepi bercak sekarang bergerigi organik + pudar lembut (bukan lagi bulatan/blok tajam) */
+  urbMin:8,       /* ukuran MINIMUM sel grid kota di layar (px, perspektif). Sel lebih kecil dari ini digabung jadi sel 2x lebih besar (cross-fade) = jalan utama saja di kejauhan, bukan moire/noise halus */
+  urbMax:40,      /* ukuran MAKSIMUM sel grid kota di layar (px, perspektif). Sel lebih besar dari ini dibelah 2x (cross-fade) = tidak ada blok raksasa tajam di dekat layar */
   bioUrb:.4,      /* luas kota cyberpunk (blok gelap + grid jalan neon magenta/cyan/amber, menyala di sisi malam). 0 = tanpa kota */
   earthK:1,       /* BUMI (overview + sektor, satu knob): laut luas biru, benua hijau/cokelat/gurun, awan putih; kota cyber tetap ada di benua dan HANYA di situ lampu kota menyala. 0 = biome biasa ngikut palette */
   /* EFEK 2D (aurora / flare / puing / petir): overlay Canvas 2D di planet3dDraw, 60fps, ikut ROT + ayunan. Rancangan: rencana-dekor-planet.md. F1 = kerangka saja (belum ada gambar). */
@@ -282,7 +285,7 @@ var PL3D_FS=[
   'uniform vec3 uLo;uniform vec3 uMid;uniform vec3 uHi;uniform vec3 uAtm;uniform float uAtmA;',
   'uniform vec2 uSeed;uniform float uLod;uniform float uFadeS;uniform float uHazeA;uniform float uCloudCov;uniform float uCloudH;uniform float uCloud;uniform float uPhi0;uniform float uFx;uniform float uPer;uniform float uHaze;',
   'uniform float uT;uniform float uCDrift;uniform float uCOff;uniform float uCSkip;uniform float uWg;uniform float uGSkip;uniform float uShd;uniform float uRimLit;uniform float uRimHalo;uniform float uCityA;uniform float uCityD;uniform float uCityTw;uniform float uCrat;uniform float uCany;uniform float uCratS;uniform float uCanyS;uniform float uBio;uniform float uBioCol;uniform float uBioSea;uniform float uBioMtn;uniform float uBioFor;uniform float uBioUrb;uniform float uEarth;',
-  'uniform float uCloudLit;uniform float uCloudDet;uniform float uCityGlow;uniform float uUrbS;uniform vec4 uBolt;uniform float uBoltAsp;',
+  'uniform float uCloudLit;uniform float uCloudDet;uniform float uCityGlow;uniform float uUrbS;uniform float uUrbP;uniform float uUrbMin;uniform float uUrbMax;uniform vec4 uBolt;uniform float uBoltAsp;',
   'uniform sampler2D uNoise;',
   /* value noise 2D: 1 fetch, f di-smooth lalu bilinear hardware = interpolasi smoothstep */
   'float vn2(vec2 p){',
@@ -391,6 +394,28 @@ var PL3D_FS=[
   '  float k=clamp(dot(C,vec3(.333))/max(dot(a,vec3(.333)),.03),.3,3.);',
   '  return mix(a*k,C,uBioCol);',
   '}',
+  /* SATU LEVEL grid kota (k = sel per satuan G; pv/ph = px layar per sel vertikal/horizontal). Keluaran: neon (garis jalan + isi blok lembut + tint distrik) dan warna dasar blok gelap.
+     Warna neon = gradien halus per DISTRIK (noise frekuensi rendah) + sedikit variasi per sel, jadi tidak ada petak warna acak; isi blok = bukaan lembut di tengah sel, bukan step per sel. */
+  'void urbL(vec2 Gb,float k,float pv,float ph,float so,out vec3 neon,out vec3 uc){',
+  '  vec2 gv=Gb*k;',
+  '  vec2 bd=.5-abs(fract(gv)-.5);',
+  '  vec2 aa=vec2(1.3/max(ph,.5),1.3/max(pv,.5));',
+  '  float gu=smoothstep(2.5,9.,pv)*smoothstep(1.5,5.,ph);',
+  '  float ln=max(1.-smoothstep(.01+aa.x*.5,.035+aa.x*1.5,bd.x),1.-smoothstep(.01+aa.y*.5,.035+aa.y*1.5,bd.y))*gu;',
+  '  float st=max(1.-smoothstep(.03,.17+aa.x,bd.x),1.-smoothstep(.03,.17+aa.y,bd.y))*gu;',
+  '  float gw=max(1.-smoothstep(0.,.22+aa.x,bd.x),1.-smoothstep(0.,.22+aa.y,bd.y));',
+  '  vec3 rb=texture2D(uNoise,(floor(gv)+uSeed+vec2(113.,29.)+so+.5)/256.).xyz;',
+  '  float dz=clamp((vn2(Gb*.5+uSeed+vec2(113.,29.))-.5)*2.4+.5,0.,1.);',
+  '  vec3 nc=mix(mix(vec3(1.,.12,.62),vec3(.10,.85,1.),smoothstep(.2,.5,dz)),vec3(1.,.62,.12),smoothstep(.55,.85,dz));',
+  '  vec3 nr=rb.x<.34?vec3(1.,.12,.62):(rb.x<.68?vec3(.10,.85,1.):vec3(1.,.62,.12));',
+  '  nc=mix(nc,nr,.2);',
+  '  vec2 cu=abs(fract(gv)-.5)*2.;',
+  '  float inner=1.-smoothstep(.15,1.,max(cu.x,cu.y));',
+  '  float fill=smoothstep(.45,.9,rb.y)*inner*(1.-st);',
+  '  float vr=.6+.4*vn2(gv*.45+uSeed+vec2(7.,3.)+so);',
+  '  neon=nc*(ln*(.55+.45*rb.z)+fill*.20*vr+gw*gu*gu*.10+.04);',
+  '  uc=vec3(.050,.045,.095)*(.92+.16*vn2(gv*.35+uSeed+vec2(61.,17.)+so))*(1.-.30*st);',
+  '}',
   'void main(){',
   '  vec2 d=(vPx-uC)/uR;',
   '  float len=length(d);',
@@ -436,9 +461,11 @@ var PL3D_FS=[
   '        float fm=vn2(CR*bG*.34+uSeed+vec2(19.,83.));',
   '        float ft=mix(1.-uBioFor*.9,.5,uEarth);',
   '        float wFor=smoothstep(ft,ft+.08,fm)*step(.001,max(uBioFor,uEarth))*(1.-wSea)*(1.-wMt);',
-  '        float um=vn2(CR*bG*.2+uSeed+vec2(88.,5.));',
+  '        float upf=.2/max(uUrbP,.2);',                                                   /* frekuensi bercak: skala bercak kota (uUrbP) */
+  '        float um=vn2(CR*bG*upf+uSeed+vec2(88.,5.));',
+  '        um+=(fbmL(CR*bG*upf*3.1+uSeed,bpv/(upf*3.1),vec2(21.,9.))-.5)*.45;',          /* tepi bercak bergerigi fraktal (oktaf halus di-LOD, tanpa moire) */
   '        float ut=1.-uBioUrb*.7;',
-  '        float wUr=smoothstep(ut-.02,ut+.14,um)*step(.001,uBioUrb)*(1.-wSea)*(1.-wMt);',   /* kota cyber ada di overview (Earth) DAN sektor: tidak lagi ditiadakan uEarth */
+  '        float wUr=smoothstep(ut-.06,ut+.20,um)*step(.001,uBioUrb)*(1.-wSea)*(1.-wMt);',   /* kota cyber ada di overview (Earth) DAN sektor: tidak lagi ditiadakan uEarth */
   '        float xSea=1.-smoothstep(seaT+.02,seaT+.10,ba);',                                  /* kota EKSKLUSIF: sabuk pantai (laut + pinggirannya) dilarang */
   '        float xMt=smoothstep(1.-mt-.14,1.-mt-.06,ba)*step(.001,uBioMtn);',                 /* sabuk gunung */
   '        float xFor=smoothstep(ft-.10,ft-.02,fm)*step(.001,max(uBioFor,uEarth));',          /* sabuk hutan (mulai sebelum tepi hutan) */
@@ -466,18 +493,15 @@ var PL3D_FS=[
   '          relief=clamp(1.+(relief-1.)*(1.+.8*wMt*bk),.45,1.9);',
   '        }',
   '        if(wUr>.003){',
-  '          vec2 bgv=bG*2.2;',
-  '          vec2 bd=.5-abs(fract(bgv)-.5);',
-  '          float pvg=bpv/2.2;float phg=s/uFx/2.2;',
-  '          float gu=smoothstep(2.5,9.,pvg)*smoothstep(1.5,5.,phg);',
-  '          vec2 aa=vec2(1.3/max(phg,.5),1.3/max(pvg,.5));',
-  '          float ln=max(1.-smoothstep(.01+aa.x*.5,.035+aa.x*1.5,bd.x),1.-smoothstep(.01+aa.y*.5,.035+aa.y*1.5,bd.y))*gu;',
-  '          float st=max(1.-smoothstep(.03,.17+aa.x,bd.x),1.-smoothstep(.03,.17+aa.y,bd.y))*gu;',
-  '          vec3 rb=texture2D(uNoise,(floor(bgv)+uSeed+vec2(113.,29.)+.5)/256.).xyz;',
-  '          vec3 nc=rb.x<.34?vec3(1.,.12,.62):(rb.x<.68?vec3(.10,.85,1.):vec3(1.,.62,.12));',
-  '          vec3 uc=vec3(.050,.045,.095)*(.9+.3*rb.z)*(1.-.30*st);',
-  '          ba3=mix(ba3,bcl(uc,alb),wUr*bk);',
-  '          bNeon=nc*(ln*(.55+.45*rb.z)+step(.55,rb.y)*.22*(1.-st))*wUr*bk;',
+  '          float pvb=bpv/2.2;float phb=s/uFx/2.2;',                                       /* px layar per sel grid dasar (vertikal / horizontal) */
+  '          float pmx=max(pvb,phb);float pmn=min(pvb,phb);',
+  '          float lvl=pmx>uUrbMax?log2(pmx/uUrbMax):(pmn<uUrbMin?log2(pmn/uUrbMin):0.);',   /* >0 = sel kebesaran -> dibelah, <0 = sel kekecilan -> digabung; 0 = sudah dalam rentang min..max */
+  '          lvl=clamp(lvl,-3.,3.);',
+  '          float n0=floor(lvl);float tl=lvl-n0;float z0=exp2(n0);',
+  '          vec3 nA;vec3 uA;urbL(bG,2.2*z0,pvb/z0,phb/z0,n0*37.,nA,uA);',
+  '          if(tl>.02){vec3 nB;vec3 uB;urbL(bG,4.4*z0,pvb/(2.*z0),phb/(2.*z0),(n0+1.)*37.,nB,uB);nA=mix(nA,nB,tl);uA=mix(uA,uB,tl);}',   /* cross-fade 2 level grid */
+  '          ba3=mix(ba3,bcl(uA,alb),wUr*bk);',
+  '          bNeon=nA*wUr*bk;',
   '        }',
   '        if(wSea>.003){',
   '          float dp=1.-smoothstep(seaT-.2,seaT,ba);',
@@ -575,7 +599,7 @@ function pl3dBuild(){
     uLo:{value:new T.Vector3(P.lo[0],P.lo[1],P.lo[2])},uMid:{value:new T.Vector3(P.mid[0],P.mid[1],P.mid[2])},uHi:{value:new T.Vector3(P.hi[0],P.hi[1],P.hi[2])},
     uAtm:{value:new T.Vector3(P.atm[0],P.atm[1],P.atm[2])},uAtmA:{value:P.atmA},
     uSeed:{value:new T.Vector2(PL3D_CFG.live.sx,PL3D_CFG.live.sy)},uCloud:{value:PL3D_CFG.cloud},uPhi0:{value:1.5707963},uFx:{value:1.4},uPer:{value:PL3D_CFG.persp},uHaze:{value:PL3D_CFG.haze},uLod:{value:PL3D_CFG.lod},uFadeS:{value:PL3D_CFG.fadeS},uCloudCov:{value:PL3D_CFG.cloudCov},uCloudH:{value:PL3D_CFG.cloudH},uHazeA:{value:PL3D_CFG.hazeA},uNoise:{value:ntex},
-    uT:{value:0},uCDrift:{value:PL3D_CFG.cloudDrift},uCOff:{value:0},uWg:{value:0},uCSkip:{value:PL3D_CFG.cloudSkip},uGSkip:{value:PL3D_CFG.groundSkip},uShd:{value:PL3D_CFG.cloudShd},uRimLit:{value:PL3D_CFG.rimLit},uRimHalo:{value:PL3D_CFG.rimHalo},uCityA:{value:PL3D_CFG.cityA},uCityD:{value:PL3D_CFG.cityD},uCityTw:{value:PL3D_CFG.cityTw},uCrat:{value:PL3D_CFG.craterA},uCany:{value:PL3D_CFG.canyonA},uCratS:{value:PL3D_CFG.craterS},uCanyS:{value:PL3D_CFG.canyonS},uBio:{value:PL3D_CFG.bioA},uBioCol:{value:PL3D_CFG.bioCol},uBioSea:{value:PL3D_CFG.bioSea},uBioMtn:{value:PL3D_CFG.bioMtn},uBioFor:{value:PL3D_CFG.bioFor},uBioUrb:{value:PL3D_CFG.bioUrb},uEarth:{value:0},uCloudLit:{value:PL3D_CFG.cloudLit},uCloudDet:{value:PL3D_CFG.cloudDet},uCityGlow:{value:PL3D_CFG.cityGlow},uUrbS:{value:1e5},uBolt:{value:new T.Vector4(0,0,1,0)},uBoltAsp:{value:.4}
+    uT:{value:0},uCDrift:{value:PL3D_CFG.cloudDrift},uCOff:{value:0},uWg:{value:0},uCSkip:{value:PL3D_CFG.cloudSkip},uGSkip:{value:PL3D_CFG.groundSkip},uShd:{value:PL3D_CFG.cloudShd},uRimLit:{value:PL3D_CFG.rimLit},uRimHalo:{value:PL3D_CFG.rimHalo},uCityA:{value:PL3D_CFG.cityA},uCityD:{value:PL3D_CFG.cityD},uCityTw:{value:PL3D_CFG.cityTw},uCrat:{value:PL3D_CFG.craterA},uCany:{value:PL3D_CFG.canyonA},uCratS:{value:PL3D_CFG.craterS},uCanyS:{value:PL3D_CFG.canyonS},uBio:{value:PL3D_CFG.bioA},uBioCol:{value:PL3D_CFG.bioCol},uBioSea:{value:PL3D_CFG.bioSea},uBioMtn:{value:PL3D_CFG.bioMtn},uBioFor:{value:PL3D_CFG.bioFor},uBioUrb:{value:PL3D_CFG.bioUrb},uEarth:{value:0},uCloudLit:{value:PL3D_CFG.cloudLit},uCloudDet:{value:PL3D_CFG.cloudDet},uCityGlow:{value:PL3D_CFG.cityGlow},uUrbS:{value:1e5},uUrbP:{value:PL3D_CFG.urbPatch},uUrbMin:{value:PL3D_CFG.urbMin},uUrbMax:{value:PL3D_CFG.urbMax},uBolt:{value:new T.Vector4(0,0,1,0)},uBoltAsp:{value:.4}
   };
   PL3D.mat=new T.ShaderMaterial({uniforms:PL3D.uni,vertexShader:PL3D_VS,fragmentShader:PL3D_FS,transparent:false,depthTest:false,depthWrite:false,blending:T.NoBlending});
   var mesh=new T.Mesh(new T.PlaneBufferGeometry(2,2),PL3D.mat);
@@ -636,6 +660,7 @@ function pl3dUniforms(now,nobolt){
   U.uCityA.value=PL3D_CFG.cityA;U.uCityD.value=PL3D_CFG.cityD;U.uCityTw.value=PL3D_CFG.cityTw;U.uCrat.value=PL3D_CFG.craterA;U.uCany.value=PL3D_CFG.canyonA;U.uCratS.value=Math.max(.2,PL3D_CFG.craterS);U.uCanyS.value=Math.max(.2,PL3D_CFG.canyonS);U.uBio.value=PL3D_CFG.bioA;U.uBioCol.value=PL3D_CFG.bioCol;U.uBioSea.value=PL3D_CFG.bioSea;U.uBioMtn.value=PL3D_CFG.bioMtn;U.uBioFor.value=PL3D_CFG.bioFor;U.uBioUrb.value=PL3D_CFG.bioUrb;   /* knob dekorasi, bisa diubah live */
   U.uLight.value.set(bp[0],PH-bp[1]+gm.bo);
   U.uCloudLit.value=PL3D_CFG.cloudLit;U.uCloudDet.value=PL3D_CFG.cloudDet;U.uCityGlow.value=PL3D_CFG.cityGlow;U.uUrbS.value=Math.max(8,(gm.R-Math.hypot(PW*.5-gm.cx,PH-gm.cy))*PL3D_CFG.urbSkip);   /* kedalaman tanah di dasar layar x urbSkip = batas kota (px dari limb) */
+  U.uUrbP.value=Math.max(.2,PL3D_CFG.urbPatch);U.uUrbMin.value=Math.max(2,PL3D_CFG.urbMin);U.uUrbMax.value=Math.max(U.uUrbMin.value*2,PL3D_CFG.urbMax);   /* max minimal 2x min: cross-fade level grid butuh rentang >= 1 oktaf */
   var bu=PL3D.bu;if(bu&&bu.a>.002&&!nobolt){U.uBolt.value.set(bu.x,PH-bu.y+gm.bo,bu.r,bu.a);U.uBoltAsp.value=bu.asp;}else U.uBolt.value.w=0;   /* kilat aktif: posisi (ruang layar tegak -> strip), jari-jari x, kekuatan; elips tinggi = x asp */
   PL3D.bo=gm.bo;PL3D.rox=gm.ox;PL3D.roy=gm.oy;PL3D.rf=gm.f;   /* parallax/zoom yang baru dirender: selisihnya ke posisi sekarang digeser saat drawImage */
   pl3dPalUpdate();var P=PL3D_CFG.pal;   /* palette hidup (crossfade sektor) */

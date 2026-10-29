@@ -33,7 +33,7 @@ var T3D=(function(){
     ui:[
       {id:'shape',raw:['rK','hzDy','cell','persp','lod']},
       {id:'ground',mem:['craterA','canyonA'],tog:1,raw:['craterS','canyonS']},
-      {id:'bio',mem:['bioA','bioSea','bioMtn','bioFor','bioUrb','earthK'],tog:1},
+      {id:'bio',mem:['bioA','bioSea','bioMtn','bioFor','bioUrb','earthK'],tog:1,raw:['urbPatch','urbMin','urbMax']},
       {id:'haze',raw:['haze','hazeA']},
       {id:'cloud',mem:['cloud','cloudCov','cloudShd','cloudLit','cloudDet'],tog:1,raw:['cloudH']},
       {id:'atm',mem:['atmK','rimLit','rimHalo'],tog:1,raw:['fallK']},
@@ -65,6 +65,9 @@ var T3D=(function(){
       ['bioFor','Forest','Hutan',0,1,100,0,'%','','bio','bioA'],
       ['bioUrb','Cyber city','Kota cyber',0,1,100,0,'%','','bio','bioA'],
       ['urbSkip','City reach','Jangkauan kota',.2,1,100,0,'%','','bio','bioUrb'],   /* kota cuma di bagian jauh tanah; 100% = sampai dasar layar */
+      ['urbPatch','City patch','Skala bercak kota',.3,3,100,0,'%','','bio','bioUrb'],   /* ukuran gumpalan area kota; tepi organik */
+      ['urbMin','Cell min','Sel kota min',3,20,1,0,'px','','bio','bioUrb'],   /* sel grid di layar tidak lebih kecil dari ini (digabung = jalan utama saja) */
+      ['urbMax','Cell max','Sel kota maks',16,120,1,0,'px','','bio','bioUrb'],   /* sel grid di layar tidak lebih besar dari ini (dibelah = tanpa blok raksasa) */
       ['earthK','Earth','Bumi',0,1,100,0,'%','','bio','bioA'],   /* overview + sektor (sama): laut luas + benua + awan putih. Tab Planet sekarang IDENTIK di overview dan sektor */
       /* Kabut */
       ['haze','Haze','Kabut',0,240,1,0,'px','','haze'],
