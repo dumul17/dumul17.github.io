@@ -68,7 +68,7 @@ var PL3D_CFG={
   cloudShd:1,    /* bayangan awan di tanah, jatuh menjauhi cahaya (0 = tanpa bayangan) */
   cityA:3,      /* kecerahan lampu kota di sisi gelap (0 = mati) */
   cityD:1,      /* kepadatan lampu kota di area permukiman 0..1 */
-  cityTw:1,     /* kedip lampu kota 0..1 (0 = tidak kedip; render periodik berhenti kalau drift awan juga 0) */
+  cityTw:1,     /* kerlip lampu kota + bioluminesensi laut 0..1 (0 = diam; render periodik ikut P16) */
   cloudLit:1,    /* cahaya sendiri awan: tepi yang menghadap cahaya terang, bagian yang terhalang awan lain gelap, inti tebal sedikit gelap (0 = warna datar seperti dulu) */
   cloudDet:.5,    /* serat/gumpalan halus di dalam awan (0 = mulus, 1 = berserat kuat); rata-rata kepadatan tidak berubah */
   cityGlow:1,    /* pendar lampu kota: tanah di kawasan kota ikut menyala tipis + dasar awan di atas kota berpendar hangat (0 = titik saja) */
@@ -81,14 +81,14 @@ var PL3D_CFG={
   bioA:.8,        /* kekuatan biome keseluruhan (0 = mati total, 1 = penuh) */
   bioCol:.8,       /* 1 = warna biome DIKUNCI (laut biru, hutan hijau, dst); 0 = pakai kecerahan biome tapi warna ngikut palette sektor */
   bioSea:.5,      /* luas laut (0 = tanpa laut). Laut rata, ada kilau cahaya + garis pantai */
-  bioMtn:.05,      /* luas pegunungan (batu gelap + puncak salju, relief lebih tajam). 0 = tanpa gunung */
-  bioFor:.4,      /* luas hutan (bercak hijau gelap bertekstur). 0 = tanpa hutan */
+  bioMtn:.30,      /* lebar band gunung di sekitar alur canyon (bukan luas bercak). 0 = tanpa gunung; default .30 = titik mulai F6 */
+  bioFor:.4,      /* FOOTHILLS bipolar: -1 = lava penuh di pita kaki, 0 = netral, +1 = hutan penuh. Default +.4 */
   urbSkip:.5,     /* jangkauan kota cyber ke arah DEPAN: bagian kedalaman tanah (0..1, dihitung dari horizon ke dasar layar) tempat kota boleh ada. .5 = paruh depan (dekat layar) dilewati; 1 = tanpa batas (kota sampai dasar layar) */
   urbPatch:1,     /* SKALA BERCAK kota cyber (pengali ukuran gumpalan area kota; 1 = bawaan, >1 = gumpalan lebih besar + jarang, <1 = lebih kecil + banyak). Tepi bercak sekarang bergerigi organik + pudar lembut (bukan lagi bulatan/blok tajam) */
   urbMin:8,       /* ukuran MINIMUM sel grid kota di layar (px, perspektif). Sel lebih kecil dari ini digabung jadi sel 2x lebih besar (cross-fade) = jalan utama saja di kejauhan, bukan moire/noise halus */
   urbMax:40,      /* ukuran MAKSIMUM sel grid kota di layar (px, perspektif). Sel lebih besar dari ini dibelah 2x (cross-fade) = tidak ada blok raksasa tajam di dekat layar */
   bioUrb:.4,      /* luas kota cyberpunk (blok gelap + grid jalan neon magenta/cyan/amber, menyala di sisi malam). 0 = tanpa kota */
-  earthK:1,       /* BUMI (overview + sektor, satu knob): laut luas biru, benua hijau/cokelat/gurun, awan putih; kota cyber tetap ada di benua dan HANYA di situ lampu kota menyala. 0 = biome biasa ngikut palette */
+  earthK:1,       /* BUMI = preset BENTUK laut (seaT=.62) + kulit benua/gurun/awan; hutan & gunung ngikut slider biome (F5). Kota cyber tetap di benua. 0 = biome biasa ngikut palette */
   /* EFEK 2D (aurora / flare / puing / petir): overlay Canvas 2D di planet3dDraw, 60fps, ikut ROT + ayunan. Rancangan: rencana-dekor-planet.md. F1 = kerangka saja (belum ada gambar). */
   auroraOn:true,  /* tirai aurora di atas limb sisi gelap */
   flareOn:true,   /* kilau saat cahaya (portal / BH mini) lewat limb; tanpa acak */
@@ -315,16 +315,30 @@ var PL3D_FS=[
   '  float rim=exp(-(q-1.)*(q-1.)*20.);',
   '  return (.14*rim-.34*bowl)*step(ex,.55)*wc;',
   '}',
-  /* kanyon: kontur (level .5) dari noise 3 oktaf = alur panjang berkelok; dibatasi mask noise besar supaya cuma di sebagian wilayah. Oktaf terhalus ikut LOD */
-  'float cany(vec2 G,float pv){',
-  '  float wl=clamp((pv*uCanyS/1.2*.5-1.2)/1.8,0.,1.);',
-  '  if(wl<=0.)return 0.;',
+  'float cratBowl(vec2 Gc,float pc){',                              /* F4b: mangkuk 0..1 (tanpa rim) untuk danau kawah */
+  '  float wc=clamp((pc*.4-1.2)/1.8,0.,1.);',
+  '  if(wc<=0.)return 0.;',
+  '  vec2 ci=floor(Gc);',
+  '  vec3 r=texture2D(uNoise,(ci+uSeed+vec2(53.,29.)+.5)/256.).xyz;',
+  '  float ex=texture2D(uNoise,(ci+uSeed+vec2(17.,71.)+.5)/256.).x;',
+  '  float rad=.10+.16*r.z;',
+  '  float q=length(Gc-(ci+.35+.30*r.xy))/rad;',
+  '  return (1.-smoothstep(.15,1.,q))*step(ex,.55)*wc;',
+  '}',
+  /* kanyon helpers (F1): f / mask / LOD / setengah-lebar band gunung. alur + punggungan dihitung langsung di terr() */
+  'float canyF(vec2 G){',
   '  vec2 Gk=G*.3/uCanyS;float f=0.;float a=.5;float fq=1.;',
   '  for(int o=0;o<3;o++){f+=a*vn2(Gk*fq+vec2(23.,61.)+uSeed);fq*=2.;a*=.5;}',
-  '  f/=.875;',
-  '  float line=1.-smoothstep(0.,.05,abs(f-.5));',
-  '  float msk=smoothstep(.40,.65,vn2(G*.09/uCanyS+vec2(5.,77.)+uSeed));',
-  '  return -.45*line*msk*wl;',
+  '  return f/.875;',
+  '}',
+  'float canyM(vec2 G){',
+  '  return smoothstep(.40,.65,vn2(G*.09/uCanyS+vec2(5.,77.)+uSeed));',
+  '}',
+  'float canyW(float pv){',
+  '  return clamp((pv*uCanyS/1.2*.5-1.2)/1.8,0.,1.);',
+  '}',
+  'float mtnHW(){',
+  '  return max(.06+.12*uBioMtn,.07);',
   '}',
   /* tanah: tekstur lama (bercak + punggungan/kontur ridged), sekarang di bidang tanah berperspektif */
   'float terr(float u,float s){',
@@ -334,11 +348,25 @@ var PL3D_FS=[
   '  float r=1.-abs(2.*fbmL(G*.7,pv/.7,vec2(11.,5.)+uSeed)-1.);',
   '  float x=e*.78+r*r*.30-.06;',
   '  float h=clamp((x-.42)*2.6+.45,0.,1.);',
+  '  float h0=h;',                                                  /* sebelum remap + crat/cany: bias ketinggian kawah (P20) */
   '  if(uCrat>0.||uCany>0.){',
   '    float m=min(uCrat+uCany,1.);',
   '    h=h*(1.-.25*m)+.12*m;',                                     /* sisakan ruang di bawah supaya kawah/kanyon tidak mentok di 0 (tanah gelap) */
-  '    if(uCrat>0.){float kc=.6/uCratS;h+=uCrat*crat(G*kc,pv/kc);}',
-  '    if(uCany>0.)h+=uCany*cany(G,pv);',
+  '    float groove=0.;',                                          /* alur canyon 0..1; untuk redam kawah di dasar ngarai */
+  '    if(uCany>0.){',
+  '      float wl=canyW(pv);',
+  '      if(wl>0.){',
+  '        float d=abs(canyF(G)-.5);float msk=canyM(G);',
+  '        float line=1.-smoothstep(0.,.05,d);',
+  '        float ridge=(1.-smoothstep(0.,mtnHW(),d))*step(.001,uBioMtn*uBio);',   /* digate uBio: bioA=0 = relief sama persis seperti sebelum biome */
+  '        groove=line*msk*wl;',
+  '        h+=uCany*(-.45*line+.30*ridge)*msk*wl;',                /* 1× fetch noise; cany() lama sudah dihapus */
+  '      }',
+  '    }',
+  '    if(uCrat>0.){',
+  '      float allow=mix(1.,smoothstep(.35,.70,h0)*(1.-.85*groove),step(.001,uBio));',     /* F4c: mid-high + redam alur HANYA kalau biome nyala (bioA=0 = kawah seperti sebelum biome) */
+  '      float kc=.6/uCratS;h+=uCrat*crat(G*kc,pv/kc)*allow;',
+  '    }',
   '    h=clamp(h,0.,1.);',
   '  }',
   '  float gs=uGSkip*uPer/120.;',
@@ -443,7 +471,7 @@ var PL3D_FS=[
   '    float e2=terr(u+tdn.x*2.5,max(s-tdn.y*2.5,.6));',
   '    float relief=clamp(1.+(e-e2)*12.,.45,1.7);',
   /* BIOME A (rev. 2: grid kota anti-alias ~1.3px + fade lebih awal, tepi area kota lebih lembut, blok/jalan gelap lebih redup): ubah albedo + relief. Urutan timpa: hutan, gunung, kota, laut (laut terakhir). Tiap bercak = noise frekuensi rendah, bobotnya x bk (kekuatan x memudar ke horizon) */
-  '    float bSea=0.;float bUrb=0.;vec3 bNeon=vec3(0.);',   /* bUrb = bobot kota cyber (0 di laut/gunung/hutan); lampu kota cuma menyala di sini */
+  '    float bSea=0.;float bUrb=0.;vec3 bNeon=vec3(0.);vec3 bLava=vec3(0.);vec3 bLum=vec3(0.);', /* bLava/bLum di luar if: BIOME B */
   '    if(uBio>0.){',
   '      vec2 bG=vec2(u,uPer)/s*uFx+vec2(uWg,0.);',
   '      float bpv=s*s/(uPer*uFx);',
@@ -454,22 +482,52 @@ var PL3D_FS=[
   '        vec2 bq=CR*bG*.16+uSeed+vec2(71.,13.);',
   '        float ba=.62*vn2(bq)+.38*vn2(CR*bq*2.1+vec2(5.,9.));',
   '        ba=clamp((ba-.5)*3.+.5,0.,1.);',
+  '        float cD=1.;float cMs=0.;',                             /* F1: jarak ke garis canyon */
+  '        if(uCany>0.){float cw=canyW(bpv);if(cw>0.){cD=abs(canyF(bG)-.5);cMs=canyM(bG)*cw;}}',                         /* mask x LOD */
+  '        float hasC=step(.001,uCany);',
+  '        float mw=mtnHW();',
+  '        float grooveB=(1.-smoothstep(0.,.05,cD))*cMs;',                                    /* F4b: alur sungai */
+  '        float allowB=1.-.85*grooveB*hasC;',
+  '        float bowl=0.;',
+  '        if(uCrat>0.){float kc=.6/max(uCratS,.2);bowl=cratBowl(bG*kc,bpv/kc);}',
   '        float seaT=mix(uBioSea*.5,.62,uEarth);',
-  '        float wSea=(1.-smoothstep(seaT-.03,seaT+.03,ba))*step(.001,max(uBioSea,uEarth));',
-  '        float mt=mix(uBioMtn*.5,min(uBioMtn*.5,.14),uEarth);',
-  '        float wMt=smoothstep(1.-mt-.04,1.-mt+.04,ba)*step(.001,uBioMtn)*(1.-wSea);',
+  '        float sk=smoothstep(0.,.03,seaT);',                                               /* F4c: .12 -> .03 (danau mulai muncul di Sea kecil) */
+  '        float baOpen=ba+.15*(1.-smoothstep(0.,.3,seaT));',                                 /* F4c: geser laut terbuka naik di Sea kecil (plateau ba=0 tidak langsung banjir), hilang di seaT>=.3 */
+  '        float baEff=baOpen-sk*(bowl*allowB*uCrat*1.2+grooveB*uCany*.5);',                   /* F4c: kawah → sungai → dataran (konstanta .40/.22 -> 1.2/.5) */
+  '        float wSea=(1.-smoothstep(seaT-.03,seaT+.03,baEff))*step(.001,max(uBioSea,uEarth));',
+  '        float mt=uBioMtn*.5;',                                    /* tanpa jepit Earth .14 (P6) */
+  '        float wMtOld=smoothstep(1.-mt-.04,1.-mt+.04,ba)*step(.001,uBioMtn);',
+  '        float wMtC=(1.-smoothstep(mw*.55,mw,cD))*cMs*step(.001,uBioMtn);',
+  '        float wMt=mix(wMtOld,wMtC,hasC)*(1.-wSea);',
   '        float fm=vn2(CR*bG*.34+uSeed+vec2(19.,83.));',
-  '        float ft=mix(1.-uBioFor*.9,.5,uEarth);',
-  '        float wFor=smoothstep(ft,ft+.08,fm)*step(.001,max(uBioFor,uEarth))*(1.-wSea)*(1.-wMt);',
+  '        float forA=max(uBioFor,0.);',                                                    /* Foothills + : hutan 0..1 */
+  '        float lavA=max(-uBioFor,0.);',                                                   /* Foothills - : lava 0..1 */
+  '        float ft=1.-forA*.7;',                                                           /* ambang noise hutan */
+  '        float xMtOld=smoothstep(1.-mt-.14,1.-mt-.06,ba)*step(.001,uBioMtn);',              /* sabuk gunung lama (sebelum foot) */
+  '        float fz=(1.-smoothstep(mw,mw*1.9,cD))*cMs*step(.001,uBioMtn);',                  /* pita kaki luar band */
+  '        float footOld=xMtOld*(1.-wMt);',
+  '        float foot=mix(footOld,fz,hasC);',                                                /* Canyons 0: sabuk noise lama */
+  '        float fsh=forA;',                                                                /* kekuatan hutan di pita (bipolar +) */
+  '        float lg=lavA;',                                                                 /* kekuatan lava di pita (bipolar -); 0 = netral */
+  '        float wForNoise=smoothstep(ft,ft+.08,fm)*step(.001,forA);',                       /* cadangan dataran */
+  '        float gl17=clamp((bpv/1.7-1.2*uLod)/(1.8*uLod),0.,1.);',                           /* LOD noise pita (anti-moire) */
+  '        float wForF=foot*fsh*mix(.55,1.,smoothstep(.35,.6,mix(.5,vn2(CR*bG*1.7+uSeed+vec2(33.,7.)),gl17)));',
+  '        float wFor=max(wForNoise,wForF)*(1.-wSea)*(1.-wMt);',
+  '        float mA=clamp(.3+uBioMtn*1.6,.3,1.)*mix(1.,mix(.7,1.,cMs),hasC);',                            /* intensitas + lebih di dalam mask (2a.3) */
+  '        float wLv=foot*lg*mA*(1.-wMt)*(1.-wSea)*(1.-wFor);',                               /* F3: pita kaki lava */
   '        float upf=.2/max(uUrbP,.2);',                                                   /* frekuensi bercak: skala bercak kota (uUrbP) */
   '        float um=vn2(CR*bG*upf+uSeed+vec2(88.,5.));',
   '        um+=(fbmL(CR*bG*upf*3.1+uSeed,bpv/(upf*3.1),vec2(21.,9.))-.5)*.45;',          /* tepi bercak bergerigi fraktal (oktaf halus di-LOD, tanpa moire) */
   '        float ut=1.-uBioUrb*.7;',
   '        float wUr=smoothstep(ut-.06,ut+.20,um)*step(.001,uBioUrb)*(1.-wSea)*(1.-wMt);',   /* kota cyber ada di overview (Earth) DAN sektor: tidak lagi ditiadakan uEarth */
-  '        float xSea=1.-smoothstep(seaT+.02,seaT+.10,ba);',                                  /* kota EKSKLUSIF: sabuk pantai (laut + pinggirannya) dilarang */
-  '        float xMt=smoothstep(1.-mt-.14,1.-mt-.06,ba)*step(.001,uBioMtn);',                 /* sabuk gunung */
-  '        float xFor=smoothstep(ft-.10,ft-.02,fm)*step(.001,max(uBioFor,uEarth));',          /* sabuk hutan (mulai sebelum tepi hutan) */
-  '        wUr*=(1.-xSea)*(1.-xMt)*(1.-xFor)*(1.-smoothstep(uUrbS*.75,uUrbS,s));',            /* + paruh DEPAN planet (dekat layar, perspektif besar) dilewati: pudar antara .75 dan 1 x uUrbS */
+  '        float xSea=1.-smoothstep(seaT+.02,seaT+.10,baEff);',                               /* F4b: larangan kota ikut danau/sungai */
+  '        float xMt=xMtOld;',                                                                /* sabuk gunung (noise lama) */
+  '        float xMtC=(1.-smoothstep(mw*.9,mw*1.6,cD))*cMs*hasC;',                            /* F1: sabuk dari band canyon */
+  '        xMt=max(xMt,xMtC);',
+  '        float xFor=smoothstep(ft-.10,ft-.02,fm)*step(.001,forA);',                         /* sabuk hutan noise */
+  '        xFor=max(xFor,wForF);',                                                            /* F2: + pita kaki */
+  '        float xLava=wLv;',                                                                  /* F3: kota dilarang di pita lava */
+  '        wUr*=(1.-xSea)*(1.-xMt)*(1.-xFor)*(1.-xLava)*(1.-smoothstep(uUrbS*.75,uUrbS,s));', /* + paruh DEPAN planet */
   '        wFor*=1.-wUr;bUrb=wUr*bk;',
   '        vec3 ba3=alb;',
   '        if(uEarth>0.){',
@@ -477,7 +535,7 @@ var PL3D_FS=[
   '          float dm=smoothstep(.60,.72,vn2(CR*bG*.26+uSeed+vec2(47.,29.)));',
   '          lc=mix(lc,vec3(.36,.29,.16),dm*(1.-wMt));',
   '          ba3=mix(ba3,lc,uEarth*bk);',
-  '          wFor*=1.-dm;',
+  '          /* F2 P9: gurun = warna tanah saja; tidak hapus hutan (wFor*=1.-dm dibuang) */',
   '        }',
   '        if(wFor>.003){',
   '          float gl=clamp((bpv/2.7-1.2*uLod)/(1.8*uLod),0.,1.);',
@@ -485,12 +543,24 @@ var PL3D_FS=[
   '          vec3 fc=mix(vec3(.022,.095,.040),vec3(.075,.235,.090),gr)*(.75+.5*e);',
   '          ba3=mix(ba3,bcl(fc,alb),wFor*bk);',
   '        }',
+  '        if(wLv>.003){',                                                                  /* F3: lava di pita kaki */
+  '          float gl23=clamp((bpv/2.3-1.2*uLod)/(1.8*uLod),0.,1.);',
+  '          float glv=clamp((bpv/5.2-1.2*uLod)/(1.8*uLod),0.,1.);',
+  '          ba3=mix(ba3,bcl(vec3(.040,.030,.032),alb),wLv*bk);',
+  '          float vein=1.-smoothstep(0.,.035,abs(.6*mix(.5,vn2(CR*bG*2.3+uSeed+vec2(71.,19.)),gl23)+.4*mix(.5,vn2(CR*bG*5.2+uSeed+vec2(9.,43.)),glv)-.5));',   /* lebar .035: retakan ±8% pita (.09 = bercak 21%) */
+  '          float pool=(1.-smoothstep(.30,.55,e))*smoothstep(.2,.6,wLv);',
+  '          bLava=mix(vec3(1.,.28,.04),vec3(1.,.72,.22),vein*pool+.35*vein)*(vein*.55+pool*.6+.10)*wLv*bk;',
+  '          relief=mix(relief,1.,.3*wLv*bk);',
+  '        }',
   '        if(wMt>.003){',
   '          vec3 rc=mix(vec3(.09,.085,.10),vec3(.36,.35,.38),e);',
-  '          float sn=smoothstep(1.-mt*.5-.02,1.-mt*.5+.04,ba)*smoothstep(.35,.7,e);',
-  '          rc=mix(rc,vec3(.80,.86,.95),sn);',
+  '          float snOld=smoothstep(1.-mt*.5-.02,1.-mt*.5+.04,ba)*smoothstep(.35,.7,e);',
+  '          float gl3=clamp((bpv/3.1-1.2*uLod)/(1.8*uLod),0.,1.);',
+  '          float snC=smoothstep(.55,.8,e)*smoothstep(.03,.055,cD)*(1.-smoothstep(mw*.6,mw*.95,cD))*smoothstep(.35,.6,mix(.5,vn2(bG*3.1+uSeed),gl3));',
+  '          float sn=mix(snOld,snC,hasC)*.85;',                    /* F1: salju di puncak band; redup */
+  '          rc=mix(rc,vec3(.66,.72,.82),sn);',
   '          ba3=mix(ba3,bcl(rc,alb),wMt*bk);',
-  '          relief=clamp(1.+(relief-1.)*(1.+.8*wMt*bk),.45,1.9);',
+  '          relief=clamp(1.+(relief-1.)*(1.+.6*wMt*bk),.45,1.9);', /* boost turun dari .8 biar tidak silau */
   '        }',
   '        if(wUr>.003){',
   '          float pvb=bpv/2.2;float phb=s/uFx/2.2;',                                       /* px layar per sel grid dasar (vertikal / horizontal) */
@@ -504,13 +574,45 @@ var PL3D_FS=[
   '          bNeon=nA*wUr*bk;',
   '        }',
   '        if(wSea>.003){',
-  '          float dp=1.-smoothstep(seaT-.2,seaT,ba);',
+  '          float dp=1.-smoothstep(seaT-.2,seaT,baEff);',
+  '          dp=max(dp,bowl*allowB*uCrat*smoothstep(0.,.15,wSea));',
   '          vec3 sc=mix(vec3(.050,.300,.380),vec3(.012,.055,.150),dp);',
   '          sc=mix(sc,mix(vec3(.050,.270,.470),vec3(.008,.045,.200),dp),uEarth);',
-  '          sc+=vec3(.20,.26,.28)*(1.-smoothstep(0.,.025,abs(ba-seaT)))*.35;',
+  '          sc+=vec3(.20,.26,.28)*(1.-smoothstep(0.,.025,abs(baEff-seaT)))*.35;',
+  '          float clR=(1.-smoothstep(0.,.07,cD))*cMs*hasC;',                               /* F4: terumbu di canyon x dangkal */
+  '          float coral=clR*(1.-smoothstep(0.,.55,dp));',
+  '          sc=mix(sc,vec3(.10,.78,.66),coral*.8);',
   '          ba3=mix(ba3,bcl(sc,alb),wSea*bk);',
   '          bSea=wSea*bk;',
   '          relief=mix(relief,1.,bSea);',
+  '          float inw=max(seaT-baOpen,0.);',                                                /* F4d: jarak ke garis pantai LAUT TERBUKA (pakai baOpen: danau kawah + sungai tidak dihitung) */
+  '          float wOpen=1.-smoothstep(seaT-.03,seaT+.03,baOpen);',                         /* laut terbuka saja; danau/sungai = 0 */
+  '          float nShr=1.-smoothstep(0.,.20,inw);',                                          /* 1 di pantai, 0 di air dalam: bibit bercak tumbuh dari pantai */
+  '          float aK=clamp((seaT-.15)/.47,0.,1.);',                                          /* luas laut: bercak merembet ke air terbuka */
+  '          float unitS=s/uFx;',
+  '          float spFar=1.-smoothstep(22.,70.,unitS);',                                      /* 1 jauh, 0 dekat: titik hanya di jauh; dekat = gumpalan lembut */
+  '          float glB=clamp((bpv/.7-1.2*uLod)/(1.8*uLod),0.,1.);',
+  '          float glC=clamp((bpv/2.3-1.2*uLod)/(1.8*uLod),0.,1.);',
+  '          float pn=mix(.5,vn2(CR*bG*.7+uSeed+vec2(5.,91.)),glB);',                         /* bibit bercak (frekuensi rendah) */
+  '          float pn2=mix(.5,vn2(CR*bG*2.3+uSeed+vec2(63.,17.)),glC);',                      /* tepi bergerigi + rongga gelap + selang-seling rim */
+  '          float ph=vn2(CR*bG*.55+uSeed+vec2(14.,3.));',                                    /* fase napas per area (bercak tetangga tidak serempak) */
+  '          float breath=1.-uCityTw*.18*(1.+sin(uT*1.05+ph*6.283));',
+  '          float thr=.80-.12*aK+.10*(1.-spFar)+.035*uCityTw*sin(uT*1.05+ph*6.283);',                        /* tepi bercak maju-mundur pelan = 'tumbuh' */
+  '          float nuc=pn+.26*nShr+.20*clR+(pn2-.5)*.26;',                                    /* + dekat pantai, + celah canyon di bawah air, + tepi fraktal */
+  '          float pm=smoothstep(thr,thr+.09,nuc);',                                          /* tubuh bercak */
+  '          float core=pow(smoothstep(thr+.03,thr+.22,nuc),1.5);',                           /* inti terang di tengah bercak */
+  '          float halo=smoothstep(thr-.16,thr+.02,nuc);',                                    /* aura lembut di luar tepi */
+  '          float rim=(1.-smoothstep(0.,.045,inw))*mix(.25,1.,smoothstep(.35,.70,pn2));',    /* garis cahaya tipis menyusuri pantai, putus-putus */
+  '          float vd=mix(.55,1.,pn2);',                                                      /* rongga gelap dalam bercak */
+  '          float bl=(halo*.50+pm*(.40+.85*core)*vd+rim*.35*spFar*vd)*breath*mix(.55,1.,spFar);',
+  '          vec2 sp1=cdot(bG,9.,.28,.50,unitS,41.);',                                        /* titik besar */
+  '          vec2 sp2=cdot(bG,17.,.22,.42,unitS,77.);',                                       /* titik halus rapat (glowworm) */
+  '          float d1=sp1.x*(1.-uCityTw*.5*(1.+sin(uT*2.1+sp1.y*60.)))*(pm*(.30+.70*core)+rim*.50);',
+  '          float d2=sp2.x*(1.-uCityTw*.5*(1.+sin(uT*2.1+sp2.y*60.+1.3)))*(pm*core+rim*.40);',
+  '          float dots=(d1+d2)*spFar;',
+  '          vec3 lumB=mix(vec3(.02,.30,1.),vec3(.04,.60,1.),vn2(CR*bG*.9+uSeed+vec2(2.,67.)));',   /* biru listrik -> biru langit (referensi); tambah .x/.y hijau kalau mau lebih cyan */
+  '          vec3 lumH=vec3(.40,.88,1.);',                                                    /* putih kebiruan: inti + titik */
+  '          bLum=wOpen*bk*(lumB*bl+lumH*(pm*core*.25+dots*.60));',
   '        }',
   '        alb=ba3;',
   '      }',
@@ -560,12 +662,14 @@ var PL3D_FS=[
   '        }',
   '      }',
   '    }',
-  /* BIOME B: kilau cahaya di laut + neon kota (menyala penuh di sisi malam, redup di sisi terang), tertutup awan seperti lampu kota */
-  '    if(bSea>0.||bNeon.x+bNeon.y+bNeon.z>0.){',
+  /* BIOME B: kilau laut + neon + lava + biolum (F4) */
+  '    if(bSea>0.||bNeon.x+bNeon.y+bNeon.z>0.||bLava.x+bLava.y+bLava.z>0.||bLum.x+bLum.y+bLum.z>0.){',
   '      float bnt=1.-smoothstep(.10,.50,nl*fall);',
   '      float bcv=1.-cl*uCloud*.85;',
   '      col+=uWarm*pow(nl,6.)*fall*.45*bSea*(1.-cl*uCloud*.8);',
   '      col+=1.-exp(-bNeon*(.25+.95*bnt)*1.6*bcv);',
+  '      col+=1.-exp(-bLava*(.30+.70*bnt)*1.6*bcv);',               /* lava: siang redup, malam penuh; tanpa kedip */
+  '      col+=1.-exp(-bLum*bnt*bnt*2.2*bcv);',                     /* biolum: hanya malam, diredam awan */
   '    }',
   '    float hz=exp(-s/uHaze);',                                  /* kabut atmosfer makin tebal ke arah horizon */
   '    col=mix(col,uAtm*.40+vec3(.04),hz*uHazeA);',
@@ -1062,7 +1166,7 @@ function planet3dDraw(now){
       /* render periodik (fps) CUMA kalau permukaan memang berputar (rot x rotK != 0). Kalau diam, render hanya karena: dirty, cahaya bergeser,
          palette/parallax berubah, atau sekali lagi saat palette selesai settle (sisa selisih di bawah ambang palCh). */
       var rotMov=Math.abs(PL3D_CFG.live.rot*PL3D_CFG.rotK)>1e-6;
-      var animOn=(PL3D_CFG.cloud>0&&PL3D_CFG.cloudDrift!==0)||(PL3D_CFG.cityA>0&&PL3D_CFG.cityTw>0);   /* awan hanyut / lampu kedip: render periodik di fps (4/dtk); matikan keduanya = render on-demand lagi (hemat baterai) */
+      var animOn=(PL3D_CFG.cloud>0&&PL3D_CFG.cloudDrift!==0)||(PL3D_CFG.cityTw>0&&PL3D_CFG.bioA>0&&(PL3D_CFG.cityA>0||PL3D_CFG.bioSea>0||PL3D_CFG.earthK>0));   /* awan / kerlip kota+biolum (P16) */
       var lMv=Math.abs(lx-PL3D.lastLx)+Math.abs(ly-PL3D.lastLy);
       var settle=!!PL3D.wasCh&&!palCh;PL3D.wasCh=palCh;
       var due=PL3D.dirty||(!still&&(rotMov||animOn)&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);

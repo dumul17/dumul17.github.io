@@ -33,12 +33,12 @@ var T3D=(function(){
     ui:[
       {id:'shape',raw:['rK','hzDy','cell','persp','lod']},
       {id:'ground',mem:['craterA','canyonA'],tog:1,raw:['craterS','canyonS']},
-      {id:'bio',mem:['bioA','bioSea','bioMtn','bioFor','bioUrb','earthK'],tog:1,raw:['urbPatch','urbMin','urbMax']},
+      {id:'bio',mem:['bioA','bioSea','bioMtn','earthK'],tog:1,raw:['bioFor']},
+      {id:'city',mem:['bioUrb','cityA','cityD','cityGlow'],tog:1,raw:['urbSkip','urbPatch','urbMin','urbMax']},
       {id:'haze',raw:['haze','hazeA']},
       {id:'cloud',mem:['cloud','cloudCov','cloudShd','cloudLit','cloudDet'],tog:1,raw:['cloudH']},
       {id:'atm',mem:['atmK','rimLit','rimHalo'],tog:1,raw:['fallK']},
-      {id:'city',mem:['cityA','cityD','cityTw','cityGlow'],tog:1},
-      {id:'fx',fx:1,raw:['evK']},
+      {id:'fx',fx:1,raw:['auroraOn','flareOn','debrisOn','boltOn','cityTw','evK']},
       {id:'move',mem:['par','zoomK','rotK','sinkK','libr.k'],tog:1}
     ],
     secs:{adv:['ADVANCED','LANJUTAN'],shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],bio:['BIOMES','BIOME'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK'],perf:['PERFORMANCE (ALL SLOTS)','PERFORMA (SEMUA SLOT)']},
@@ -61,14 +61,18 @@ var T3D=(function(){
       ['bioA','Biomes','Biome',0,1,100,0,'%','','bio'],
       ['bioCol','Biome color','Warna biome',0,1,100,0,'%','','bio','bioA'],
       ['bioSea','Sea','Laut',0,1,100,0,'%','','bio','bioA'],
-      ['bioMtn','Mountains','Gunung',0,1,100,0,'%','','bio','bioA'],
-      ['bioFor','Forest','Hutan',0,1,100,0,'%','','bio','bioA'],
-      ['bioUrb','Cyber city','Kota cyber',0,1,100,0,'%','','bio','bioA'],
-      ['urbSkip','City reach','Jangkauan kota',.2,1,100,0,'%','','bio','bioUrb'],   /* kota cuma di bagian jauh tanah; 100% = sampai dasar layar */
-      ['urbPatch','City patch','Skala bercak kota',.3,3,100,0,'%','','bio','bioUrb'],   /* ukuran gumpalan area kota; tepi organik */
-      ['urbMin','Cell min','Sel kota min',3,20,1,0,'px','','bio','bioUrb'],   /* sel grid di layar tidak lebih kecil dari ini (digabung = jalan utama saja) */
-      ['urbMax','Cell max','Sel kota maks',16,120,1,0,'px','','bio','bioUrb'],   /* sel grid di layar tidak lebih besar dari ini (dibelah = tanpa blok raksasa) */
-      ['earthK','Earth','Bumi',0,1,100,0,'%','','bio','bioA'],   /* overview + sektor (sama): laut luas + benua + awan putih. Tab Planet sekarang IDENTIK di overview dan sektor */
+      ['bioMtn','Mountains','Gunung',0,1,100,0,'%','','bio','bioA'],   /* lebar punggungan di sekitar alur canyon */
+      ['bioFor','Foothills','Kaki gunung',-1,1,100,0,'%','','bio','bioA'],   /* bipolar: -100% lava, 0 netral, +100% hutan; snap di 0 */
+      ['earthK','Earth','Bumi',0,1,100,0,'%','','bio','bioA'],   /* preset bentuk laut (seaT) + kulit benua/gurun/awan; hutan & gunung ngikut slider */
+      /* Kota */
+      ['bioUrb','Cyber city','Kota cyber',0,1,100,0,'%','','city'],   /* F6: pindah dari BIOMES */
+      ['urbSkip','City reach','Jangkauan kota',.2,1,100,0,'%','','city','bioUrb'],
+      ['urbPatch','City patch','Skala bercak kota',.3,3,100,0,'%','','city','bioUrb'],
+      ['urbMin','Cell min','Sel kota min',3,20,1,0,'px','','city','bioUrb'],
+      ['urbMax','Cell max','Sel kota maks',16,120,1,0,'px','','city','bioUrb'],
+      ['cityA','City','Lampu kota',0,3,100,0,'%','','city','bioUrb'],   /* lampu cuma di Cyber city */
+      ['cityD','Density','Padat',0,1,100,0,'%','','city','cityA'],
+      ['cityGlow','Glow','Pendar kota',0,1,100,0,'%','','city','cityA'],
       /* Kabut */
       ['haze','Haze','Kabut',0,240,1,0,'px','','haze'],
       ['hazeA','Haze α','Kabut α',0,1,100,0,'%','','haze'],
@@ -85,16 +89,12 @@ var T3D=(function(){
       ['rimLit','Rim lit','Rim cahaya',0,2,100,0,'%','','atm'],
       ['rimHalo','Halo','Halo limb',0,1.5,100,0,'%','','atm'],
       ['fallK','Light','Jangkauan cahaya',.3,3,100,0,'%','','atm'],
-      /* Kota */
-      ['cityA','City','Lampu kota',0,3,100,0,'%','','city','bioUrb'],   /* lampu cuma di biome Cyber city: kalau Cyber city 0 baris ini diredupkan (percuma digeser) */
-      ['cityD','Density','Padat',0,1,100,0,'%','','city','cityA'],
-      ['cityTw','Twinkle','Kedip',0,1,100,0,'%','','city','cityA'],
-      ['cityGlow','Glow','Pendar kota',0,1,100,0,'%','','city','cityA'],        /* pendar tanah kota + dasar awan di atas kota */
       /* Efek 2D (rancangan: rencana-dekor-planet.md; F1 = knob saja, gambar menyusul F2-F5) */
       ['auroraOn','Aurora','Aurora',0,1,1,0,'','t','fx'],
       ['flareOn','Flare','Flare',0,1,1,0,'','t','fx'],
       ['debrisOn','Debris','Puing',0,1,1,0,'','t','fx'],
       ['boltOn','Lightning','Petir',0,1,1,0,'','t','fx'],
+      ['cityTw','Shimmer','Kerlip malam',0,1,1,0,'','t','fx'],   /* F6: toggle kerlip kota + biolum; key cityTw sama; bukan FXK */
       ['evK','Events','Kejadian',.2,3,100,0,'%','','fx','debrisOn|boltOn'],
       ['boltK','Bolt size','Ukuran petir',.3,2,100,0,'%','','fx','boltOn'],   /* dep any-of: diredupkan kalau puing DAN petir mati */
       /* Gerak */
@@ -180,7 +180,7 @@ var T3D=(function(){
   function rootOf(g){try{return g.root();}catch(e){return null;}}
   function vget(g,r){var v=g.get?g.get(r.p):pget(rootOf(g),r.p);if(r.t)return v?1:0;v=+v;if(!isFinite(v))v=g.def[r.p];return r.inv?1-v:v;}
   function vset(g,r,v){
-    if(r.t)v=v?1:0;else{v=clamp(+v,r.min,r.max);if(r.inv)v=1-v;}
+    if(r.t)v=v?1:0;else{v=clamp(+v,r.min,r.max);if(r.inv)v=1-v;if(r.p==='bioFor'&&Math.abs(v)<.025)v=0;}   /* Foothills: snap ke 0 (netral) */
     if(g.set)g.set(r.p,v);else if(r.t)pset(rootOf(g),r.p,!!v);else pset(rootOf(g),r.p,v);
     g.after(r.p);
   }
