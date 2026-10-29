@@ -31,6 +31,7 @@ var PL3D_CFG={
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:1.5,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
+  qSlow:1,        /* skala resolusi saat governor FS.slow (HP lambat): dipakai kalau 0 < qSlow < q. Probe: q 1,5 -> 1 hemat ±18 ms/frame di HP dpr 1,6 (GPU-bound), ±2 ms di HP dpr 2,0. 0 = mati (selalu pakai q) */
   fps:15,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
   slowAur:1,      /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe; jarak keyframe = PL3D_AUR_KF) */
   slowAurAlt:0,   /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe) */
@@ -304,7 +305,7 @@ var PL3D_FS=[
   '  float tn=0.;float a=.5;float fq=1.;',
   '  for(int o=0;o<5;o++){',
   '    float w=clamp((pv/fq-1.2*uLod)/(1.8*uLod),0.,1.);',
-  '    tn+=a*mix(.5,vn2(G*fq+off),w);',
+  '    if(w>0.)tn+=a*mix(.5,vn2(G*fq+off),w);else tn+=a*.5;',   /* oktaf yang sudah di-fade penuh (w=0) tidak perlu fetch: hasil identik */
   '    fq*=2.;a*=.5;',
   '  }',
   '  return tn;',
@@ -389,7 +390,7 @@ var PL3D_FS=[
   '  float tn=0.;float a=.5;float fq=1.;vec2 p=G+off;',
   '  for(int o=0;o<5;o++){',
   '    float w=clamp((pv/fq-1.2*uLod)/(1.8*uLod),0.,1.);',
-  '    tn+=a*mix(.5,vn2(p),w);',
+  '    if(w>0.)tn+=a*mix(.5,vn2(p),w);else tn+=a*.5;',
   '    p=CR*p*2.03+vec2(17.3,9.1);fq*=2.03;a*=.5;',
   '  }',
   '  return tn;',
@@ -523,8 +524,8 @@ var PL3D_FS=[
   '        float mA=clamp(.3+uBioMtn*1.6,.3,1.)*mix(1.,mix(.7,1.,cMs),hasC);',                            /* intensitas + lebih di dalam mask (2a.3) */
   '        float wLv=foot*lg*mA*(1.-wMt)*(1.-wSea)*(1.-wFor);',                               /* F3: pita kaki lava */
   '        float upf=.2/max(uUrbP,.2);',                                                   /* frekuensi bercak: skala bercak kota (uUrbP) */
-  '        float um=vn2(CR*bG*upf+uSeed+vec2(88.,5.));',
-  '        um+=(fbmL(CR*bG*upf*3.1+uSeed,bpv/(upf*3.1),vec2(21.,9.))-.5)*.45;',          /* tepi bercak bergerigi fraktal (oktaf halus di-LOD, tanpa moire) */
+  '        float um=0.;',
+  '        if(uBioUrb>.001){um=vn2(CR*bG*upf+uSeed+vec2(88.,5.));um+=(fbmL(CR*bG*upf*3.1+uSeed,bpv/(upf*3.1),vec2(21.,9.))-.5)*.45;}',   /* bercak kota cuma dihitung kalau kota nyala (uBioUrb=0: wUr selalu 0, jadi hasil identik; overview Earth memakai bioUrb 0) */          /* tepi bercak bergerigi fraktal (oktaf halus di-LOD, tanpa moire) */
   '        float ut=1.-uBioUrb*.7;',
   '        float wUr=smoothstep(ut-.06,ut+.20,um)*step(.001,uBioUrb)*(1.-wSea)*(1.-wMt);',   /* kota cyber ada di overview (Earth) DAN sektor: tidak lagi ditiadakan uEarth */
   '        float xSea=1.-smoothstep(seaT+.02,seaT+.10,baEff);',                               /* F4b: larangan kota ikut danau/sungai */
@@ -733,9 +734,10 @@ function pl3dBuild(){
 }
 
 /* ukuran strip + kanvas 2D penyimpan hasil (kanvas WebGL offscreen tidak dijamin menyimpan isinya antar-task) */
+function pl3dQ(){var q=PL3D_CFG.q,qs=PL3D_CFG.qSlow;return(qs>0&&qs<q&&typeof FS!=='undefined'&&FS.slow)?qs:q;}   /* q efektif: lebih kecil saat FS.slow */
 function pl3dResize(){
   pl3dSync();
-  var gm=pl3dGeom(true,false,true),q=PL3D_CFG.q,rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
+  var gm=pl3dGeom(true,false,true),q=pl3dQ(),rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
   if(PL3D.W===PW&&PL3D.H===PH&&PL3D.rw===rw&&PL3D.rh===rh&&PL3D.cv2)return;
   PL3D.W=PW;PL3D.H=PH;PL3D.rw=rw;PL3D.rh=rh;PL3D.stripH=gm.stripH;PL3D.dirty=true;
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
@@ -744,6 +746,8 @@ function pl3dResize(){
   PL3D.cv3.width=rw;PL3D.cv3.height=rh;
   if(!PL3D.cvP){PL3D.cvP=document.createElement('canvas');PL3D.cP=PL3D.cvP.getContext('2d');}   /* snapshot SEBELUMNYA (cross-fade); tiga kanvas berputar peran cv2/cv3/cvP tanpa salin */
   PL3D.cvP.width=rw;PL3D.cvP.height=rh;PL3D.fadeT=null;
+  if(!PL3D.cvM){PL3D.cvM=document.createElement('canvas');PL3D.cM=PL3D.cvM.getContext('2d');}   /* kanvas campur cross-fade (lerp premultiplied) */
+  PL3D.cvM.width=rw;PL3D.cvM.height=rh;
   PL3D.cyc=null;PL3D.full=true;PL3D.bwR=null;   /* ukuran berubah: render penuh sekali jalan dulu */
   PL3D.fb=null;
   if(PL3D.r){PL3D.r.setSize(rw,rh,false);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
@@ -821,7 +825,7 @@ function pl3dCycleStep(){
 /* PETIR: render ulang cuma kotak kecil di sekitar kilau (shader yang sama, uniform terakhir), ditimpa ke cv2 yang sedang tampil. Kilat berakhir -> kotak yang sama
    dirender sekali lagi tanpa kilau (mengembalikan dasar). Dipanggil SETELAH langkah siklus di frame yang sama, jadi tukar buffer tidak menghapus kilau. */
 function pl3dBoltWin(){
-  var bu=PL3D.bu,U=PL3D.uni,r=PL3D.r,act=!!(bu&&bu.a>.002),W=PL3D.bwR,q=PL3D_CFG.q,rw=PL3D.rw,rh=PL3D.rh,cy,hx,hy,x0,y0,x1,y1,w,h;
+  var bu=PL3D.bu,U=PL3D.uni,r=PL3D.r,act=!!(bu&&bu.a>.002),W=PL3D.bwR,q=pl3dQ(),rw=PL3D.rw,rh=PL3D.rh,cy,hx,hy,x0,y0,x1,y1,w,h;
   if(!r||!U||!PL3D.c2||(!act&&!W))return;
   if(act){
     cy=PH-bu.y+(PL3D.bo||0);hx=bu.r*2.2+2;hy=bu.r*bu.asp*2.2+2;   /* exp(-1.7*d^2) < .001 di d = 2.2 */
@@ -1276,12 +1280,16 @@ function planet3dDraw(now){
       fa=(PL3D.curNow-PL3D.fadeT)/(PL3D.swapInt||400);
       if(fa>=1)PL3D.fadeT=null;else if(fa<0)fa=0;
     }else{PL3D.fadeT=null;}
-    if(PL3D.fadeT!=null&&fa<1){
-      g.drawImage(PL3D.cvP,cp.x-(PL3D.pox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.poy||0),PW,sh);
-      g.globalAlpha=PL3D.al*fa;
+    var src=PL3D.cv2;
+    if(PL3D.fadeT!=null&&fa<1&&PL3D.cM){   /* lerp premultiplied di kanvas campur: prev x (1-fa) + cur x fa ('lighter'). Menimpa dua kali dengan source-over membuat piksel semi-transparan (fade horizon, tepi limb) berdenyut tiap swap */
+      var m=PL3D.cM,kk=PL3D.rw/PW;
+      m.globalCompositeOperation='source-over';m.globalAlpha=1;m.clearRect(0,0,PL3D.rw,PL3D.rh);
+      m.globalAlpha=1-fa;m.drawImage(PL3D.cvP,((PL3D.rox||0)-(PL3D.pox||0))*kk,((PL3D.roy||0)-(PL3D.poy||0))*kk);
+      m.globalCompositeOperation='lighter';m.globalAlpha=fa;m.drawImage(PL3D.cv2,0,0);
+      m.globalCompositeOperation='source-over';m.globalAlpha=1;
+      src=PL3D.cvM;
     }
-    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');
-    g.globalAlpha=PL3D.al;   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
+    g.drawImage(src,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
     if(!PL3D.fxOff&&!(typeof reduce!=='undefined'&&reduce)&&pl3dFxOn()){   /* efek 2D: error di sini TIDAK boleh mematikan planet 3D (pl3dFail) */
       try{pl3dFx(g,now,cp);}catch(eFx){PL3D.fxOff=1;try{console.warn('[planet3d] efek 2D dimatikan:',eFx&&eFx.message);}catch(eW){}}
       pl3dMk('pl.fx');
