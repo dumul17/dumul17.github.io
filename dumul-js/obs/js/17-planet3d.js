@@ -32,8 +32,8 @@ var PL3D_CFG={
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:1.5,           /* skala resolusi render (x px CSS). Dulu 5 (25 sampel/px layar, mubazir); 2 cukup utk layar DPR 2 */
   fps:15,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
-  slowAur:1,      /* HP lambat (FS.slow): pengali jeda bake aurora (1 = sama dgn normal, 2 = dulu: 2x lebih jarang, patah). */
-  slowAurAlt:0,   /* 1 = di HP lambat bake aurora cuma di frame ganjil (dulu); 0 = boleh di frame mana pun */
+  slowAur:1,      /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe; jarak keyframe = PL3D_AUR_KF) */
+  slowAurAlt:0,   /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe) */
   bandMin:1,      /* batas bawah pita ADAPTIF: satu refresh penuh butuh `bands` frame, jadi di HP 15 fps bands 6 = cuma ~2,5 refresh/dtk (lampu kota + awan patah-patah). Pita dikurangi otomatis supaya satu refresh muat di 1000/fps ms, tapi tidak di bawah nilai ini. 6 (= bands) = tanpa adaptasi */
   bands:6,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
@@ -803,7 +803,7 @@ function pl3dCycleStep(){
   }
   if(++c.i>=n){
     t=PL3D.cv2;PL3D.cv2=PL3D.cv3;PL3D.cv3=t;t=PL3D.c2;PL3D.c2=PL3D.c3;PL3D.c3=t;
-    PL3D.rox=c.rox;PL3D.roy=c.roy;PL3D.rf=c.rf;PL3D.cyc=null;PL3D.renders++;
+    PL3D.rox=c.rox;PL3D.roy=c.roy;PL3D.rf=c.rf;PL3D.cyc=null;PL3D.renders++;pl3dRfMark();
   }
 }
 /* PETIR: render ulang cuma kotak kecil di sekitar kilau (shader yang sama, uniform terakhir), ditimpa ke cv2 yang sedang tampil. Kilat berakhir -> kotak yang sama
@@ -860,6 +860,8 @@ function pl3dBake2D(){
 function pl3dLimbY(gm,x){var dx=x-gm.cx,r2=gm.R*gm.R-dx*dx;return gm.cy-Math.sqrt(r2>0?r2:0);}   /* y limb (layar tegak) di kolom x */
 /* PROFIL (cuma aktif kalau overlay PERF hidup, nol biaya di luar itu). pl3dMk = tandai waktu sejak tanda sebelumnya ke bucket n (pmk di 05-sector-ui.js).
    pl3dMkGpu = paksa gl.finish() lalu tandai: 'pl.sub' = CPU kirim perintah, 'pl.gpu' = waktu TUNGGU GPU menyelesaikan shader (ini yang tak kelihatan di js ms biasa). Efek samping: di mode PERF saja, GPU dipaksa sinkron. */
+/* PERF/probe: catat tiap refresh PENUH strip tanah (tukar buffer / render penuh): jumlah + jeda terpanjang. Dibaca probe set 'bio' (?probe=1&pset=bio) */
+function pl3dRfMark(){try{if(typeof PERF==='undefined'||!PERF)return;var tn=performance.now(),q=PL3D.pf||(PL3D.pf={n:0,max:0,last:0});if(q.last){var gp=tn-q.last;q.n++;if(gp>q.max)q.max=gp;}q.last=tn;}catch(eRf){}}
 function pl3dMk(n){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function')pmk(n);}catch(eM){}}
 function pl3dMkGpu(r){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function'){pmk('pl.sub');r.getContext().finish();pmk('pl.gpu');}}catch(eM){}}
 function pl3dFxOn(){var C=PL3D_CFG,F=PL3D.fx;return !!(C.auroraOn||C.flareOn||C.debrisOn||C.boltOn||C.fxDebug||(F&&(F.aur>.001||F.flv>.001||(F.deb&&F.deb.length)||F.bolt)));}   /* F.aur>0: aurora masih memudar keluar setelah toggle dimatikan */
@@ -867,7 +869,7 @@ function pl3dFxOn(){var C=PL3D_CFG,F=PL3D.fx;return !!(C.auroraOn||C.flareOn||C.
 /* AURORA (F2 v2): tirai KONTINU di atas limb, HANYA sisi gelap (memudar mulus ke sisi terang).
    Dulu: quad ~22px per segmen, tiap quad gradient + alpha sendiri -> ada loncatan di tiap sambungan (kelihatan "tempelan").
    Sekarang: dibake ke kanvas offscreen setengah resolusi (kolom 1px offscreen = 2px layar, tinggi + alpha berubah halus antar kolom, tanpa jahitan),
-   lalu di-blit 1x per frame dengan upscale bilinear (sekalian melembutkan). Bake cuma ~22x/dtk (aurora gerak pelan); blit tiap frame + kompensasi parallax.
+   lalu di-blit 1x per frame dengan upscale bilinear (sekalian melembutkan). Sejak 2 keyframe: bake ~0.7x/dtk, dua keyframe di-blend tiap frame (60fps) + kompensasi parallax.
    Lapisan: 0 = kabut lebar tipis (tanpa sinar), 1 = tirai utama (sinar vertikal lembut), 2 = tirai kedua lebih pendek (potato: tanpa lapisan 2).
    Warna dari palette hidup: bawah = atm geser hue +38 (lebih terang), tengah = atm, atas = atm geser hue -32 (lebih gelap). Tepi bawah memudar SEDIKIT ke dalam atmosfer (tidak ada garis keras di limb). */
 var PL3D_AUR=[   /* s = sprite (0 kabut, 1 tirai), H = tinggi relatif x Hb, lift = px di atas limb, a = alpha relatif, ry = kekuatan sinar 0..1, k/w/ph + k2/w2/ph2 = dua gelombang tinggi (siklus selebar layar, rad/dtk, fase) */
@@ -898,13 +900,16 @@ function pl3dAurSpr(F){   /* 2 sprite gradient vertikal 1x64 (kabut, tirai); ata
   F.aurKey=key;F.aurSp=sp;return sp;
 }
 function pl3dAurEnv(x,lx){var t=(Math.abs(x-lx)/PW-.08)/.6;t=t<0?0:(t>1?1:t);return t*t*(3-2*t);}   /* 0 di dekat cahaya, 1 di sisi gelap (transisi lebar = tidak ada batas tegas) */
-var PL3D_AUR_SC=.5;
-var PL3D_AUR_HK=1;   /* pengali tinggi semua lapisan aurora. .8 = 20% lebih pendek (blit + bake lebih murah). 1 = default */   /* skala kanvas offscreen terhadap layar */
-function pl3dAurBake(F,A){
-  var gm=F.gm,SC=PL3D_AUR_SC,W=F.aurCv.width,Hh=F.aurCv.height,c=F.aurCx,sp=pl3dAurSpr(F),pot=F.pot,st=pot?4:2,N=Math.ceil(PW/st),
-      nL=pot?2:3,Hb=PL3D_AUR_HK*Math.min(150,.15*Math.max(PW,PH)),t=F.t*.001,TP=6.2832/PW,lx=F.lx,cw=st*SC,yMin=1e9,yMax=-1e9,
+var PL3D_AUR_SC=.5;   /* skala kanvas offscreen terhadap layar */
+var PL3D_AUR_HK=1;   /* pengali tinggi semua lapisan aurora. .8 = 20% lebih pendek (blit + bake lebih murah). 1 = default */
+var PL3D_AUR_KF=1400;   /* jarak waktu (ms) antar dua KEYFRAME aurora (potato: 2000). Keyframe di-blend per frame (60fps) -> gerak kontinu, bake cuma ~1x per KF. Makin besar = bake makin jarang, tapi sinar makin "lembut" (interpolasi alpha) */
+/* Satu keyframe = kanvas offscreen + geometri limb saat dibake (G), waktu animasi (t), posisi cahaya (lx), alpha (A), kunci warna (key), waktu bake (rb), kotak baris terisi (B0..B1) */
+function pl3dAurSlot(W,Hh){var cv=document.createElement('canvas');cv.width=W;cv.height=Hh;return {cv:cv,cx:cv.getContext('2d'),t:0,G:{cx:0,cy:0,R:0},lx:0,A:0,key:'',rb:0,B0:0,B1:0};}
+function pl3dAurBake(F,A,S,tms){   /* bake satu keyframe ke slot S untuk waktu animasi tms (ms; boleh di MASA DEPAN, fungsi murni terhadap waktu) */
+  var gm=F.gm,SC=PL3D_AUR_SC,W=S.cv.width,Hh=S.cv.height,c=S.cx,sp=pl3dAurSpr(F),pot=F.pot,st=pot?4:2,N=Math.ceil(PW/st),
+      nL=pot?2:3,Hb=PL3D_AUR_HK*Math.min(150,.15*Math.max(PW,PH)),t=tms*.001,TP=6.2832/PW,lx=F.lx,cw=st*SC,yMin=1e9,yMax=-1e9,
       rk1=6.2832/30,rk2=6.2832/17,i,j,x,L,m,ray,a1,b1,al,h,yb,env,mm,lay,R;
-  c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,W,Hh);c.globalCompositeOperation='lighter';c.globalAlpha=1;
+  c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,W,Hh);c.globalCompositeOperation='lighter';c.globalAlpha=1;
   for(i=0;i<nL;i++){
     lay=PL3D_AUR[i];
     for(j=0;j<N;j++){
@@ -922,30 +927,62 @@ function pl3dAurBake(F,A){
       if(yb-h<yMin)yMin=yb-h;if(yb+h*.111>yMax)yMax=yb+h*.111;
     }
   }
-  c.globalAlpha=1;
-  F.aurB0=Math.max(0,Math.floor(yMin*SC)-1);F.aurB1=Math.min(Hh,Math.ceil(yMax*SC)+1);
-  if(!(F.aurB1>F.aurB0)){F.aurB0=0;F.aurB1=0;}
-  F.aurG={cx:gm.cx,cy:gm.cy,R:gm.R};F.aurR=F.t;F.aurLx=lx;
+  c.globalAlpha=1;c.globalCompositeOperation='source-over';
+  S.B0=Math.max(0,Math.floor(yMin*SC)-1);S.B1=Math.min(Hh,Math.ceil(yMax*SC)+1);
+  if(!(S.B1>S.B0)){S.B0=0;S.B1=0;}
+  S.G={cx:gm.cx,cy:gm.cy,R:gm.R};S.t=tms;S.lx=lx;S.A=A;S.key=F.aurKey;S.rb=F.t;
 }
+function pl3dAurBakeMk(F,A,S,tms){pl3dMk('pl.pre');pl3dAurBake(F,A,S,tms);pl3dMk('pl.bake');}
 function pl3dFxAurora(g,F){
-  var C=PL3D_CFG,P=F.pal,gm=F.gm,ba=g.globalAlpha,SC=PL3D_AUR_SC;
+  var C=PL3D_CFG,P0=F.pal,gm=F.gm,ba=g.globalAlpha,SC=PL3D_AUR_SC;
   F.aur=Math.max(0,Math.min(1,F.aur+(C.auroraOn?1:-1)*F.dt/.6));   /* fade-in/out 0.6 dtk (diterapkan saat blit, bukan saat bake) */
   if(F.aur<=.001){F.aur=0;return;}
-  var A=Math.min(.5,P.atmA*C.atmK*2.2);   /* kecerahan ikut slider Atmosfer */
+  var A=Math.min(.5,P0.atmA*C.atmK*2.2);   /* kecerahan ikut slider Atmosfer */
   if(A<.01)return;
   var W=Math.max(2,Math.ceil(PW*SC)),Hh=Math.max(2,Math.ceil(PH*SC));
   if(!F.aurCv||F.aurCv.width!==W||F.aurCv.height!==Hh){
-    F.aurCv=document.createElement('canvas');F.aurCv.width=W;F.aurCv.height=Hh;F.aurCx=F.aurCv.getContext('2d');F.aurG=null;
+    F.aurCv=document.createElement('canvas');F.aurCv.width=W;F.aurCv.height=Hh;F.aurCx=F.aurCv.getContext('2d');   /* kanvas komposit (blend dua keyframe) */
+    F.aurS=[pl3dAurSlot(W,Hh),pl3dAurSlot(W,Hh)];F.aurP=F.aurN=null;
   }
-  if(!F.aurCx)return;
-  /* bake jarang: sinar bergeser cuma ~1.5 px/dtk, jadi 5-6x/dtk sudah tak terlihat beda dari 22x/dtk. Paksa bake ulang kalau radius berubah atau cahaya (portal/BH) bergeser >12px (batas terang-gelap ikut). Blit tetap tiap frame. */
-  var fsl=(typeof FS!=='undefined'&&FS.slow),aIv=(F.pot?300:180)*(fsl?(PL3D_CFG.slowAur||1):1);   /* HP lambat (FS): pengali jeda bake aurora (slowAur; dulu 2 -> ~3 update/dtk, patah) */
-  if(!F.aurG||Math.abs(gm.R-F.aurG.R)>.5||Math.abs(F.lx-F.aurLx)>12||(F.t-F.aurR>=aIv&&(!fsl||!PL3D_CFG.slowAurAlt||(FS.n&1)))){pl3dMk('pl.pre');pl3dAurBake(F,A);pl3dMk('pl.bake');}
-  if(F.aurB1<=F.aurB0)return;
-  var dx=gm.cx-F.aurG.cx,dy=gm.cy-F.aurG.cy;   /* parallax murni = geser: aurora tetap menempel di limb walau bake lebih jarang dari frame */
-  g.globalAlpha=ba*F.aur;
+  if(!F.aurCx||!F.aurS[0].cx||!F.aurS[1].cx)return;
+  /* DUA KEYFRAME + BLEND. P = keyframe lama, N = keyframe baru (dibake untuk waktu MASA DEPAN P.t+KF). Tiap frame: hasil = P*(1-u) + N*u, u = progres waktu.
+     Gelombang aurora sangat pelan, jadi interpolasi alpha antar dua keyframe ~1.4 dtk tidak terlihat bedanya dari bake ulang, tapi geraknya kontinu 60fps dan bake turun dari ~5x ke ~0.7x/dtk.
+     Mode TUNGGAL (P===N): setelah kondisi berubah (zoom, cahaya geser >12px, warna/atmosfer berubah, tab ditahan lama) -> bake 1 keyframe "sekarang" lalu ~250ms kemudian masuk mode ganda lagi. */
+  var now=F.t,KF=F.pot?2000:PL3D_AUR_KF,S=F.aurS,P=F.aurP,N=F.aurN,fr;
+  pl3dAurSpr(F);   /* pastikan F.aurKey = warna palette sekarang (di-cache, murah) */
+  if(!N||Math.abs(gm.R-N.G.R)>.5||Math.abs(F.lx-N.lx)>12||(now-N.rb>=180&&(F.aurKey!==N.key||Math.abs(A-N.A)>.008))){
+    fr=N||S[0];pl3dAurBakeMk(F,A,fr,now);P=N=fr;F.aurExp=now+250;
+  }else if(P!==N){
+    if(now>=N.t){   /* N sudah jadi "sekarang": N naik jadi P, slot lama dipakai bake keyframe berikutnya */
+      fr=P;P=N;
+      if(now>=P.t+KF){pl3dAurBakeMk(F,A,fr,now);P=N=fr;F.aurExp=now+250;}   /* frame tertahan lama (tab/menu): jangan mengejar, bake sekali */
+      else{pl3dAurBakeMk(F,A,fr,P.t+KF);N=fr;}
+    }
+  }else if(now>=F.aurExp){   /* mode tunggal -> ganda: P dianggap berumur 0 supaya tampilan tidak meloncat */
+    fr=(P===S[0])?S[1]:S[0];P.t=now;pl3dAurBakeMk(F,A,fr,now+KF);N=fr;
+  }
+  F.aurP=P;F.aurN=N;
   g.imageSmoothingEnabled=true;
-  g.drawImage(F.aurCv,0,F.aurB0,W,F.aurB1-F.aurB0,dx,F.aurB0/SC+dy,W/SC,(F.aurB1-F.aurB0)/SC);
+  if(P===N){   /* tunggal: blit langsung + kompensasi parallax (geser murni) */
+    if(P.B1<=P.B0)return;
+    g.globalAlpha=ba*F.aur;
+    g.drawImage(P.cv,0,P.B0,W,P.B1-P.B0,gm.cx-P.G.cx,P.B0/SC+gm.cy-P.G.cy,W/SC,(P.B1-P.B0)/SC);
+    g.globalAlpha=ba;pl3dMk('pl.aur');return;
+  }
+  var u=(now-P.t)/(N.t-P.t);u=u<0?0:(u>1?1:u);
+  var oxP=(gm.cx-P.G.cx)*SC,oyP=(gm.cy-P.G.cy)*SC,oxN=(gm.cx-N.G.cx)*SC,oyN=(gm.cy-N.G.cy)*SC,y0=1e9,y1=-1e9,eP=P.B1>P.B0,eN=N.B1>N.B0;
+  if(eP){y0=P.B0+oyP;y1=P.B1+oyP;}
+  if(eN){if(N.B0+oyN<y0)y0=N.B0+oyN;if(N.B1+oyN>y1)y1=N.B1+oyN;}
+  y0=Math.max(0,Math.floor(y0)-1);y1=Math.min(Hh,Math.ceil(y1)+1);
+  if(!(y1>y0))return;
+  var cx=F.aurCx;   /* komposit: 'lighter' pada kanvas premultiplied = P*(1-u)+N*u persis (tanpa dip alpha) */
+  cx.setTransform(1,0,0,1,0,0);cx.globalCompositeOperation='source-over';cx.globalAlpha=1;cx.clearRect(0,y0,W,y1-y0);
+  cx.globalCompositeOperation='lighter';
+  if(eP&&u<.999){cx.globalAlpha=1-u;cx.drawImage(P.cv,0,P.B0,W,P.B1-P.B0,oxP,P.B0+oyP,W,P.B1-P.B0);}
+  if(eN&&u>.001){cx.globalAlpha=u;cx.drawImage(N.cv,0,N.B0,W,N.B1-N.B0,oxN,N.B0+oyN,W,N.B1-N.B0);}
+  cx.globalAlpha=1;cx.globalCompositeOperation='source-over';
+  g.globalAlpha=ba*F.aur;
+  g.drawImage(F.aurCv,0,y0,W,y1-y0,0,y0/SC,W/SC,(y1-y0)/SC);
   g.globalAlpha=ba;pl3dMk('pl.aur');
 }
 /* PUING (F4 v2): TANPA ekor (versi pertama terlihat seperti kecebong). Dua jenis benda, sama-sama cuma titik/garis kecil yang berkedip:
@@ -1198,7 +1235,7 @@ function planet3dDraw(now){
           }
           PL3D.c2.clearRect(0,0,PL3D.rw,PL3D.rh);
           PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh);
-          PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.renders++;
+          PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.renders++;pl3dRfMark();
         }else{pl3dCycleStart(now,lx,ly,nb);pl3dCycleStep();}
       }
       pl3dBoltWin();   /* petir: render parsial kotak kecil, di atas hasil siklus frame ini */
