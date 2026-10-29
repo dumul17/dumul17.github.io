@@ -252,10 +252,24 @@ var T3D=(function(){
       if(u>=1){g.lp=null;if(g.built)paint(g.id);try{bhuRepaint();}catch(e2){}}else requestAnimationFrame(step);
     })(L.t0);
   }
+  /* PERINGATAN BELUM DI-SAVE: edit slot yang belum di-Save TIDAK lagi hilang diam-diam saat pindah sektor.
+     Nilai ditahan sementara (g.pend[konteks], tidak ke localStorage) + toast; balik ke konteks itu = nilai dipulihkan (masih belum di-Save). Penanda * di chip. */
+  function slotDirty(g){var st=allVals(g,g.ctx||ctxKey()),d=false;g.rows.forEach(function(r){if(g.perf[r.p])return;var tol=r.t?.5:(.5/r.sc);if(Math.abs(rawGet(g,r)-st[r.p])>tol)d=true;});return d;}
+  function curVals(g){var o={};g.rows.forEach(function(r){if(!g.perf[r.p])o[r.p]=rawGet(g,r);});return o;}
   function ctxTick(){
     var g=G.pl;if(!g||g.dead)return;
-    var k=ctxKey();if(k===g.ctx)return;
-    g.ctx=k;startLerp(g,valuesFor(g,k));
+    var k=ctxKey();
+    if(k===g.ctx){   /* konteks sama: pantau status dirty buat penanda chip */
+      if(g.built&&!g.lp){var dn=slotDirty(g);if(dn!==!!g.dflag){g.dflag=dn;g.sig=null;paintBar(g);}}
+      return;
+    }
+    var old=g.ctx,nx=null;
+    if(old&&!g.lp&&slotDirty(g)){   /* sedang ada edit belum di-Save di slot lama */
+      g.pend=g.pend||{};g.pend[old]=curVals(g);
+      try{if(typeof showModeToast==='function')showModeToast(lb('NOT SAVED: '+ctxShort(old)+' \u00b7 edits held, go back + Save','BELUM DISIMPAN: '+ctxShort(old)+' \u00b7 edit ditahan, balik + Save'),null,3200);}catch(eW){}
+    }
+    if(g.pend&&g.pend[k]){nx=g.pend[k];delete g.pend[k];}
+    g.ctx=k;g.dflag=false;g.sig=null;startLerp(g,nx||valuesFor(g,k));
     if(g.built)paint('pl');
     try{bhuRepaint();}catch(e){}
   }
@@ -358,18 +372,19 @@ var T3D=(function(){
     host.appendChild(frag);
   }
   function chip(txt,on,fn){var b=document.createElement('button');b.type='button';b.className='bp-switch'+(on?'':' off');b.textContent=txt;b.setAttribute('aria-pressed',on?'true':'false');b.addEventListener('click',function(e){e.stopPropagation();fn();});return b;}
+  function pu(g,k,cur){return (k===cur&&!!g.dflag)||!!(g.pend&&g.pend[k]);}   /* slot ini punya edit belum di-Save (aktif / ditahan) */
   function paintBar(g){
     var cur=g.ctx||ctxKey(),L=sectList(),ks=['ov'],i,sig;
     for(i=0;i<L.length;i++)ks.push(L[i].k);
-    sig=ks.map(function(k){return k+(slotSaved(g,k)?'*':'');}).join(',')+'|'+cur;
+    sig=ks.map(function(k){return k+(slotSaved(g,k)?'*':'')+(pu(g,k,cur)?'!':'');}).join(',')+'|'+cur;
     if(g.sig!==sig){
       g.sig=sig;g.bar.textContent='';g.cbar.textContent='';
-      ks.forEach(function(k){g.bar.appendChild(chip(ctxShort(k)+(slotSaved(g,k)?' \u2022':''),k===cur,function(){}));});   /* indikator saja: slot ikut konteks yang lagi aktif; \u2022 = sudah tersimpan */
+      ks.forEach(function(k){g.bar.appendChild(chip(ctxShort(k)+(slotSaved(g,k)?' \u2022':'')+(pu(g,k,cur)?' *':''),k===cur,function(){}));});   /* indikator saja: slot ikut konteks yang lagi aktif; \u2022 = sudah tersimpan */
       var lab=document.createElement('span');lab.className='t3-sub';lab.textContent=lb('Copy from','Salin dari');g.cbar.appendChild(lab);
       g.cbar.appendChild(chip(lb('Default','Bawaan'),false,function(){copyFrom(g,'def');}));
       ks.forEach(function(k){if(k!==cur)g.cbar.appendChild(chip(ctxShort(k),false,function(){copyFrom(g,k);}));});
     }
-    g.info.textContent=lb('Editing: ','Mengedit: ')+ctxName(cur);
+    g.info.textContent=lb('Editing: ','Mengedit: ')+ctxName(cur)+(g.dflag?lb(' \u00b7 NOT SAVED',' \u00b7 BELUM DISIMPAN'):'');
   }
   function copyFrom(g,k){
     var v=(k==='def')?(function(){var o={};g.rows.forEach(function(r){if(!g.perf[r.p])o[r.p]=g.def[r.p];});return o;})():valuesFor(g,k);
@@ -413,7 +428,7 @@ var T3D=(function(){
     var o={},po={};
     g.rows.forEach(function(r){if(g.slots&&g.perf[r.p])po[r.p]=rawGet(g,r);else o[r.p]=rawGet(g,r);});
     try{
-      if(g.slots){localStorage.setItem(slotKey(g,g.ctx||ctxKey()),JSON.stringify(o));localStorage.setItem(slotKey(g,'perf'),JSON.stringify(po));g.sig=null;}
+      if(g.slots){localStorage.setItem(slotKey(g,g.ctx||ctxKey()),JSON.stringify(o));localStorage.setItem(slotKey(g,'perf'),JSON.stringify(po));g.sig=null;g.dflag=false;if(g.pend)delete g.pend[g.ctx||ctxKey()];}
       else localStorage.setItem(g.key,JSON.stringify(o));
     }catch(e){}
     toast(g);
@@ -421,7 +436,7 @@ var T3D=(function(){
   function reset(id){
     var g=G[id];if(!g||g.dead)return;
     if(g.slots){   /* Reset = slot konteks aktif balik ke default (perf global tidak disentuh); {} supaya simpanan lama tidak muncul lagi */
-      cancelLerp(g);
+      cancelLerp(g);if(g.pend)delete g.pend[g.ctx||ctxKey()];
       g.rows.forEach(function(r){if(!g.perf[r.p])putRaw(g,r,cd(g,r.p));});
       afterAll(g);
       try{localStorage.setItem(slotKey(g,g.ctx||ctxKey()),'{}');}catch(e){}
@@ -455,6 +470,16 @@ var T3D=(function(){
       L.push('','// '+TITLE[id]+' \u00b7 key '+g.key+(g.slots?'_'+(g.ctx||ctxKey()):'')+' \u00b7 '+ch+' beda dari default',JSON.stringify(o));n++;
       if(g.slots)['ov'].concat(sectList().map(function(x){return x.k;})).concat(['perf']).forEach(function(k){var so=lsGet(slotKey(g,k));if(so&&Object.keys(so).length)L.push('// slot '+k+' \u00b7 key '+slotKey(g,k),JSON.stringify(so));});
     });
+    /* ASTEROID: bukan grup T3D (tuner-nya di panel tab Asteroid, 05-sector-ui.js); satu set GLOBAL untuk overview + sektor, key dumul_ast_cfg */
+    try{
+      if(typeof AST_CFG!=='undefined'&&typeof AST_DEF!=='undefined'){
+        var ao={},ac=0,q;
+        for(q in AST_DEF){var av=r5(+AST_CFG[q]);ao[q]=av;if(Math.abs(av-AST_DEF[q])>1e-6)ac++;}
+        L.push('','// ASTEROID \u00b7 key dumul_ast_cfg (global: 1 set overview + sektor; n -1 = otomatis) \u00b7 '+ac+' beda dari default',JSON.stringify(ao));
+        var asv=localStorage.getItem('dumul_ast_cfg');if(asv)L.push('// tersimpan \u00b7 key dumul_ast_cfg',asv);
+        n++;
+      }
+    }catch(eAst){}
     return n?L.join('\n'):'';
   }
 
