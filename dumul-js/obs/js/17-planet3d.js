@@ -34,7 +34,8 @@ var PL3D_CFG={
   fps:15,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
   slowAur:1,      /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe; jarak keyframe = PL3D_AUR_KF) */
   slowAurAlt:0,   /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe) */
-  bandMin:1,      /* batas bawah pita ADAPTIF: satu refresh penuh butuh `bands` frame, jadi di HP 15 fps bands 6 = cuma ~2,5 refresh/dtk (lampu kota + awan patah-patah). Pita dikurangi otomatis supaya satu refresh muat di 1000/fps ms, tapi tidak di bawah nilai ini. 6 (= bands) = tanpa adaptasi */
+  fade:1,         /* CROSS-FADE antar refresh (kerlip kota/biolum + awan): snapshot lama ditimpa pelan-pelan oleh snapshot baru selama satu interval refresh, jadi di HP lambat (2-3 refresh/dtk) kerlip terlihat mengalir, bukan patah. Cuma untuk refresh periodik (bukan saat palette/parallax/cahaya/petir bergeser). 0 = mati (cara lama). Biaya: 1 drawImage strip tambahan per frame */
+  bandMin:6,      /* batas bawah pita ADAPTIF: satu refresh penuh butuh `bands` frame, jadi di HP 15 fps bands 6 = cuma ~2,5 refresh/dtk (lampu kota + awan patah-patah). Pita dikurangi otomatis supaya satu refresh muat di 1000/fps ms, tapi tidak di bawah nilai ini. 6 (= bands) = tanpa adaptasi */
   bands:6,        /* pecah 1 refresh jadi N pita horizontal, dirender 1 pita per frame (scissor) ke kanvas belakang lalu ditukar sekaligus. Beban GPU per frame ~1/N, tanpa sambungan. 1 = render penuh sekali jalan (cara lama) */
   lightCol:[1,.74,.48],   /* warna cahaya, SAMA dengan asteroid (12-ast3d.js 'warm') */
   ov:{lo:[.014,.022,.036],mid:[.105,.140,.190],hi:[.340,.400,.480],atm:[.43,.90,1],atmA:.17,   /* palette OVERVIEW (netral): biru-baja gelap ke terang + atmosfer cyan tipis (110,229,255) */
@@ -740,7 +741,10 @@ function pl3dResize(){
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
   PL3D.cv2.width=rw;PL3D.cv2.height=rh;
   if(!PL3D.cv3){PL3D.cv3=document.createElement('canvas');PL3D.c3=PL3D.cv3.getContext('2d');}   /* kanvas belakang: pita dirender ke sini, ditukar ke cv2 saat siklus selesai */
-  PL3D.cv3.width=rw;PL3D.cv3.height=rh;PL3D.cyc=null;PL3D.full=true;PL3D.bwR=null;   /* ukuran berubah: render penuh sekali jalan dulu */
+  PL3D.cv3.width=rw;PL3D.cv3.height=rh;
+  if(!PL3D.cvP){PL3D.cvP=document.createElement('canvas');PL3D.cP=PL3D.cvP.getContext('2d');}   /* snapshot SEBELUMNYA (cross-fade); tiga kanvas berputar peran cv2/cv3/cvP tanpa salin */
+  PL3D.cvP.width=rw;PL3D.cvP.height=rh;PL3D.fadeT=null;
+  PL3D.cyc=null;PL3D.full=true;PL3D.bwR=null;   /* ukuran berubah: render penuh sekali jalan dulu */
   PL3D.fb=null;
   if(PL3D.r){PL3D.r.setSize(rw,rh,false);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
 }
@@ -784,10 +788,10 @@ function pl3dUniforms(now,nobolt){
 /* ---- RENDER DIPECAH (anti-lonjakan GPU) ----
    Satu refresh strip = `bands` pita horizontal, 1 pita per frame (gl scissor). Uniform + batu dibekukan di awal siklus, jadi semua pita sama waktu/cahaya/palette.
    Hasil ditulis ke kanvas belakang (cv3); setelah pita terakhir, cv2 <-> cv3 ditukar -> yang tampil selalu satu gambar utuh (tanpa sambungan antar pita). */
-function pl3dCycleStart(now,lx,ly,nb){
+function pl3dCycleStart(now,lx,ly,nb,fade){
   var pv={x:PL3D.rox,y:PL3D.roy,f:PL3D.rf};   /* parallax yang sedang TAMPIL di cv2 */
   pl3dUniforms(now,true);
-  PL3D.cyc={t:now,i:0,n:nb,rox:PL3D.rox,roy:PL3D.roy,rf:PL3D.rf};
+  PL3D.cyc={t:now,i:0,n:nb,rox:PL3D.rox,roy:PL3D.roy,rf:PL3D.rf,fade:!!fade};
   PL3D.rox=pv.x;PL3D.roy=pv.y;PL3D.rf=pv.f;   /* offset baru baru berlaku saat tukar buffer */
   PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;
 }
@@ -802,7 +806,15 @@ function pl3dCycleStep(){
     PL3D.c3.drawImage(r.domElement,0,y0,rw,h,0,y0,rw,h);pl3dMk('pl.copy');
   }
   if(++c.i>=n){
-    t=PL3D.cv2;PL3D.cv2=PL3D.cv3;PL3D.cv3=t;t=PL3D.c2;PL3D.c2=PL3D.c3;PL3D.c3=t;
+    var tn=PL3D.curNow||0,pv2=PL3D.cv2,pc2=PL3D.c2;
+    if(PL3D.cvP){   /* putar tiga kanvas: cv2 lama -> cvP (snapshot sebelumnya), cv3 -> cv2 (baru), cvP lama -> cv3 (kanvas belakang berikutnya) */
+      PL3D.cv2=PL3D.cv3;PL3D.c2=PL3D.c3;PL3D.cv3=PL3D.cvP;PL3D.c3=PL3D.cP;PL3D.cvP=pv2;PL3D.cP=pc2;
+    }else{t=PL3D.cv2;PL3D.cv2=PL3D.cv3;PL3D.cv3=t;t=PL3D.c2;PL3D.c2=PL3D.c3;PL3D.c3=t;}
+    if(c.fade&&PL3D.cvP&&!PL3D.blk&&PL3D_CFG.fade>0&&tn>0){   /* mulai cross-fade lama -> baru selama ~satu interval swap (EMA, 100..900 ms) */
+      if(PL3D.swapT){var iv=Math.max(100,Math.min(900,tn-PL3D.swapT));PL3D.swapInt=PL3D.swapInt?PL3D.swapInt*.5+iv*.5:iv;}
+      PL3D.fadeT=tn;PL3D.pox=PL3D.rox;PL3D.poy=PL3D.roy;   /* posisi parallax snapshot lama (yang masih tampil) */
+    }else PL3D.fadeT=null;
+    if(tn>0)PL3D.swapT=tn;
     PL3D.rox=c.rox;PL3D.roy=c.roy;PL3D.rf=c.rf;PL3D.cyc=null;PL3D.renders++;pl3dRfMark();
   }
 }
@@ -1204,6 +1216,7 @@ function planet3dDraw(now){
     var palCh=pl3dPalUpdate();   /* true selama palette bergeser (masuk/keluar sektor) */
     if(use3d){
       var bp=pl3dLightPos(),lx=bp[0],ly=PH-bp[1],pr=pl3dPar();
+      PL3D.curNow=now;
       var still=(typeof reduce!=='undefined'&&reduce);
       var parCh=Math.abs(pr.x-PL3D.rox)+Math.abs(pr.y-PL3D.roy)>1.5||Math.abs(pr.f-PL3D.rf)>.004;   /* parallax/zoom bergeser: render ulang (maks palFps) */
       /* render periodik (fps) CUMA kalau permukaan memang berputar (rot x rotK != 0). Kalau diam, render hanya karena: dirty, cahaya bergeser,
@@ -1218,6 +1231,8 @@ function planet3dDraw(now){
         var bmn=Math.max(1,Math.min(nb,(PL3D_CFG.bandMin|0)||nb)),bfit=Math.floor(1000/Math.max(1,PL3D_CFG.fps)/Math.max(16.7,FS.ema));
         nb=Math.max(bmn,Math.min(nb,bfit));
       }
+      var perOnly=!PL3D.dirty&&!settle&&!palCh&&!parCh&&!(lMv>(rotMov?40:.5));   /* refresh murni periodik (kerlip/awan/rotasi): boleh cross-fade. Selain itu (palette, parallax, cahaya, dirty) tampil langsung */
+      PL3D.blk=!perOnly;
       if(PL3D.cyc&&settle)PL3D.dirty=true;   /* "settle" cuma sekali: jangan hilang selagi siklus jalan */
       if(PL3D.cyc){   /* siklus pecah sedang jalan: 1 pita per frame */
         if(now-PL3D.cyc.t>600){PL3D.cyc=null;PL3D.dirty=true;}   /* basi (render ditahan lama oleh menu/tab) */
@@ -1235,8 +1250,8 @@ function planet3dDraw(now){
           }
           PL3D.c2.clearRect(0,0,PL3D.rw,PL3D.rh);
           PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh);
-          PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.renders++;pl3dRfMark();
-        }else{pl3dCycleStart(now,lx,ly,nb);pl3dCycleStep();}
+          PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.fadeT=null;PL3D.renders++;pl3dRfMark();
+        }else{pl3dCycleStart(now,lx,ly,nb,perOnly&&PL3D_CFG.fade>0);pl3dCycleStep();}
       }
       pl3dBoltWin();   /* petir: render parsial kotak kecil, di atas hasil siklus frame ini */
         }else if(PL3D.state===3||PL3D.state===0||PL3D.state===1){
@@ -1256,7 +1271,17 @@ function planet3dDraw(now){
       var th=Math.atan2((lb[1]-lb[0])*PH,PW),sc=1+Math.abs(Math.tan(th))*2*Math.max(0,PH+(PL3D.bo||0)-yc)/PW;   /* sc: lebarkan sedikit supaya sudut bawah yang terangkat karena miring tidak membuka celah di tepi kiri/kanan */
       g.translate(PW*.5,yc);g.scale(sc,1);g.rotate(th);g.translate(-PW*.5,-yc+(lb[0]+lb[1])*.5*PH);
     }
-    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
+    var fa=1;   /* cross-fade: snapshot lama penuh, baru menimpa dengan alpha fa (0..1). Mati saat palette/parallax/cahaya berubah atau petir aktif */
+    if(PL3D.fadeT!=null&&PL3D.cvP&&PL3D_CFG.fade>0&&use3d&&!PL3D.blk&&!PL3D.bwR&&!(PL3D.bu&&PL3D.bu.a>.002)){
+      fa=(PL3D.curNow-PL3D.fadeT)/(PL3D.swapInt||400);
+      if(fa>=1)PL3D.fadeT=null;else if(fa<0)fa=0;
+    }else{PL3D.fadeT=null;}
+    if(PL3D.fadeT!=null&&fa<1){
+      g.drawImage(PL3D.cvP,cp.x-(PL3D.pox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.poy||0),PW,sh);
+      g.globalAlpha=PL3D.al*fa;
+    }
+    g.drawImage(PL3D.cv2,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');
+    g.globalAlpha=PL3D.al;   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
     if(!PL3D.fxOff&&!(typeof reduce!=='undefined'&&reduce)&&pl3dFxOn()){   /* efek 2D: error di sini TIDAK boleh mematikan planet 3D (pl3dFail) */
       try{pl3dFx(g,now,cp);}catch(eFx){PL3D.fxOff=1;try{console.warn('[planet3d] efek 2D dimatikan:',eFx&&eFx.message);}catch(eW){}}
       pl3dMk('pl.fx');

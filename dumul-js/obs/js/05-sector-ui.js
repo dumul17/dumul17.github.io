@@ -797,7 +797,9 @@ var PROBE_TESTS_BIO=[
   ['diam+kerlip OFF',function(){var C=PL3D_CFG;C.rotK=0;C.cloudDrift=0;C.cityTw=0;}],
   ['biome OFF',function(){PL3D_CFG.bioA=0;}],
   ['kota OFF',function(){PL3D_CFG.cityA=0;}],
-  ['bandMin 6 (no adapt)',function(){PL3D_CFG.bandMin=6;}],
+  ['fade OFF',function(){PL3D_CFG.fade=0;}],
+  ['q 1',function(){PL3D_CFG.q=1;}],
+  ['bandMin 3',function(){PL3D_CFG.bandMin=3;}],
   ['bands 3',function(){PL3D_CFG.bands=3;}],
   ['bands 1',function(){PL3D_CFG.bands=1;}],
   ['fps 30',function(){PL3D_CFG.fps=30;}],
@@ -823,8 +825,8 @@ function probeCtx(){
   }
   return '';
 }
-function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true),tw:C.cityTw,cd:C.cloudDrift,ba:C.bioA,ca:C.cityA,bn:C.bands,fp:C.fps,bm:C.bandMin};}
-function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(S.tw!==undefined){C.cityTw=S.tw;C.cloudDrift=S.cd;C.bioA=S.ba;C.cityA=S.ca;C.bands=S.bn;C.fps=S.fp;C.bandMin=S.bm;}if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;PX.sky=0;PX.pulse=0;PX.hole=0;PX.mw=0;PX.pt=0;PX.neb=0;PX.ptr=0;PX.ptm=0;PX.ptb=0;}
+function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true),tw:C.cityTw,cd:C.cloudDrift,ba:C.bioA,ca:C.cityA,bn:C.bands,fp:C.fps,bm:C.bandMin,fd:C.fade,qq:C.q};}
+function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(S.tw!==undefined){C.cityTw=S.tw;C.cloudDrift=S.cd;C.bioA=S.ba;C.cityA=S.ca;C.bands=S.bn;C.fps=S.fp;C.bandMin=S.bm;if(S.qq!==undefined){C.fade=S.fd;C.q=S.qq;}}if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;PX.sky=0;PX.pulse=0;PX.hole=0;PX.mw=0;PX.pt=0;PX.neb=0;PX.ptr=0;PX.ptm=0;PX.ptb=0;}
 function probeP(x,n){x=String(x);while(x.length<n)x+=' ';return x;}
 function probeL(x,n){x=String(x);while(x.length<n)x=' '+x;return x;}
 function probeSg(v,d){return (v>=0?'+':'')+v.toFixed(d);}
