@@ -210,15 +210,19 @@ function sectStep(now){
   if(SECT.phase==='in'){
     sectApply(s,sectEase(u));
     if(u>=1){
+      /* whperf: pecah biaya blok akhir phase-in (tunnel@~3.6s) — window.__whMk dibaca 09-wormhole panel */
+      var _mk=[],_t=performance.now(),_m=function(n){var t=performance.now();_mk.push(n+' '+(t-_t).toFixed(0));_t=t;};
       SECT.flash=now;SECT.cur=s;SECT.phase='sec';SECT.busy=false;
       try{sumRestore(s);}catch(eSR){}
       try{sumUI();}catch(eU2){}
-      skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;
+      skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;_m('restore+ui');
       RELAY.pend=0;try{sumPlace();}catch(ePl){}   /* BH mini selalu ada -> diparkir di titik kosong saat masuk sektor */
-      sectSet(false);
+      sectSet(false);_m('sectSet');
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
-      try{syncSkyPanHits();}catch(e){}
-      try{lisArrive(s.k);}catch(eL){}
+      _m('focus');
+      try{syncSkyPanHits();}catch(e){}_m('panHits');
+      try{lisArrive(s.k);}catch(eL){}_m('lisArrive');
+      window.__whMk=_mk.join(' | ');
     }
   }else if(SECT.phase==='out'){
     sectApply(s,1-sectEase(u));

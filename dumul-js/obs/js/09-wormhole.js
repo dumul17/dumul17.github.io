@@ -229,6 +229,7 @@ function wpEnd(){
       out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0)+'  | js med '+jj[jj.length>>1].toFixed(0)+' max '+jj[jj.length-1].toFixed(0));
     }
     out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+')';}).join(' | '));
+    if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
     el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
