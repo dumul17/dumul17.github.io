@@ -1484,7 +1484,7 @@ body.tesseract-running #live-count{visibility:hidden}
    Deretan tombol = [tombol musik] + cluster di kirinya. Jumlah tombol di cluster yang benar-benar tampil: overview = 1 (observe), di dalam sektor = 2 (observe + sektor).
    Offset dihitung dari ukuran tombol, jadi tidak perlu angka keras per mode lagi (sisa tombol HUD lama yang sudah dihapus bikin jaraknya renggang). */
 :root{--hud-r:12px;--hud-b:32px;--hud-g:6px;--np-n:1}
-body.sect-in{--np-n:2}
+body.sect-in #mp-now-playing{--np-n:2}   /* v12: dulu di body -> style recalc seluruh DOM tiap sectSet; sekarang cuma elemen pemakainya */
 @media (max-width:520px){:root{--hud-r:10px;--hud-b:31px}}
 @media (orientation:landscape) and (max-height:520px){:root{--hud-r:8px;--hud-b:28px;--hud-g:5px}}
 #mp-now-playing{right:calc(var(--hud-r) + var(--hud-b) + var(--hud-g) + var(--np-n) * var(--hud-b) + (var(--np-n) - 1) * var(--hud-g) + 8px)!important}
