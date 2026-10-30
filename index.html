@@ -337,6 +337,16 @@
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=6"></script>
 <script defer src="dumul-js/obs/js/17-planet3d.js?v=33"></script>
 <script defer src="dumul-js/obs/js/18-tune3d.js?v=17"></script>
+<script>
+/* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
+   (semua script defer sudah jalan, global SECT/WORMHOLE/PROBE ada). Sengaja TIDAK di SHELL service-worker.js dan bukan <script src> di atas;
+   check-sky.js mengecualikan file ini. Naikkan ?v= kalau file-nya diubah. */
+(function () {
+  if (!/[?&]debug=1(&|$)/.test(location.search)) return;
+  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=1'; s.async = true; document.body.appendChild(s); }
+  if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
+})();
+</script>
 
 <!-- GLITCH NEURAL NETWORK WARP OVERLAY -->
 <div id="tesseract-warp" aria-hidden="true">
