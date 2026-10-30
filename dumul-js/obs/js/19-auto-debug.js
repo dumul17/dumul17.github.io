@@ -18,6 +18,8 @@
  *   Mode dipilih = halaman reload dengan param yang pas (whperf/PERF/PROBE membaca
  *   URL saat load, jadi tidak bisa dinyalakan tanpa reload).
  *   Export: JSON / TXT (semua hasil), tombol Clr untuk reset.
+*   UI minimal: panel emas PROBE disilent (tombol Hasil PROBE); #whperf dive auto-remove setelah rekam;
+*     daftar hasil di tombol Log (hide default) — runtime cuma status + aksi.
  *
  * Posisi tombol: kanan-bawah, di BARIS ATAS tombol musik + cluster mode (observer / kamera / menu sektor),
  *   jadi tidak menimpa satupun. Mengikuti breakpoint & body.ls (translate --gut) yang sama dengan mereka.
@@ -241,8 +243,10 @@
         var snap = snapshot(i, s, panel);
         snap.leg = 'overview→sektor';
         store.push(snap);
+        /* hasil sudah di store — buang panel #whperf biar tidak menuhin layar (buka lewat Log / export) */
+        try { var _wp = document.getElementById('whperf'); if (_wp) _wp.remove(); } catch (eW) {}
         updateList();
-        log('dive ' + i + ' tersimpan' + (panel ? '' : ' (panel whperf tidak muncul)') + (snap.hints.skyHeavy ? ' · ada sky>150ms' : ''));
+        log('dive ' + i + ' tersimpan' + (panel ? '' : ' (panel whperf kosong)') + (snap.hints.skyHeavy ? ' · ada sky>150ms' : ''));
         await sleep(CFG.settleMs);
         log('dive ' + i + ' — balik ke overview…');
         await returnToOverview();   /* putaran berikutnya mulai lagi dari overview */
@@ -260,7 +264,52 @@
     }
   }
 
-  /* ---------- probe ---------- */
+  /* ---------- probe ----------
+     Panel emas built-in (PROBE.box) DISILENCE: probe tetap jalan di background (?probe=1),
+     tapi overlay tidak muncul otomatis. Hasil ditangkap ke probeStore; tampilkan lewat
+     tombol "Hasil PROBE" di panel debug. */
+  var probeUiShown = false;
+  function hideGoldProbe() {
+    try {
+      if (typeof PROBE !== 'undefined' && PROBE && PROBE.box) {
+        PROBE.box.style.display = 'none';
+        PROBE.box.style.pointerEvents = 'none';
+      }
+    } catch (e) {}
+  }
+  function installProbeSilence() {
+    if (window.__whProbeSilenced) return;
+    function tryHook() {
+      if (typeof probeShow !== 'function') return false;
+      if (window.__whProbeSilenced) return true;
+      window.__whProbeSilenced = true;
+      var orig = probeShow;
+      /* override global probeShow: hitung & simpan teks, JANGAN tampilkan panel emas */
+      window.probeShow = function (t, fin) {
+        try {
+          /* jalankan logic asli (PROBE.txt, localStorage) tapi langsung hide box */
+          orig(t, fin);
+        } catch (e0) {}
+        hideGoldProbe();
+        if (fin) {
+          try { captureProbeIfNew(); } catch (e1) {}
+          log('probe selesai — ketuk Hasil PROBE / TXT');
+        } else if (t) {
+          /* status jalan: cukup di bar status debug, bukan overlay emas */
+          var short = String(t).split('\n')[0] || 'PROBE…';
+          if (short.length > 64) short = short.slice(0, 61) + '…';
+          log(short);
+        }
+      };
+      hideGoldProbe();
+      return true;
+    }
+    if (tryHook()) return;
+    var n = 0, iv = setInterval(function () {
+      n++;
+      if (tryHook() || n > 40) clearInterval(iv);
+    }, 250);
+  }
   function readProbeText() {
     var t = '';
     try { if (typeof PROBE !== 'undefined' && PROBE && typeof PROBE.txt === 'string') t = PROBE.txt; } catch (e) {}
@@ -285,12 +334,42 @@
     lastProbeKey = key;
     probeStore.push({ ts: nowIso(), ctx: probeCtxLabel(), dpr: dpr(), url: String(location.href), text: t });
     updateList();
-    log('probe tertangkap [' + probeStore[probeStore.length - 1].ctx + ']');
+    hideGoldProbe();
+    log('probe tertangkap [' + probeStore[probeStore.length - 1].ctx + '] — Hasil PROBE / TXT');
     return true;
   }
   function startProbeWatch() {
+    installProbeSilence();
     if (probeWatch) return;
-    probeWatch = setInterval(function () { try { captureProbeIfNew(); } catch (e) {} }, CFG.probePollMs);
+    probeWatch = setInterval(function () {
+      try {
+        captureProbeIfNew();
+        hideGoldProbe();
+      } catch (e) {}
+    }, CFG.probePollMs);
+  }
+  function toggleProbeResult() {
+    captureProbeIfNew();
+    var t = '';
+    if (probeStore.length) t = probeStore[probeStore.length - 1].text;
+    if (!t) t = readProbeText();
+    if (!t || t.indexOf('HASIL PROBE') < 0) {
+      log('belum ada hasil probe — diam di ov/sektor sampai selesai');
+      return;
+    }
+    if (!ui || !ui.viewer) return;
+    probeUiShown = !probeUiShown;
+    if (probeUiShown) {
+      ui.viewer.textContent = t;
+      ui.viewer.style.display = 'block';
+      if (ui.btnProbeRes) ui.btnProbeRes.textContent = 'Tutup hasil';
+      log('hasil PROBE ditampilkan (scroll)');
+    } else {
+      ui.viewer.style.display = 'none';
+      ui.viewer.textContent = '';
+      if (ui.btnProbeRes) ui.btnProbeRes.textContent = 'Hasil PROBE';
+      log('hasil PROBE disembunyikan');
+    }
   }
 
   /* ---------- perf ---------- */
@@ -463,6 +542,9 @@
   }
   function clearAll() {
     store.length = 0; probeStore.length = 0; perfStore.length = 0; lastProbeKey = '';
+    probeUiShown = false;
+    if (ui && ui.viewer) { ui.viewer.style.display = 'none'; ui.viewer.textContent = ''; }
+    if (ui && ui.btnProbeRes) ui.btnProbeRes.textContent = 'Hasil PROBE';
     updateList();
     log('cleared');
   }
@@ -470,11 +552,27 @@
   /* ---------- UI ---------- */
   function updateList() {
     if (!ui || !ui.list) return;
-    var p = [];
-    if (store.length) p.push(store.map(function (r) { return 'D#' + r.i + ' ' + r.sector + (r.hints && r.hints.skyHeavy ? ' ⚠sky' : ''); }).join('\n'));
-    if (probeStore.length) p.push(probeStore.map(function (x, i) { return 'P#' + (i + 1) + ' ' + x.ctx; }).join('\n'));
-    if (perfStore.length) p.push(perfStore.map(function (x, i) { return 'F#' + (i + 1) + ' ' + ((x.summary && x.summary.mode) || '?') + (x.summary && x.summary.fps ? ' ' + x.summary.fps + 'fps' : ''); }).join('\n'));
-    ui.list.textContent = p.length ? p.join('\n') : '(kosong)';
+    if (ui.logShown === false) {
+      ui.list.style.display = 'none';
+      return;
+    }
+    ui.list.style.display = 'block';
+    var parts = [];
+    if (store.length) {
+      parts.push(store.map(function (r) {
+        return 'D#' + r.i + ' ' + r.sector + (r.hints && r.hints.skyHeavy ? ' ⚠' : '');
+      }).join('\n'));
+    }
+    if (probeStore.length) {
+      parts.push(probeStore.map(function (p, i) { return 'P#' + (i + 1) + ' ' + p.ctx; }).join('\n'));
+    }
+    if (perfStore.length) {
+      parts.push(perfStore.map(function (p, i) {
+        var s = p.summary || {};
+        return 'F#' + (i + 1) + (s.mode ? ' [' + s.mode + ']' : '') + (s.fps ? ' ' + s.fps + 'fps' : '');
+      }).join('\n'));
+    }
+    ui.list.textContent = parts.length ? parts.join('\n') : '(kosong)';
   }
 
   var BTN = 'background:#0e2430;color:#cfe;border:1px solid #2a6;border-radius:6px;padding:5px 8px;font:inherit;font-size:10px;cursor:pointer;pointer-events:auto;touch-action:manipulation;line-height:1.2';
@@ -624,12 +722,35 @@
     exp.appendChild(btn('Matikan', function () { go(urlFor(null)); }));
     panel.appendChild(exp);
 
-    var list = mk('pre', 'margin:0;max-height:5.5em;overflow:auto;opacity:.88;white-space:pre-wrap;font-size:10px;pointer-events:auto', '(kosong)');
+    /* Log hasil (ringkas) — hide by default; export tetap ada */
+    var logRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px');
+    var btnLog = btn('Log ▸', function () {
+      ui.logShown = !ui.logShown;
+      btnLog.textContent = ui.logShown ? 'Log ▾' : 'Log ▸';
+      updateList();
+    });
+    var btnProbeRes = btn('Hasil PROBE', toggleProbeResult);
+    logRow.appendChild(btnLog);
+    logRow.appendChild(btnProbeRes);
+    panel.appendChild(logRow);
+
+    var list = mk('pre', 'margin:0;max-height:5.5em;overflow:auto;opacity:.88;white-space:pre-wrap;font-size:10px;pointer-events:auto;display:none', '(kosong)');
     panel.appendChild(list);
+
+    /* viewer hasil PROBE (ganti panel emas) — hide default */
+    var viewer = mk('pre',
+      'display:none;margin:6px 0 0;max-height:min(38vh,280px);overflow:auto;' +
+      'opacity:.95;white-space:pre-wrap;font-size:9px;line-height:1.35;' +
+      'padding:6px 7px;border-radius:6px;border:1px solid rgba(255,210,127,.35);' +
+      'background:rgba(2,8,14,.92);color:#ffd27f;pointer-events:auto', '');
+    panel.appendChild(viewer);
 
     root.appendChild(panel);
     root.appendChild(fab);
-    ui = { root: root, status: status, list: list, panel: panel, fab: fab };
+    ui = {
+      root: root, status: status, list: list, panel: panel, fab: fab,
+      viewer: viewer, btnProbeRes: btnProbeRes, logShown: false
+    };
 
     function expand(on) {
       panel.style.display = on ? 'block' : 'none';
@@ -639,11 +760,21 @@
     ui.expand = expand;
 
     document.body.appendChild(root);
+    /* runtime minimal: panel terbuka, list hasil tertutup sampai user ketuk Log */
     expand(true);
     updateList();
+    installProbeSilence();
     if (MODE === 'probe') startProbeWatch();
+    else if (MODE === 'whperf') {
+      /* jaga-jaga: panel whperf sisa dari sesi sebelumnya dibuang */
+      try { var w0 = document.getElementById('whperf'); if (w0) w0.remove(); } catch (e0) {}
+    }
 
-    var boot = { whperf: 'Dive siap — tekan Dive×N (mulai dari overview)', probe: 'probe watch ON — diam sampai PROBE selesai', perf: 'PERF aktif — Snap PERF / Sweep PERF' };
+    var boot = {
+      whperf: 'Dive siap — tekan Dive×N (hasil di Log/export, panel whperf auto-hide)',
+      probe: 'PROBE silent — diam sampai selesai, lalu Hasil PROBE / TXT',
+      perf: 'PERF aktif — Snap / Sweep (hasil di Log/export)'
+    };
     log(MODE ? boot[MODE] : 'pilih tes di atas');
   }
 
