@@ -211,9 +211,12 @@ function hide(){
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
 /* ---- recorder FPS on-device: aktif HANYA kalau URL pakai ?whperf=1 (tanpa itu = nol biaya). Setelah transisi selesai muncul panel kecil; tap panel untuk menutup. ---- */
 var WP=(function(){try{return /[?&]whperf=1/.test(location.search)?{r:[],t:0,ph:''}:null;}catch(e){return null;}})();
-function wpRec(now,ph,q,js){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
+/* v8: js = (now -> akhir tick) SUDAH TERMASUK frame() sky (05-sector-ui.js) yang jalan di rAF yang sama SEBELUM tick ini. WSK = ms yang dipakai frame() sky di rAF ini, jadi js-sky = biaya tick wormhole sendiri. */
+var WSK=0;
+if(WP){try{var _wf0=window.frame;if(typeof _wf0==='function'){window.frame=function(n){var t=performance.now(),r;try{r=_wf0.apply(this,arguments);}finally{WSK+=performance.now()-t;}return r;};}}catch(eWk){}}
+function wpRec(now,ph,q,js,sky){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
   if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;}
-  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js]);
+  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js,sky||0]);
   WP.t=now;WP.ph=ph;
 }
 function wpEnd(){
@@ -225,10 +228,10 @@ function wpEnd(){
       ms=a.map(function(x){return x[1];}).sort(function(x,y){return x-y;});
       for(j=0,tot=0;j<ms.length;j++)tot+=ms[j];
       md=ms[ms.length>>1];mx=ms[ms.length-1];
-      var jj=a.map(function(x){return x[3];}).sort(function(x,y){return x-y;});
-      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0)+'  | js med '+jj[jj.length>>1].toFixed(0)+' max '+jj[jj.length-1].toFixed(0));
+      var jj=a.map(function(x){return x[3];}).sort(function(x,y){return x-y;}),sk=a.map(function(x){return x[4];}).sort(function(x,y){return x-y;}),tk=a.map(function(x){return Math.max(0,x[3]-x[4]);}).sort(function(x,y){return x-y;});
+      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0)+'  | js med '+jj[jj.length>>1].toFixed(0)+' max '+jj[jj.length-1].toFixed(0)+' = sky med '+sk[sk.length>>1].toFixed(0)+' max '+sk[sk.length-1].toFixed(0)+' + tick med '+tk[tk.length>>1].toFixed(0)+' max '+tk[tk.length-1].toFixed(0));
     }
-    out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+')';}).join(' | '));
+    out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+' sky '+x[4].toFixed(0)+')';}).join(' | '));
     if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
@@ -630,7 +633,8 @@ function teleHover(dt,cx,cy,m,amp){   /* amp 0..1: amplitudo melayang (naik pela
 function tick(now){
   raf=0;
   if(state==='idle'||!g||!ok)return;
-  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,eT;
+  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,eT,skyMs=0;
+  if(WP){skyMs=WSK;WSK=0;}   /* v8: biaya frame() sky di rAF ini (jalan sebelum tick) */
   W=winW();H=winH();cvr=cover();
   last=now;ema+=(dt-ema)*.08;
   try{if(typeof UIS!=='undefined'&&UIS.warpUpd)UIS.warpUpd(state,env,S.rate);}catch(eW){}
@@ -706,7 +710,7 @@ function tick(now){
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
   if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
   if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*.22;S.cx=W*.5;S.cy=H*.5;}
-  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now);}
+  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs);}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
     hardStop();return;
@@ -727,6 +731,9 @@ window.WORMHOLE={
   ringFade:ringFade,   /* 0..1 serah-terima cincin/BH (dipakai 03-gargantua: BH sektor disembunyikan saat 1) */
   ringOwned:function(){return state==='travel'&&!!S.ring;},   /* cincin portal sektor sedang digambar di kanvas wormhole (zoom-in) */
   get zooming(){return state==='travel'&&!S.cov&&S.tt!=null&&(performance.now()-S.tt)<T_OPEN;},   /* zoom-in ke portal sebelum layar tertutup: sky di bawah cuma di-zoom CSS + meredup, tak perlu dirender penuh tiap frame */
+  /* v8: kanvas terowongan menutup SELURUH layar secara buram (travel setelah S.cov, + awal exit sampai dinding mulai menyusut u<.22) -> #sky di bawahnya tak terlihat sama sekali;
+     05-sector-ui.js frame() menjarangkan render sky saat ini true (sebelumnya sky dirender PENUH tiap frame di bawah terowongan = biaya js ~20ms/frame). ?whdbg=nocov = perilaku lama (A/B). */
+  get covered(){return WH_DBG.indexOf('nocov')<0&&((state==='travel'&&!!S&&!!S.cov)||(state==='exit'&&!!S&&S.u<.22));},
   get on(){return state!=='idle';},
   get busy(){return state==='enter'||state==='travel'||state==='exit';},   /* transisi sedang jalan */
   get supported(){return usable();}

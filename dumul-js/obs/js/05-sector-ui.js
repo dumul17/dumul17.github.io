@@ -1019,6 +1019,8 @@ function frame(now){
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.zooming){
     var zk=(typeof SECT!=='undefined'&&SECT.cur)?3:8;
     if(++zmN%zk){renderRAF=requestAnimationFrame(frame);return;}
+  }else if(typeof WORMHOLE!=='undefined'&&WORMHOLE.covered){   /* v8: terowongan menutup layar penuh (buram) -> sky tak terlihat; render penuh cuma tiap 4 frame (state/sectStep/bake tetap jalan, tapi tak tiap frame). Sebelumnya fase ini render sky PENUH tiap frame. */
+    if(++zmN%4){renderRAF=requestAnimationFrame(frame);return;}
   }else zmN=0;
   capLast=now;fsTick(now);
   /* The whole frame is now one safety net: whatever throws, wherever, the
