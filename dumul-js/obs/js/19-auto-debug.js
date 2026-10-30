@@ -10,9 +10,11 @@
  *
  * Alur:
  *   buka  situs?debug=1  → tombol 🐞 kanan-bawah → panel pilih mode:
- *     Dive  → ?whperf=1  : auto dive wormhole antar sektor × N, simpan panel #whperf
- *     Probe → ?probe=1   : tangkap hasil PROBE (overview / sektor), set normal atau bio
- *     PERF  → ?perf=1    : snapshot overlay PERF
+ *     Dive  → ?whperf=1  : auto dive wormhole OVERVIEW → sektor × N (tiap putaran balik ke overview dulu), simpan panel #whperf
+ *     Probe → ?probe=1   : tangkap hasil PROBE (overview / sektor), set normal atau bio, + ?pin=1|2 (orbit portal dikunci)
+ *     PERF  → ?perf=1    : snapshot overlay PERF; "Sweep PERF" menyapu semua PX_MODES otomatis (1 snapshot per mode)
+ *               (PERF yang menyala dari localStorage dumul_perf=1 juga dikenali sebagai mode PERF)
+ *   Override kualitas ?perf=high|low: baris "kualitas" di panel (auto/HIGH/LOW), ikut terbawa saat ganti mode.
  *   Mode dipilih = halaman reload dengan param yang pas (whperf/PERF/PROBE membaca
  *   URL saat load, jadi tidak bisa dinyalakan tanpa reload).
  *   Export: JSON / TXT (semua hasil), tombol Clr untuk reset.
@@ -35,19 +37,29 @@
     var m = new RegExp('[?&]' + k + '=([a-z0-9]+)(&|$)').exec(Q);
     return m ? m[1] : '';
   }
-  var MODE = flag('whperf') ? 'whperf' : flag('probe') ? 'probe' : flag('perf') ? 'perf' : '';
+  function perfLS() { try { return localStorage.getItem('dumul_perf') === '1'; } catch (e) { return false; } }
+  function perfGlobal() { try { return typeof PERF !== 'undefined' && !!PERF; } catch (e) { return false; } }
+  var URL_MODE = flag('whperf') ? 'whperf' : flag('probe') ? 'probe' : flag('perf') ? 'perf' : '';
+  /* PERF bisa menyala tanpa ?perf=1: localStorage dumul_perf=1 (flag PERF di 05-sector-ui.js) → tetap dianggap mode PERF */
+  var PERF_FROM_LS = !URL_MODE && (perfLS() || perfGlobal());
+  var MODE = URL_MODE || (PERF_FROM_LS ? 'perf' : '');
   if (!flag('debug') && !window.__WH_AD_FORCE) return;
 
   var MODES = [
-    { id: 'whperf', label: 'Dive', hint: 'auto-dive wormhole antar sektor, rekam panel whperf' },
+    { id: 'whperf', label: 'Dive', hint: 'auto-dive wormhole overview → sektor (sama tiap putaran, balik ke overview di sela-sela), rekam panel whperf' },
     { id: 'probe', label: 'Probe', hint: 'diam di overview/sektor sampai PROBE selesai, hasil ditangkap otomatis' },
-    { id: 'perf', label: 'PERF', hint: 'overlay PERF aktif; tekan Snap untuk simpan snapshot' }
+    { id: 'perf', label: 'PERF', hint: 'overlay PERF aktif; Snap = 1 snapshot, Sweep = semua mode PERF otomatis' }
   ];
 
-  var CFG = { dives: 3, settleMs: 900, timeoutMs: 45000, startMs: 3000, preferCarry: true, alwaysSkipAsk: true, probePollMs: 800 };
+  var CFG = {
+    dives: 3, settleMs: 900, timeoutMs: 45000, startMs: 3000, preferCarry: true, alwaysSkipAsk: true, probePollMs: 800,
+    sweepSettleMs: 1300,      /* jeda setelah ganti mode PERF sebelum mulai mengukur */
+    sweepMinN: 120,           /* minimal frame di jendela ukur overlay (~2 dtk @60fps) sebelum snapshot diambil */
+    sweepTimeoutMs: 10000     /* batas tunggu per mode (HP lambat: ambil apa adanya) */
+  };
 
   var store = [], probeStore = [], perfStore = [];
-  var running = false, probeWatch = null, lastProbeKey = '', ui = null;
+  var running = false, stopReq = false, probeWatch = null, lastProbeKey = '', ui = null;
 
   /* ---------- util ---------- */
   function nowIso() { return new Date().toISOString(); }
@@ -95,13 +107,33 @@
       })();
     });
   }
+  /* ?perf=high|low (override kualitas, 01-core.js) = param TERPISAH dari ?perf=1 (overlay PERF) tapi namanya sama:
+     keduanya ditulis sebagai dua param 'perf' (…&perf=1&perf=high). Regex situs (/[?&]perf=1(&|$)/ dan /[?&]perf=(high|low)/)
+     membaca string query mentah, jadi dua-duanya tetap terbaca. */
+  function qualityParam() {
+    var m = /[?&]perf=(high|low)(&|$)/.exec(Q);
+    return m ? m[1] : '';
+  }
+  /* extra: {k:v} param tambahan (nilai kosong = dilewati). extra.quality: 'high'|'low' set, '' hapus, tidak diisi = pertahankan
+     override kualitas yang sekarang (kecuali mode===null / Matikan: bersih semua). */
   function urlFor(mode, extra) {
-    var u = new URL(location.href);
+    var u = new URL(location.href), qv = (mode === null) ? '' : qualityParam();
     ['whperf', 'probe', 'perf', 'pset', 'pin', 'debug'].forEach(function (k) { u.searchParams.delete(k); });
     if (mode !== null) u.searchParams.set('debug', '1');
     if (mode) u.searchParams.set(mode, '1');
-    if (extra) Object.keys(extra).forEach(function (k) { u.searchParams.set(k, extra[k]); });
+    if (extra) Object.keys(extra).forEach(function (k) {
+      if (k === 'quality') { qv = extra[k] || ''; return; }
+      if (extra[k]) u.searchParams.set(k, extra[k]);
+    });
+    if (qv === 'high' || qv === 'low') u.searchParams.append('perf', qv);
     return u.toString();
+  }
+  /* URL mode Probe dengan pset/pin yang dipertahankan kecuali di-override */
+  function probeUrl(over) {
+    var ps = param('pset'), pn = param('pin');
+    var o = { pset: ps === 'bio' ? 'bio' : '', pin: (pn === '1' || pn === '2') ? pn : '' };
+    Object.keys(over || {}).forEach(function (k) { o[k] = over[k]; });
+    return urlFor('probe', o);
   }
   function go(url) { try { location.href = url; } catch (e) { log('gagal pindah: ' + e.message); } }
 
@@ -110,17 +142,33 @@
     if (typeof SECT === 'undefined' || !SECT.list) return [];
     return SECT.list.filter(function (s) { return s && s.ids && s.ids.length; });
   }
-  function nextSector() {
+  /* Target dive = SATU sektor yang sama tiap putaran (overview → sektor, bukan sektor → sektor berikutnya).
+     pref = sektor tempat kita berdiri saat start (kalau ada), selain itu sektor pertama yang sudah punya posisi (bx). */
+  function diveTarget(pref) {
     var v = validSectors();
     if (!v.length) return null;
-    var cur = SECT.cur;
-    if (!cur) {
-      for (var i = 0; i < v.length; i++) if (v[i].bx != null && isFinite(v[i].bx)) return v[i];
-      return v[0];
-    }
-    if (v.length < 2) return null;
-    var k = v.indexOf(cur);
-    return v[(k + 1) % v.length];
+    if (pref && v.indexOf(pref) >= 0) return pref;
+    for (var i = 0; i < v.length; i++) if (v[i].bx != null && isFinite(v[i].bx)) return v[i];
+    return v[0];
+  }
+  /* Balik ke overview lewat wormhole keluar (jalur yang sama dengan tekan-tahan BH mini: sectSwallowToggle → sectWormholeOut),
+     tanpa panel tanya teleskop (lisDecide, sama seperti sectJumpTo). Menunggu transisi selesai dan membuang panel whperf milik
+     perjalanan pulang supaya tidak terbaca sebagai panel dive berikutnya. */
+  async function returnToOverview() {
+    if (typeof SECT === 'undefined' || !SECT.cur) return;
+    if (typeof sectWormholeOut !== 'function') throw new Error('sectWormholeOut tidak ada');
+    await waitIdle();
+    var old = document.getElementById('whperf');
+    if (old) old.remove();
+    var go1 = function () { sectWormholeOut(); };
+    if (typeof lisDecide === 'function') lisDecide(go1, false, !!CFG.preferCarry, !!CFG.alwaysSkipAsk);
+    else go1();
+    await waitBusyStart(CFG.startMs);
+    await waitIdle();
+    if (SECT.cur) throw new Error('gagal balik ke overview');
+    var back = await waitPerfPanel(6000);
+    var el = document.getElementById('whperf');
+    if (back && el) el.remove();
   }
   function ensureOverviewPositions() {
     try {
@@ -159,22 +207,31 @@
     if (MODE !== 'whperf') return log('pilih mode Dive dulu');
     if (typeof sectJumpTo !== 'function' || typeof SECT === 'undefined') return log('⚠️ sectJumpTo / SECT tidak ada');
     if (typeof WORMHOLE === 'undefined' || !WORMHOLE.supported) return log('⚠️ WORMHOLE tidak supported di device ini');
-    running = true;
+    running = true; stopReq = false;
     store.length = 0;
     updateList();
     /* sectJumpTo(...,always=true) menyalakan & MENYIMPAN pengaturan lis-auto → kembalikan di akhir */
     var lisBefore = (typeof LIS !== 'undefined') ? !!LIS.auto : null;
     try {
+      /* mulai dari overview: kalau sekarang di dalam sektor, balik dulu, dan sektor itu jadi target (supaya tidak pindah sektor) */
+      await waitIdle();
+      var startCur = SECT.cur || null;
+      if (startCur) { log('mulai dari dalam sektor — balik ke overview dulu…'); await returnToOverview(); }
+      await sleep(CFG.settleMs);
+      ensureOverviewPositions();
+      var s = diveTarget(startCur);
+      if (!s) throw new Error('tidak ada sektor tujuan yang valid');
+      var name = s.k || s.name || '?';
       for (var i = 1; i <= CFG.dives; i++) {
+        if (stopReq) { log('dihentikan (' + store.length + ' dive tersimpan)'); break; }
         log('dive ' + i + '/' + CFG.dives + ' — tunggu idle…');
         await waitIdle();
         await sleep(CFG.settleMs);
+        if (SECT.cur) await returnToOverview();   /* jaga-jaga: harus selalu mulai dari overview */
         ensureOverviewPositions();
-        var s = nextSector();
-        if (!s) throw new Error('tidak ada sektor tujuan yang valid');
         var old = document.getElementById('whperf');
         if (old) old.remove();   /* supaya panel yang dibaca pasti milik dive ini */
-        log('dive ' + i + ' → ' + (s.k || s.name || '?'));
+        log('dive ' + i + ' overview → ' + name);
         var ok = sectJumpTo(s, !!CFG.preferCarry, !!CFG.alwaysSkipAsk);
         if (ok === false) throw new Error('sectJumpTo ditolak (busy / sektor kosong)');
         await waitBusyStart(CFG.startMs);
@@ -182,12 +239,16 @@
         await waitIdle();
         var panel = await waitPerfPanel(10000);
         var snap = snapshot(i, s, panel);
+        snap.leg = 'overview→sektor';
         store.push(snap);
         updateList();
         log('dive ' + i + ' tersimpan' + (panel ? '' : ' (panel whperf tidak muncul)') + (snap.hints.skyHeavy ? ' · ada sky>150ms' : ''));
         await sleep(CFG.settleMs);
+        log('dive ' + i + ' — balik ke overview…');
+        await returnToOverview();   /* putaran berikutnya mulai lagi dari overview */
+        await sleep(CFG.settleMs);
       }
-      log('selesai ' + store.length + ' dive — Export JSON/TXT');
+      if (!stopReq) log('selesai ' + store.length + ' dive (overview → ' + name + ') — Export JSON/TXT');
     } catch (e) {
       log('error: ' + (e && e.message ? e.message : e));
       try { console.warn(e); } catch (e2) {}
@@ -233,27 +294,109 @@
   }
 
   /* ---------- perf ---------- */
-  function snapshotPerf() {
-    var hasEl = false, panel = '', summary = {};
-    try { hasEl = typeof PP !== 'undefined' && !!(PP && PP.el); } catch (e) {}
-    if (!hasEl) { log('⚠️ overlay PERF belum aktif (butuh mode PERF)'); return null; }
+  function ppReady() { try { return typeof PP !== 'undefined' && !!(PP && PP.el); } catch (e) { return false; } }
+  function perfModeNow() { try { return (typeof PX_MODES !== 'undefined' && PX_MODES[PP.mode | 0]) || '?'; } catch (e) { return '?'; } }
+  function qualityNow() { try { return (typeof IS_POTATO !== 'undefined' && IS_POTATO) ? 'low' : 'high'; } catch (e) { return '?'; } }
+  function ctxNow() {
+    try { return SECT.on ? 'OVERVIEW' : 'SEKTOR' + (SECT.cur ? ' ' + (SECT.cur.k || SECT.cur.name || '') : ''); } catch (e) { return '?'; }
+  }
+  /* Baca ringkasan dari TEKS overlay ("[mode] … fps N int X ms (max M) js Y ms … jank>34ms: J/N").
+     Teks dihitung overlay tepat sebelum jendela ukurnya di-reset (n>240), jadi lebih andal daripada membaca PP.n sesudahnya. */
+  function parsePerfText(t) {
+    if (!t) return null;
+    var m = /^\[([^\]]+)\]/.exec(t),
+        f = /fps\s+(\d+)\s+int\s+([\d.]+)ms\s+\(max\s+(\d+)\)\s+js\s+([\d.]+)ms/.exec(t),
+        j = /jank>34ms:\s*(\d+)\/(\d+)/.exec(t);
+    if (!f || !j) return null;
+    return { mode: m ? m[1] : '?', fps: f[1], intMs: f[2], jsMs: f[4], imax: +f[3], jank: +j[1], n: +j[2], src: 'text' };
+  }
+  /* opt.text = paksa ringkasan dari teks overlay (dipakai sweep); opt.tag = label snapshot */
+  function snapshotPerf(opt) {
+    opt = (opt && typeof opt === 'object' && !opt.target) ? opt : {};   /* dipakai juga sebagai onclick (arg = event) */
+    var panel = '', summary = {};
+    if (!ppReady()) { log('⚠️ overlay PERF belum aktif (butuh mode PERF; overlay muncul ~1 dtk setelah load)'); return null; }
     try {
       panel = PP.el.textContent || '';
       var n = PP.n || 0;
-      summary = {
-        n: n,
-        fps: n ? (1000 / (PP.isum / n)).toFixed(1) : null,
-        intMs: n ? (PP.isum / n).toFixed(2) : null,
-        jsMs: n ? (PP.jsum / n).toFixed(2) : null,
-        imax: PP.imax || 0, jank: PP.jank || 0,
-        mode: (typeof PX_MODES !== 'undefined' && PX_MODES[PP.mode | 0]) || '?'
-      };
+      if (!opt.text && n >= 30) {
+        summary = {
+          n: n,
+          fps: (1000 / (PP.isum / n)).toFixed(1),
+          intMs: (PP.isum / n).toFixed(2),
+          jsMs: (PP.jsum / n).toFixed(2),
+          imax: PP.imax || 0, jank: PP.jank || 0,
+          mode: perfModeNow(), src: 'PP'
+        };
+      } else {
+        /* jendela PP baru di-reset (atau diminta dari teks) → pakai angka dari teks overlay */
+        summary = parsePerfText(panel) || { n: n, fps: null, intMs: null, jsMs: null, imax: PP.imax || 0, jank: PP.jank || 0, mode: perfModeNow(), src: 'kosong' };
+      }
     } catch (e2) {}
-    var snap = { ts: nowIso(), dpr: dpr(), url: String(location.href), summary: summary, panel: panel };
+    var snap = { ts: nowIso(), dpr: dpr(), ctx: ctxNow(), quality: qualityNow(), tag: opt.tag || 'snap', url: String(location.href), summary: summary, panel: panel };
     perfStore.push(snap);
     updateList();
-    log('perf snapshot #' + perfStore.length);
+    log('perf snapshot #' + perfStore.length + ' [' + (summary.mode || '?') + ']');
     return snap;
+  }
+  function cyclePerfMode() { try { PP.el.click(); } catch (e) {} }   /* handler ketuk overlay situs: PP.mode++ → set PX.* → reset jendela */
+  function waitPerfEl(ms) {
+    return new Promise(function (resolve) {
+      var t0 = performance.now();
+      (function tick() {
+        if (ppReady()) return resolve(true);
+        if (performance.now() - t0 > ms) return resolve(false);
+        setTimeout(tick, 150);
+      })();
+    });
+  }
+  /* tunggu teks overlay untuk mode `nm` dengan jendela ukur >= minN frame */
+  function waitFreshPerf(nm, minN, ms) {
+    return new Promise(function (resolve) {
+      var t0 = performance.now();
+      (function tick() {
+        var p = ppReady() ? parsePerfText(PP.el.textContent || '') : null;
+        if (p && p.mode === nm && p.n >= minN) return resolve(true);
+        if (performance.now() - t0 > ms) return resolve(false);
+        setTimeout(tick, 120);
+      })();
+    });
+  }
+  async function perfModeToZero() {
+    var N = (typeof PX_MODES !== 'undefined' && PX_MODES.length) || 1;
+    for (var g = 0; g < N && (PP.mode | 0) !== 0; g++) { cyclePerfMode(); await sleep(60); }
+  }
+  /* Sweep PERF: dari mode 'normal' ketuk overlay satu per satu sampai PX_MODES habis; tiap mode = settle → tunggu jendela ukur
+     terisi → 1 snapshot. Berhenti di 'normal' (siklus penuh). Konteks (overview/sektor) = tempat kita berdiri saat dijalankan. */
+  async function sweepPerf() {
+    if (running) return log('sudah jalan…');
+    if (MODE !== 'perf') return log('pilih mode PERF dulu');
+    if (typeof PX_MODES === 'undefined' || !PX_MODES.length) return log('⚠️ PX_MODES tidak ada');
+    running = true; stopReq = false;
+    var done = 0, N = PX_MODES.length;
+    try {
+      log('sweep: tunggu overlay PERF…');
+      if (!(await waitPerfEl(8000))) throw new Error('overlay PERF tidak muncul (loop frame belum jalan?)');
+      if (busy()) { log('sweep: tunggu transisi selesai…'); await waitIdle(); }
+      await perfModeToZero();
+      for (var k = 0; k < N; k++) {
+        if (stopReq) { log('sweep dihentikan (' + done + '/' + N + ')'); break; }
+        var nm = PX_MODES[PP.mode | 0];
+        log('sweep ' + (k + 1) + '/' + N + ' — ' + nm + '…');
+        await sleep(CFG.sweepSettleMs);
+        var fresh = await waitFreshPerf(nm, CFG.sweepMinN, CFG.sweepTimeoutMs);
+        var snap = snapshotPerf({ text: true, tag: 'sweep' });
+        if (snap) { done++; if (!fresh) snap.partial = true; }
+        cyclePerfMode();   /* mode berikutnya (setelah mode terakhir → balik ke 'normal') */
+        await sleep(80);
+      }
+      if (!stopReq) log('sweep selesai: ' + done + '/' + N + ' mode tersimpan — Export JSON/TXT');
+    } catch (e) {
+      log('error: ' + (e && e.message ? e.message : e));
+      try { console.warn(e); } catch (e2) {}
+    } finally {
+      try { if (ppReady()) await perfModeToZero(); } catch (e3) {}   /* jangan tinggalkan situs di mode diagnosa (mis. SEMUA OFF) */
+      running = false;
+    }
   }
 
   /* ---------- export ---------- */
@@ -263,7 +406,9 @@
       meta: {
         exportedAt: nowIso(), mode: MODE || '-', url: String(location.href), dpr: dpr(), ua: navigator.userAgent || '',
         dives: store.length, probes: probeStore.length, perfs: perfStore.length,
-        cfg: { dives: CFG.dives, settleMs: CFG.settleMs }
+        quality: qualityNow(), qualityUrl: qualityParam() || null, perfFromLocalStorage: PERF_FROM_LS,
+        pin: param('pin') || null, pset: param('pset') || null,
+        cfg: { dives: CFG.dives, settleMs: CFG.settleMs, sweepSettleMs: CFG.sweepSettleMs, sweepMinN: CFG.sweepMinN }
       },
       runs: store, probes: probeStore, perfs: perfStore
     };
@@ -293,9 +438,10 @@
     var m = buildExportObj().meta, L = [];
     L.push('=== wh auto-debug export ===');
     L.push('exportedAt: ' + m.exportedAt, 'mode: ' + m.mode, 'url: ' + m.url, 'dpr: ' + m.dpr);
+    L.push('quality: ' + m.quality + (m.qualityUrl ? ' (?perf=' + m.qualityUrl + ')' : '') + (m.pin ? '  pin: ' + m.pin : '') + (m.pset ? '  pset: ' + m.pset : '') + (m.perfFromLocalStorage ? '  perf: dari localStorage' : ''));
     L.push('dives: ' + m.dives + '  probes: ' + m.probes + '  perfs: ' + m.perfs, '');
     store.forEach(function (r) {
-      L.push('========== DIVE ' + r.i + ' @ ' + r.ts + ' → ' + r.sector + ' ==========');
+      L.push('========== DIVE ' + r.i + ' @ ' + r.ts + ' → ' + r.sector + (r.leg ? ' (' + r.leg + ')' : '') + ' ==========');
       if (r.whMk) L.push('sectStep: ' + r.whMk);
       ['skyHeavy', 'worst', 'zoom', 'tunnel', 'exit'].forEach(function (k) { if (r.hints && r.hints[k]) L.push(r.hints[k]); });
       L.push('--- panel ---', r.panel || '(tidak ada #whperf)', '');
@@ -304,9 +450,9 @@
       L.push('========== PROBE #' + (i + 1) + ' [' + p.ctx + '] @ ' + p.ts + ' ==========', p.text || '(kosong)', '');
     });
     perfStore.forEach(function (p, i) {
-      L.push('========== PERF SNAP #' + (i + 1) + ' @ ' + p.ts + ' ==========');
+      L.push('========== PERF SNAP #' + (i + 1) + ' @ ' + p.ts + ' [' + (p.tag || 'snap') + (p.partial ? ', jendela ukur belum penuh' : '') + '] ==========');
       var s = p.summary || {};
-      L.push('mode: ' + (s.mode || '?'));
+      L.push('mode: ' + (s.mode || '?') + '  konteks: ' + (p.ctx || '?') + '  kualitas: ' + (p.quality || '?'));
       L.push('fps: ' + (s.fps || '?') + '  int: ' + (s.intMs || '?') + 'ms  js: ' + (s.jsMs || '?') + 'ms');
       L.push('imax: ' + (s.imax || 0) + '  jank: ' + (s.jank || 0) + '/' + (s.n || 0));
       L.push('--- panel ---', p.panel || '(kosong)', '');
@@ -327,7 +473,7 @@
     var p = [];
     if (store.length) p.push(store.map(function (r) { return 'D#' + r.i + ' ' + r.sector + (r.hints && r.hints.skyHeavy ? ' ⚠sky' : ''); }).join('\n'));
     if (probeStore.length) p.push(probeStore.map(function (x, i) { return 'P#' + (i + 1) + ' ' + x.ctx; }).join('\n'));
-    if (perfStore.length) p.push(perfStore.map(function (x, i) { return 'F#' + (i + 1) + (x.summary && x.summary.fps ? ' ' + x.summary.fps + 'fps' : ''); }).join('\n'));
+    if (perfStore.length) p.push(perfStore.map(function (x, i) { return 'F#' + (i + 1) + ' ' + ((x.summary && x.summary.mode) || '?') + (x.summary && x.summary.fps ? ' ' + x.summary.fps + 'fps' : ''); }).join('\n'));
     ui.list.textContent = p.length ? p.join('\n') : '(kosong)';
   }
 
@@ -397,7 +543,7 @@
     MODES.forEach(function (m) {
       modes.appendChild(btn(m.label, function () {
         if (m.id === MODE) return;
-        if (running) return log('tunggu dive selesai dulu');
+        if (running) return log('tunggu tes selesai dulu');
         go(urlFor(m.id));
       }, m.id === MODE));
     });
@@ -406,7 +552,8 @@
     var cur = null;
     MODES.forEach(function (m) { if (m.id === MODE) cur = m; });
     panel.appendChild(mk('div', 'opacity:.8;font-size:10px;margin-bottom:6px;line-height:1.3',
-      cur ? cur.hint : 'belum ada mode — pilih salah satu (halaman akan reload)'));
+      (cur ? cur.hint : 'belum ada mode — pilih salah satu (halaman akan reload)') +
+      (PERF_FROM_LS ? ' · PERF menyala dari localStorage dumul_perf=1' : '')));
 
     var status = mk('div', 'opacity:.9;min-height:2.4em;margin-bottom:6px;font-size:10px;line-height:1.3', 'siap');
     panel.appendChild(status);
@@ -426,15 +573,49 @@
         runSeries();
       });
       acts.appendChild(runB);
+      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop diminta — selesaikan langkah ini…'); } }));
     } else if (MODE === 'probe') {
-      var ps = param('pset');
-      acts.appendChild(btn('set normal', function () { go(urlFor('probe')); }, ps !== 'bio'));
-      acts.appendChild(btn('set bio', function () { go(urlFor('probe', { pset: 'bio' })); }, ps === 'bio'));
+      var ps = param('pset'), pn = param('pin');
+      acts.appendChild(btn('set normal', function () { go(probeUrl({ pset: '' })); }, ps !== 'bio'));
+      acts.appendChild(btn('set bio', function () { go(probeUrl({ pset: 'bio' })); }, ps === 'bio'));
       acts.appendChild(btn('Tangkap', function () { if (!captureProbeIfNew()) log('belum ada hasil PROBE — tunggu selesai'); }));
+      /* ?pin=1|2: orbit portal dikunci di overview (sisi jauh / dekat limb) supaya tiap tes kena fase orbit yang sama */
+      var pinRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;flex-basis:100%');
+      pinRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'pin orbit:'));
+      pinRow.appendChild(btn('off', function () { go(probeUrl({ pin: '' })); }, pn !== '1' && pn !== '2'));
+      pinRow.appendChild(btn('1 jauh', function () { go(probeUrl({ pin: '1' })); }, pn === '1'));
+      pinRow.appendChild(btn('2 dekat', function () { go(probeUrl({ pin: '2' })); }, pn === '2'));
+      acts.appendChild(pinRow);
+      acts.appendChild(mk('div', 'flex-basis:100%;opacity:.6;font-size:9px;line-height:1.25', 'pin hanya berlaku di OVERVIEW; halaman reload'));
     } else if (MODE === 'perf') {
-      acts.appendChild(btn('Snap PERF', snapshotPerf));
+      acts.appendChild(btn('Snap PERF', function () { snapshotPerf(); }));
+      acts.appendChild(btn('Sweep PERF', sweepPerf));
+      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop diminta — selesaikan mode ini…'); } }));
+      if (PERF_FROM_LS) {
+        acts.appendChild(btn('LS off', function () {
+          if (running) return log('tunggu tes selesai dulu');
+          try { localStorage.removeItem('dumul_perf'); } catch (e) {}
+          go(urlFor(''));
+        }));
+      }
     }
     panel.appendChild(acts);
+
+    /* override kualitas ?perf=high|low (berlaku di semua mode; ikut terbawa saat ganti mode) */
+    var qUrl = qualityParam();
+    var qRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:6px');
+    qRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'kualitas:'));
+    [['auto', ''], ['HIGH', 'high'], ['LOW', 'low']].forEach(function (q) {
+      qRow.appendChild(btn(q[0], function () {
+        if (running) return log('tunggu tes selesai dulu');
+        if (q[1] === qUrl) return;
+        go(urlFor(MODE || '', { quality: q[1] }));
+      }, q[1] === qUrl));
+    });
+    var qLs = ''; try { qLs = localStorage.getItem('dumul_quality') || ''; } catch (e) {}
+    qRow.appendChild(mk('span', 'flex-basis:100%;opacity:.6;font-size:9px;line-height:1.25',
+      'aktif: ' + qualityNow().toUpperCase() + (qUrl ? ' (URL ?perf=' + qUrl + ')' : qLs ? ' (tersimpan: ' + qLs + ')' : ' (default)')));
+    panel.appendChild(qRow);
 
     var exp = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
     exp.appendChild(btn('JSON', exportJSON));
@@ -462,7 +643,7 @@
     updateList();
     if (MODE === 'probe') startProbeWatch();
 
-    var boot = { whperf: 'Dive siap — tekan Dive×N', probe: 'probe watch ON — diam sampai PROBE selesai', perf: 'PERF aktif — tekan Snap PERF' };
+    var boot = { whperf: 'Dive siap — tekan Dive×N (mulai dari overview)', probe: 'probe watch ON — diam sampai PROBE selesai', perf: 'PERF aktif — Snap PERF / Sweep PERF' };
     log(MODE ? boot[MODE] : 'pilih tes di atas');
   }
 
@@ -470,6 +651,7 @@
     open: open,
     run: runSeries,
     snapPerf: snapshotPerf,
+    sweepPerf: sweepPerf,
     captureProbe: captureProbeIfNew,
     exportJSON: exportJSON,
     exportTXT: exportTXT,
@@ -478,7 +660,7 @@
     get store() { return store.slice(); },
     get probes() { return probeStore.slice(); },
     get perfs() { return perfStore.slice(); },
-    stop: function () { if (probeWatch) { clearInterval(probeWatch); probeWatch = null; } running = false; }
+    stop: function () { stopReq = true; if (probeWatch) { clearInterval(probeWatch); probeWatch = null; } running = false; }
   };
 
   if (document.body) open();
