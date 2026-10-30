@@ -745,7 +745,7 @@ function setCameraMode(on){
     btn.setAttribute('aria-label',CAMERA_MODE?T('mode.camera.exit'):T('mode.camera'));
     btn.hidden=!(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE);
   }
-  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;_focusHome=null;_zoomOut=false;setSkyZoom(1,false);FOCUS.list=null;gridCanvas=null;}   /* gridCanvas (02-sky-logic.js) dilepas biar memorinya balik; di-bake lagi pas masuk cam */
+  if(!CAMERA_MODE){FOCUS.i=0;FOCUS.anim=false;_focusHome=null;_zoomOut=false;setSkyZoom(1,false);FOCUS.list=null;}   /* v12: gridCanvas TIDAK dilepas lagi (sekarang setengah resolusi, ~1/4 memori); ensureCamGrid() bake ulang hanya kalau DPR/rot/ukuran berubah atau plate di-bake ulang */
   else{FOCUS.list=focusList();FOCUS.i=0;}
   if(!CAMERA_MODE){FFX.id=null;hideWhisper();setGame(false,true);setBand('vis');setLines(true);}
   focusUI();

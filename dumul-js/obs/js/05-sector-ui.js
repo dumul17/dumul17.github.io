@@ -23,8 +23,31 @@ function sectApply(s,u){
   skyPan.x=(W*.5-s.bx)*u;skyPan.y=(H*.5-s.by)*u;
   SECT.z=u;
 }
+/* v12 (A/B: ?whdbg=nowarm = mati): selama SECT.busy lapisan debu (plateDust) dilewati (xfade) dan sky tertutup terowongan, jadi plate besar tidak pernah di-blit.
+   Di kedatangan semuanya digambar pertama kali sekaligus -> upload tekstur GPU ratusan ms (js kecil, sky 0). Di sini tiap plate digambar sekali ke kanvas 1x1
+   di tengah terowongan (layar toh tertutup) supaya upload-nya terbayar lebih awal. Dipanggil sekali per dive; waktunya masuk panel whperf sebagai 'warm N'. */
+var _warmCv=null;
+/* v12b: dicicil 1 plate per frame (bukan sekaligus) dan TANPA getImageData (itu membekukan main thread menunggu GPU). Kanvas 1x1 dipasang di DOM (hampir transparan)
+   supaya compositor mengeksekusi gambarnya async di frame berjalan. Dipanggil tiap frame fase masuk mulai u>=.3; waktu main-thread terbesar per langkah -> 'warm N' di panel. */
+function skyWarmStep(){
+  try{
+    if(typeof WH_DBG==='string'&&WH_DBG.indexOf('nowarm')>=0){SECT.warmQ=[];return;}
+    var t0=performance.now();
+    if(!_warmCv){_warmCv=document.createElement('canvas');_warmCv.width=_warmCv.height=1;_warmCv.setAttribute('aria-hidden','true');_warmCv.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:.01;pointer-events:none;z-index:-1';document.body.appendChild(_warmCv);}
+    if(!SECT.warmQ){
+      var L=[],i;
+      if(typeof plateDeep!=='undefined'&&plateDeep)L.push(plateDeep);
+      if(typeof bgCanvas!=='undefined'&&bgCanvas&&!bgEmpty)L.push(bgCanvas);
+      if(typeof plateDust!=='undefined')for(i=0;i<plateDust.length;i++)if(plateDust[i]&&plateDust[i].c)L.push(plateDust[i].c);
+      SECT.warmQ=L;
+    }
+    var c=SECT.warmQ.shift();
+    if(c){_warmCv.getContext('2d').drawImage(c,0,0,1,1);var d=Math.round(performance.now()-t0);if(SECT.warmMs==null||d>SECT.warmMs)SECT.warmMs=d;}
+  }catch(eW){SECT.warmQ=[];}
+}
 function sectZoomIn(s){
   if(SECT.busy||!s||s.bx==null)return;
+  SECT.warmQ=null;SECT.warmMs=null;
   SECT.busy=true;SECT.phase='in';SECT.cur=null;SECT.target=s;SECT.t0=performance.now();
   try{if(typeof setCameraMode==='function'&&CAMERA_MODE)setCameraMode(false);}catch(e){}
 }
@@ -209,6 +232,7 @@ function sectStep(now){
   var u=clamp((now-SECT.t0)/(reduce?1:SECT.dur));
   if(SECT.phase==='in'){
     sectApply(s,sectEase(u));
+    if(u>=.3&&u<.95&&(SECT.warmQ==null||SECT.warmQ.length))skyWarmStep();
     if(u>=1){
       /* whperf: pecah biaya blok akhir phase-in (tunnel@~3.6s) — window.__whMk dibaca 09-wormhole panel */
       var _mk=[],_t=performance.now(),_m=function(n){var t=performance.now();_mk.push(n+' '+(t-_t).toFixed(0));_t=t;};
@@ -222,6 +246,7 @@ function sectStep(now){
       _m('focus');
       try{syncSkyPanHits();}catch(e){}_m('panHits');
       try{lisArrive(s.k);}catch(eL){}_m('lisArrive');
+      if(SECT.warmMs!=null)_mk.unshift('warm(max/langkah) '+SECT.warmMs);
       window.__whMk=_mk.join(' | ');
     }
   }else if(SECT.phase==='out'){

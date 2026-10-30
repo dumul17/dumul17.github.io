@@ -1632,12 +1632,14 @@ function bakeAstroPlates(){
 function bakeCamGrid(){
   if(!bgCanvas)return;
   var M=plateM,EW=W+2*M,EH=H+2*M;
-  gridCanvas=document.createElement('canvas');
-  gridCanvas.width=Math.max(1,Math.round(EW*DPR));gridCanvas.height=Math.max(1,Math.round(EH*DPR));
+  /* v12: grid cuma garis putus-putus alpha .035 -> bake di setengah DPR (~1/4 piksel), plateBlit sudah menskala ke pW x pH. Kurangi alokasi + biaya stroke tiap masuk cam. */
+  var gk=Math.max(.75,DPR*.5);
+  if(!gridCanvas)gridCanvas=document.createElement('canvas');
+  gridCanvas.width=Math.max(1,Math.round(EW*gk));gridCanvas.height=Math.max(1,Math.round(EH*gk));
   var gc=gridCanvas.getContext('2d');
-  gc.setTransform(DPR,0,0,DPR,M*DPR,M*DPR);
+  gc.setTransform(gk,0,0,gk,M*gk,M*gk);
   gc.strokeStyle='rgba(110,229,255,.035)';
-  gc.lineWidth=.7;
+  gc.lineWidth=1.1;
   gc.setLineDash([4,8]);
   /* Landscape ROT: grid digambar di ruang LAYAR (gw x gh, sumbu ditukar) lalu diputar balik, jadi garis deklinasi tetap horizontal di layar */
   var gw=W,gh=H;
