@@ -18,7 +18,7 @@
  *   Mode dipilih = halaman reload dengan param yang pas (whperf/PERF/PROBE membaca
  *   URL saat load, jadi tidak bisa dinyalakan tanpa reload).
  *   Export: JSON / TXT (semua hasil), tombol Clr untuk reset.
-*   UI minimal: panel emas PROBE disilent (tombol Hasil PROBE); #whperf dive auto-remove setelah rekam;
+*   UI minimal: panel emas PROBE disilent (tombol Hasil); #whperf dive auto-remove setelah rekam;
 *     daftar hasil di tombol Log (hide default) — runtime cuma status + aksi.
  *
  * Posisi tombol: kanan-bawah, di BARIS ATAS tombol musik + cluster mode (observer / kamera / menu sektor),
@@ -293,7 +293,7 @@
         hideGoldProbe();
         if (fin) {
           try { captureProbeIfNew(); } catch (e1) {}
-          log('probe selesai — ketuk Hasil PROBE / TXT');
+          log('probe selesai — ketuk Hasil / Export');
         } else if (t) {
           /* status jalan: cukup di bar status debug, bukan overlay emas */
           var short = String(t).split('\n')[0] || 'PROBE…';
@@ -335,7 +335,7 @@
     probeStore.push({ ts: nowIso(), ctx: probeCtxLabel(), dpr: dpr(), url: String(location.href), text: t });
     updateList();
     hideGoldProbe();
-    log('probe tertangkap [' + probeStore[probeStore.length - 1].ctx + '] — Hasil PROBE / TXT');
+    log('probe tertangkap [' + probeStore[probeStore.length - 1].ctx + '] — Hasil / Export');
     return true;
   }
   function startProbeWatch() {
@@ -362,12 +362,12 @@
     if (probeUiShown) {
       ui.viewer.textContent = t;
       ui.viewer.style.display = 'block';
-      if (ui.btnProbeRes) ui.btnProbeRes.textContent = 'Tutup hasil';
+      if (ui.btnHasil) ui.btnHasil.textContent = 'Tutup';
       log('hasil PROBE ditampilkan (scroll)');
     } else {
       ui.viewer.style.display = 'none';
       ui.viewer.textContent = '';
-      if (ui.btnProbeRes) ui.btnProbeRes.textContent = 'Hasil PROBE';
+      if (ui.btnHasil) ui.btnHasil.textContent = 'Hasil';
       log('hasil PROBE disembunyikan');
     }
   }
@@ -505,17 +505,23 @@
       try { a.remove(); } catch (e2) {}
     }, 1500);
   }
-  function exportJSON() {
-    if (empty()) return log('belum ada data');
-    var name = 'wh-debug-' + Date.now() + '.json';
-    download(name, JSON.stringify(buildExportObj(), null, 2), 'application/json');
-    log('download ' + name);
+  /* Nama file mengikuti ISI data (bukan selalu debug):
+       probe-….txt / perf-….txt / dive-….txt
+       probe+perf-….txt kalau digabung, dst. */
+  function exportStem() {
+    var k = [];
+    if (probeStore.length) k.push('probe');
+    if (perfStore.length) k.push('perf');
+    if (store.length) k.push('dive');
+    if (k.length) return k.join('+');
+    if (MODE === 'probe') return 'probe';
+    if (MODE === 'perf') return 'perf';
+    if (MODE === 'whperf') return 'dive';
+    return 'debug';
   }
-  function exportTXT() {
-    if (!empty()) captureProbeIfNew();
-    if (empty()) return log('belum ada data');
+  function buildTxtBody() {
     var m = buildExportObj().meta, L = [];
-    L.push('=== wh auto-debug export ===');
+    L.push('=== debug export (' + exportStem() + ') ===');
     L.push('exportedAt: ' + m.exportedAt, 'mode: ' + m.mode, 'url: ' + m.url, 'dpr: ' + m.dpr);
     L.push('quality: ' + m.quality + (m.qualityUrl ? ' (?perf=' + m.qualityUrl + ')' : '') + (m.pin ? '  pin: ' + m.pin : '') + (m.pset ? '  pset: ' + m.pset : '') + (m.perfFromLocalStorage ? '  perf: dari localStorage' : ''));
     L.push('dives: ' + m.dives + '  probes: ' + m.probes + '  perfs: ' + m.perfs, '');
@@ -536,15 +542,35 @@
       L.push('imax: ' + (s.imax || 0) + '  jank: ' + (s.jank || 0) + '/' + (s.n || 0));
       L.push('--- panel ---', p.panel || '(kosong)', '');
     });
-    var name = 'wh-debug-' + Date.now() + '.txt';
-    download(name, L.join('\n'), 'text/plain');
+    return L.join('\n');
+  }
+  function exportJSON() {
+    if (empty()) return log('belum ada data');
+    var name = exportStem() + '-' + Date.now() + '.json';
+    download(name, JSON.stringify(buildExportObj(), null, 2), 'application/json');
     log('download ' + name);
+  }
+  function exportTXT() {
+    if (!empty()) captureProbeIfNew();
+    if (empty()) return log('belum ada data');
+    var name = exportStem() + '-' + Date.now() + '.txt';
+    download(name, buildTxtBody(), 'text/plain');
+    log('download ' + name);
+  }
+  /* satu tombol: TXT + JSON, stem sama */
+  function exportAll() {
+    if (!empty()) captureProbeIfNew();
+    if (empty()) return log('belum ada data');
+    var stem = exportStem() + '-' + Date.now();
+    download(stem + '.txt', buildTxtBody(), 'text/plain');
+    download(stem + '.json', JSON.stringify(buildExportObj(), null, 2), 'application/json');
+    log('download ' + stem + '.txt + .json');
   }
   function clearAll() {
     store.length = 0; probeStore.length = 0; perfStore.length = 0; lastProbeKey = '';
     probeUiShown = false;
     if (ui && ui.viewer) { ui.viewer.style.display = 'none'; ui.viewer.textContent = ''; }
-    if (ui && ui.btnProbeRes) ui.btnProbeRes.textContent = 'Hasil PROBE';
+    if (ui && ui.btnHasil) ui.btnHasil.textContent = 'Hasil';
     updateList();
     log('cleared');
   }
@@ -611,133 +637,119 @@
   }
 
   function open() {
-    if (ui && ui.root && ui.root.parentNode) { ui.root.style.display = ''; if (ui.expand) ui.expand(true); return; }
+    if (ui && ui.root && ui.root.parentNode) {
+      ui.root.style.display = 'block';
+      return;
+    }
+    if (!document.getElementById('wh-ad-css')) {
+      var st = document.createElement('style');
+      st.id = 'wh-ad-css';
+      st.textContent =
+        '#wh-autodive{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;' +
+        'font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#b8fff0;pointer-events:auto;touch-action:manipulation}' +
+        '@media (max-width:520px){#wh-autodive{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}#wh-ad-fab{width:31px!important;height:31px!important}}' +
+        '@media (orientation:landscape) and (max-height:520px){#wh-autodive{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}#wh-ad-fab{width:28px!important;height:28px!important;font-size:13px!important}}' +
+        'body.ls #wh-autodive{translate:var(--gut,0px) 0}' +
+        'body.layout-edit #wh-autodive{display:none}';
+      document.head.appendChild(st);
+    }
 
-    addStyle();
-    var root = mk('div');
+    var root = document.createElement('div');
     root.id = 'wh-autodive';
-    ['pointerdown', 'pointerup', 'pointermove', 'touchstart', 'touchend', 'touchmove', 'mousedown', 'mouseup', 'click', 'wheel'].forEach(function (ev) {
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'wheel'].forEach(function (ev) {
       root.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: false });
     });
 
     var fab = mk('button', BTN + ';width:32px;height:32px;padding:0;font-size:15px;border-radius:5px;background:rgba(6,11,17,.34);border-color:rgba(110,229,255,.17);display:grid;place-items:center', '🐞');
     fab.id = 'wh-ad-fab';
     fab.type = 'button';
-    fab.title = 'auto-debug';
+    fab.title = 'debug';
 
     var panel = mk('div',
-      'background:rgba(0,10,18,.94);padding:8px 10px;border-radius:10px;border:1px solid rgba(100,255,220,.32);' +
-      'width:min(290px,calc(100vw - 24px));max-height:calc(100vh - 110px);overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.5);backdrop-filter:blur(6px);display:none');
+      'display:none;min-width:min(260px,88vw);max-width:min(300px,92vw);padding:10px 12px;' +
+      'background:rgba(0,10,18,.94);border:1px solid rgba(100,255,220,.32);border-radius:10px;' +
+      'box-shadow:0 8px 28px rgba(0,0,0,.5)');
 
     var head = mk('div', 'display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px');
-    head.appendChild(mk('div', 'font-weight:700;font-size:11px', 'wh-debug'));
-    var xb = btn('✕', function () { expand(false); });
-    head.appendChild(xb);
+    head.appendChild(mk('div', 'font-weight:700;font-size:11px', 'debug'));
+    head.appendChild(btn('✕', function () { expand(false); }));
     panel.appendChild(head);
 
-    /* pilih mode (reload dengan param yang pas) */
-    panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'pilih tes:'));
-    var modes = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px');
-    MODES.forEach(function (m) {
+    /* —— 2 mode utama —— */
+    panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'mode:'));
+    var modes = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
+    [
+      { id: 'probe', label: 'Probe' },
+      { id: 'perf', label: 'PERF' }
+    ].forEach(function (m) {
       modes.appendChild(btn(m.label, function () {
-        if (m.id === MODE) return;
-        if (running) return log('tunggu tes selesai dulu');
+        if (running) return log('tunggu tes selesai');
+        if (MODE === m.id) return;
         go(urlFor(m.id));
-      }, m.id === MODE));
+      }, MODE === m.id));
     });
+    /* Dive tetap ada tapi sekunder (wormhole) */
+    modes.appendChild(btn('Dive', function () {
+      if (running) return log('tunggu tes selesai');
+      if (MODE === 'whperf') return;
+      go(urlFor('whperf'));
+    }, MODE === 'whperf'));
     panel.appendChild(modes);
 
-    var cur = null;
-    MODES.forEach(function (m) { if (m.id === MODE) cur = m; });
-    panel.appendChild(mk('div', 'opacity:.8;font-size:10px;margin-bottom:6px;line-height:1.3',
-      (cur ? cur.hint : 'belum ada mode — pilih salah satu (halaman akan reload)') +
-      (PERF_FROM_LS ? ' · PERF menyala dari localStorage dumul_perf=1' : '')));
-
-    var status = mk('div', 'opacity:.9;min-height:2.4em;margin-bottom:6px;font-size:10px;line-height:1.3', 'siap');
+    var status = mk('div', 'opacity:.9;min-height:2.6em;margin-bottom:8px;font-size:10px;line-height:1.35', 'siap');
     panel.appendChild(status);
 
-    /* aksi per mode */
-    var acts = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:6px');
+    /* aksi mode-spesifik (satu baris, ringkas) */
+    var acts = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
     if (MODE === 'whperf') {
-      var lab = mk('label', 'display:flex;align-items:center;gap:4px;font-size:10px', 'dives');
-      var inp = mk('input', 'width:2.8em;background:#0a1a22;color:#b8fff0;border:1px solid #2a5;border-radius:4px;padding:1px 3px;font:inherit');
-      inp.type = 'number'; inp.min = '1'; inp.max = '20'; inp.value = String(CFG.dives);
-      lab.appendChild(inp);
-      acts.appendChild(lab);
       var runB = btn('Dive×' + CFG.dives, function () {
-        var n = parseInt(inp.value, 10);
+        var n = 3;
+        try { n = parseInt(prompt('jumlah dive (1–20)', String(CFG.dives)) || CFG.dives, 10); } catch (e) {}
         if (n >= 1 && n <= 20) CFG.dives = n;
         runB.textContent = 'Dive×' + CFG.dives;
         runSeries();
       });
       acts.appendChild(runB);
-      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop diminta — selesaikan langkah ini…'); } }));
+      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }));
     } else if (MODE === 'probe') {
-      var ps = param('pset'), pn = param('pin');
-      acts.appendChild(btn('set normal', function () { go(probeUrl({ pset: '' })); }, ps !== 'bio'));
-      acts.appendChild(btn('set bio', function () { go(probeUrl({ pset: 'bio' })); }, ps === 'bio'));
-      acts.appendChild(btn('Tangkap', function () { if (!captureProbeIfNew()) log('belum ada hasil PROBE — tunggu selesai'); }));
-      /* ?pin=1|2: orbit portal dikunci di overview (sisi jauh / dekat limb) supaya tiap tes kena fase orbit yang sama */
-      var pinRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;flex-basis:100%');
-      pinRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'pin orbit:'));
-      pinRow.appendChild(btn('off', function () { go(probeUrl({ pin: '' })); }, pn !== '1' && pn !== '2'));
-      pinRow.appendChild(btn('1 jauh', function () { go(probeUrl({ pin: '1' })); }, pn === '1'));
-      pinRow.appendChild(btn('2 dekat', function () { go(probeUrl({ pin: '2' })); }, pn === '2'));
-      acts.appendChild(pinRow);
-      acts.appendChild(mk('div', 'flex-basis:100%;opacity:.6;font-size:9px;line-height:1.25', 'pin hanya berlaku di OVERVIEW; halaman reload'));
+      acts.appendChild(btn('set normal', function () { go(probeUrl({ pset: '' })); }, param('pset') !== 'bio'));
+      acts.appendChild(btn('set bio', function () { go(probeUrl({ pset: 'bio' })); }, param('pset') === 'bio'));
     } else if (MODE === 'perf') {
-      acts.appendChild(btn('Snap PERF', function () { snapshotPerf(); }));
-      acts.appendChild(btn('Sweep PERF', sweepPerf));
-      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop diminta — selesaikan mode ini…'); } }));
-      if (PERF_FROM_LS) {
-        acts.appendChild(btn('LS off', function () {
-          if (running) return log('tunggu tes selesai dulu');
-          try { localStorage.removeItem('dumul_perf'); } catch (e) {}
-          go(urlFor(''));
-        }));
-      }
+      acts.appendChild(btn('Snap', function () { snapshotPerf(); }));
+      acts.appendChild(btn('Sweep', sweepPerf));
+      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }));
+    } else {
+      acts.appendChild(mk('span', 'opacity:.65;font-size:10px', 'pilih Probe atau PERF'));
     }
-    panel.appendChild(acts);
+    if (acts.childNodes.length) panel.appendChild(acts);
 
-    /* override kualitas ?perf=high|low (berlaku di semua mode; ikut terbawa saat ganti mode) */
-    var qUrl = qualityParam();
-    var qRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:6px');
-    qRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'kualitas:'));
-    [['auto', ''], ['HIGH', 'high'], ['LOW', 'low']].forEach(function (q) {
-      qRow.appendChild(btn(q[0], function () {
-        if (running) return log('tunggu tes selesai dulu');
-        if (q[1] === qUrl) return;
-        go(urlFor(MODE || '', { quality: q[1] }));
-      }, q[1] === qUrl));
-    });
-    var qLs = ''; try { qLs = localStorage.getItem('dumul_quality') || ''; } catch (e) {}
-    qRow.appendChild(mk('span', 'flex-basis:100%;opacity:.6;font-size:9px;line-height:1.25',
-      'aktif: ' + qualityNow().toUpperCase() + (qUrl ? ' (URL ?perf=' + qUrl + ')' : qLs ? ' (tersimpan: ' + qLs + ')' : ' (default)')));
-    panel.appendChild(qRow);
-
-    var exp = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-    exp.appendChild(btn('JSON', exportJSON));
-    exp.appendChild(btn('TXT', exportTXT));
-    exp.appendChild(btn('Clr', clearAll));
-    exp.appendChild(btn('Matikan', function () { go(urlFor(null)); }));
-    panel.appendChild(exp);
-
-    /* Log hasil (ringkas) — hide by default; export tetap ada */
-    var logRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px');
-    var btnLog = btn('Log ▸', function () {
+    /* —— 2 tombol utama: Hasil + Export —— */
+    var main = mk('div', 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px');
+    var btnHasil = btn('Hasil', function () {
+      /* Probe: tampilkan laporan. PERF/Dive: tampilkan Log ringkas. */
+      if (MODE === 'probe' || probeStore.length) {
+        toggleProbeResult();
+        if (ui.btnHasil) ui.btnHasil.textContent = probeUiShown ? 'Tutup' : 'Hasil';
+        return;
+      }
       ui.logShown = !ui.logShown;
-      btnLog.textContent = ui.logShown ? 'Log ▾' : 'Log ▸';
       updateList();
+      if (ui.btnHasil) ui.btnHasil.textContent = ui.logShown ? 'Tutup' : 'Hasil';
+      if (ui.logShown && empty()) log('belum ada data — jalankan tes dulu');
     });
-    var btnProbeRes = btn('Hasil PROBE', toggleProbeResult);
-    logRow.appendChild(btnLog);
-    logRow.appendChild(btnProbeRes);
-    panel.appendChild(logRow);
+    var btnExport = btn('Export', exportAll);
+    main.appendChild(btnHasil);
+    main.appendChild(btnExport);
+    panel.appendChild(main);
+
+    var foot = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px');
+    foot.appendChild(btn('Clr', clearAll));
+    foot.appendChild(btn('Matikan', function () { go(urlFor(null)); }));
+    panel.appendChild(foot);
 
     var list = mk('pre', 'margin:0;max-height:5.5em;overflow:auto;opacity:.88;white-space:pre-wrap;font-size:10px;pointer-events:auto;display:none', '(kosong)');
     panel.appendChild(list);
 
-    /* viewer hasil PROBE (ganti panel emas) — hide default */
     var viewer = mk('pre',
       'display:none;margin:6px 0 0;max-height:min(38vh,280px);overflow:auto;' +
       'opacity:.95;white-space:pre-wrap;font-size:9px;line-height:1.35;' +
@@ -749,7 +761,7 @@
     root.appendChild(fab);
     ui = {
       root: root, status: status, list: list, panel: panel, fab: fab,
-      viewer: viewer, btnProbeRes: btnProbeRes, logShown: false
+      viewer: viewer, btnHasil: btnHasil, btnProbeRes: btnHasil, logShown: false
     };
 
     function expand(on) {
@@ -760,22 +772,20 @@
     ui.expand = expand;
 
     document.body.appendChild(root);
-    /* runtime minimal: panel terbuka, list hasil tertutup sampai user ketuk Log */
     expand(true);
     updateList();
     installProbeSilence();
     if (MODE === 'probe') startProbeWatch();
     else if (MODE === 'whperf') {
-      /* jaga-jaga: panel whperf sisa dari sesi sebelumnya dibuang */
       try { var w0 = document.getElementById('whperf'); if (w0) w0.remove(); } catch (e0) {}
     }
 
     var boot = {
-      whperf: 'Dive siap — tekan Dive×N (hasil di Log/export, panel whperf auto-hide)',
-      probe: 'PROBE silent — diam sampai selesai, lalu Hasil PROBE / TXT',
-      perf: 'PERF aktif — Snap / Sweep (hasil di Log/export)'
+      whperf: 'Dive — tekan Dive×N, lalu Export',
+      probe: 'PROBE silent — diam sampai selesai → Hasil / Export',
+      perf: 'Snap sekali atau Sweep semua mode → Export'
     };
-    log(MODE ? boot[MODE] : 'pilih tes di atas');
+    log(MODE ? boot[MODE] : 'pilih Probe atau PERF');
   }
 
   window.__WH_AD = {
@@ -786,6 +796,7 @@
     captureProbe: captureProbeIfNew,
     exportJSON: exportJSON,
     exportTXT: exportTXT,
+    exportAll: exportAll,
     cfg: CFG,
     mode: MODE,
     get store() { return store.slice(); },
