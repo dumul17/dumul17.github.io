@@ -211,6 +211,24 @@ function hide(){
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
 /* ---- recorder FPS on-device: aktif HANYA kalau URL pakai ?whperf=1 (tanpa itu = nol biaya). Setelah transisi selesai muncul panel kecil; tap panel untuk menutup. ---- */
 var WP=(function(){try{return /[?&]whperf=1/.test(location.search)?{r:[],t:0,ph:''}:null;}catch(e){return null;}})();
+/* v12d: atribusi frame macet lewat Long Animation Frames (Chromium 123+; fallback longtask). Per frame >150ms: durasi total, script (JS), render (style/layout/paint/commit di main thread), sisa (GC/idle/menunggu).
+   Kalau durasi frame LoAF kecil padahal interval whperf besar -> main thread bebas, yang menahan GPU/compositor/proses lain. */
+if(WP){try{
+  WP.lf=[];WP.lfSup='none';
+  var _ty=(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes)||[];
+  var _tn=_ty.indexOf('long-animation-frame')>=0?'long-animation-frame':(_ty.indexOf('longtask')>=0?'longtask':'');
+  if(_tn){
+    WP.lfSup=_tn==='longtask'?'longtask':'LoAF';
+    new PerformanceObserver(function(l){l.getEntries().forEach(function(e){
+      if(e.duration<150)return;
+      var sc=0,fl=0,src='',i,S=e.scripts||[],bn=0;
+      for(i=0;i<S.length;i++){sc+=S[i].duration||0;fl+=S[i].forcedStyleAndLayoutDuration||0;if((S[i].duration||0)>bn){bn=S[i].duration;src=String(S[i].sourceURL||'').split('/').pop().split('?')[0]+':'+(S[i].sourceFunctionName||S[i].invoker||'?');}}
+      var rn=e.renderStart>0?e.duration-e.renderStart:0,sl=e.styleAndLayoutStart>0?e.duration-e.styleAndLayoutStart:0;
+      WP.lf.push({t:e.startTime,d:e.duration,sc:sc,rn:rn,sl:sl,fl:fl,src:src,ph:WP.ph});
+      WP.lf.sort(function(a,b){return b.d-a.d;});if(WP.lf.length>6)WP.lf.length=6;
+    });}).observe({type:_tn,buffered:false});
+  }
+}catch(eLF){}}
 /* v8: js = (now -> akhir tick) SUDAH TERMASUK frame() sky (05-sector-ui.js) yang jalan di rAF yang sama SEBELUM tick ini. WSK = ms yang dipakai frame() sky di rAF ini, jadi js-sky = biaya tick wormhole sendiri. */
 var WSK=0;
 if(WP){try{var _wf0=window.frame;if(typeof _wf0==='function'){window.frame=function(n){var t=performance.now(),r;try{r=_wf0.apply(this,arguments);}finally{WSK+=performance.now()-t;}return r;};}}catch(eWk){}}
@@ -220,7 +238,7 @@ function wpM(n){
   c[0]+=t-WP.l;c[1]++;WP.l=t;
 }
 function wpRec(now,ph,q,js,sky,lead){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
-  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;WP.s={};}
+  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;WP.s={};WP.lf=[];WP.t0=performance.now();}
   if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js,sky||0,lead||0]);
   WP.t=now;WP.ph=ph;
 }
@@ -239,6 +257,7 @@ function wpEnd(){
     try{['zoom','tunnel','exit'].forEach(function(ph){var p=WP.s&&WP.s[ph];if(!p)return;out.push('  '+ph+' ms/frame: '+['pre','fresh','step','comp','streak','vig','ring','tele'].map(function(k){return p[k]?k+' '+(p[k][0]/p[k][1]).toFixed(1):'';}).filter(Boolean).join(' | '));});}catch(eS){}
     out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+' sky '+x[4].toFixed(0)+')';}).join(' | '));
     if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);
+    try{out.push(WP.lfSup+' >150ms (total | script | render | s+l | forced | sumber): '+(WP.lf.length?WP.lf.slice(0,4).map(function(x){return '['+x.ph+' +'+Math.round(x.t-(WP.t0||0))+'] '+Math.round(x.d)+' | '+Math.round(x.sc)+' | '+Math.round(x.rn)+' | '+Math.round(x.sl)+' | '+Math.round(x.fl)+' | '+(x.src||'-');}).join('  ;  '):'tidak ada (main thread tidak macet >150ms)'));}catch(eL){}
     if(window.__plSt)out.push('planet3d sejak zoom-in: resize '+window.__plSt.rs+' | render-penuh '+window.__plSt.fl+' (terlama '+window.__plSt.mx+'ms'+(/(^|,)plfin(,|$)/.test(WH_DBG)?', GPU':', js')+')');   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
