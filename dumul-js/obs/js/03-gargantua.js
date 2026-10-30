@@ -315,6 +315,8 @@ function drawHole(now,age){
     var pOK=false;try{pOK=portal3dOverview(now,bp,R);}catch(ePt){window.__hub.renderError='portal3d: '+(ePt&&ePt.message||ePt);}
     if(pOK)return;
   }
+  /* zoom-in dari sektor: cincin + terowongan digambar di kanvas wormhole (09). BH mini ikut di-scale skyCam dan tampak sebagai portal kedua -> sembunyikan setelah serah-terima. */
+  if(SECT.cur){var whF=0;try{if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringFade)whF=WORMHOLE.ringFade();}catch(eWF){}if(whF>=.995)return;}
 
   g.save();
   g.translate(bp[0],bp[1]);

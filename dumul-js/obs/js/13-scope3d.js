@@ -299,6 +299,8 @@ function scp3dBuild(){
 /* ---------- per frame ---------- */
 function scp3dUpdate(now,mm){
   var T=THREE,r=SCP3D.r,o=SCP3D.o,m=SCP3D.m,sc=Math.hypot(mm.a,mm.b),res=Math.max(SCP3D_CFG.resMin,Math.min(SCP3D_CFG.resMax,Math.ceil(SCP3D_CFG.half*2*sc*1.4/32)*32));
+  /* selama transisi portal skala teleskop berubah .1->.95 -> res bergeser per 32px = setSize (realokasi buffer) berulang = stutter. Kunci res di nilai frame pertama transisi. */
+  if(typeof WORMHOLE!=='undefined'&&WORMHOLE.busy){if(SCP3D.rl==null)SCP3D.rl=res;res=SCP3D.rl;}else SCP3D.rl=null;
   if(res!==SCP3D.res){SCP3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);}
   var TL=(typeof TELESCOPE!=='undefined')?TELESCOPE:null,mode=TL?TL.mode:'drift';
 
@@ -402,10 +404,18 @@ function tele3dBody(g,now){
   try{
     var mm=g.getTransform?g.getTransform():null;
     if(!mm)return false;
-    if(now-SCP3D.last>3||now<SCP3D.last){SCP3D.last=now;scp3dUpdate(now,mm);}   /* ghost copy di frame yang sama memakai hasil render yang sama */
+    /* kapal di dalam transisi wormhole (tilt dipaksa dari 09): render GL selang-seling, frame ganjil pakai salinan 2D frame sebelumnya (posisi/skala tetap per frame, hanya pose+cahaya 3D yang 1 frame telat). SCP3D_CFG.whAlt=0 untuk mematikan. */
+    var wh=SCP3D_CFG.whAlt=0&&SCP3D.tilt&&SCP3D.altOK&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy,cache=null;   /* altOK: hanya dari fase travel (pose berubah pelan); enter/exit pose berubah cepat -> selalu render penuh */
+    if(now-SCP3D.last>3||now<SCP3D.last){   /* ghost copy di frame yang sama memakai hasil render yang sama */
+      if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)&1)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<45)cache=SCP3D.cc;
+      else{
+        SCP3D.last=now;scp3dUpdate(now,mm);
+        if(wh){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(SCP3D.r.domElement,0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;}
+      }
+    }
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
     var H=SCP3D_CFG.half;
-    g.drawImage(SCP3D.r.domElement,-H,-H,H*2,H*2);
+    g.drawImage(cache||SCP3D.r.domElement,-H,-H,H*2,H*2);
     return true;
   }catch(e){
     scp3dFail(e&&e.message||e);

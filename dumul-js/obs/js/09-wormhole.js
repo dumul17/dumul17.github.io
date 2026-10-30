@@ -23,8 +23,8 @@ var NEB_PAL=[[70,95,255],[150,65,240],[255,75,175],[255,125,70],[90,190,255]];  
 var N_STARS=380, N_STARS_LOW=110;   /* jumlah streak bintang tajam (potato lebih sedikit) */
 /* Layer kedalaman (urutan jauh -> dekat): kecepatan, alpha, ketebalan, porsi jumlah */
 var LAYERS=[{sp:.6,al:.5,sz:.6,cnt:.50},{sp:1.3,al:.8,sz:1.1,cnt:.32},{sp:2.2,al:1,sz:1.7,cnt:.18}];
-var SPEED=1;          /* pengali kecepatan bintang (0.6 = lebih santai) */
-var ZOOM=2.0;         /* kecepatan zoom buffer (e-fold/detik) = seberapa kencang terowongan "melesat" */
+var SPEED=2;          /* pengali kecepatan bintang (0.6 = lebih santai) */
+var ZOOM=4.0;         /* kecepatan zoom buffer (e-fold/detik) = seberapa kencang terowongan "melesat" */
 var SPIN=.20;         /* kecepatan putar terowongan (rad/detik); 0 = lurus tanpa swirl */
 var DECAY=.955;       /* sisa terang buffer per frame @60fps. makin besar = ekor streak makin panjang */
 var NEB_RATE=60;      /* blob warna dinding per detik. makin banyak = dinding makin pekat/terang */
@@ -64,7 +64,7 @@ var T_TELE_OVERLAP=1600;   /* ms: zoom-in ke portal mulai SEBELUM teleskop seles
 var ZN=.05, BG='#02050d', WARM=16;
 var cv=null,g=null,spr=null,SC=48,dpr=1,RGB=[],NP=STAR_PAL.length,NN=NEB_PAL.length,
     ST=[],inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
-    W=0,H=0,bw=0,bh=0,bq=.5,bA=null,bB=null,gA=null,gB=null,fresh=0,nebAcc=0,dustAcc=0;
+    W=0,H=0,bw=0,bh=0,bq=.5,bA=null,bB=null,gA=null,gB=null,nebAcc=0,dustAcc=0;
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
 function usable(){return ok&&!(reduceMq&&reduceMq.matches);}
@@ -157,27 +157,79 @@ function init(){
 function show(){if(cv&&cv.style.display!=='block'){resize();cv.style.display='block';}}
 /* KAMERA zoom-in ke portal: canvas #sky di-scale (CSS) di sekitar titik cincin sambil digeser ke tengah layar, jadi langit + cincin ikut mendekat (bukan cincin yang membesar di atas langit diam).
    Koordinat lokal #sky = ruang virtual stage, jadi benar di portrait / landscape / ROT. Terowongan di kanvas ini mengikuti titik + skala yang sama. */
+/* SKY_ZOOM: true (default) = kamera zoom CSS pada #sky. ?whzoom=0 di URL = tanpa zoom (mulut portal membesar di atas sky diam, jalur lama ck=null) untuk A/B di device. Di headless tanpa-zoom tidak lebih ringan: biaya utama adalah isi sky yang dirender, bukan scale-nya. */
+var SKY_ZOOM=(function(){try{return !/[?&]whzoom=0/.test(location.search);}catch(e){return true;}})();
 function skyCam(uu,ee){
   var sk=document.getElementById('sky'),Wv,Hv,m,tx,ty,k;
   if(!sk||S.vx==null)return null;
   Wv=sk.clientWidth||winW();Hv=sk.clientHeight||winH();m=sm(uu);k=Math.exp(S.lnK*ee);
   tx=(Wv*.5-S.vx)*m;ty=(Hv*.5-S.vy)*m;
-  sk.style.willChange='transform,opacity';sk.style.transformOrigin=S.vx+'px '+S.vy+'px';
+  sk.style.willChange='transform,opacity';if(WH_DBG.indexOf('nosky')>=0)sk.style.visibility='hidden';sk.style.transformOrigin=S.vx+'px '+S.vy+'px';
   sk.style.transform='translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px) scale('+k.toFixed(4)+')';
   sk.style.opacity=(1-.92*sm((ee-.5)/.5)).toFixed(3);   /* langit meredup menjelang tertutup terowongan (membesar jadi buram) */
   S.skyOn=1;
   return toScr(S.vx+tx,S.vy+ty);
 }
+/* serah-terima cincin #sky -> kanvas ini, 0..1. Overview: cincin sky langsung disembunyikan (portal3dOverview) -> 1 seketika. Sektor: yang tampak di #sky adalah BH mini (ikut
+   di-scale skyCam, glow/disk-nya jauh lebih besar dari cincin) -> dulu terlihat PORTAL GANDA (BH membesar + cincin). Sekarang cincin fade-in & BH fade-out (WH_HANDOFF ms), lalu 03 menyembunyikan BH. */
+var WH_HANDOFF=260;
+/* diagnosa cincin ganda (URL ?whdbg=noring,nosky): noring = cincin di kanvas wormhole TIDAK digambar; nosky = #sky disembunyikan selama zoom-in. Bandingkan mana yang membuat cincin kedua hilang. */
+var WH_DBG=(function(){try{var m=/[?&]whdbg=([a-z,]+)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
+function ringFade(){
+  if(state!=='travel'||!S||!S.ring)return 0;
+  if(typeof SECT==='undefined'||!SECT.cur||WH_HANDOFF<=0)return 1;
+  return sm(clamp((performance.now()-S.tt)/WH_HANDOFF));
+}
+/* Pre-warm renderer cincin 3D ke resMax. Hanya bila renderer siap (state 2; potato/reduce/gagal-load dilewati) dan PT3D.res baru diset SETELAH setSize sukses
+   (kalau setSize melempar, pt3dRender masih tahu ukuran sebenarnya dan menyesuaikan sendiri). */
+function whPrewarm(){
+  try{
+    if(typeof pt3dWarmMax==='function'){pt3dWarmMax();return;}   /* 15-portal3d.js: setSize(resMax) + 1 render, idempotent */
+    if(typeof PT3D!=='undefined'&&PT3D.r&&PT3D.state===2&&typeof PT3D_CFG!=='undefined'){
+      var rmax=PT3D_CFG.resMax;PT3D.big=1;
+      if(PT3D.res!==rmax){PT3D.r.setPixelRatio(1);PT3D.r.setSize(rmax,rmax,false);PT3D.res=rmax;}
+    }
+  }catch(ePw){}
+}
 function skyReset(){
   try{
     var sk=document.getElementById('sky');
-    if(sk&&S&&S.skyOn){sk.style.transform='';sk.style.transformOrigin='';sk.style.opacity='';sk.style.willChange='';}
+    if(sk&&S&&S.skyOn){sk.style.transform='';sk.style.transformOrigin='';sk.style.opacity='';sk.style.willChange='';sk.style.visibility='';}
     if(S)S.skyOn=0;
   }catch(e){}
 }
 function warpFx(k){try{if(typeof UIS!=='undefined'&&UIS.warpFx)UIS.warpFx(k);}catch(e){}}   /* SFX terowongan (10-ui-sound.js), selalu aman kalau modul suara tidak ada */
-function hide(){warpFx('stop');skyReset();try{if(typeof TELESCOPE!=='undefined')TELESCOPE.dive=0;}catch(eD){}if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}}
+function hide(){
+  warpFx('stop');skyReset();
+  try{if(typeof TELESCOPE!=='undefined')TELESCOPE.dive=0;}catch(eD){}
+  try{if(S){S.freshLeft=0;S.freshR=0;}}catch(eF){}
+  if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}
+}
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
+/* ---- recorder FPS on-device: aktif HANYA kalau URL pakai ?whperf=1 (tanpa itu = nol biaya). Setelah transisi selesai muncul panel kecil; tap panel untuk menutup. ---- */
+var WP=(function(){try{return /[?&]whperf=1/.test(location.search)?{r:[],t:0,ph:''}:null;}catch(e){return null;}})();
+function wpRec(now,ph,q){
+  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;}
+  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q)]);
+  WP.t=now;WP.ph=ph;
+}
+function wpEnd(){
+  if(!WP||!WP.r.length)return;
+  try{
+    var R=WP.r,out=[],P=['enter','zoom','tunnel','exit'],i,j,a,ms,md,mx,tot=0,w=R.slice().sort(function(x,y){return y[1]-x[1];}).slice(0,6);
+    for(i=0;i<P.length;i++){
+      a=R.filter(function(x){return x[0]===P[i];});if(!a.length)continue;
+      ms=a.map(function(x){return x[1];}).sort(function(x,y){return x-y;});
+      for(j=0,tot=0;j<ms.length;j++)tot+=ms[j];
+      md=ms[ms.length>>1];mx=ms[ms.length-1];
+      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0));
+    }
+    out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms';}).join(' | '));
+    var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
+    el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
+    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
+  }catch(e){}
+}
 function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}runCover();state='idle';env=0;hide();}
 function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);}}
 function startExit(now){
@@ -205,13 +257,14 @@ function chargeP(now){
 function go(dest,pos,R,onCover){
   if(!usable()||!init())return false;
   if(state==='travel'||state==='enter'||state==='exit')return false;
+  whPrewarm();   /* v7: sinkron di awal go — hitch = latensi klik, bukan patah di tengah enter (bukan setTimeout 60) */
   var sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,
       x=sp?sp[0]:(S&&S.x!=null?S.x:winW()*.5),y=sp?sp[1]:(S&&S.y!=null?S.y:winH()*.5),
       k=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1,
       Rs=R>2?R*k:Math.min(winW(),winH())*.05,
       tb=teleBase(),carry=false;
   try{carry=!!tb&&!(typeof LIS!=='undefined'&&LIS.pend&&!LIS.pend.carry);}catch(eL){}
-  S={vx:sp?pos[0]:null,vy:sp?pos[1]:null,x:x,y:y,cx:x,cy:y,r:Rs*(typeof PT_IN==='number'?PT_IN:.745),rp:Rs,a:1,rate:.7,rim:0,dest:dest||null,fromOv:!!(dest&&typeof SECT!=='undefined'&&!SECT.cur),go:1,cov:0,tgi:0,onCover:onCover||null,t0:performance.now(),carry:carry,ch:0,fl:0,hv:null,tv:0};
+  S={vx:sp?pos[0]:null,vy:sp?pos[1]:null,x:x,y:y,cx:x,cy:y,r:Rs*(typeof PT_IN==='number'?PT_IN:.745),rp:Rs,a:1,rate:.7,rim:0,dest:dest||null,fromOv:!!(dest&&typeof SECT!=='undefined'&&!SECT.cur),go:1,cov:0,tgi:0,onCover:onCover||null,t0:performance.now(),carry:carry,ch:0,fl:0,hv:null,tv:0,freshR:0,freshLeft:0};
   S.A=carry?T_ENTER_TELE+450:900;   /* carry: terbang T_ENTER_TELE + 450ms muatan (dulu 1100 tetap -> tf0 negatif kalau T_ENTER_TELE > 1100) */
   S.tf0=carry?S.A-T_ENTER_TELE:0;
   S.chT=carry?Math.max(1,S.A-T_ENTER_TELE):S.A*.9;
@@ -225,9 +278,20 @@ function engageDive(now){
   /* Bekukan pose teleskop (posisi/skala/sudut) SEBELUM skyCam mulai menskala #sky. teleBase() membaca getBoundingClientRect #sky, jadi saat zoom-in dia ikut membesar eksponensial
      (k kamera) dan begitu runCover() -> skyReset() melepas transform, skalanya LONCAT turun ke ukuran asli = teleskop "kepotong" jadi kecil. Selama travel semua dibaca dari S.tb. */
   S.tb=null;if(S.carry){try{S.tb=teleBase();}catch(eB){S.tb=null;}}
-  state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=1;S.rate1=S.rate;S.rate=.9;S.rim=0;S.edge=.94;S.ring=1;S.cov=0;S.tgi=0;
+  /* overview -> sektor: cincin di #sky sedang MEMBENGKAK (charge penuh = x(1+PT_SWELL), lihat portal3dOverview) saat diserahkan ke kanvas ini. Dulu kanvas ini mulai dari ukuran dasar
+     -> cincin 'mengecil' mendadak (loncat ~30%) di awal zoom-in. Mulai dari ukuran bengkak yang sama (rp/r ikut, jadi mulut + zoom eksponensial konsisten). */
+  if(typeof PT_SWELL==='number'&&!(typeof SECT!=='undefined'&&SECT.cur)){var swf=1+PT_SWELL;S.rp*=swf;S.r*=swf;}
+  state='travel';S.tt=now;S.r1=S.r;S.cx1=S.cx;S.cy1=S.cy;S.a1=1;S.rate1=S.rate;S.rate=.9;S.rim=0;S.edge=.94;S.ring=0;S.cov=0;S.cvQ=0;S.tgi=0;S.justDive=1;   /* ring=0 dulu: kepemilikan cincin pindah ke kanvas ini di frame travel PENUH pertama (frame justDive tidak menggambar cincin -> kalau sky sudah menyembunyikannya = cincin hilang 1 frame) */
   S.lnK=Math.log(Math.max(2,1.05*(Math.hypot(winW(),winH())*.5)/Math.max(4,S.rp*(typeof PT_IN==='number'?PT_IN:.745))));   /* skala akhir: tepi mulut pas melewati sudut layar */
-  fresh=Math.hypot(winW(),winH())*.56;   /* isi awal: terowongan sudah "penuh" begitu cincin mulai membesar */
+  /* v7 D: isi buffer terowongan dipecah ~3 frame (bukan 16× stepBuf di frame travel penuh pertama) */
+  S.freshR=Math.hypot(winW(),winH())*.56;
+  S.freshLeft=potato()?8:(S.freshR>Math.min(winW(),winH())*.4?WARM:9);
+  /* pre-warm: safety net (idempotent kalau go()/menu sudah warm); + pra-set willChange/origin #sky */
+  whPrewarm();
+  try{
+    var sk=document.getElementById('sky');
+    if(sk&&S.vx!=null){sk.style.willChange='transform,opacity';sk.style.transformOrigin=S.vx+'px '+S.vy+'px';S.skyOn=1;}   /* skyOn=1: kalau transisi dibatalkan sebelum frame travel pertama, skyReset tetap membersihkan style ini */
+  }catch(eSk){}
 }
 function engage(now){engageDive(now);}
 /* Titik tujuan lubang hitam terowongan (layar): BH overview (dest=null) atau tengah layar (tujuan sektor). Diperhalus supaya
@@ -389,9 +453,9 @@ function drawTele(ov){
   if(ov.head!=null&&!t3){var hk=ov.hk!=null?clamp(ov.hk,0,1):1;a0=a0+wrapPi(ov.head-a0)*hk;}   /* badan 2D: hidung (+x) mengarah ke arah terbang */
   g.translate(x,y);g.rotate(a0+(ov.sp||0)+Math.sin(tt*2.7)*.14*wob*(1-.7*kk)+(tl&&!t3?tl.z:0));g.scale(sc,sc);
   g.globalAlpha=clamp(al,0,1);
-  if(t3){SCP3D.tilt=tl;SCP3D.last=-1e9;}   /* paksa render 3D ulang dengan kemiringan ini (cache 3ms di tele3dBody) */
+  if(t3){SCP3D.tilt=tl;SCP3D.altOK=ov.alt?1:0;SCP3D.last=-1e9;}   /* paksa render 3D ulang dengan kemiringan ini (cache 3ms di tele3dBody) */
   try{teleDrawBody(g,performance.now());}catch(e){}
-  if(t3){SCP3D.tilt=null;SCP3D.last=-1e9;}   /* gambar teleskop biasa berikutnya render ulang tanpa kemiringan */
+  if(t3){SCP3D.tilt=null;SCP3D.altOK=0;SCP3D.last=-1e9;}   /* gambar teleskop biasa berikutnya render ulang tanpa kemiringan */
   g.restore();
 }
 /* lubang hitam tengah terowongan: cakram hitam pekat dengan tepi lembut; al<1 = setengah transparan */
@@ -407,11 +471,13 @@ function drawFrame(dt,cx,cy,r,cvr){
       small=r<cvr*.98,n=ST.length,low=potato(),adv=dt*S.rate,
       i,c,L,rh,a,w,ca,sa,lf,tr,hx,hy,tx,ty,al,gr,Rw,Rhw,sd;
   tt+=dt;
-  /* isi awal supaya terowongan sudah "penuh" begitu kebuka (bukan merambat pelan dari tengah) */
-  if(fresh){
-    Rw=Math.max(Rv,fresh);Rhw=Math.min(Rw*.15,Math.min(W,H)*.06);sd=.03*S.rate;
-    for(i=0;i<(low?8:(Rw>Math.min(W,H)*.4?WARM:9));i++){roll+=sd*SPIN;tt+=.03;moveStars(.03,sd);stepBuf(.03,cx,cy,Rw,Rhw,sd);}
-    fresh=0;
+  /* v7 D: isi awal terowongan — maks 6 iter/frame (potato 3), total tetap ~WARM; hindari spike di frame travel #1 */
+  if(S&&S.freshLeft>0){
+    var nDo=Math.min(S.freshLeft,low?3:6);
+    Rw=Math.max(Rv,S.freshR||0);Rhw=Math.min(Rw*.15,Math.min(W,H)*.06);sd=.03*S.rate;
+    for(i=0;i<nDo;i++){roll+=sd*SPIN;tt+=.03;moveStars(.03,sd);stepBuf(.03,cx,cy,Rw,Rhw,sd);}
+    S.freshLeft-=nDo;
+    if(S.freshLeft<=0){S.freshLeft=0;S.freshR=0;}
   }
   roll+=adv*SPIN;
   moveStars(dt,adv);
@@ -506,8 +572,8 @@ function drawFrame(dt,cx,cy,r,cvr){
     g.globalCompositeOperation='source-over';
   }
   /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
-  if(S.ring&&small&&typeof portal3dDraw==='function'){
-    var ra=1-sm((r/cvr-.3)/.55);
+  if(S.ring&&small&&typeof portal3dDraw==='function'&&WH_DBG.indexOf('noring')<0){
+    var ra=(1-sm((r/cvr-.3)/.55))*ringFade();   /* sektor: BH mini di #sky masih tampak -> cincin fade-in selagi BH fade-out (tidak ganda) */
     if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr)});}catch(eR){}}
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
@@ -518,14 +584,18 @@ function drawFrame(dt,cx,cy,r,cvr){
   /* teleskop: melayang mengikuti lubang hitam terowongan (travel), lalu keluar dari tengah portal tujuan (exit) */
   if(S.carry&&state==='travel'){
     /* teleskop terlihat dari awal travel: kecil di tengah mulut -> membesar mengikuti zoom -> melayang+miring di terowongan -> menyusut masuk ke lubang tujuan (lanjut ke exit tanpa pop) */
-    var tq=(performance.now()-S.tt),mm=Math.min(W,H),zu=sm(tq/T_OPEN),sw=sm((tq-TS())/Math.max(1,TT()-TS())),
+    var tq=(performance.now()-S.tt),mm=Math.min(W,H),zu=sm(tq/T_OPEN),uu2=clamp(tq/T_OPEN,0,1),ee2=Math.pow(uu2,1.35),ez=lerp(ee2,sm(uu2),sm((uu2-.6)/.4)),   /* P0-1: kapal tumbuh di ruang log dgn waktu yg sama dgn mulut (ee), ease-out di ujung supaya berhenti halus di T_OPEN */
+        sw=sm((tq-TS())/Math.max(1,TT()-TS())),
         fq=(performance.now()-S.t0-S.tf0)/T_ENTER_TELE,fe=sm(clamp(fq)),b1=fe<1?(S.tb||teleBase()):null;   /* fe<1 = teleskop masih terbang masuk ke cincin sementara zoom-in sudah jalan (T_TELE_OVERLAP) */
-    var hp2=teleHover(dt,cx,cy,mm,zu),bx=b1?lerp(b1.x,cx,fe):cx,by=b1?lerp(b1.y,cy,fe):cy,
-        px=lerp(bx+(hp2[0]-cx),cx,sw),py=lerp(by+(hp2[1]-cy),cy,sw);
+    var sShip=Math.exp(lerp(Math.log(lerp(1,.1,fe)),Math.log(.95),ez)),hoverAmp=sm(clamp((uu2-.45)/.55,0,1)),   /* P0-1 skala kapal (log), P0-2 amp hover */
+        rw=sm(tq/320),   /* ramp 0..1: wobble (w) & ayun (sp) naik mulus; enter memakai w:0,sp:0 jadi tanpa ini frame pertama travel meloncat */
+        hp2=teleHover(dt,cx,cy,mm,1),bx=b1?lerp(b1.x,cx,fe):cx,by=b1?lerp(b1.y,cy,fe):cy,
+        px=lerp(bx+(hp2[0]-cx)*hoverAmp,cx,sw),py=lerp(by+(hp2[1]-cy)*hoverAmp,cy,sw),
+        aFade=1-sm(clamp((tq-(TT()-260))/260,0,1));   /* H1: fade teleskop ~260ms sebelum TT() supaya travel→exit tidak pop a:1→aE=0 */
     if(chase3d()){
       var tlc=teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1);
-      drawTele({base:S.tb,x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:Math.sin(tt*1.1)*.07*(1-sw),tilt:chasePose(fe,1,tlc)});   /* POV belakang: bank/lean dari gerak ikut di atas pose */
-    }else drawTele({base:S.tb,x:px,y:py,s:lerp(lerp(1,.1,fe),.95,zu)*(1-.87*sw),a:1,w:.7,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw),tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
+      drawTele({alt:1,base:S.tb,x:px,y:py,s:sShip*(1-.87*sw),a:aFade,w:.7*rw,sp:Math.sin(tt*1.1)*.07*(1-sw)*rw,tilt:chasePose(fe,1,tlc)});   /* POV belakang: bank/lean dari gerak ikut di atas pose */
+    }else drawTele({alt:1,base:S.tb,x:px,y:py,s:sShip*(1-.87*sw),a:aFade,w:.7*rw,sp:(fq>=1?5.2-6.2832:fe*5.2)*(1-sm(Math.max(0,fq-1)*T_ENTER_TELE/700))+Math.sin(tt*1.1)*.18*(1-sw)*rw,tilt:teleTilt(dt,[px,py],cx,cy,mm,.3+.7*zu,1)});
   }else if(S.carry&&state==='exit'){
     /* keluar portal: HIDUNG duluan. Hidung mengarah ke arah terbang (portal -> posisi istirahat), bukan arah tetap; selama masih keluar hanya bagian di depan bidang portal yang digambar
        (hidung muncul dulu, badan lalu buritan menyusul), lalu belok mulus ke pose istirahat. Teleskop di atas kilat layar, alpha naik pelan supaya pergantian pose dari terowongan tak terlihat. */
@@ -559,21 +629,26 @@ function tick(now){
   W=winW();H=winH();cvr=cover();
   last=now;ema+=(dt-ema)*.08;
   try{if(typeof UIS!=='undefined'&&UIS.warpUpd)UIS.warpUpd(state,env,S.rate);}catch(eW){}
+  var justDive=0;
   if(state==='enter'){
     q=now-S.t0;
     S.ch=sm(q/S.chT);env=Math.min(.5,q/Math.max(1,S.A)*.5);
-    if(q>=S.A-(S.carry?Math.min(T_TELE_OVERLAP,T_ENTER_TELE*.8):0))engageDive(now);   /* teleskop yang masih terbang diteruskan di blok travel (fe) */
+    if(q>=S.A-(S.carry?Math.min(T_TELE_OVERLAP,T_ENTER_TELE*.8):0)){engageDive(now);justDive=1;}   /* teleskop yang masih terbang diteruskan di blok travel (fe) */
   }
-  if(state==='travel'){
-    q=now-S.tt;
+  /* justDive: frame engageDive cuma teleBase + pre-warm + gambar enter-style. Travel penuh (skyCam + terowongan + portal3d) mulai frame berikutnya = anti-hitch awal zoom. */
+  if(state==='travel'&&!justDive&&!(S&&S.justDive)){
+    q=now-S.tt;S.ring=1;   /* mulai frame ini cincin digambar di sini; sky menyembunyikan miliknya di frame sky berikutnya (tumpang tindih 1 frame, ukuran sama = tak terlihat) */
     {
       /* sektor -> overview & lompat antar sektor: jadwal identik (lihat komentar T_TRAVEL). Beda cuma tujuan akhir lubang hitam. */
       var uu=clamp(q/T_OPEN),ee=Math.pow(uu,1.35),ck=null;   /* kamera mendekat: skala eksponensial, pelan di awal lalu makin cepat */
       S.r=q<T_OPEN?S.rp*(typeof PT_IN==='number'?PT_IN:.745)*Math.exp(S.lnK*ee):cvr;
-      if(q<T_OPEN)ck=skyCam(uu,ee);
+      if(q<T_OPEN&&SKY_ZOOM&&!S.cov)ck=skyCam(uu,ee);   /* guard !S.cov: jangan pasang ulang transform setelah skyReset (bug laten + aman utk P0-3) */
       if(!S.cov){
         var cd=Math.max(Math.hypot(S.cx,S.cy),Math.hypot(W-S.cx,S.cy),Math.hypot(S.cx,H-S.cy),Math.hypot(W-S.cx,H-S.cy));
-        if(S.r>=cd*1.02||q>T_OPEN){S.cov=1;runCover();warpFx('hit');}   /* layar sudah tertutup: sektor asal boleh zoom-out di bawah (tak kelihatan), BH tujuan siap muncul dari ujung terowongan (arrive) */
+        if(S.r>=cd*1.02||q>T_OPEN){
+          S.cov=1;warpFx('hit');
+          if(!S.cvQ){S.cvQ=1;var Sref=S;requestAnimationFrame(function(){if(S===Sref)runCover();});}   /* P0-3: defer runCover ke frame berikutnya (anti-hitch puncak zoom); token S===Sref biar tak jalan di transisi baru */
+        }
       }
       w=sm((q-TS())/(TT()-TS()));
       if(w>0){var tg=seekTarget(dt);S.cx=lerp(W*.5,tg[0],w);S.cy=lerp(H*.5,tg[1],w);}   /* tengah layar -> tujuan (BH overview / BH mini sektor tujuan) */
@@ -585,23 +660,33 @@ function tick(now){
       else if(q>TT()+6000){runCover();startClose(now,T_CLOSE);}   /* pengaman: transisi macet */
     }
   }
+  if(S&&S.justDive)S.justDive=0;
   if(state==='exit'){
     var ue=clamp((now-S.tx)/T_EXIT,0,1),bt=seekTarget(dt);
     S.u=ue;S.cx=bt[0];S.cy=bt[1];S.r=S.r0;S.a=1;S.rate=lerp(S.rate0,.7,sm(ue));S.rim=0;S.ring=0;S.fl=1-sm(ue/.35);env=S.e0*(1-sm(ue));
-    if(ue>=1){state='idle';env=0;hide();return;}
+    if(ue>=1){
+      /* Handoff ke #sky TANPA kedip & tanpa bayangan: dulu hide() langsung di sini -> kanvas wormhole hilang, sedangkan #sky baru menggambar teleskop di frame sky berikutnya
+         (frame-cap / slow-mode bisa melewati 1-3 frame) = kedip. Sekarang: TELESCOPE.dive=0 (sky mulai menggambar teleskopnya), sementara exit tetap digambar di ue=1
+         (posisi/skala/pose istirahat dari teleBase() LIVE, jadi selalu menempel ke teleskop sky yang bergerak). Begitu satu frame sky utuh selesai, kanvas ini dilepas
+         seketika (tanpa crossfade = tanpa bayangan ganda). Pengaman 300ms kalau sky macet. */
+      if(S.carry&&typeof lastFrameOK==='number'){
+        if(!S.ho){S.ho=1;S.ht=now;S.hf=lastFrameOK;try{TELESCOPE.dive=0;}catch(eH){}}
+        else if(lastFrameOK!==S.hf||now-S.ht>300){wpEnd();state='idle';env=0;hide();return;}
+      }else{wpEnd();state='idle';env=0;hide();return;}
+    }
   }
   if(state==='close'){
     q=clamp((now-S.tc)/S.cms,0,1);eT=sm(q);
     S.cx=S.c0[0];S.cy=S.c0[1];
     S.r=S.r0;
     S.a=S.a0*(1-eT);S.rate=lerp(S.rate0,.6,eT);S.rim=0;env=S.e0*(1-eT);
-    if(q>=1){state='idle';env=0;hide();return;}
+    if(q>=1){wpEnd();state='idle';env=0;hide();return;}
   }
-  if(state==='enter'){   /* belum ada terowongan: kanvas transparan, hanya teleskop yang terbang masuk ke tengah cincin */
+  if(state==='enter'||justDive){   /* belum ada terowongan: kanvas transparan, hanya teleskop. justDive = frame engageDive tetap ringan (travel penuh frame berikutnya) */
     tt+=dt;
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.clearRect(0,0,W,H);
     if(S.carry){
-      var fu=clamp((now-S.t0-S.tf0)/T_ENTER_TELE),b1=teleBase(),fe=sm(fu);
+      var fu=clamp((now-S.t0-S.tf0)/T_ENTER_TELE),b1=(justDive&&S.tb)?S.tb:teleBase(),fe=sm(fu);
       if(b1){
         if(chase3d())drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:0,tilt:chasePose(fe,1)});   /* pesawat berbalik: hidung ke portal, mesin hijau menghadap kita, sambil mengecil masuk */
         else drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:fe*5.2});
@@ -616,7 +701,7 @@ function tick(now){
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
   if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
   if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*.22;S.cx=W*.5;S.cy=H*.5;}
-  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);}
+  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now));}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
     hardStop();return;
@@ -634,7 +719,9 @@ window.WORMHOLE={
   arrive:function(){if(state==='exit')return .08+.92*eo(clamp(S.u/.6,0,1));if(state==='travel'&&S.go&&S.cov)return .08;return 1;},
   muffle:function(){return muffle();},
   charge:function(){try{return chargeP(performance.now());}catch(e){return 0;}},   /* 0..1: progres muatan cincin (plat menyala satu per satu) */
+  ringFade:ringFade,   /* 0..1 serah-terima cincin/BH (dipakai 03-gargantua: BH sektor disembunyikan saat 1) */
   ringOwned:function(){return state==='travel'&&!!S.ring;},   /* cincin portal sektor sedang digambar di kanvas wormhole (zoom-in) */
+  get zooming(){return state==='travel'&&!S.cov&&S.tt!=null&&(performance.now()-S.tt)<T_OPEN;},   /* zoom-in ke portal sebelum layar tertutup: sky di bawah cuma di-zoom CSS + meredup, tak perlu dirender penuh tiap frame */
   get on(){return state!=='idle';},
   get busy(){return state==='enter'||state==='travel'||state==='exit';},   /* transisi sedang jalan */
   get supported(){return usable();}

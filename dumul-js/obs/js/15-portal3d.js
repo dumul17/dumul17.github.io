@@ -193,6 +193,22 @@ function ptOvK(){
   return PT3D_CFG.ovK;
 }
 function pt3dRes(Rp){var S=2*PT3D_CFG.half*Rp;return Math.max(PT3D_CFG.resMin,Math.min(PT3D_CFG.resMax,Math.ceil(S*Math.min(1.5,DPR||1)/32)*32));}
+/* P0-OV: bayar setSize(resMax)+1 render di luar animasi zoom. Overview cincin kecil → res rendah; dive pertama
+   portal3dDraw(ch:1) memaksa resMax di tengah travel = hitch. Setelah ini PT3D.big+res terkunci, path berikutnya no-op. */
+function pt3dWarmMax(){
+  try{
+    if(PT3D.state!==2||!PT3D.r)return false;
+    var res=PT3D_CFG.resMax|0;if(!(res>0))return false;
+    PT3D.big=1;
+    /* setSize cuma mengubah ukuran kanvas; realokasi framebuffer (MSAA) baru terbayar di render pertama -> render 1x SEKARANG, tapi hanya kalau res berubah.
+       Kalau res sudah resMax (pernah charge / dive / warm), buffer sudah teralokasi -> no-op murni (aman dipanggil di frame berat). */
+    if(PT3D.res!==res){
+      PT3D.res=res;PT3D.r.setPixelRatio(1);PT3D.r.setSize(res,res,false);
+      try{if(PT3D.sc&&PT3D.cam)PT3D.r.render(PT3D.sc,PT3D.cam);}catch(eR){}
+    }
+    return true;
+  }catch(e){return false;}
+}
 
 /* ---------- warna cincin: dikunci PT3D_CFG.ringCol ('r,g,b'), TIDAK ikut AV_COLOR / tema SFX ---------- */
 function ptCol(){

@@ -962,7 +962,7 @@ function pEnd(now){
 /* Cap 60fps untuk layar >=110Hz (120/144): tanpa ini sky berat dirender 2x lebih sering dari yang bisa dilihat.
    Layar 60Hz tidak tersentuh. capVs = interval vsync terkecil yang teramati (estimasi refresh). Kalau estimasi meleset
    di layar 60Hz pun aman: ambang (~12ms) tetap di bawah interval 16.7ms, jadi tidak ada frame yang dibuang. */
-var CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
+var zmN=0,CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
 
 /* FPS ADAPTIF (governor). Ukur interval frame (EMA, stall diklem 120 ms). HP lambat (> 40 ms = < 25 fps selama 2 dtk) -> FS.slow=true: kerja periodik berat dijarangkan dan digantian
    antar-frame genap/ganjil: asteroid GL (pass belakang di frame genap, depan di ganjil, jeda = 2x interval, maks 140 ms) dan bake aurora planet (frame ganjil, jeda 2x).
@@ -1011,6 +1011,11 @@ function frame(now){
   var cd=now-capPrev;capPrev=now;
   if(cd>2&&cd<50&&cd<capVs)capVs=cd;
   if(capVs<9&&now-capLast<CAP_MS-capVs*.5){renderRAF=requestAnimationFrame(frame);return;}   /* frame ini dilewati; dicek SETELAH gen supaya callback stale tidak nge-reschedule */
+  /* v7.1: overview sky (planet3d/aurora) jauh lebih berat dari sky sektor — throttle lebih agresif saat zoom dari overview */
+  if(typeof WORMHOLE!=='undefined'&&WORMHOLE.zooming){
+    var zk=(typeof SECT!=='undefined'&&SECT.cur)?3:8;
+    if(++zmN%zk){renderRAF=requestAnimationFrame(frame);return;}
+  }else zmN=0;
   capLast=now;fsTick(now);
   /* The whole frame is now one safety net: whatever throws, wherever, the
      loop always reschedules itself in the finally block below. A single

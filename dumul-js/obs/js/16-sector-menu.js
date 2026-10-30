@@ -412,6 +412,11 @@ function smenuOpen(){
   void a.offsetWidth;a.classList.add('on');
   try{UIS.pop('open');}catch(eU){}try{haptic(10);}catch(eH){}
   try{var cd=a.querySelector('.sm-card');cd.focus({preventScroll:true});}catch(eF){}
+  /* v7: pre-warm portal3d ke resMax setelah fade-in menu (~180ms), bukan di tengah buka (60ms). */
+  try{
+    var warm=function(){try{if(typeof pt3dWarmMax==='function')pt3dWarmMax();}catch(eW){}};
+    setTimeout(warm,(typeof reduce!=='undefined'&&reduce)?0:320);
+  }catch(eWm){}
   clearInterval(SMENU.mon);
   SMENU.mon=setInterval(function(){   /* keadaan berubah di belakang menu (transisi, kamera, pindah sektor, portal hilang): tutup otomatis */
     if(!SMENU.open){clearInterval(SMENU.mon);SMENU.mon=0;return;}
