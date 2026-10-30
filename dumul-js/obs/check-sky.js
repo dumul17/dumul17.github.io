@@ -17,6 +17,8 @@ var html=rdR('index.html'),sw=rdR('service-worker.js');
 var shell=sw.slice(sw.indexOf('const SHELL'));shell=shell.slice(0,shell.indexOf('];'));
 /* index.js dipecah jadi js/*.js (script klasik berurutan, satu scope global): tiap file harus ada di index.html + SHELL, urutannya sama */
 var jsDir=path.join(dir,'js'),jsFiles=fs.existsSync(jsDir)?fs.readdirSync(jsDir).filter(function(f){return /\.js$/.test(f);}).sort():[];
+/* file lazy-debug: tidak ada <script src> di index.html & tidak di SHELL (nol biaya, dimuat loader inline hanya kalau ?debug=1) — dikecualikan dari cek urutan/SHELL, tapi loader-nya dicek di bawah */
+var LAZY=['19-auto-debug.js'],lazyFiles=jsFiles.filter(function(f){return LAZY.indexOf(f)>=0;});jsFiles=jsFiles.filter(function(f){return LAZY.indexOf(f)<0;});
 if(!jsFiles.length)P.push('folder js/ kosong / tidak ada');
 var jsTags=[],jsRe=/(?:<script[^>]*src="|import\('\.\/)dumul-js\/obs\/(js\/[^"'?]+\.js)\?v=\d+["']/g,jm; /* 11-live-count.js dimuat lewat import('./dumul-js/obs/js/...?v=N') di script inline, bukan tag <script src>: dua bentuk dikenali */
 while((jm=jsRe.exec(html)))jsTags.push(jm[1]);
@@ -30,6 +32,12 @@ jsFiles.forEach(function(f){
   var m=html.match(new RegExp('(?:src|href)="('+n.replace(/[.\/]/g,'\\$&')+'\\?v=\\d+)"'));
   if(!m){P.push(n+': tag di index.html tidak ketemu / tanpa ?v=');return;}
   if(shell.indexOf("'"+m[1]+"'")<0)P.push('SHELL service-worker belum memuat \''+m[1]+'\' (harus sama persis dengan index.html)');
+});
+lazyFiles.forEach(function(f){
+  var n='js/'+f;
+  if(!new RegExp((OBS+n).replace(/[.\/]/g,'\\$&')+'\\?v=\\d+').test(html))P.push(n+': loader lazy (?debug=1) tidak ada di index.html');
+  if(shell.indexOf(f)>=0)P.push(n+': TIDAK boleh ada di SHELL service-worker.js (file debug, lazy)');
+  if(!/^\s*(?:\/\*[\s\S]*?\*\/\s*)*'use strict';/.test(rd(n)))P.push(n+": tidak diawali 'use strict'");
 });
 /* texts.js: harus bisa dieksekusi sendiri (data murni) dan punya semua kunci yang dipakai index.js */
 var tctx={};try{vm.runInNewContext(rd('texts.js')+';this.TXT=TXT',tctx);}catch(e){P.push('texts.js error: '+e.message);}
