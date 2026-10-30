@@ -123,7 +123,7 @@ function resize(){
   if(!cv)return;
   var nw,nh;
   W=winW();H=winH();
-  dpr=Math.min(window.devicePixelRatio||1,potato()?1:2);
+  dpr=Math.min(window.devicePixelRatio||1,potato()?1:(WH_DPR||2));
   cv.width=Math.max(64,Math.round(W*dpr));cv.height=Math.max(64,Math.round(H*dpr));
   bq=potato()?.3:.5;
   nw=Math.max(32,Math.round(W*bq));nh=Math.max(32,Math.round(H*bq));
@@ -175,6 +175,9 @@ function skyCam(uu,ee){
 var WH_HANDOFF=260;
 /* diagnosa cincin ganda (URL ?whdbg=noring,nosky): noring = cincin di kanvas wormhole TIDAK digambar; nosky = #sky disembunyikan selama zoom-in. Bandingkan mana yang membuat cincin kedua hilang. */
 var WH_DBG=(function(){try{var m=/[?&]whdbg=([a-z,]+)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
+/* A/B diagnosa performa (hanya via URL, tanpa URL = perilaku normal). ?whdpr=1.25 = batas dpr kanvas wormhole (default 2). Flag whdbg tambahan:
+   notele = teleskop tidak digambar; nostep = buffer terowongan tidak di-update (komposit tetap jalan); nobloom = lewati drawImage bloom kedua. */
+var WH_DPR=(function(){try{var m=/[?&]whdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
 function ringFade(){
   if(state!=='travel'||!S||!S.ring)return 0;
   if(typeof SECT==='undefined'||!SECT.cur||WH_HANDOFF<=0)return 1;
@@ -208,9 +211,9 @@ function hide(){
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
 /* ---- recorder FPS on-device: aktif HANYA kalau URL pakai ?whperf=1 (tanpa itu = nol biaya). Setelah transisi selesai muncul panel kecil; tap panel untuk menutup. ---- */
 var WP=(function(){try{return /[?&]whperf=1/.test(location.search)?{r:[],t:0,ph:''}:null;}catch(e){return null;}})();
-function wpRec(now,ph,q){
+function wpRec(now,ph,q,js){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
   if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;}
-  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q)]);
+  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js]);
   WP.t=now;WP.ph=ph;
 }
 function wpEnd(){
@@ -222,12 +225,13 @@ function wpEnd(){
       ms=a.map(function(x){return x[1];}).sort(function(x,y){return x-y;});
       for(j=0,tot=0;j<ms.length;j++)tot+=ms[j];
       md=ms[ms.length>>1];mx=ms[ms.length-1];
-      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0));
+      var jj=a.map(function(x){return x[3];}).sort(function(x,y){return x-y;});
+      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0)+'  | js med '+jj[jj.length>>1].toFixed(0)+' max '+jj[jj.length-1].toFixed(0));
     }
-    out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms';}).join(' | '));
+    out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+')';}).join(' | '));
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
-    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
+    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
   }catch(e){}
 }
 function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}runCover();state='idle';env=0;hide();}
@@ -435,6 +439,7 @@ function chasePose(k,face,tl,roll){   /* roll (opsional) = roll layar pengganti:
   return {x:o.x,y:o.y,z:o.z,k:clamp(k,0,1),ty:C.yaw*face,tr:roll!=null?roll:C.roll*face,tp:C.pitch,th:C.th,glow:C.glow};
 }
 function drawTele(ov){
+  if(WH_DBG.indexOf('notele')>=0)return;
   var b=(ov&&ov.base)||teleBase(),wob,x,y,sc,al;   /* ov.base = pose teleskop yang DIBEKUKAN (S.tb); tanpa itu dibaca live dari #sky */
   if(!b)return;
   ov=ov||{};
@@ -480,8 +485,7 @@ function drawFrame(dt,cx,cy,r,cvr){
     if(S.freshLeft<=0){S.freshLeft=0;S.freshR=0;}
   }
   roll+=adv*SPIN;
-  moveStars(dt,adv);
-  stepBuf(dt,cx,cy,Rv,Rh,adv);
+  if(WH_DBG.indexOf('nostep')<0){moveStars(dt,adv);stepBuf(dt,cx,cy,Rv,Rh,adv);}
 
   g.setTransform(dpr,0,0,dpr,0,0);
   g.globalCompositeOperation='source-over';g.globalAlpha=1;
@@ -496,7 +500,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   g.fillStyle=BG;g.fillRect(0,0,W,H);
   g.imageSmoothingEnabled=true;
   g.drawImage(bA,0,0,bw,bh,0,0,W,H);
-  if(!low){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
+  if(!low&&WH_DBG.indexOf('nobloom')<0){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
 
   /* streak bintang tajam: garis tipis radial, ekor makin panjang kalau makin dekat tepi (perspektif) */
   g.globalCompositeOperation='lighter';g.lineCap='round';
@@ -701,7 +705,7 @@ function tick(now){
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
   if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
   if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*.22;S.cx=W*.5;S.cy=H*.5;}
-  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now));}
+  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now);}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
     hardStop();return;
