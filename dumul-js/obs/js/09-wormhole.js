@@ -214,18 +214,22 @@ var WP=(function(){try{return /[?&]whperf=1/.test(location.search)?{r:[],t:0,ph:
 /* v12d: atribusi frame macet lewat Long Animation Frames (Chromium 123+; fallback longtask). Per frame >150ms: durasi total, script (JS), render (style/layout/paint/commit di main thread), sisa (GC/idle/menunggu).
    Kalau durasi frame LoAF kecil padahal interval whperf besar -> main thread bebas, yang menahan GPU/compositor/proses lain. */
 if(WP){try{
-  WP.lf=[];WP.lfSup='none';
+  WP.lf={};WP.pt=[];WP.lfSup='none';
   var _ty=(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes)||[];
   var _tn=_ty.indexOf('long-animation-frame')>=0?'long-animation-frame':(_ty.indexOf('longtask')>=0?'longtask':'');
   if(_tn){
     WP.lfSup=_tn==='longtask'?'longtask':'LoAF';
     new PerformanceObserver(function(l){l.getEntries().forEach(function(e){
       if(e.duration<150)return;
-      var sc=0,fl=0,src='',i,S=e.scripts||[],bn=0;
+      var sc=0,fl=0,src='',i,S=e.scripts||[],bn=0,pp=null,pt=WP.pt||[],end=e.startTime+e.duration;
+      for(i=pt.length-1;i>=0;i--)if(pt[i][0]<=e.startTime+1){pp=pt[i];break;}
+      if(!pp||(pp[1]!=='zoom'&&pp[1]!=='tunnel'&&pp[1]!=='exit'))return;   /* hanya selama dive; boot/idle diabaikan */
       for(i=0;i<S.length;i++){sc+=S[i].duration||0;fl+=S[i].forcedStyleAndLayoutDuration||0;if((S[i].duration||0)>bn){bn=S[i].duration;src=String(S[i].sourceURL||'').split('/').pop().split('?')[0]+':'+(S[i].sourceFunctionName||S[i].invoker||'?');}}
-      var rn=e.renderStart>0?e.duration-e.renderStart:0,sl=e.styleAndLayoutStart>0?e.duration-e.styleAndLayoutStart:0;
-      WP.lf.push({t:e.startTime,d:e.duration,sc:sc,rn:rn,sl:sl,fl:fl,src:src,ph:WP.ph});
-      WP.lf.sort(function(a,b){return b.d-a.d;});if(WP.lf.length>6)WP.lf.length=6;
+      /* renderStart / styleAndLayoutStart = timestamp absolut (bukan offset frame): waktu = akhir frame - timestamp itu */
+      var rn=e.renderStart>0?Math.max(0,end-e.renderStart):0,sl=e.styleAndLayoutStart>0?Math.max(0,end-e.styleAndLayoutStart):0;
+      var L=WP.lf[pp[1]]||(WP.lf[pp[1]]=[]);
+      L.push({o:e.startTime-pp[0],d:e.duration,sc:sc,rn:rn,sl:sl,fl:fl,bd:e.blockingDuration||0,src:src});
+      L.sort(function(x,y){return y.d-x.d;});if(L.length>3)L.length=3;
     });}).observe({type:_tn,buffered:false});
   }
 }catch(eLF){}}
@@ -238,7 +242,8 @@ function wpM(n){
   c[0]+=t-WP.l;c[1]++;WP.l=t;
 }
 function wpRec(now,ph,q,js,sky,lead){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
-  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;WP.s={};WP.lf=[];WP.t0=performance.now();}
+  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;WP.s={};}
+  if(WP.pt&&WP.ph!==ph){WP.pt.push([now,ph]);if(WP.pt.length>400)WP.pt.splice(0,200);}   /* v12e: riwayat transisi fase utk melabeli entri LoAF */
   if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js,sky||0,lead||0]);
   WP.t=now;WP.ph=ph;
 }
@@ -257,7 +262,7 @@ function wpEnd(){
     try{['zoom','tunnel','exit'].forEach(function(ph){var p=WP.s&&WP.s[ph];if(!p)return;out.push('  '+ph+' ms/frame: '+['pre','fresh','step','comp','streak','vig','ring','tele'].map(function(k){return p[k]?k+' '+(p[k][0]/p[k][1]).toFixed(1):'';}).filter(Boolean).join(' | '));});}catch(eS){}
     out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+' sky '+x[4].toFixed(0)+')';}).join(' | '));
     if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);
-    try{out.push(WP.lfSup+' >150ms (total | script | render | s+l | forced | sumber): '+(WP.lf.length?WP.lf.slice(0,4).map(function(x){return '['+x.ph+' +'+Math.round(x.t-(WP.t0||0))+'] '+Math.round(x.d)+' | '+Math.round(x.sc)+' | '+Math.round(x.rn)+' | '+Math.round(x.sl)+' | '+Math.round(x.fl)+' | '+(x.src||'-');}).join('  ;  '):'tidak ada (main thread tidak macet >150ms)'));}catch(eL){}
+    try{['zoom','tunnel','exit'].forEach(function(ph){var L=WP.lf&&WP.lf[ph];out.push(WP.lfSup+' '+ph+' >150ms (+ms dlm fase: total | script | render | s+l | forced | sumber): '+(L&&L.length?L.map(function(x){return '[+'+Math.round(x.o)+'] '+Math.round(x.d)+' | '+Math.round(x.sc)+' | '+Math.round(x.rn)+' | '+Math.round(x.sl)+' | '+Math.round(x.fl)+' | '+(x.src||'-');}).join('  ;  '):'tidak ada'));});}catch(eL){}
     if(window.__plSt)out.push('planet3d sejak zoom-in: resize '+window.__plSt.rs+' | render-penuh '+window.__plSt.fl+' (terlama '+window.__plSt.mx+'ms'+(/(^|,)plfin(,|$)/.test(WH_DBG)?', GPU':', js')+')');   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
