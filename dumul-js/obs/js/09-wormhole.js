@@ -489,7 +489,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   tt+=dt;
   /* v7 D: isi awal terowongan — maks 6 iter/frame (potato 3), total tetap ~WARM; hindari spike di frame travel #1 */
   if(S&&S.freshLeft>0){
-    var nDo=Math.min(S.freshLeft,low?3:6);
+    var nDo=Math.min(S.freshLeft,low?1:2);   /* v10: 2 iter/frame (dulu 6) -> ~8 frame, bukan 3 frame x ~50ms */
     Rw=Math.max(Rv,S.freshR||0);Rhw=Math.min(Rw*.15,Math.min(W,H)*.06);sd=.03*S.rate;
     for(i=0;i<nDo;i++){roll+=sd*SPIN;tt+=.03;moveStars(.03,sd);stepBuf(.03,cx,cy,Rw,Rhw,sd);}
     S.freshLeft-=nDo;
@@ -527,6 +527,7 @@ function drawFrame(dt,cx,cy,r,cvr){
     a=c.th+roll;
     lf=clamp(.17*Math.sqrt(c.v)*c.lf*S.rate,.06,.5);   /* panjang ekor relatif */
     tr=Math.max(Rh*1.05,rh*(1-lf));
+    if(small&&tr>r*1.15)continue;   /* v10: streak seluruhnya di luar mulut portal (clip/mask) = tak terlihat: lewati stroke */
     ca=Math.cos(a);sa=Math.sin(a);
     hx=cx+ca*rh;hy=cy+sa*rh;
     a-=SPIN*lf/Math.max(.3,c.v);   /* ekor sedikit melengkung mengikuti putaran */
