@@ -235,7 +235,19 @@ if(WP){try{
 }catch(eLF){}}
 /* v8: js = (now -> akhir tick) SUDAH TERMASUK frame() sky (05-sector-ui.js) yang jalan di rAF yang sama SEBELUM tick ini. WSK = ms yang dipakai frame() sky di rAF ini, jadi js-sky = biaya tick wormhole sendiri. */
 var WSK=0;
-if(WP){try{var _wf0=window.frame;if(typeof _wf0==='function'){window.frame=function(n){var t=performance.now(),r;try{r=_wf0.apply(this,arguments);}finally{WSK+=performance.now()-t;}return r;};}}catch(eWk){}}
+/* v12f: LoAF menunjukkan stall tunnel = script ~420ms di callback anonim 09-wormhole.js = pembungkus window.frame (sky frame() dari 05-sector-ui.js), BUKAN tick. 'sky max 3xx-6xx' di panel selama ini memang itu.
+   Di sini tiap fungsi gambar/logika yang dipanggil frame() dibungkus (hanya ?whperf=1) supaya frame sky >150ms dirinci per fungsi. */
+var WFB=[];
+if(WP){try{var _wf0=window.frame;if(typeof _wf0==='function'){
+  var _wn=['drawStars','drawCons','drawSectorOverview','drawAsteroids','drawHud','planet3dDraw','mwDraw','sectDrawSky','drawPortals','drawPleiades','drawTxLines','drawTxTop','drawTriggerVisuals','drawFloatingTelescope','drawFloatingTelescopeTop','drawBeltFx','drawBHShockwaves','drawHoleSafe','drawFocusFx','drawPulses','drawShooting','drawSupernovaBursts','drawTargetLock','drawSectFlash','sectStep','syncSkyPanHits','plateBlit','bandDimDraw','updateHover','fsTick','updateConstellationFocus','focusStep','sectorScanUpdate','ensureCamGrid','updateAudioViz','updateTimeDilation','updateClockDilation','placeSecretMsg','planetBhClamp','bhScaleStep','teleGreetFollow','startRenderLoop','drawSectorOverview'],_wa={},_wi;
+  _wn.forEach(function(nm){var f=window[nm];if(typeof f!=='function'||f.__wp)return;var w=function(){var t=performance.now();try{return f.apply(this,arguments);}finally{_wa[nm]=(_wa[nm]||0)+performance.now()-t;}};w.__wp=1;window[nm]=w;});
+  window.frame=function(n){var t=performance.now(),r,k;for(k in _wa)_wa[k]=0;try{r=_wf0.apply(this,arguments);}finally{
+    var d=performance.now()-t;WSK+=d;
+    if(d>150&&WP.pt){var pp=null,i,pt=WP.pt;for(i=pt.length-1;i>=0;i--)if(pt[i][0]<=t+1){pp=pt[i];break;}
+      var bk=[];for(k in _wa)if(_wa[k]>8)bk.push([k,_wa[k]]);bk.sort(function(a,b){return b[1]-a[1];});
+      WFB.push({ph:pp?pp[1]:'?',o:pp?t-pp[0]:0,d:d,bk:bk.slice(0,5)});WFB.sort(function(a,b){return b.d-a.d;});if(WFB.length>4)WFB.length=4;}
+  }return r;};
+}}catch(eWk){}}
 /* v9: pecah biaya tick per bagian drawFrame (hanya ?whperf=1). Nama: pre=sebelum drawFrame (skyCam/seek/warpUpd), step=stepBuf, comp=isi+bloom, streak, vig=vinyet+exit mask, ring=portal3dDraw, tele=kilat+teleskop. */
 function wpM(n){
   var t=performance.now(),ph=state==='travel'?(S.cov?'tunnel':'zoom'):state,o=WP.s||(WP.s={}),p=o[ph]||(o[ph]={}),c=p[n]||(p[n]=[0,0]);
@@ -262,6 +274,7 @@ function wpEnd(){
     try{['zoom','tunnel','exit'].forEach(function(ph){var p=WP.s&&WP.s[ph];if(!p)return;out.push('  '+ph+' ms/frame: '+['pre','fresh','step','comp','streak','vig','ring','tele'].map(function(k){return p[k]?k+' '+(p[k][0]/p[k][1]).toFixed(1):'';}).filter(Boolean).join(' | '));});}catch(eS){}
     out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+' sky '+x[4].toFixed(0)+')';}).join(' | '));
     if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);
+    try{out.push('sky frame() >150ms (fase +ms: total | fungsi ms): '+(WFB.length?WFB.map(function(x){return '['+x.ph+' +'+Math.round(x.o)+'] '+Math.round(x.d)+' | '+(x.bk.length?x.bk.map(function(b){return b[0]+' '+Math.round(b[1]);}).join(', '):'(tak terinci)');}).join('  ;  '):'tidak ada'));}catch(eFB){}
     try{['zoom','tunnel','exit'].forEach(function(ph){var L=WP.lf&&WP.lf[ph];out.push(WP.lfSup+' '+ph+' >150ms (+ms dlm fase: total | script | render | s+l | forced | sumber): '+(L&&L.length?L.map(function(x){return '[+'+Math.round(x.o)+'] '+Math.round(x.d)+' | '+Math.round(x.sc)+' | '+Math.round(x.rn)+' | '+Math.round(x.sl)+' | '+Math.round(x.fl)+' | '+(x.src||'-');}).join('  ;  '):'tidak ada'));});}catch(eL){}
     if(window.__plSt)out.push('planet3d sejak zoom-in: resize '+window.__plSt.rs+' | render-penuh '+window.__plSt.fl+' (terlama '+window.__plSt.mx+'ms'+(/(^|,)plfin(,|$)/.test(WH_DBG)?', GPU':', js')+')');   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
