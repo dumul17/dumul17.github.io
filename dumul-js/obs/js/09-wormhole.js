@@ -214,9 +214,14 @@ var WP=(function(){try{return /[?&]whperf=1/.test(location.search)?{r:[],t:0,ph:
 /* v8: js = (now -> akhir tick) SUDAH TERMASUK frame() sky (05-sector-ui.js) yang jalan di rAF yang sama SEBELUM tick ini. WSK = ms yang dipakai frame() sky di rAF ini, jadi js-sky = biaya tick wormhole sendiri. */
 var WSK=0;
 if(WP){try{var _wf0=window.frame;if(typeof _wf0==='function'){window.frame=function(n){var t=performance.now(),r;try{r=_wf0.apply(this,arguments);}finally{WSK+=performance.now()-t;}return r;};}}catch(eWk){}}
-function wpRec(now,ph,q,js,sky){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
-  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;}
-  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js,sky||0]);
+/* v9: pecah biaya tick per bagian drawFrame (hanya ?whperf=1). Nama: pre=sebelum drawFrame (skyCam/seek/warpUpd), step=stepBuf, comp=isi+bloom, streak, vig=vinyet+exit mask, ring=portal3dDraw, tele=kilat+teleskop. */
+function wpM(n){
+  var t=performance.now(),ph=state==='travel'?(S.cov?'tunnel':'zoom'):state,o=WP.s||(WP.s={}),p=o[ph]||(o[ph]={}),c=p[n]||(p[n]=[0,0]);
+  c[0]+=t-WP.l;c[1]++;WP.l=t;
+}
+function wpRec(now,ph,q,js,sky,lead){   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread; interval >> js berarti GPU/raster/compositor yang menahan */
+  if(ph==='enter'&&WP.ph!=='enter'){WP.r=[];WP.t=0;WP.s={};}
+  if(WP.t)WP.r.push([ph,now-WP.t,Math.round(q),js==null?0:js,sky||0,lead||0]);
   WP.t=now;WP.ph=ph;
 }
 function wpEnd(){
@@ -228,9 +233,10 @@ function wpEnd(){
       ms=a.map(function(x){return x[1];}).sort(function(x,y){return x-y;});
       for(j=0,tot=0;j<ms.length;j++)tot+=ms[j];
       md=ms[ms.length>>1];mx=ms[ms.length-1];
-      var jj=a.map(function(x){return x[3];}).sort(function(x,y){return x-y;}),sk=a.map(function(x){return x[4];}).sort(function(x,y){return x-y;}),tk=a.map(function(x){return Math.max(0,x[3]-x[4]);}).sort(function(x,y){return x-y;});
-      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0)+'  | js med '+jj[jj.length>>1].toFixed(0)+' max '+jj[jj.length-1].toFixed(0)+' = sky med '+sk[sk.length>>1].toFixed(0)+' max '+sk[sk.length-1].toFixed(0)+' + tick med '+tk[tk.length>>1].toFixed(0)+' max '+tk[tk.length-1].toFixed(0));
+      var jj=a.map(function(x){return x[3];}).sort(function(x,y){return x-y;}),sk=a.map(function(x){return x[4];}).sort(function(x,y){return x-y;}),tk=a.map(function(x){return Math.max(0,x[3]-x[5]);}).sort(function(x,y){return x-y;}),ot=a.map(function(x){return Math.max(0,x[5]-x[4]);}).sort(function(x,y){return x-y;});
+      out.push(P[i]+'  n='+a.length+'  fps~'+(1000*a.length/Math.max(1,tot)).toFixed(0)+'  med '+md.toFixed(0)+'ms  p95 '+ms[Math.min(ms.length-1,Math.floor(ms.length*.95))].toFixed(0)+'  max '+mx.toFixed(0)+'  | js med '+jj[jj.length>>1].toFixed(0)+' max '+jj[jj.length-1].toFixed(0)+' = sky med '+sk[sk.length>>1].toFixed(0)+' max '+sk[sk.length-1].toFixed(0)+' + rAF-lain med '+ot[ot.length>>1].toFixed(0)+' max '+ot[ot.length-1].toFixed(0)+' + tick-sendiri med '+tk[tk.length>>1].toFixed(0)+' max '+tk[tk.length-1].toFixed(0));
     }
+    try{['zoom','tunnel','exit'].forEach(function(ph){var p=WP.s&&WP.s[ph];if(!p)return;out.push('  '+ph+' ms/frame: '+['pre','fresh','step','comp','streak','vig','ring','tele'].map(function(k){return p[k]?k+' '+(p[k][0]/p[k][1]).toFixed(1):'';}).filter(Boolean).join(' | '));});}catch(eS){}
     out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+' sky '+x[4].toFixed(0)+')';}).join(' | '));
     if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
@@ -475,6 +481,7 @@ function holeDisc(cx,cy,Rh,al){
   g.fillStyle=gr;g.beginPath();g.arc(cx,cy,Rh*1.3,0,6.283185307);g.fill();
 }
 function drawFrame(dt,cx,cy,r,cvr){
+  if(WP)wpM('pre');
   var Rv=Math.min(r,Math.hypot(W,H)*.56),                 /* radius tampilan perspektif (kepala bintang menyentuh Rv = tepi) */
       Rh=Math.min(r*.15,Math.min(W,H)*.06),              /* radius lubang hitam tengah */
       small=r<cvr*.98,n=ST.length,low=potato(),adv=dt*S.rate,
@@ -489,7 +496,9 @@ function drawFrame(dt,cx,cy,r,cvr){
     if(S.freshLeft<=0){S.freshLeft=0;S.freshR=0;}
   }
   roll+=adv*SPIN;
+  if(WP)wpM('fresh');
   if(WH_DBG.indexOf('nostep')<0){moveStars(dt,adv);stepBuf(dt,cx,cy,Rv,Rh,adv);}
+  if(WP)wpM('step');
 
   g.setTransform(dpr,0,0,dpr,0,0);
   g.globalCompositeOperation='source-over';g.globalAlpha=1;
@@ -506,6 +515,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   g.drawImage(bA,0,0,bw,bh,0,0,W,H);
   if(!low&&WH_DBG.indexOf('nobloom')<0){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
 
+  if(WP)wpM('comp');
   /* streak bintang tajam: garis tipis radial, ekor makin panjang kalau makin dekat tepi (perspektif) */
   g.globalCompositeOperation='lighter';g.lineCap='round';
   for(i=0;i<n;i++){
@@ -533,6 +543,7 @@ function drawFrame(dt,cx,cy,r,cvr){
     }
   }
   g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  if(WP)wpM('streak');
   /* pusat: lubang hitam dengan tepi lembut. Saat exit digambar SETELAH dinding dihapus (lihat bawah), dengan alpha yang memudar */
   if(state!=='exit')holeDisc(cx,cy,Rh,1);
   /* vignette: portal mini = gelap di tepi lingkaran; layar penuh = tepi layar sedikit digelapkan */
@@ -579,12 +590,14 @@ function drawFrame(dt,cx,cy,r,cvr){
     g.fillStyle=gr;g.beginPath();g.arc(cx,cy,r*1.25,0,6.283185307);g.fill();
     g.globalCompositeOperation='source-over';
   }
+  if(WP)wpM('vig');
   /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
   if(S.ring&&small&&typeof portal3dDraw==='function'&&WH_DBG.indexOf('noring')<0){
     var ra=(1-sm((r/cvr-.3)/.55))*ringFade();   /* sektor: BH mini di #sky masih tampak -> cincin fade-in selagi BH fade-out (tidak ganda) */
     if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr)});}catch(eR){}}
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
+  if(WP)wpM('ring');
   if(S.fl>.01){   /* kilat layar (di BAWAH teleskop supaya keluarnya dari portal tetap kelihatan) menjelang tiba di portal tujuan */
     g.globalCompositeOperation='source-over';g.globalAlpha=1;
     g.fillStyle='rgba(228,249,255,'+Math.min(1,S.fl*.96).toFixed(3)+')';g.fillRect(0,0,W,H);
@@ -620,6 +633,7 @@ function drawFrame(dt,cx,cy,r,cvr){
       }else drawTele({x:ex,y:ey,s:sE,a:aE,w:(1-pu)*.5,sp:0,clip:clip,head:hd,hk:pk,tilt:teleTilt(dt,[ex,ey],cx,cy,Math.min(W,H),1-pu,TELE_TILT.exitDir,TELE_TILT.exitVel)});
     }
   }
+  if(WP)wpM('tele');
 }
 /* posisi teleskop di dalam terowongan: menuju titik sedikit di depan/bawah lubang hitam dengan jeda (pegas), jadi kelihatan MENGIKUTI gerakan lubang hitam, bukan menempel */
 function teleHover(dt,cx,cy,m,amp){   /* amp 0..1: amplitudo melayang (naik pelan seiring zoom-in) */
@@ -633,8 +647,8 @@ function teleHover(dt,cx,cy,m,amp){   /* amp 0..1: amplitudo melayang (naik pela
 function tick(now){
   raf=0;
   if(state==='idle'||!g||!ok)return;
-  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,eT,skyMs=0;
-  if(WP){skyMs=WSK;WSK=0;}   /* v8: biaya frame() sky di rAF ini (jalan sebelum tick) */
+  var dt=Math.min(.05,Math.max(0,(now-last)/1000)),p,q,w,cvr,eT,skyMs=0,leadMs=0;
+  if(WP){skyMs=WSK;WSK=0;WP.l=performance.now();leadMs=WP.l-now;}   /* v8: biaya frame() sky di rAF ini (jalan sebelum tick) */
   W=winW();H=winH();cvr=cover();
   last=now;ema+=(dt-ema)*.08;
   try{if(typeof UIS!=='undefined'&&UIS.warpUpd)UIS.warpUpd(state,env,S.rate);}catch(eW){}
@@ -710,7 +724,7 @@ function tick(now){
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
   if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
   if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*.22;S.cx=W*.5;S.cy=H*.5;}
-  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs);}
+  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs,leadMs);}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
     hardStop();return;
