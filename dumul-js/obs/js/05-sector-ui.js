@@ -31,7 +31,7 @@ var _warmCv=null;
    supaya compositor mengeksekusi gambarnya async di frame berjalan. Dipanggil tiap frame fase masuk mulai u>=.3; waktu main-thread terbesar per langkah -> 'warm N' di panel. */
 function skyWarmStep(){
   try{
-    if(typeof WH_DBG==='string'&&WH_DBG.indexOf('nowarm')>=0){SECT.warmQ=[];return;}
+    if(typeof WH_DBG!=='string'||!/(^|,)warm(,|$)/.test(WH_DBG)){SECT.warmQ=[];return;}   /* v12c: warm terbukti tidak mengubah spike -> opt-in saja (?whdbg=warm) */
     var t0=performance.now();
     if(!_warmCv){_warmCv=document.createElement('canvas');_warmCv.width=_warmCv.height=1;_warmCv.setAttribute('aria-hidden','true');_warmCv.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:.01;pointer-events:none;z-index:-1';document.body.appendChild(_warmCv);}
     if(!SECT.warmQ){
@@ -47,7 +47,7 @@ function skyWarmStep(){
 }
 function sectZoomIn(s){
   if(SECT.busy||!s||s.bx==null)return;
-  SECT.warmQ=null;SECT.warmMs=null;
+  SECT.warmQ=null;SECT.warmMs=null;window.__plSt={rs:0,fl:0,mx:0,fin:0};   /* hitung resize/render-penuh planet3d sejak zoom-in (panel whperf) */
   SECT.busy=true;SECT.phase='in';SECT.cur=null;SECT.target=s;SECT.t0=performance.now();
   try{if(typeof setCameraMode==='function'&&CAMERA_MODE)setCameraMode(false);}catch(e){}
 }

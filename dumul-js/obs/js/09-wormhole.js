@@ -238,7 +238,8 @@ function wpEnd(){
     }
     try{['zoom','tunnel','exit'].forEach(function(ph){var p=WP.s&&WP.s[ph];if(!p)return;out.push('  '+ph+' ms/frame: '+['pre','fresh','step','comp','streak','vig','ring','tele'].map(function(k){return p[k]?k+' '+(p[k][0]/p[k][1]).toFixed(1):'';}).filter(Boolean).join(' | '));});}catch(eS){}
     out.push('terburuk: '+w.map(function(x){return x[0]+'@'+x[2]+' '+x[1].toFixed(0)+'ms(js '+x[3].toFixed(0)+' sky '+x[4].toFixed(0)+')';}).join(' | '));
-    if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
+    if(typeof window.__whMk==='string')out.push('sectStep(in) ms: '+window.__whMk);
+    if(window.__plSt)out.push('planet3d sejak zoom-in: resize '+window.__plSt.rs+' | render-penuh '+window.__plSt.fl+' (terlama '+window.__plSt.mx+'ms'+(/(^|,)plfin(,|$)/.test(WH_DBG)?', GPU':', js')+')');   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
     el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+'\n'+out.join('\n');el.onclick=function(){el.remove();};

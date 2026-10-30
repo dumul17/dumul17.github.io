@@ -740,6 +740,7 @@ function pl3dResize(){
   var gm=pl3dGeom(true,false,true),q=pl3dQ(),rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
   if(PL3D.W===PW&&PL3D.H===PH&&PL3D.rw===rw&&PL3D.rh===rh&&PL3D.cv2)return;
   PL3D.W=PW;PL3D.H=PH;PL3D.rw=rw;PL3D.rh=rh;PL3D.stripH=gm.stripH;PL3D.dirty=true;
+  if(window.__plSt)window.__plSt.rs++;   /* diagnosa v12c: ukuran strip berubah (overview<->sektor) */
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
   PL3D.cv2.width=rw;PL3D.cv2.height=rh;
   if(!PL3D.cv3){PL3D.cv3=document.createElement('canvas');PL3D.c3=PL3D.cv3.getContext('2d');}   /* kanvas belakang: pita dirender ke sini, ditukar ke cv2 saat siklus selesai */
@@ -1245,9 +1246,12 @@ function planet3dDraw(now){
         else pl3dCycleStep();
       }else if(due){
         if(nb<=1||PL3D.full||!PL3D.chk||!PL3D.cv3){   /* render penuh sekali jalan: pertama kali, ukuran berubah, atau bands=1 */
+          var _pt0=performance.now();
           pl3dUniforms(now,true);
           PL3D.r.setScissorTest(false);
           PL3D.r.render(PL3D.sc,PL3D.cam);
+          if(window.__plSt){var _S=window.__plSt;_S.fl++;if(typeof WH_DBG==='string'&&/(^|,)plfin(,|$)/.test(WH_DBG)){try{PL3D.r.getContext().finish();}catch(eF){}}   /* ?whdbg=plfin: tunggu GPU selesai -> waktu render penuh yang SEBENARNYA (membekukan sebentar, hanya diagnosa) */
+            var _d=Math.round(performance.now()-_pt0);if(_d>_S.mx)_S.mx=_d;}
           if(!PL3D.chk){   /* sekali: piksel dasar-tengah harus terisi (di dalam bola). Program yang tidak jalan tapi lolos diagnostics -> fallback 2D */
             PL3D.chk=1;
             var gl=PL3D.r.getContext(),px=new Uint8Array(4);
