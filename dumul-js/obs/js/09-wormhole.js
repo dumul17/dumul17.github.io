@@ -281,7 +281,7 @@ function wpEnd(){
     if(window.__plSt)out.push('planet3d sejak zoom-in: resize '+window.__plSt.rs+' | render-penuh '+window.__plSt.fl+' (terlama '+window.__plSt.mx+'ms'+(/(^|,)plfin(,|$)/.test(WH_DBG)?', GPU':', js')+')');   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
-    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
+    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+' | build v17 ring='+WH_RING+' tele='+(typeof SCP3D_WHALT!=='undefined'?SCP3D_WHALT:'LAMA(13 belum v16)')+' cov='+(typeof WORMHOLE!=='undefined'&&('covered' in WORMHOLE)?'ok':'LAMA')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
   }catch(e){}
 }
 function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}runCover();state='idle';env=0;hide();}
