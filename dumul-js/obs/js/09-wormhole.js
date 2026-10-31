@@ -751,4 +751,12 @@ if(!potato()&&usable()){
   var idle=window.requestIdleCallback||function(f){return setTimeout(f,3500);};
   idle(function(){if(document.body)init();},{timeout:7000});
 }
+/* v23: html.wh-busy selama transisi wormhole atau sektor (SECT.busy); dipakai index.css untuk menjeda animasi HUD. Polling 100ms, DOM hanya disentuh saat nilai berubah. */
+(function(){
+  var de=document.documentElement,cur=false;
+  setInterval(function(){
+    var b=state==='enter'||state==='travel'||state==='exit'||(typeof SECT!=='undefined'&&!!SECT.busy);
+    if(b!==cur){cur=b;de.classList.toggle('wh-busy',b);}
+  },100);
+})();
 })();

@@ -38,6 +38,7 @@ try {
   const el = document.getElementById('live-count');
   const num = el && el.querySelector('b');
   const lab = el && el.querySelector('span');
+  const dot = el && el.querySelector('i');
   /* label: "1 observer" / "5 observers" (EN), "pengamat" (ID, tanpa jamak). T dari i18n.js; fallback Inggris kalau belum ada. */
   const word = (n) => { try { return window.T(n === 1 ? 'live.one' : 'live.many'); } catch (e) { return n === 1 ? 'observer' : 'observers'; } };
   if (el && num) {
@@ -56,7 +57,14 @@ try {
       if (pend == null) return;
       if (busy()) { tm = setTimeout(flush, 800); return; }
       const n = pend; pend = null;
-      if (n !== last) { last = n; num.textContent = n; if (lab) lab.textContent = word(n); }
+      if (n !== last) {
+        const first = last < 0;
+        last = n; num.textContent = n; if (lab) lab.textContent = word(n);
+        /* v23: titik berdenyut SEKALI tiap nilai berubah (bukan animasi CSS infinite, yang terbukti ikut menahan frame wormhole). Update sudah ditunda saat busy, jadi tidak pernah jalan di tengah transisi. */
+        if (!first && dot && dot.animate && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+          try { dot.animate([{ opacity: 1 }, { opacity: .3 }, { opacity: 1 }], { duration: 1200, easing: 'ease-in-out' }); } catch (e) {}
+        }
+      }
       if (el.hidden) el.hidden = false;
     };
     onValue(ref(db, 'presence'), (s) => {
