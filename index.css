@@ -132,6 +132,9 @@ body.aligning .portal{opacity:0!important}
 #veil{position:fixed;inset:0;z-index:20;background:#000;opacity:0;pointer-events:none;transition:opacity .55s ease-in}
 #veil.on{opacity:1}
 body.sw{pointer-events:none}
+/* ===== belt HUD fade: beltEnter (04-render.js) cuma menambah body.sw; fade HUD murni CSS (dulu el.animate + getComputedStyle per elemen di frame awal zoom) ===== */
+body.sw :is(#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock,#signal-fragment,#cons-archive,#mode-cluster,#mode-observe,#mode-silence,#last-signal,#mode-bh){opacity:0 !important;transition:opacity .65s ease-in .12s !important}
+@media (prefers-reduced-motion:reduce){body.sw :is(#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock,#signal-fragment,#cons-archive,#mode-cluster,#mode-observe,#mode-silence,#last-signal,#mode-bh){transition-duration:.2s !important;transition-delay:0s !important}}
 
 /* ---------- v4 interaction layer ---------- | v25 mobile canvas compatibility */
 #header{visibility:hidden;pointer-events:none;opacity:0}
