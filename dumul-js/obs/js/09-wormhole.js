@@ -179,6 +179,10 @@ var WH_DBG=(function(){try{var m=/[?&]whdbg=([a-z,]+)/.exec(location.search);ret
    notele = teleskop tidak digambar; nostep = buffer terowongan tidak di-update (komposit tetap jalan); nobloom = lewati drawImage bloom kedua. */
 /* v15: ?whring=N = cincin GL dirender tiap N frame (default 4; 0/1 = tiap frame). Hasil di-cache ke kanvas 2D dan digambar ulang dgn skala terkini tiap frame. (whdbg cuma menerima huruf, jadi pakai param sendiri) */
 var WH_RING=(function(){try{var m=/[?&]whring=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):4;return v>1?v:0;}catch(e){return 4;}})();
+/* v18 (default MATI, tes mata dulu): ?whstep=2 = selama ZOOM (sebelum layar tertutup) buffer terowongan di-update tiap 2 frame dgn dt/adv terakumulasi (hemat ~2-3ms JS/frame);
+   ?whbloom=0 = lewati pass bloom aditif selama mulut portal masih lebih kecil dari layar (zoom). Keduanya mengubah tampilan terowongan sedikit. */
+var WH_STEP=(function(){try{var m=/[?&]whstep=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):0;return v>1?v:0;}catch(e){return 0;}})();
+var WH_NOBLOOM=(function(){try{return /[?&]whbloom=0/.test(location.search);}catch(e){return false;}})();
 var WH_DPR=(function(){try{var m=/[?&]whdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
 function ringFade(){
   if(state!=='travel'||!S||!S.ring)return 0;
@@ -281,7 +285,7 @@ function wpEnd(){
     if(window.__plSt)out.push('planet3d sejak zoom-in: resize '+window.__plSt.rs+' | render-penuh '+window.__plSt.fl+' (terlama '+window.__plSt.mx+'ms'+(/(^|,)plfin(,|$)/.test(WH_DBG)?', GPU':', js')+')');   /* diisi 05-sector-ui.js (blok u>=1 fase in), kalau snippet pengukurnya dipasang */
     var el=document.getElementById('whperf')||document.body.appendChild(document.createElement('div'));
     el.id='whperf';el.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
-    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+' | build v17 ring='+WH_RING+' tele='+(typeof SCP3D_WHALT!=='undefined'?SCP3D_WHALT:'LAMA(13 belum v16)')+' cov='+(typeof WORMHOLE!=='undefined'&&('covered' in WORMHOLE)?'ok':'LAMA')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
+    el.textContent='whperf (tap = tutup) zoom='+(SKY_ZOOM?'on':'off')+' dpr='+dpr.toFixed(2)+' dbg='+(WH_DBG||'-')+' | build v18 ring='+WH_RING+' step='+WH_STEP+' bloom='+(WH_NOBLOOM?'zoomOFF':'on')+' tele='+(typeof SCP3D_WHALT!=='undefined'?SCP3D_WHALT:'LAMA(13 belum v16)')+' cov='+(typeof WORMHOLE!=='undefined'&&('covered' in WORMHOLE)?'ok':'LAMA')+'\n'+out.join('\n');el.onclick=function(){el.remove();};
   }catch(e){}
 }
 function hardStop(){if(raf){cancelAnimationFrame(raf);raf=0;}runCover();state='idle';env=0;hide();}
@@ -538,7 +542,12 @@ function drawFrame(dt,cx,cy,r,cvr){
   }
   roll+=adv*SPIN;
   if(WP)wpM('fresh');
-  if(WH_DBG.indexOf('nostep')<0){moveStars(dt,adv);stepBuf(dt,cx,cy,Rv,Rh,adv);}
+  var stDt=dt,stAdv=adv,doStep=WH_DBG.indexOf('nostep')<0;
+  if(WH_STEP>1&&state==='travel'&&!S.cov&&!(S.freshLeft>0)){   /* v18: zoom = update buffer tiap WH_STEP frame, dt/adv diakumulasi */
+    S.sdt=(S.sdt||0)+dt;S.sa=(S.sa||0)+adv;
+    if(((S.sn=(S.sn||0)+1)%WH_STEP)!==0)doStep=false;else{stDt=S.sdt;stAdv=S.sa;S.sdt=0;S.sa=0;}
+  }else if(S.sdt){stDt=dt+S.sdt;stAdv=adv+S.sa;S.sdt=0;S.sa=0;}   /* keluar dari zoom: sisa akumulasi dilepas */
+  if(doStep){moveStars(stDt,stAdv);stepBuf(stDt,cx,cy,Rv,Rh,stAdv);}
   if(WP)wpM('step');
 
   g.setTransform(dpr,0,0,dpr,0,0);
@@ -554,7 +563,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   g.fillStyle=BG;g.fillRect(0,0,W,H);
   g.imageSmoothingEnabled=true;
   g.drawImage(bA,0,0,bw,bh,0,0,W,H);
-  if(!low&&WH_DBG.indexOf('nobloom')<0){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
+  if(!low&&WH_DBG.indexOf('nobloom')<0&&!(WH_NOBLOOM&&small)){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
 
   if(WP)wpM('comp');
   /* streak bintang tajam: garis tipis radial, ekor makin panjang kalau makin dekat tepi (perspektif) */
