@@ -177,6 +177,8 @@ var WH_HANDOFF=260;
 var WH_DBG=(function(){try{var m=/[?&]whdbg=([a-z,]+)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
 /* A/B diagnosa performa (hanya via URL, tanpa URL = perilaku normal). ?whdpr=1.25 = batas dpr kanvas wormhole (default 2). Flag whdbg tambahan:
    notele = teleskop tidak digambar; nostep = buffer terowongan tidak di-update (komposit tetap jalan); nobloom = lewati drawImage bloom kedua. */
+/* v15: ?whring=N = cincin GL dirender tiap N frame (default 4; 0/1 = tiap frame). Hasil di-cache ke kanvas 2D dan digambar ulang dgn skala terkini tiap frame. (whdbg cuma menerima huruf, jadi pakai param sendiri) */
+var WH_RING=(function(){try{var m=/[?&]whring=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):4;return v>1?v:0;}catch(e){return 4;}})();
 var WH_DPR=(function(){try{var m=/[?&]whdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
 function ringFade(){
   if(state!=='travel'||!S||!S.ring)return 0;
@@ -635,7 +637,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   if(S.ring&&small&&typeof portal3dDraw==='function'&&WH_DBG.indexOf('noring')<0){
     var ra=(1-sm((r/cvr-.3)/.55))*ringFade();   /* sektor: BH mini di #sky masih tampak -> cincin fade-in selagi BH fade-out (tidak ganda) */
     if(typeof PX!=='undefined'){if(WH_DBG.indexOf('noringgl')>=0)PX.ptr=1;if(WH_DBG.indexOf('nobolt')>=0)PX.ptb=1;}   /* v14 diagnosa: noringgl = tanpa cincin GL (bolt/kilau 2D tetap), nobolt = tanpa petir+kilau+percikan 2D (GL tetap) */
-    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr),lq:WH_DBG.indexOf('ringhq')<0,alt2:WH_DBG.indexOf('ringfull')<0});}catch(eR){}}
+    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr),lq:WH_DBG.indexOf('ringhq')<0,alt2:WH_RING});}catch(eR){}}
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
   if(WP)wpM('ring');

@@ -685,7 +685,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
       var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
       var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
-      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?((PT3D.wN=(PT3D.wN||0)+1)&1):(FS.n&1)===1)&&now-PT3D.ccT<140&&PT3D.cc;
+      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0):(FS.n&1)===1)   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
       if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
         PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);
         if(alt){
