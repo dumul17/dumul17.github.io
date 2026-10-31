@@ -1323,3 +1323,24 @@ window.addEventListener('pageshow',function(e){
   if(e.persisted)location.reload();
 });
 
+/* Pre-warm panel owl + music player (sekali, idle setelah masuk observatory; dipanggil 07-boot.js).
+   Dua panel ini tersembunyi (visibility:hidden / opacity:0), jadi raster, layer compositor, dan cache glyph-nya baru dibayar di frame buka pertama.
+   Di sini keduanya ditampilkan transparan (.001) tanpa transisi selama 4 frame lalu dikembalikan (CSS: .pw-warm di index.css). Tidak kelihatan, tidak bisa disentuh. */
+var _pwDone=false,_pwTry=0;
+function panelWarmOnce(){
+  if(_pwDone)return;
+  try{
+    if(typeof IS_POTATO!=='undefined'&&IS_POTATO){_pwDone=true;return;}
+    var bc=document.body.classList;
+    if(document.hidden||bc.contains('sw')||bc.contains('owl-open')||bc.contains('smenu-open')||bc.contains('tesseract-running')){
+      if(++_pwTry<6)setTimeout(panelWarmOnce,3000);
+      return;
+    }
+    _pwDone=true;
+    var els=[document.getElementById('owl-panel'),document.getElementById('music-player')].filter(function(e){return e&&!e.classList.contains('on')&&!e.classList.contains('open');});
+    if(!els.length)return;
+    els.forEach(function(e){e.classList.add('pw-warm');});
+    var n=0;
+    (function f(){if(++n<4){requestAnimationFrame(f);return;}els.forEach(function(e){e.classList.remove('pw-warm');});})();
+  }catch(e){}
+}

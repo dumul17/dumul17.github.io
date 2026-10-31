@@ -103,6 +103,7 @@
     try{window.dispatchEvent(new Event('obs-entered'));}catch(eEv){}   /* PP-12: index.html mendaftarkan SW setelah ini */
     var wr=window.requestIdleCallback||function(f){return setTimeout(f,300);};
     wr(function(){setTimeout(warmRest,1200);},{timeout:3000});   /* setelah frame pertama (±0.5s di SM-T837A) */
+    setTimeout(function(){try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(eW){}},2600);   /* pre-warm panel owl + music (06-interaction.js): buka pertama tidak hitch */
     setTimeout(function(){if(bs&&bs.parentNode)bs.remove();},850);
   }
   function finish(){
