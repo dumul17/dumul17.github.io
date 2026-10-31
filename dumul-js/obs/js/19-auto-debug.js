@@ -522,7 +522,7 @@
         c[0] += t - WP.l; c[1]++; WP.l = t;
       };
       WP.rec = function (now, ph, q, js, sky, lead) {   /* js = ms dari awal vsync (now) sampai akhir tick ini = CPU/JS main-thread */
-        if (ph === 'enter' && WP.ph !== 'enter') { WP.r = []; WP.t = 0; WP.s = {}; }
+        if (ph === 'enter' && WP.ph !== 'enter') { WP.r = []; WP.t = 0; WP.s = {}; WP.ra = {}; WP.lf = {}; WFB.length = 0; }   /* v20: LoAF / sky>150 / rAF-atribusi ikut direset per dive (dulu menumpuk lintas dive) */
         if (WP.pt && WP.ph !== ph) { WP.pt.push([now, ph]); if (WP.pt.length > 400) WP.pt.splice(0, 200); }   /* v12e: riwayat transisi fase utk melabeli entri LoAF */
         if (WP.t) WP.r.push([ph, now - WP.t, Math.round(q), js == null ? 0 : js, sky || 0, lead || 0]);
         WP.t = now; WP.ph = ph;
@@ -541,6 +541,13 @@
             out.push(P[i] + '  n=' + a.length + '  fps~' + (1000 * a.length / Math.max(1, tot)).toFixed(0) + '  med ' + md.toFixed(0) + 'ms  p95 ' + ms[Math.min(ms.length - 1, Math.floor(ms.length * .95))].toFixed(0) + '  max ' + mx.toFixed(0) + '  | js med ' + jj[jj.length >> 1].toFixed(0) + ' max ' + jj[jj.length - 1].toFixed(0) + ' = sky med ' + sk[sk.length >> 1].toFixed(0) + ' max ' + sk[sk.length - 1].toFixed(0) + ' + rAF-lain med ' + ot[ot.length >> 1].toFixed(0) + ' max ' + ot[ot.length - 1].toFixed(0) + ' + tick-sendiri med ' + tk[tk.length >> 1].toFixed(0) + ' max ' + tk[tk.length - 1].toFixed(0));
           }
           try { ['zoom', 'tunnel', 'exit'].forEach(function (ph) { var p = WP.s && WP.s[ph]; if (!p) return; out.push('  ' + ph + ' ms/frame: ' + ['pre', 'fresh', 'step', 'comp', 'streak', 'vig', 'ring', 'tele'].map(function (k) { return p[k] ? k + ' ' + (p[k][0] / p[k][1]).toFixed(1) : ''; }).filter(Boolean).join(' | ')); }); } catch (eS) {}
+          try {
+            ['zoom', 'tunnel', 'exit'].forEach(function (ph) {
+              var o = WP.ra && WP.ra[ph]; if (!o) return;
+              var nf = R.filter(function (x) { return x[0] === ph; }).length || 1, ks = Object.keys(o).sort(function (x, y) { return o[y][0] - o[x][0]; }).slice(0, 6);
+              out.push('  ' + ph + ' rAF per frame (ms | panggilan | max): ' + ks.map(function (k) { return k + ' ' + (o[k][0] / nf).toFixed(1) + ' | ' + o[k][1] + ' | ' + o[k][2].toFixed(0); }).join('  ;  '));
+            });
+          } catch (eR) {}
           out.push('terburuk: ' + w.map(function (x) { return x[0] + '@' + x[2] + ' ' + x[1].toFixed(0) + 'ms(js ' + x[3].toFixed(0) + ' sky ' + x[4].toFixed(0) + ')'; }).join(' | '));
           if (typeof window.__whMk === 'string') out.push('sectStep(in) ms: ' + window.__whMk);
           try { out.push('sky frame() >150ms (fase +ms: total | fungsi ms): ' + (WFB.length ? WFB.map(function (x) { return '[' + x.ph + ' +' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + (x.bk.length ? x.bk.map(function (b) { return b[0] + ' ' + Math.round(b[1]); }).join(', ') : '(tak terinci)'); }).join('  ;  ') : 'tidak ada')); } catch (eFB) {}
@@ -551,6 +558,31 @@
           el.textContent = 'whperf (tap = tutup) zoom=' + (I.zoom ? 'on' : 'off') + ' dpr=' + I.dpr.toFixed(2) + ' dbg=' + (WH_DBG || '-') + ' | build v19 ring=' + I.ring + ' step=' + I.step + ' bloom=' + (I.nobloom ? 'zoomOFF' : 'on') + ' tele=' + (typeof SCP3D_WHALT !== 'undefined' ? SCP3D_WHALT : 'LAMA(13 belum v16)') + ' cov=' + (typeof WORMHOLE !== 'undefined' && ('covered' in WORMHOLE) ? 'ok' : 'LAMA') + '\n' + out.join('\n'); el.onclick = function () { el.remove(); };
         } catch (e) {}
       };
+
+      /* v20: atribusi rAF. Bungkus requestAnimationFrame: waktu tiap callback dikelompokkan per nama fungsi (anonim: 48 char awal source) per fase.
+         Callback <0.3ms digabung ke '(kecil)'. Tujuan: cari siapa yang makan 'rAF-lain' ~30ms di exit. Hanya aktif dengan ?debug=1&whperf=1. */
+      try {
+        WP.ra = {};
+        var _raw = window.requestAnimationFrame;
+        if (typeof _raw === 'function' && !_raw.__wpra) {
+          var _wr = function (cb) {
+            if (typeof cb !== 'function') return _raw.call(window, cb);
+            return _raw.call(window, function (ts) {
+              var t = performance.now(), ph = WP.ph;
+              try { return cb.call(this, ts); } finally {
+                if (ph === 'zoom' || ph === 'tunnel' || ph === 'exit') {
+                  var d = performance.now() - t, lb;
+                  if (d < 0.3) lb = '(kecil)';
+                  else { lb = cb.__wl; if (!lb) { lb = cb === window.frame ? 'frame(sky)' : (cb.name || String(cb).replace(/\s+/g, ' ').slice(0, 48)); try { cb.__wl = lb; } catch (eL) {} } }
+                  var o = WP.ra[ph] || (WP.ra[ph] = {}), c = o[lb] || (o[lb] = [0, 0, 0]);
+                  c[0] += d; c[1]++; if (d > c[2]) c[2] = d;
+                }
+              }
+            });
+          };
+          _wr.__wpra = 1; window.requestAnimationFrame = _wr;
+        }
+      } catch (eRA) {}
 
       WH.dbgAttach(WP);
       window.__WH_AD_instWP = true;
