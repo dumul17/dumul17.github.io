@@ -54,148 +54,10 @@
     /* PP-4: prefers-reduced-motion → tanpa hujan matrix (background #boot-screen sudah gelap). */
     matrixAlive=false;
   }
-  if(mx&&!reduce){
-    /* Cyberpunk glyph mix: kana + digits + circuit symbols. */
-    var glyphs='ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789ABCDEF✦★*+<>|/\\□■◆◇○●▲△▼▽';
-    var gLen=glyphs.length;
-    function randGlyph(){return glyphs[(Math.random()*gLen)|0];}
-    /* Multi-neon palette from ref: cyan, magenta, purple, yellow, blue, pink, mint */
-    var CYBER_PAL=[
-      {r:34,g:230,b:255},
-      {r:255,g:43,b:214},
-      {r:180,g:74,b:255},
-      {r:255,g:220,b:50},
-      {r:80,g:160,b:255},
-      {r:255,g:80,b:140},
-      {r:80,g:255,b:180}
-    ];
-    function randCyber(){return CYBER_PAL[(Math.random()*CYBER_PAL.length)|0];}
-    var cv=document.createElement('canvas');
-    var cx=cv.getContext('2d');
-    mx.appendChild(cv);
-    /* Depth layers: far (slow + faint) → mid → near (fast + bright).
-       Streams spawn already mid-fall so the first frame is a full rain field. */
-    var cols=[],baseFont,dprM;
-    var LAYERS=[
-      {depth:0.28,speedMul:0.32,alphaMul:0.28,fontScale:0.70,countMul:1.25},
-      {depth:0.58,speedMul:0.62,alphaMul:0.55,fontScale:0.90,countMul:0.95},
-      {depth:0.92,speedMul:1.05,alphaMul:0.95,fontScale:1.10,countMul:0.65}
-    ];
-    function makeStream(layer,w,h,midway){
-      var fs=Math.max(8,Math.round(baseFont*layer.fontScale));
-      var spd=(IS_POTATO?0.38:0.52)+Math.random()*(IS_POTATO?0.55:0.85);
-      /* midway: scatter heads across the viewport instead of all above the top. */
-      var y0=midway?(Math.random()*h*1.15-h*0.15):(Math.random()*-h*1.2);
-      var len=8+((Math.random()*(IS_POTATO?14:22))|0);
-      var chars=new Array(len);
-      for(var j=0;j<len;j++)chars[j]=randGlyph();
-      return {
-        y:y0,
-        speed:spd*layer.speedMul,
-        len:len,
-        chars:chars,
-        head:0,
-        tick:(Math.random()*40)|0,
-        col:randCyber(),
-        layer:layer,
-        fs:fs,
-        x:Math.random()*w
-      };
-    }
-    /* Ring buffer: advance head instead of unshift/pop (no array shift). */
-    function advanceMatrixColumn(c){
-      c.head=(c.head-1+c.len)%c.len;
-      c.chars[c.head]=randGlyph();
-    }
-    function refillMatrixColumn(c){
-      if(c.chars.length!==c.len)c.chars=new Array(c.len);
-      for(var j=0;j<c.len;j++)c.chars[j]=randGlyph();
-      c.head=0;
-    }
-    function resizeMatrix(){
-      dprM=Math.min(window.devicePixelRatio||1,IS_POTATO?1:1.5);
-      var w=innerWidth,h=innerHeight;
-      cv.width=Math.max(1,Math.round(w*dprM));
-      cv.height=Math.max(1,Math.round(h*dprM));
-      cx.setTransform(dprM,0,0,dprM,0,0);
-      baseFont=IS_POTATO?12:Math.max(11,Math.min(16,Math.floor(w/52)));
-      cols.length=0;
-      for(var li=0;li<LAYERS.length;li++){
-        var L=LAYERS[li];
-        var n=Math.max(6,Math.floor((w/(baseFont*L.fontScale))*L.countMul*(IS_POTATO?0.7:1)));
-        if(IS_POTATO&&li===0)n=Math.min(n,18);
-        for(var k=0;k<n;k++){
-          cols.push(makeStream(L,w,h,true));
-        }
-      }
-      /* Sort far → near so near streams paint last (on top). */
-      cols.sort(function(a,b){return a.layer.depth-b.layer.depth;});
-    }
-    resizeMatrix();
-    /* PP-4 soft-start: 900ms pertama main thread masih sibuk eval script defer → gambar tiap 2 frame saja + fade-in; setelah itu penuh. */
-    var mxFrame=0,mxStart=performance.now();
-    try{cv.style.opacity='0';cv.style.transition='opacity .9s ease-out';requestAnimationFrame(function(){cv.style.opacity='1';});}catch(eMo){}
-    function drawMatrix(){
-      if(!matrixAlive)return;
-      matrixRAF=requestAnimationFrame(drawMatrix);
-      if(performance.now()-mxStart<900&&((mxFrame++)&1))return;
-      var w=innerWidth,h=innerHeight;
-      /* Slightly stronger trail so dense far layers read as depth. */
-      cx.fillStyle='rgba(2,6,14,0.16)';
-      cx.fillRect(0,0,w,h);
-      cx.textAlign='center';
-      cx.textBaseline='top';
-      var lastFont='';
-      for(var i=0;i<cols.length;i++){
-        var c=cols[i],L=c.layer,fs=c.fs,rgb=c.col||CYBER_PAL[0];
-        var aMul=L.alphaMul;
-        if(c.fs!==lastFont){lastFont=c.fs;cx.font=fs+'px "Courier New",monospace';}
-        c.y+=c.speed*fs*0.30;
-        c.tick++;
-        if(c.tick%3===0&&c.len){var ri=(Math.random()*c.len)|0;c.chars[ri]=randGlyph();}
-        if(c.y-c.len*fs>h){
-          /* Recycle from above the top (normal continuous rain). */
-          c.y=Math.random()*-h*0.4;
-          c.x=Math.random()*w;
-          c.speed=((IS_POTATO?0.38:0.52)+Math.random()*(IS_POTATO?0.55:0.85))*L.speedMul;
-          c.len=8+((Math.random()*(IS_POTATO?14:22))|0);
-          c.col=randCyber();
-          rgb=c.col;
-          c.sty=null;
-          refillMatrixColumn(c);
-        }
-        /* Style per-baris dihitung sekali per (kolom, warna, len); hasil string identik dgn versi lama, cuma nggak dirakit ulang tiap frame. */
-        var sty=c.sty;
-        if(!sty||sty.length!==c.len){
-          sty=c.sty=new Array(c.len);
-          for(var sj=0;sj<c.len;sj++){
-            if(sj===0){
-              sty[sj]=L.depth>=0.7?'#ffffff':'rgba('+Math.min(255,rgb.r+30)+','+Math.min(255,rgb.g+30)+','+Math.min(255,rgb.b+30)+',0.7)';
-            }else if(sj===1){
-              sty[sj]='rgba('+Math.min(255,rgb.r+20)+','+Math.min(255,rgb.g+20)+','+Math.min(255,rgb.b+20)+',0.85)';
-            }else if(sj<5){
-              sty[sj]='rgba('+rgb.r+','+rgb.g+','+rgb.b+','+Math.max(0.04,(0.78-sj*0.09)*aMul).toFixed(2)+')';
-            }else{
-              var fade=Math.max(0.03,(0.42-(sj-5)*0.028)*aMul);
-              sty[sj]='rgba('+Math.max(0,Math.round(rgb.r*(0.45+0.2*L.depth)))+','+Math.max(0,Math.round(rgb.g*(0.45+0.2*L.depth)))+','+Math.max(0,Math.round(rgb.b*(0.45+0.2*L.depth)))+','+fade.toFixed(2)+')';
-            }
-          }
-        }
-        var x=c.x,head=c.head,len=c.len,ga0=L.depth>=0.7?aMul:aMul*0.85,ga1=aMul*0.9;
-        for(var j=0;j<len;j++){
-          var gy=c.y-j*fs;
-          if(gy<-fs||gy>h)continue;
-          cx.globalAlpha=j===0?ga0:(j===1?ga1:1);
-          cx.fillStyle=sty[j];
-          cx.fillText(c.chars[(head+j)%len],x,gy);
-        }
-        cx.globalAlpha=1;
-        if(c.tick%2===0)advanceMatrixColumn(c);
-      }
-    }
-    cx.fillStyle='#02060e';cx.fillRect(0,0,innerWidth,innerHeight);drawMatrix();
-    var rtM;window.addEventListener('resize',function(){clearTimeout(rtM);rtM=setTimeout(function(){if(matrixAlive)resizeMatrix();},150);});
-  }
+  /* Hujan matrix sudah dijalankan lebih awal oleh inline <script> RAIN-EARLY di index.html (window.__rain: Worker + OffscreenCanvas, knob di sana).
+     Di sini cuma ditandai + disediakan matrixKill supaya enterObservatory() mematikannya. */
+  var matrixKill=function(){try{if(window.__rain)window.__rain.kill();}catch(eRk){}};
+  try{if(mx)mx.setAttribute('data-boot','1');}catch(eDb){}
 
   var stars=STELLAR_KEYS.map(function(k){return SFX[k];}),t0=bootT0,done=false; /* semua audio SFX dari registry */
   /* Baseline perangkat nyata: capsule selalu lewat maxMs (0/16 metadata), jadi tuas efektif = gate Tier-0 + maxMs lebih pendek. */
@@ -232,6 +94,7 @@
     bs.classList.add('off');
     try{performance.mark('obs-blue');}catch(eM){}
     matrixAlive=false;
+    if(matrixKill){try{matrixKill();}catch(eMk){}matrixKill=null;}
     if(matrixRAF){cancelAnimationFrame(matrixRAF);matrixRAF=0;}
     bootDone=true;
     try{sessionStorage.setItem('obs_booted','1');}catch(eSs){}   /* PP-9 */
