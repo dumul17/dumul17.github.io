@@ -70,7 +70,15 @@
      preload='metadata' + gate readyState>=1. JANGAN 'auto': di Chrome Android itu menarik file penuh (±3 MB/file, terbukti di probe) dan bikin Tier-0 lebih lambat; tap pertama tetap lewat safePlay (±0.3-0.4 dtk). Sisanya dihangatkan setelah masuk (warmRest). */
   var tier0=['aldebaran','betel','rigel'].map(function(k){return SFX[k];}).filter(Boolean);
   if(!tier0.length)tier0=stars.slice(0,3);
-  tier0.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
+  /* 9.4b (pass 6): Tier-0 TIDAK lagi di-load di awal IIFE (sebelum DCL, saat 18 script defer masih dieksekusi + diduga menahan event 'load' lewat elemen media NETWORK_LOADING).
+     Sekarang dimulai setelah capsule tampil (finish()); user butuh >1 dtk memilih Blue, tap pertama tetap lewat safePlay. ?legacy=1 = perilaku lama (A/B bench). */
+  var LEGACY=false;try{LEGACY=/[?&]legacy=1/.test(location.search);}catch(eLg){}
+  var tier0Started=false;
+  function startTier0(){
+    if(tier0Started)return;tier0Started=true;
+    tier0.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
+  }
+  if(LEGACY)startTier0();
   function tier0Count(){var n=0;for(var i=0;i<tier0.length;i++)if(tier0[i].readyState>=1)n++;return n;}
   /* Hangatkan sisa audio bertahap (3 file per 400ms) agar tidak bersaing dgn frame pertama / SW install. Satu jalur retry tetap milik safePlay. */
   var warmed=false;
@@ -89,6 +97,13 @@
     })();
   }
   function readyCount(){return tier0Count();}
+  /* 9.4a (pass 6): gate capsule dilepas dari window 'load'. Siap = layout() sudah jalan (W>0: font siap / fallback 1.5 dtk di boot()) dan gambar nebula/milky-way
+     (dibuat lazy di 02-sky-logic) tidak sedang di-fetch. Gambar gagal -> .complete true -> tidak menahan. maxMs tetap safety net. */
+  function imgSettled(im){return !im||im.complete;}
+  function pageReady(){
+    if(!W)return false;
+    try{return imgSettled(typeof NEB!=='undefined'&&NEB.img)&&imgSettled(typeof MW!=='undefined'&&MW.img);}catch(e){return true;}
+  }
   function enterObservatory(){
     if(bs.classList.contains('off'))return;
     bs.classList.add('off');
@@ -97,6 +112,7 @@
     if(matrixKill){try{matrixKill();}catch(eMk){}matrixKill=null;}
     if(matrixRAF){cancelAnimationFrame(matrixRAF);matrixRAF=0;}
     bootDone=true;
+    startTier0();   /* no-op kalau sudah jalan */
     try{sessionStorage.setItem('obs_booted','1');}catch(eSs){}   /* PP-9 */
     startRenderLoop();
     window.__obsEntered=true;
@@ -109,6 +125,7 @@
   function finish(){
     if(done)return;done=true;
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
+    if(!LEGACY)requestAnimationFrame(function(){setTimeout(startTier0,0);});   /* 9.4b: setelah capsule ter-paint */
     fill.style.width='100%';pct.textContent='100%';sig.classList.add('on');
     if(quoteEl)quoteEl.classList.add('on');
     if(statusEl)statusEl.innerHTML=
@@ -149,7 +166,9 @@
   }
   var pLast=0;
   function tick(){
-    var now=performance.now(),elapsed=now-t0,rc=readyCount(),readyRatio=rc/tier0.length;
+    var now=performance.now(),elapsed=now-t0;
+    var ready=LEGACY?(document.readyState==='complete'):pageReady();
+    var readyRatio=LEGACY?(readyCount()/tier0.length):(ready?1:0);
     var timeRatio=Math.min(1,Math.max(0,elapsed/minMs));
     var p=Math.min(99,Math.round((timeRatio*.72+readyRatio*.28)*100));
     if(elapsed>=minMs)p=Math.min(99,Math.max(p,90+Math.round(readyRatio*9)));
@@ -159,8 +178,8 @@
     pLast=p;
     fill.style.width=p+'%';pct.textContent=p+'%';
     paintTelemetry(false);
-    /* Gate = aset halaman siap (window load: gambar nebula/milky-way), bukan audio: tap pertama tetap ±0.4 dtk lewat safePlay walau audio belum siap (probe). maxMs = safety net. */
-    if(elapsed>=minMs && (document.readyState==='complete' || elapsed>=maxMs))finish();
+    /* Gate = pageReady() (layout + gambar), bukan window 'load' dan bukan audio: tap pertama tetap ±0.4 dtk lewat safePlay walau audio belum siap (probe). maxMs = safety net. */
+    if(elapsed>=minMs && (ready || elapsed>=maxMs)){window.__bootFinish=ready?'gate':'maxMs';finish();}
     else requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
