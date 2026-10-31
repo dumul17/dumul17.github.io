@@ -397,7 +397,7 @@ function scp3dUpdate(now,mm){
 }
 
 /* v15: ?whtele=1 menyalakan render GL teleskop selang-seling selama travel wormhole (whAlt dulu dimatikan permanen lewat '0&&'; umur cache 45ms terlalu pendek utk frame 66ms -> 150ms). */
-var SCP3D_WHALT=(function(){try{return /[?&]whtele=1/.test(location.search)?1:0;}catch(e){return 0;}})();
+var SCP3D_WHALT=(function(){try{var m=/[?&]whtele=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>=2?v:(m&&v===1?2:0);}catch(e){return 2;}})();   /* v16: DEFAULT ON, periode 2 (GL tiap 2 frame). ?whtele=0 = mati, ?whtele=3 = tiap 3 frame. Terukur di HP: zoom med 66 -> 50ms */
 /* Dipanggil dari teleDrawBody() (04-render.js). true = badan 3D sudah digambar (2D dilewati); false = pakai badan 2D. */
 function tele3dBody(g,now){
   if(SCP3D.state===0){scp3dLoad();return false;}
@@ -407,9 +407,9 @@ function tele3dBody(g,now){
     var mm=g.getTransform?g.getTransform():null;
     if(!mm)return false;
     /* kapal di dalam transisi wormhole (tilt dipaksa dari 09): render GL selang-seling, frame ganjil pakai salinan 2D frame sebelumnya (posisi/skala tetap per frame, hanya pose+cahaya 3D yang 1 frame telat). SCP3D_CFG.whAlt=0 untuk mematikan. */
-    var wh=SCP3D_CFG.whAlt=SCP3D_WHALT&&SCP3D.tilt&&SCP3D.altOK&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy,cache=null;   /* altOK: hanya dari fase travel (pose berubah pelan); enter/exit pose berubah cepat -> selalu render penuh */
+    var wh=SCP3D_CFG.whAlt=(SCP3D_WHALT>0)&&SCP3D.tilt&&SCP3D.altOK&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy,cache=null;   /* altOK: hanya dari fase travel (pose berubah pelan); enter/exit pose berubah cepat -> selalu render penuh */
     if(now-SCP3D.last>3||now<SCP3D.last){   /* ghost copy di frame yang sama memakai hasil render yang sama */
-      if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)&1)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<150)cache=SCP3D.cc;
+      if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)%SCP3D_WHALT!==0)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<130*SCP3D_WHALT)cache=SCP3D.cc;
       else{
         SCP3D.last=now;scp3dUpdate(now,mm);
         if(wh){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(SCP3D.r.domElement,0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;}
