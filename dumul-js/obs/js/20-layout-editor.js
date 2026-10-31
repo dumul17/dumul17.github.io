@@ -37,8 +37,8 @@
   /* Bounds fit ASLI dihitung dari data sky-data.js SEBELUM draft diterapkan. Dikunci selama edit, jadi
      menggeser anchor / memperbesar rasi nggak pernah ikut mengubah skala layar (cuma tombol FIT yang menghitung ulang). */
   /* ANCHOR_B = batas fit dihitung dari anchor sky-data.js SEKARANG (scene.at / ple.at + pad 300; dihitung sebelum draft diterapkan). SKY.fit di sky-data.js cuma angka
-     tempelan Export lama: kalau anchor di sky-data diubah tapi SKY.fit tidak ikut diganti, SKY.fit jadi basi dan layout "pakai anchor lama".
-     Reset (flag sekali-pakai obs_layout_fresh) memuat bounds dari ANCHOR_B, bukan SKY.fit. */
+     tempelan Export lama: kalau anchor di sky-data diubah tapi SKY.fit tidak ikut diganti, SKY.fit jadi basi. Dipakai hanya untuk fallback (SKY.fit tidak ada) dan peringatan basi;
+     bounds awal / setelah Reset tetap SKY.fit supaya sama dengan situs live. */
   var ANCHOR_B=null,FIT_STALE=false;
   (function(){
     var a=[1e9,-1e9,1e9,-1e9];
@@ -47,8 +47,7 @@
     if(a[0]<1e8)ANCHOR_B=[a[0]-300,a[1]+300,a[2]-300,a[3]+300];
     if(ANCHOR_B&&SKY.fit&&SKY.fit.length===4)FIT_STALE=ANCHOR_B.some(function(v,i){return Math.abs(v-SKY.fit[i])>2;});
     if(window.__scnBounds)return;
-    var fresh=false;try{fresh=localStorage.getItem('obs_layout_fresh')==='1';localStorage.removeItem('obs_layout_fresh');}catch(eF){}
-    if(!fresh&&SKY.fit&&SKY.fit.length===4){window.__scnBounds=SKY.fit.slice();return;}
+    if(SKY.fit&&SKY.fit.length===4){window.__scnBounds=SKY.fit.slice();return;}   /* sama dengan situs live (02 layout) */
     if(ANCHOR_B)window.__scnBounds=ANCHOR_B.slice();
   })();
   loadSaved();
@@ -353,7 +352,8 @@
     });
     return {base:BASE,scene:scene,ov:JSON.parse(JSON.stringify(window.__layOV||{})),fit:window.__scnBounds?window.__scnBounds.slice():null};
   }
-  function autosave(){try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));}catch(e){}saveStars();}
+  function autosave(){if(window.__layResetting)return;   /* Reset: jangan tulis ulang draft di beforeunload (reload dari Reset memicu autosave -> draft lama hidup lagi) */
+    try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));}catch(e){}saveStars();}
   function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(snapshot()));toast('SAVED ✓');}catch(e){toast('SAVE GAGAL');}}
 
   /* ---- UNDO / REDO: tiap aksi edit (geser, ukuran, putar, grup, bintang) = satu langkah ---- */
@@ -590,7 +590,8 @@
     }
     if(a==='rst'){
       if(!confirm('Buang draft layout & muat ulang dari sky-data.js?'))return;
-      try{localStorage.removeItem(LS_KEY);localStorage.removeItem(STAR_LS);localStorage.setItem('obs_layout_fresh','1');}catch(e){}   /* fresh: bounds dari anchor sky-data, bukan SKY.fit lama */
+      window.__layResetting=true;   /* harus sebelum removeItem + reload: beforeunload -> autosave akan menulis draft kembali */
+      try{localStorage.removeItem(LS_KEY);localStorage.removeItem(STAR_LS);}catch(e){}
       window.__layOV={};window.__scnBounds=null;location.reload();return;
     }
     if(a==='collapse'){collapsed=!collapsed;hud.classList.toggle('col',collapsed);stPos();return;}
