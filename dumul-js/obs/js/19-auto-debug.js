@@ -51,19 +51,23 @@
 
   /* v22 (diagnosa hitch exit, A/B murni, hanya di mode ?debug=1):
        ?whdbg=nohud  = semua DOM HUD (anak langsung <body>, kecuali #sky, #wh-canvas, #whperf, #boot-screen, #bh/#cap-bh, UI debug) visibility:hidden selama wormhole aktif
+       ?whdbg=nolc   = HANYA #live-count visibility:hidden selama wormhole aktif (Firebase tetap jalan). Pisahkan elemen vs Firebase.
+       ?whdbg=nolcanim = animasi lcPulse (titik #live-count) dimatikan selama wormhole aktif, elemen tetap tampil.
        ?whdbg=nohole = DOM lubang hitam (#bh, #cap-bh) disembunyikan; sprite BH di kanvas dilewati di 03-gargantua.js (WH_NOHOLE)
      Kelas di <html> ditoggle polling 100ms mengikuti WORMHOLE.on. Bisa digabung: ?whdbg=nohud,nohole */
   (function () {
-    var m = /[?&]whdbg=([a-z,]+)/.exec(Q), f = m ? ',' + m[1] + ',' : '', nh = f.indexOf(',nohud,') >= 0, nb = f.indexOf(',nohole,') >= 0, de = document.documentElement, st;
-    if (!nh && !nb) return;
+    var m = /[?&]whdbg=([a-z,]+)/.exec(Q), f = m ? ',' + m[1] + ',' : '', nh = f.indexOf(',nohud,') >= 0, nb = f.indexOf(',nohole,') >= 0, nl = f.indexOf(',nolc,') >= 0, na = f.indexOf(',nolcanim,') >= 0, de = document.documentElement, st;
+    if (!nh && !nb && !nl && !na) return;
     st = document.createElement('style'); st.id = 'wh-nohud-css';
     st.textContent = (nh ? 'html.wh-nohud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not([id^="wh-ad"]):not(script):not(style){visibility:hidden!important}' : '')
-      + (nb ? 'html.wh-nohole #bh,html.wh-nohole #cap-bh{visibility:hidden!important}' : '');
+      + (nb ? 'html.wh-nohole #bh,html.wh-nohole #cap-bh{visibility:hidden!important}' : '')
+      + (nl ? 'html.wh-nolc #live-count{visibility:hidden!important}' : '')
+      + (na ? 'html.wh-nolcanim #live-count i{animation:none!important}' : '');
     (document.head || de).appendChild(st);
     setInterval(function () {
       var on = false;
       try { on = typeof WORMHOLE !== 'undefined' && !!WORMHOLE.on; } catch (e) {}
-      de.classList.toggle('wh-nohud', nh && on); de.classList.toggle('wh-nohole', nb && on);
+      de.classList.toggle('wh-nohud', nh && on); de.classList.toggle('wh-nohole', nb && on); de.classList.toggle('wh-nolc', nl && on); de.classList.toggle('wh-nolcanim', na && on);
     }, 100);
   })();
 
