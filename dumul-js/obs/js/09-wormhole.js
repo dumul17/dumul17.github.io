@@ -634,6 +634,7 @@ function drawFrame(dt,cx,cy,r,cvr){
   /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
   if(S.ring&&small&&typeof portal3dDraw==='function'&&WH_DBG.indexOf('noring')<0){
     var ra=(1-sm((r/cvr-.3)/.55))*ringFade();   /* sektor: BH mini di #sky masih tampak -> cincin fade-in selagi BH fade-out (tidak ganda) */
+    if(typeof PX!=='undefined'){if(WH_DBG.indexOf('noringgl')>=0)PX.ptr=1;if(WH_DBG.indexOf('nobolt')>=0)PX.ptb=1;}   /* v14 diagnosa: noringgl = tanpa cincin GL (bolt/kilau 2D tetap), nobolt = tanpa petir+kilau+percikan 2D (GL tetap) */
     if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr),lq:WH_DBG.indexOf('ringhq')<0,alt2:WH_DBG.indexOf('ringfull')<0});}catch(eR){}}
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
