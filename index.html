@@ -318,7 +318,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=123"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=124"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -539,12 +539,12 @@ if ('serviceWorker' in navigator) {
 /* BENCH v3 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
-  var R = { t: {}, meta: {}, ls: {}, cp: {}, playLog: [], tapLog: [], taps: 0, playing: 0 }, playReq = {}, playRs = {}, lt = 0, ltN = 0, ltAll = 0, ltAllN = 0, capDone = false, blueAt = 0, tapAt = 0, box, hooked = false;
+  var R = { t: {}, meta: {}, ls: {}, cp: {}, playLog: [], tapLog: [], taps: 0, playing: 0 }, playReq = {}, playRs = {}, LP = { pre: { n: 0, ms: 0 }, cap2blue: { n: 0, ms: 0 }, blue2f1: { n: 0, ms: 0 }, after: { n: 0, ms: 0 } }, lt = 0, ltN = 0, ltAll = 0, ltAllN = 0, capDone = false, blueAt = 0, tapAt = 0, box, hooked = false;
   function now() { return Math.round(performance.now()); }
   function mark(k) { if (R.t[k] == null) { R.t[k] = now(); paint(); } }
   try {
     new PerformanceObserver(function (l) {
-      l.getEntries().forEach(function (e) { ltAll += e.duration; ltAllN++; if (!capDone) { lt += e.duration; ltN++; } });
+      l.getEntries().forEach(function (e) { ltAll += e.duration; ltAllN++; if (!capDone) { lt += e.duration; ltN++; } var ph = R.t.capsule == null ? 'pre' : (R.t.blue == null ? 'cap2blue' : (R.t.frame1 == null ? 'blue2f1' : 'after')); var q = LP[ph]; q.n++; q.ms += Math.round(e.duration); });
     }).observe({ entryTypes: ['longtask'] });
   } catch (e) {}
   window.addEventListener('obs-entered', function () { mark('entered'); });
@@ -556,7 +556,6 @@ if ('serviceWorker' in navigator) {
   function hookAud(k, a) {
     if (!a || !a.addEventListener) return;
     if (a.readyState >= 1) R.meta[k] = 'pre'; /* sudah siap sebelum hook dipasang */
-    a.addEventListener('loadstart', function () { if (R.ls[k] == null) R.ls[k] = now(); });
     a.addEventListener('loadedmetadata', function () { if (R.meta[k] == null) R.meta[k] = now(); });
     a.addEventListener('canplay', function () { if (R.cp[k] == null) R.cp[k] = now(); });
     a.addEventListener('play', function () { playReq[k] = now(); playRs[k] = a.readyState; });
@@ -582,7 +581,7 @@ if ('serviceWorker' in navigator) {
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v4 ms (sejak navigasi)');
+    x.push('BENCH v5 ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -601,6 +600,8 @@ if ('serviceWorker' in navigator) {
   }
   function snapshot() {
     R.sfxFinal = sfxStates();
+    R.ltPhase = LP;
+    try { var m0 = performance.getEntriesByName('obs-t0')[0], mw = performance.getEntriesByName('obs-warm')[0]; R.t0Start = m0 ? Math.round(m0.startTime) : null; R.warmStart = mw ? Math.round(mw.startTime) : null; R.t0mode = /[?&]legacy=1/.test(location.search) ? 'legacy' : (/[?&]t0=capsule/.test(location.search) ? 'capsule' : 'dcl'); } catch (e) {}
     R.longtaskBeforeCapsule = { n: ltN, ms: Math.round(lt) };
     R.longtaskTotal = { n: ltAllN, ms: Math.round(ltAll) };
     try { R.ver = {}; Array.prototype.forEach.call(document.scripts, function (sc) { var m = /\/([^\/?]+)\?v=(\d+)/.exec(sc.src || ''); if (m && /^(01-core|07-boot)/.test(m[1])) R.ver[m[1]] = +m[2]; }); R.legacy = /[?&]legacy=1/.test(location.search); R.loadAfterCapsule = R.t.load != null && R.t.capsule != null ? R.t.load - R.t.capsule : null; } catch (e) {}
