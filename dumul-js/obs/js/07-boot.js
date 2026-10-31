@@ -205,11 +205,11 @@
   var capBlue=document.getElementById('boot-cap-blue');
   var capRed=document.getElementById('boot-cap-red');
   /* PP-2/PP-3: Tier-0 = SFX yang paling mungkin dibunyikan pertama (aldebaran = tap pertama di probe; Orion). Hanya ini yang di-load saat boot,
-     preload='auto' + gate readyState>=2 (playable, bukan sekadar metadata). Sisanya dihangatkan setelah masuk (warmRest). */
+     preload='metadata' + gate readyState>=1. JANGAN 'auto': di Chrome Android itu menarik file penuh (±3 MB/file, terbukti di probe) dan bikin Tier-0 lebih lambat; tap pertama tetap lewat safePlay (±0.3-0.4 dtk). Sisanya dihangatkan setelah masuk (warmRest). */
   var tier0=['aldebaran','betel','rigel'].map(function(k){return SFX[k];}).filter(Boolean);
   if(!tier0.length)tier0=stars.slice(0,3);
-  tier0.forEach(function(a){try{a.preload='auto';a.load();}catch(e){}});
-  function tier0Count(){var n=0;for(var i=0;i<tier0.length;i++)if(tier0[i].readyState>=2)n++;return n;}
+  tier0.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
+  function tier0Count(){var n=0;for(var i=0;i<tier0.length;i++)if(tier0[i].readyState>=1)n++;return n;}
   /* Hangatkan sisa audio bertahap (3 file per 400ms) agar tidak bersaing dgn frame pertama / SW install. Satu jalur retry tetap milik safePlay. */
   var warmed=false;
   function warmRest(){
@@ -220,7 +220,7 @@
       for(var n=0;n<3&&q.length;n++){
         var a=q.shift();
         try{
-          if(a&&a.readyState<1&&a.paused&&!a._retrying&&!a._want){a.preload=(a===GARG||a===AMB)?'auto':'metadata';a.load();}
+          if(a&&a.readyState<1&&a.paused&&!a._retrying&&!a._want){a.preload='metadata';a.load();}
         }catch(e){}
       }
       if(q.length)setTimeout(step,400);
