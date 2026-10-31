@@ -36,13 +36,20 @@
   }
   /* Bounds fit ASLI dihitung dari data sky-data.js SEBELUM draft diterapkan. Dikunci selama edit, jadi
      menggeser anchor / memperbesar rasi nggak pernah ikut mengubah skala layar (cuma tombol FIT yang menghitung ulang). */
+  /* ANCHOR_B = batas fit dihitung dari anchor sky-data.js SEKARANG (scene.at / ple.at + pad 300; dihitung sebelum draft diterapkan). SKY.fit di sky-data.js cuma angka
+     tempelan Export lama: kalau anchor di sky-data diubah tapi SKY.fit tidak ikut diganti, SKY.fit jadi basi dan layout "pakai anchor lama".
+     Reset (flag sekali-pakai obs_layout_fresh) memuat bounds dari ANCHOR_B, bukan SKY.fit. */
+  var ANCHOR_B=null,FIT_STALE=false;
   (function(){
-    if(window.__scnBounds)return;
-    if(SKY.fit&&SKY.fit.length===4){window.__scnBounds=SKY.fit.slice();return;}
     var a=[1e9,-1e9,1e9,-1e9];
     function add(p){a[0]=Math.min(a[0],p[0]);a[1]=Math.max(a[1],p[0]);a[2]=Math.min(a[2],p[1]);a[3]=Math.max(a[3],p[1]);}
     SKY.rasi.forEach(function(r){if(r.off)return;if(r.scene)add(r.scene.at);else if(r.ple)add(r.ple.at);});
-    if(a[0]<1e8)window.__scnBounds=[a[0]-300,a[1]+300,a[2]-300,a[3]+300];
+    if(a[0]<1e8)ANCHOR_B=[a[0]-300,a[1]+300,a[2]-300,a[3]+300];
+    if(ANCHOR_B&&SKY.fit&&SKY.fit.length===4)FIT_STALE=ANCHOR_B.some(function(v,i){return Math.abs(v-SKY.fit[i])>2;});
+    if(window.__scnBounds)return;
+    var fresh=false;try{fresh=localStorage.getItem('obs_layout_fresh')==='1';localStorage.removeItem('obs_layout_fresh');}catch(eF){}
+    if(!fresh&&SKY.fit&&SKY.fit.length===4){window.__scnBounds=SKY.fit.slice();return;}
+    if(ANCHOR_B)window.__scnBounds=ANCHOR_B.slice();
   })();
   loadSaved();
 
@@ -576,10 +583,14 @@
       else prompt('Copy:',tt);
       console.log('[tune3d export]\n'+tt);return;
     }
-    if(a==='fit'){window.__scnRefit=true;hMark();refresh();toast('FIT ULANG dari anchor');return;}
+    if(a==='fit'){
+      window.__scnRefit=true;hMark();refresh();toast('FIT ULANG dari anchor');
+      setTimeout(function(){try{var b=window.__scnBounds;if(b){console.log('[layout] FIT ULANG: SKY.fit=['+b.map(rnd).join(',')+']'+(SKY.fit?'  (sky-data.js sekarang: ['+SKY.fit.map(rnd).join(',')+'])':''));toast('FIT \u2713 SKY.fit=['+b.map(rnd).join(',')+']');}}catch(eFt){}},400);
+      return;
+    }
     if(a==='rst'){
       if(!confirm('Buang draft layout & muat ulang dari sky-data.js?'))return;
-      try{localStorage.removeItem(LS_KEY);localStorage.removeItem(STAR_LS);}catch(e){}
+      try{localStorage.removeItem(LS_KEY);localStorage.removeItem(STAR_LS);localStorage.setItem('obs_layout_fresh','1');}catch(e){}   /* fresh: bounds dari anchor sky-data, bukan SKY.fit lama */
       window.__layOV={};window.__scnBounds=null;location.reload();return;
     }
     if(a==='collapse'){collapsed=!collapsed;hud.classList.toggle('col',collapsed);stPos();return;}
@@ -781,6 +792,7 @@
     hCommit();hBtn();updateInfo();
     (function ringLoop(){try{stRingPos();}catch(e){}requestAnimationFrame(ringLoop);})();   /* ring ikut sway tiap frame (jalan setelah loop render utama) */
     console.log('[layout editor v5] dock ringkas + undo/redo + bantu isi bintang ???');
+    if(FIT_STALE){console.warn('[layout] SKY.fit di sky-data.js BASI. sky-data: ['+SKY.fit.map(rnd).join(',')+']  dari anchor sekarang: ['+ANCHOR_B.map(rnd).join(',')+']  -> Reset/FIT ULANG lalu Export & tempel SKY.fit baru.');setTimeout(function(){try{toast('SKY.fit sky-data BASI (beda dari anchor). Lihat console');}catch(eSt){}},900);}
   }
 
   function waitReady(){
