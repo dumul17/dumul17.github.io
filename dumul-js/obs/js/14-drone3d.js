@@ -340,7 +340,7 @@ function dr3dUpdate(now,x,y,col){
   }catch(eL){}
   var lk=DR3D_CFG.light*DR3D_CFG.glowK;o.rim.intensity=1.1*lk;o.hemi.intensity=.45*lk;o.fill.intensity=.55*lk;
   /* render GPU dibatasi (minDt); hasil disalin ke kanvas 2D kecil supaya frame yang dilewati tinggal drawImage (isi buffer WebGL tidak dijamin utuh antar frame) */
-  if(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt){
+  if(!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
     r.render(sc,DR3D.cam);
     if(!DR3D.c2||DR3D.c2.width!==res){DR3D.c2=document.createElement('canvas');DR3D.c2.width=DR3D.c2.height=res;DR3D.x2=DR3D.c2.getContext('2d');}
     DR3D.x2.clearRect(0,0,res,res);DR3D.x2.drawImage(r.domElement,0,0);

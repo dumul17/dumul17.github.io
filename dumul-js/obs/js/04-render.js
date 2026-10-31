@@ -268,12 +268,7 @@ function beltEnter(href){
       clearTimeout(fl._snT);fl._snT=setTimeout(function(){fl.classList.remove('on');},1000);
     }
   }catch(eF){}
-  try{   /* HUD memudar (bukan disedot) */
-    [].slice.call(document.querySelectorAll('#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-toggle,#music-player,#mp-now-playing,#owl-source,#bh-clock,#signal-fragment,#cons-archive,#mode-cluster,#mode-observe,#mode-silence,#last-signal,#mode-bh')).forEach(function(el){
-      if(el.animate)el.animate([{opacity:getComputedStyle(el).opacity},{opacity:0}],{duration:reduce?200:650,delay:reduce?0:120,easing:'ease-in',fill:'forwards'});
-      else el.style.opacity=0;
-    });
-  }catch(eH){}
+  /* HUD memudar (bukan disedot): cukup satu class di body (body.sw sudah ditambah di atas), fade-nya CSS (index.css, blok 'belt HUD fade'): tanpa getComputedStyle / el.animate per elemen */
   if(!reduce)requestAnimationFrame(beltCamStep);
   return true;
 }

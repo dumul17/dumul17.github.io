@@ -246,6 +246,7 @@ function ast3dReuse(now,half){
   if(!AST3D_CFG.reuse||AST3D.state!==2||!AST3D_CFG.on)return 0;
   try{
     if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return 0;
+    if((typeof BELT!=='undefined'&&BELT)&&AST3D.cache[ci]){U[ci]=now;AST3D.reused++;return 1;}   /* zoom masuk dumul.html (beltEnter): batu dibekukan = blit cache terakhir, tanpa signature / astStep / GL */
     var same=ast3dFrameSig(now),C=AST3D.cache,per=1000/Math.max(1,AST3D_CFG.fps),ok=!!(C[ci]&&C[ci].ver===AST3D.ver);
     var fsl=(typeof FS!=='undefined'&&FS.slow)?FS:null;
     if(fsl){   /* HP lambat (05-sector-ui.js FS): jeda render = 2x interval frame (maks 140 ms), pass belakang cuma di frame genap, depan cuma di ganjil -> tiap frame paling banyak satu pass GL */
