@@ -60,8 +60,9 @@
       else {
         for (var k in PX0) if (!(k in window.PX)) window.PX[k] = 0;
       }
-      window.PX_MODES = window.PX_MODES || ['normal','panel HIDDEN','asteroid OFF','bintang OFF','milky way OFF','portal3d OFF','nebula/plate OFF','SEMUA OFF (loop kosong)'];
-      window.PX_PANEL = window.PX_PANEL || {
+      /* TIMPA stub 05 (PX_MODES=['normal'], PX_PANEL={}); jangan pakai `||` karena stub itu truthy → tap/Sweep macet di 1 mode */
+      window.PX_MODES = ['normal','panel HIDDEN','asteroid OFF','bintang OFF','milky way OFF','portal3d OFF','nebula/plate OFF','SEMUA OFF (loop kosong)'];
+      window.PX_PANEL = {
         'panel HIDDEN': { visibility: 'hidden' },
         'panel OPAQUE': { background: '#040a10' },
         'panel NO-CLIP': { overflow: 'visible', contain: 'none', borderRadius: '0' },
@@ -1538,6 +1539,17 @@
     trRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'trace:'));
     trRow.appendChild(btn('Copy', traceCopy));
     trRow.appendChild(btn('Save', traceSave));
+    /* muffdbg toggle (tanpa reload): nyalakan/matikan overlay #muff-dbg spatial audio */
+    var muffOn = !!(window.AV && window.AV._dbg);
+    var muffB = btn('muff: ' + (muffOn ? 'ON' : 'off'), function () {
+      try {
+        if (typeof AV === 'undefined' || !AV) return;
+        if (!AV._dbg) { installMuff(); AV._dbg = true; }
+        else { AV._dbg = false; var me = document.getElementById('muff-dbg'); if (me && me.parentNode) me.parentNode.removeChild(me); }
+        muffB.textContent = 'muff: ' + (AV._dbg ? 'ON' : 'off');
+      } catch (eMf) {}
+    }, muffOn);
+    trRow.appendChild(muffB);
     panel.appendChild(trRow);
 
     /* —— 2 tombol utama: Hasil + Export —— */
