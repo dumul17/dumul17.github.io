@@ -34,6 +34,7 @@
 
 <div id="boot-screen" aria-hidden="false">
   <div id="boot-matrix" aria-hidden="true"></div>
+  <script src="dumul-js/obs/js/00-rain.js?v=1"></script>
   <div id="boot-scan" aria-hidden="true"></div>
   <div id="boot-core">
     <div id="boot-title">DUMUL//OBSERVATORY</div>
@@ -317,7 +318,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=140"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=123"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=120"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=121"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -596,11 +597,11 @@ if ('serviceWorker' in navigator) {
       s.addEventListener('load', function () { R.scr[n] = now(); });
     });
   } catch (e) {}
-  /* boot start = saat 07-boot menambahkan canvas matrix ke #boot-matrix (satu kali, di awal IIFE) */
+  /* boot start = saat 07-boot menandai #boot-matrix[data-boot] (hujan matrix sendiri sudah jalan lebih awal lewat 00-rain.js) */
   var mx = document.getElementById('boot-matrix');
   if (mx) new MutationObserver(function (m, ob) {
     if (R.t.bootStart == null) { mark('bootStart'); R.sfxAtBootStart = sfxStates(); hookSfx(); ob.disconnect(); }
-  }).observe(mx, { childList: true });
+  }).observe(mx, { childList: true, attributes: true, attributeFilter: ['data-boot'] });
   var ch = document.getElementById('boot-choices');
   if (ch) new MutationObserver(function () {
     if (ch.classList.contains('on') && !capDone) {
