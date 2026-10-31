@@ -230,7 +230,7 @@ body.owl-open #owl-panel,body.owl-open #owl-backdrop,body.owl-open #owl-source{p
 #terminal .term-body{max-height:46vh;overflow:hidden}
 #terminal .term-body div{white-space:pre-wrap;word-break:break-word}
 #terminal .term-warn{color:#ffb4c0}
-#terminal .cursor{display:inline-block;width:7px;height:12px;background:#6ee5ff;vertical-align:-2px;animation:blink .8s steps(1,end) infinite}
+#terminal .cursor{display:inline-block;width:7px;height:12px;background:#6ee5ff;vertical-align:-2px;animation:blink .8s steps(1,end) 12}
 @keyframes blink{50%{opacity:0}}
 .supernova-flash{position:fixed;inset:0;z-index:7;pointer-events:none;background:radial-gradient(circle at var(--sx) var(--sy),rgba(255,255,255,.98) 0,rgba(var(--sn-rgb),.82) 4%,rgba(var(--sn-rgb),.24) 13%,transparent 42%);opacity:0}
 .supernova-flash.on{animation:snflash .85s ease-out forwards}
@@ -1212,11 +1212,11 @@ body.camera-mode .hit,body.camera-mode #bh,body.sect-in .hit,body.sect-in #bh{to
 body.lis-gone #lis-fx{opacity:.5}
 body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,rgba(2,5,10,.25) 20%,rgba(2,5,10,.8) 100%)}
 @keyframes lisGrain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(3%,3%)}}
-@keyframes lisGlitch{0%{top:8%;opacity:0}12%{top:22%;opacity:1}30%{top:61%;opacity:.4}48%{top:38%;opacity:1}66%{top:84%;opacity:0}84%{top:50%;opacity:.8}100%{top:14%;opacity:0}}
+@keyframes lisGlitch{0%{transform:translateY(-83.333%);opacity:0}12%{transform:translateY(33.333%);opacity:1}30%{transform:translateY(358.333%);opacity:.4}48%{transform:translateY(166.667%);opacity:1}66%{transform:translateY(550%);opacity:0}84%{transform:translateY(266.667%);opacity:.8}100%{transform:translateY(-33.333%);opacity:0}}
 #lis-hud{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:16;padding:5px 10px;border:1px solid rgba(110,229,255,.3);border-radius:4px;background:rgba(2,7,12,.88);font:600 9px/1.4 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;color:#8eeeff;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s}
 #lis-hud.on{opacity:1;visibility:visible}
 #lis-hud.red{border-color:rgba(255,80,80,.6);color:#ff9a9a}
-#lis-hud.red::before{content:'';display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#ff4848;box-shadow:0 0 6px #ff4848;animation:lisBlink .5s steps(2) infinite;vertical-align:1px}
+#lis-hud.red::before{content:'';display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#ff4848;box-shadow:0 0 6px #ff4848;animation:lisBlink .5s steps(2) 10;vertical-align:1px}
 @keyframes lisBlink{50%{opacity:.2}}
 #lis-ask{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:120;pointer-events:auto;width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box;padding:12px 14px;border:1px solid rgba(110,229,255,.35);border-radius:6px;background:rgba(2,7,12,.94);font:600 10px/1.5 'Courier New',monospace;letter-spacing:.1em;text-transform:uppercase;color:#bff4ff;text-align:center}
 #lis-ask[hidden]{display:none}
@@ -1288,7 +1288,7 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 .mp-track .mp-obs,.mp-track .mp-state{grid-column:3;grid-row:1;justify-self:center}
 .mp-track .mp-state{font:600 8px/1 'Courier New',monospace;min-width:8px;text-align:center}
 @keyframes mpDot{0%,100%{opacity:1}50%{opacity:.2}}
-.mp-track.playing .mp-state{animation:mpDot 1s ease-in-out infinite}
+.mp-track.playing .mp-state{animation:mpDot 1s ease-in-out 8}
 @media (prefers-reduced-motion:reduce){.mp-track.playing .mp-state{animation:none}}
 
 /* marquee judul grup: hanya untuk judul yang benar-benar kepotong (kelas .mq dipasang JS saat panel dibuka) */
@@ -1390,8 +1390,6 @@ body.camera-mode #live-count{max-width:calc((100vw - min(80vw,270px)) / 2 - 12px
 /* kartu cam dipindah ke kanan (cam-compact) / ke gutter (landscape stage): ruang kiri lega lagi */
 body.camera-mode.cam-compact #live-count,body.camera-mode.ls #live-count{max-width:calc(100vw - 24px)}
 body.camera-mode.cam-compact #live-count span,body.camera-mode.ls #live-count span{display:inline}
-@media (prefers-reduced-motion:no-preference){#live-count i{animation:lcPulse 2s ease-in-out infinite}}
-@keyframes lcPulse{50%{opacity:.35}}
 body.tesseract-running #live-count{visibility:hidden}
 
 /* Bar spektrum digerakkan CSS keyframe (jalan di compositor, nol kerja JS/main-thread per frame). Rumus meniru versi JS lama:
@@ -1503,3 +1501,6 @@ body.sect-in #mp-now-playing{--np-n:2}   /* v12: dulu di body -> style recalc se
 .bp-page .t3-head::after{content:none}
 .bp-page .t3-head{min-height:28px}
 #owl-panel.owl-scrub .bp-page .t3-info{display:none!important}
+
+/* v23: html.wh-busy (diset 09-wormhole.js selama WORMHOLE/SECT busy): semua animasi HUD dijeda, layar tertutup terowongan jadi tak terlihat. Lanjut dari posisi terakhir setelah selesai. */
+html.wh-busy #terminal .cursor,html.wh-busy .tp-row.ld .tp-t,html.wh-busy #cat-lock::before,html.wh-busy #lis-fx::before,html.wh-busy #lis-fx::after,html.wh-busy #lis-hud.red::before,html.wh-busy #exit-panel .ex-next.on,html.wh-busy #exit-panel.talk .tl-m,html.wh-busy #exit-panel.talk .tl-glow,html.wh-busy #exit-panel.talk .ex-owl,html.wh-busy #exit-panel.talk .ow-beak,html.wh-busy .mp-track.playing .mp-state,html.wh-busy .mp-track.playing .mp-spec i,html.wh-busy #music-toggle.playing-closed .mp-spec-mini i{animation-play-state:paused!important}

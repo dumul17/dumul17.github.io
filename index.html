@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=79">
+<link rel="stylesheet" href="index.css?v=80">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -323,7 +323,7 @@
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=13"></script>
-<script defer src="dumul-js/obs/js/09-wormhole.js?v=42"></script>
+<script defer src="dumul-js/obs/js/09-wormhole.js?v=43"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=8"></script>
 <script>
 /* Live counter: dimuat BELAKANGAN (setelah window load + idle) supaya Firebase dari gstatic nggak rebutan bandwidth dengan boot & audio.
@@ -335,7 +335,7 @@
   function go() {
     var w = window.WORMHOLE, s = window.SECT, boot = (typeof bootDone !== 'undefined' && bootDone);
     if ((!boot && tries++ < 40) || (w && w.busy) || (s && s.busy)) { setTimeout(go, 1500); return; }
-    try { import('./dumul-js/obs/js/11-live-count.js?v=4').catch(function () {}); } catch (e) {}
+    try { import('./dumul-js/obs/js/11-live-count.js?v=5').catch(function () {}); } catch (e) {}
   }
   function idle() {
     if (/[?&]nolive=1(&|$)/.test(location.search)) return;
