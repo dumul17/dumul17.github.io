@@ -9,7 +9,7 @@
   var isRepeatVisit=false;
   try{
     isRepeatVisit=!!sessionStorage.getItem('obs_booted');
-    sessionStorage.setItem('obs_booted','1');
+    /* PP-9: marker ditulis di enterObservatory() (masuk sukses), bukan di sini — reload sebelum Blue tetap dihitung first visit. */
   }catch(e){}
 
   /* Boot matrix: head glow, glyph mix, clean telemetry (no glitch) */
@@ -50,7 +50,11 @@
   /* Quote fades in mid-boot, stays through the handoff. */
   setTimeout(function(){if(quoteEl)quoteEl.classList.add('on');},1600);
 
-  if(mx){
+  if(mx&&reduce){
+    /* PP-4: prefers-reduced-motion → tanpa hujan matrix (background #boot-screen sudah gelap). */
+    matrixAlive=false;
+  }
+  if(mx&&!reduce){
     /* Cyberpunk glyph mix: kana + digits + circuit symbols. */
     var glyphs='ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789ABCDEF✦★*+<>|/\\□■◆◇○●▲△▼▽';
     var gLen=glyphs.length;
@@ -128,9 +132,13 @@
       cols.sort(function(a,b){return a.layer.depth-b.layer.depth;});
     }
     resizeMatrix();
+    /* PP-4 soft-start: 900ms pertama main thread masih sibuk eval script defer → gambar tiap 2 frame saja + fade-in; setelah itu penuh. */
+    var mxFrame=0,mxStart=performance.now();
+    try{cv.style.opacity='0';cv.style.transition='opacity .9s ease-out';requestAnimationFrame(function(){cv.style.opacity='1';});}catch(eMo){}
     function drawMatrix(){
       if(!matrixAlive)return;
       matrixRAF=requestAnimationFrame(drawMatrix);
+      if(performance.now()-mxStart<900&&((mxFrame++)&1))return;
       var w=innerWidth,h=innerHeight;
       /* Slightly stronger trail so dense far layers read as depth. */
       cx.fillStyle='rgba(2,6,14,0.16)';
@@ -190,20 +198,47 @@
   }
 
   var stars=STELLAR_KEYS.map(function(k){return SFX[k];}),t0=bootT0,done=false; /* semua audio SFX dari registry */
-  var minMs=isRepeatVisit?2000:(IS_POTATO?7000:4200);
-  var maxMs=isRepeatVisit?4000:(IS_POTATO?12000:8000);
+  /* Baseline perangkat nyata: capsule selalu lewat maxMs (0/16 metadata), jadi tuas efektif = gate Tier-0 + maxMs lebih pendek. */
+  var minMs=isRepeatVisit?1500:(IS_POTATO?5000:3200);
+  var maxMs=isRepeatVisit?3000:(IS_POTATO?9000:6000);
   var choicesEl=document.getElementById('boot-choices');
   var capBlue=document.getElementById('boot-cap-blue');
   var capRed=document.getElementById('boot-cap-red');
-  stars.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
-  function readyCount(){var n=0;for(var i=0;i<stars.length;i++)if(stars[i].readyState>=1)n++;return n;}
+  /* PP-2/PP-3: Tier-0 = SFX yang paling mungkin dibunyikan pertama (aldebaran = tap pertama di probe; Orion). Hanya ini yang di-load saat boot,
+     preload='auto' + gate readyState>=2 (playable, bukan sekadar metadata). Sisanya dihangatkan setelah masuk (warmRest). */
+  var tier0=['aldebaran','betel','rigel'].map(function(k){return SFX[k];}).filter(Boolean);
+  if(!tier0.length)tier0=stars.slice(0,3);
+  tier0.forEach(function(a){try{a.preload='auto';a.load();}catch(e){}});
+  function tier0Count(){var n=0;for(var i=0;i<tier0.length;i++)if(tier0[i].readyState>=2)n++;return n;}
+  /* Hangatkan sisa audio bertahap (3 file per 400ms) agar tidak bersaing dgn frame pertama / SW install. Satu jalur retry tetap milik safePlay. */
+  var warmed=false;
+  function warmRest(){
+    if(warmed)return;warmed=true;
+    var q=stars.filter(function(a){return tier0.indexOf(a)<0;});
+    try{q.push(MUSIC_COLLAP,AMB,GARG);}catch(e){}
+    (function step(){
+      for(var n=0;n<3&&q.length;n++){
+        var a=q.shift();
+        try{
+          if(a&&a.readyState<1&&a.paused&&!a._retrying&&!a._want){a.preload=(a===GARG||a===AMB)?'auto':'metadata';a.load();}
+        }catch(e){}
+      }
+      if(q.length)setTimeout(step,400);
+    })();
+  }
+  function readyCount(){return tier0Count();}
   function enterObservatory(){
     if(bs.classList.contains('off'))return;
     bs.classList.add('off');
     matrixAlive=false;
     if(matrixRAF){cancelAnimationFrame(matrixRAF);matrixRAF=0;}
     bootDone=true;
+    try{sessionStorage.setItem('obs_booted','1');}catch(eSs){}   /* PP-9 */
     startRenderLoop();
+    window.__obsEntered=true;
+    try{window.dispatchEvent(new Event('obs-entered'));}catch(eEv){}   /* PP-12: index.html mendaftarkan SW setelah ini */
+    var wr=window.requestIdleCallback||function(f){return setTimeout(f,300);};
+    wr(function(){setTimeout(warmRest,1200);},{timeout:3000});   /* setelah frame pertama (±0.5s di SM-T837A) */
     setTimeout(function(){if(bs&&bs.parentNode)bs.remove();},850);
   }
   function finish(){
@@ -246,11 +281,16 @@
       }
     });
   }
+  var pLast=0;
   function tick(){
-    var now=performance.now(),elapsed=now-t0,rc=readyCount(),readyRatio=rc/stars.length;
+    var now=performance.now(),elapsed=now-t0,rc=readyCount(),readyRatio=rc/tier0.length;
     var timeRatio=Math.min(1,Math.max(0,elapsed/minMs));
     var p=Math.min(99,Math.round((timeRatio*.72+readyRatio*.28)*100));
     if(elapsed>=minMs)p=Math.min(99,Math.max(p,90+Math.round(readyRatio*9)));
+    /* PP-2 anti-jump: maks +5%/tick (frame jank / batch event tidak bikin bar loncat). */
+    if(p>pLast+5)p=pLast+5;
+    if(p<pLast)p=pLast;
+    pLast=p;
     fill.style.width=p+'%';pct.textContent=p+'%';
     paintTelemetry(false);
     if(elapsed>=minMs && (readyRatio>=1 || elapsed>=maxMs))finish();

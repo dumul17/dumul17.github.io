@@ -1441,12 +1441,14 @@ var utcClicks=0,utcReset=0;
 var SW=null;   /* SW = transisi keluar ke dumul.html sedang jalan (guard input, dipakai ~65 tempat). F5: hanya SW.kind==='belt' (beltEnter) */
 var ARV=1;   /* skala kedatangan BH overview saat keluar dari terowongan swallow sektor (0.08 = jauh di ujung terowongan .. 1 = penuh); dari WORMHOLE.arrive() tiap frame */
 var HPV=0,HP_K=.5;   /* HPV: tarikan portal saat hold (0..1, dari WORMHOLE.pull() tiap frame); HP_K: porsi tarikan penuh swallow yang dipakai saat hold */
-var AMB=mkAudio('constellation.opus',.5,true,'auto');
-var GARG=mkAudio('glitch-instrumental.opus',0,true,'auto');
-var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'metadata');
+/* Boot-optimasi: objek Audio tetap dibuat di sini (registry/iterator Object.keys(SFX) aman), tapi preload='none' supaya TIDAK ada fetch
+   saat boot. 07-boot.js menghangatkan Tier-0 (preload auto) lebih dulu, sisanya (SFX lain + BGM + GARG) dihangatkan setelah enterObservatory. */
+var AMB=mkAudio('constellation.opus',.5,true,'none');
+var GARG=mkAudio('glitch-instrumental.opus',0,true,'none');
+var MUSIC_COLLAP=mkAudio('collapsars.opus',.5,true,'none');
 /* Objek audio per bintang SFX — dibuat dari registry (sky-data.js). File: audio/<nama>.opus */
 var SFX={};
-SKY.sfx.forEach(function(d){SFX[d.key]=mkAudio(d.audio,.85,false,'metadata');});
+SKY.sfx.forEach(function(d){SFX[d.key]=mkAudio(d.audio,.85,false,'none');});
 function mkAudio(name,vol,loop,preloadMode){var a=new Audio('audio/'+encodeURIComponent(name));a.preload=preloadMode||'metadata';a.loop=!!loop;a.volume=vol;a._bv=vol;return a;}
 function safePlay(a){
   if(!a)return false;
