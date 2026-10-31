@@ -1217,6 +1217,7 @@ function planet3dDraw(now){
   if(typeof skyZoom!=='undefined'&&skyZoom>4)return;           /* planet keluar layar */
   if(typeof smenuHidesSky==='function'&&smenuHidesSky())return;
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.arrive&&WORMHOLE.arrive()<.15)return;   /* wormhole sudah menutup layar: planet tidak kelihatan, jangan render */
+  if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.noPlanet)return;   /* ?whdbg=noplanet (A/B hitch exit): planet tidak dirender & tidak digambar selama wormhole aktif; normal lagi setelah wormhole selesai (planet tampak hilang/beku selama transisi: memang begitu) */
   try{
     pl3dResize();
     var use3d=PL3D.state===2&&PL3D.r;
@@ -1250,7 +1251,7 @@ function planet3dDraw(now){
           pl3dUniforms(now,true);
           PL3D.r.setScissorTest(false);
           PL3D.r.render(PL3D.sc,PL3D.cam);
-          if(window.__plSt){var _S=window.__plSt;_S.fl++;if(typeof WH_DBG==='string'&&/(^|,)plfin(,|$)/.test(WH_DBG)){try{PL3D.r.getContext().finish();}catch(eF){}}   /* ?whdbg=plfin: tunggu GPU selesai -> waktu render penuh yang SEBENARNYA (membekukan sebentar, hanya diagnosa) */
+          if(window.__plSt){var _S=window.__plSt;_S.fl++;if(typeof WORMHOLE!=='undefined'&&WORMHOLE.dbgHas&&WORMHOLE.dbgHas('plfin')){try{PL3D.r.getContext().finish();}catch(eF){}}   /* ?whdbg=plfin: tunggu GPU selesai -> waktu render penuh yang SEBENARNYA (membekukan sebentar, hanya diagnosa) */
             var _d=Math.round(performance.now()-_pt0);if(_d>_S.mx)_S.mx=_d;}
           if(!PL3D.chk){   /* sekali: piksel dasar-tengah harus terisi (di dalam bola). Program yang tidak jalan tapi lolos diagnostics -> fallback 2D */
             PL3D.chk=1;

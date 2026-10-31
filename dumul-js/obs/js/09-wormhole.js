@@ -737,6 +737,9 @@ window.WORMHOLE={
   get on(){return state!=='idle';},
   get busy(){return state==='enter'||state==='travel'||state==='exit';},   /* transisi sedang jalan */
   get supported(){return usable();},
+  /* flag whdbg bertoken persis (dipisah koma), untuk modul lain: WH_DBG private di IIFE ini. ?whdbg=noplanet = A/B planet3d dilewati selama wormhole aktif (17-planet3d.js) */
+  dbgHas:function(t){return (','+WH_DBG+',').indexOf(','+t+',')>=0;},
+  get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
   dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG};}
