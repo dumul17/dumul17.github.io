@@ -70,20 +70,29 @@
      preload='metadata' + gate readyState>=1. JANGAN 'auto': di Chrome Android itu menarik file penuh (±3 MB/file, terbukti di probe) dan bikin Tier-0 lebih lambat; tap pertama tetap lewat safePlay (±0.3-0.4 dtk). Sisanya dihangatkan setelah masuk (warmRest). */
   var tier0=['aldebaran','betel','rigel'].map(function(k){return SFX[k];}).filter(Boolean);
   if(!tier0.length)tier0=stars.slice(0,3);
-  /* 9.4b (pass 6): Tier-0 TIDAK lagi di-load di awal IIFE (sebelum DCL, saat 18 script defer masih dieksekusi + diduga menahan event 'load' lewat elemen media NETWORK_LOADING).
-     Sekarang dimulai setelah capsule tampil (finish()); user butuh >1 dtk memilih Blue, tap pertama tetap lewat safePlay. ?legacy=1 = perilaku lama (A/B bench). */
-  var LEGACY=false;try{LEGACY=/[?&]legacy=1/.test(location.search);}catch(eLg){}
+  /* 9.4b (pass 6, rev v124): Tier-0 JANGAN di-load di awal IIFE (saat 18 script defer masih dieksekusi), tapi juga JANGAN menunggu capsule/Blue:
+     bench 6 run menunjukkan Tier-0 'setelah capsule' baru mulai 2-4 dtk kemudian, bertabrakan dgn klik Blue (frame1 +0.5 dtk) dan 1/3 run tap aldebaran cold (1.47 dtk).
+     Default sekarang = setelah DOMContentLoaded (script defer selesai). Gate capsule sudah lepas dari 'load' (pageReady), jadi Tier-0 lebih awal tidak lagi menahan capsule.
+     A/B: ?t0=capsule (v123) | ?legacy=1 (v118: Tier-0 di awal + gate 'load'). */
+  var LEGACY=false,T0MODE='dcl';
+  try{LEGACY=/[?&]legacy=1/.test(location.search);if(/[?&]t0=capsule/.test(location.search))T0MODE='capsule';}catch(eLg){}
   var tier0Started=false;
   function startTier0(){
     if(tier0Started)return;tier0Started=true;
+    try{performance.mark('obs-t0');}catch(eM){}
     tier0.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
   }
   if(LEGACY)startTier0();
+  else if(T0MODE==='dcl'){
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(startTier0,0);},{once:true});
+    else setTimeout(startTier0,0);
+  }
   function tier0Count(){var n=0;for(var i=0;i<tier0.length;i++)if(tier0[i].readyState>=1)n++;return n;}
   /* Hangatkan sisa audio bertahap (3 file per 400ms) agar tidak bersaing dgn frame pertama / SW install. Satu jalur retry tetap milik safePlay. */
   var warmed=false;
   function warmRest(){
     if(warmed)return;warmed=true;
+    try{performance.mark('obs-warm');}catch(eM){}
     var q=stars.filter(function(a){return tier0.indexOf(a)<0;});
     try{q.push(MUSIC_COLLAP,AMB,GARG);}catch(e){}
     (function step(){
@@ -125,7 +134,7 @@
   function finish(){
     if(done)return;done=true;
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
-    if(!LEGACY)requestAnimationFrame(function(){setTimeout(startTier0,0);});   /* 9.4b: setelah capsule ter-paint */
+    if(!LEGACY&&T0MODE==='capsule')requestAnimationFrame(function(){setTimeout(startTier0,0);});   /* ?t0=capsule (v123) */
     fill.style.width='100%';pct.textContent='100%';sig.classList.add('on');
     if(quoteEl)quoteEl.classList.add('on');
     if(statusEl)statusEl.innerHTML=
