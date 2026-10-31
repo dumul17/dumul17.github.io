@@ -510,5 +510,71 @@ if ('serviceWorker' in navigator) {
   if (document.readyState === 'complete') boot(); else window.addEventListener('load', boot);
 })();
 </script>
+<script>
+/* BENCH (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
+(function () {
+  if (!/[?&]bench=1(&|$)/.test(location.search)) return;
+  var R = { t: {}, n: {} }, lt = 0, ltN = 0, capDone = false, blueAt = 0, tapAt = 0, box;
+  function now() { return Math.round(performance.now()); }
+  function mark(k) { if (R.t[k] == null) { R.t[k] = now(); paint(); } }
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (e) { if (!capDone) { lt += e.duration; ltN++; } });
+    }).observe({ entryTypes: ['longtask'] });
+  } catch (e) {}
+  function sfxStates() {
+    var a = 0, m = 0, p = 0, tot = 0;
+    try { Object.keys(SFX).forEach(function (k) { tot++; var s = SFX[k].readyState; if (s >= 1) m++; if (s >= 2) p++; }); } catch (e) {}
+    return { total: tot, metadata: m, playable: p };
+  }
+  function paint() {
+    if (!box) return;
+    var t = R.t, x = [];
+    x.push('BENCH ms (sejak navigasi)');
+    x.push('dcl: ' + (t.dcl || '-'));
+    x.push('capsule: ' + (t.capsule || '-'));
+    x.push('blue klik: ' + (t.blue || '-'));
+    x.push('frame1 setelah blue: ' + (t.frame1 || '-') + (t.frame1 && t.blue ? ' (+' + (t.frame1 - t.blue) + ')' : ''));
+    x.push('tap->bunyi pertama: ' + (R.tapToPlay != null ? R.tapToPlay + ' ms' : '-'));
+    if (R.sfxAtCapsule) x.push('SFX @capsule meta/play: ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.playable + ' dari ' + R.sfxAtCapsule.total);
+    x.push('longtask sblm capsule: ' + ltN + 'x / ' + Math.round(lt) + 'ms');
+    x.push('SW: ' + (R.sw || '-') + ' | net: ' + (R.net || '-'));
+    box.firstChild.textContent = x.join('\n');
+  }
+  function snapshot() {
+    R.sfxFinal = sfxStates();
+    R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
+    return JSON.stringify(R);
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#7fffb0;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #2a6;max-width:70vw;white-space:pre;pointer-events:none';
+    box.appendChild(document.createElement('div'));
+    var b = document.createElement('button');
+    b.textContent = 'COPY JSON';
+    b.style.cssText = 'pointer-events:auto;margin-top:4px;font:10px monospace;padding:3px 6px;display:block';
+    b.onclick = function (ev) { ev.stopPropagation(); var s = snapshot(); try { navigator.clipboard.writeText(s); b.textContent = 'COPIED'; } catch (e) { prompt('Copy:', s); } console.log('[bench]', s); };
+    box.appendChild(b);
+    document.body.appendChild(box);
+    mark('dcl');
+    R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
+    R.sw = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
+    var ch = document.getElementById('boot-choices');
+    if (ch) new MutationObserver(function () {
+      if (ch.classList.contains('on') && !capDone) { capDone = true; R.sfxAtCapsule = sfxStates(); mark('capsule'); }
+    }).observe(ch, { attributes: true, attributeFilter: ['class'] });
+    var blue = document.getElementById('boot-cap-blue');
+    if (blue) blue.addEventListener('click', function () {
+      blueAt = now(); mark('blue'); var f0 = typeof lastFrameOK !== 'undefined' ? lastFrameOK : 0;
+      (function poll() { if (typeof lastFrameOK !== 'undefined' && lastFrameOK !== f0) { mark('frame1'); return; } if (now() - blueAt < 8000) requestAnimationFrame(poll); })();
+    }, true);
+  });
+  window.addEventListener('load', function () { mark('load'); });
+  document.addEventListener('pointerdown', function () { if (blueAt) tapAt = now(); }, true);
+  document.addEventListener('playing', function (e) {
+    if (R.tapToPlay == null && tapAt && e.target && e.target.tagName === 'AUDIO') { R.tapToPlay = now() - tapAt; paint(); }
+  }, true);
+})();
+</script>
 </body>
 </html>
