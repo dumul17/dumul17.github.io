@@ -580,6 +580,12 @@
           el.textContent = msg;
         };
       }
+      /* #muff-dbg (dibuat 01-core.spatialDbg di kiri-atas) bertabrakan dengan overlay PERF/WP di kiri-atas → pindah ke kiri-bawah lewat stylesheet */
+      if (!document.getElementById('muff-dbg-pos')) {
+        var ms = document.createElement('style'); ms.id = 'muff-dbg-pos';
+        ms.textContent = '#muff-dbg{top:auto!important;bottom:calc(6px + env(safe-area-inset-bottom,0px))!important;left:6px!important;max-width:60vw}';
+        (document.head || document.documentElement).appendChild(ms);
+      }
       window.__WH_AD_instMuff = true;
       return true;
     } catch (e) {
