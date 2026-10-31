@@ -511,44 +511,84 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 <script>
-/* BENCH (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
+/* BENCH v2 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
-  var R = { t: {}, n: {} }, lt = 0, ltN = 0, capDone = false, blueAt = 0, tapAt = 0, box;
+  var R = { t: {}, meta: {}, taps: 0, playing: 0 }, lt = 0, ltN = 0, ltAll = 0, ltAllN = 0, capDone = false, blueAt = 0, tapAt = 0, box, hooked = false;
   function now() { return Math.round(performance.now()); }
   function mark(k) { if (R.t[k] == null) { R.t[k] = now(); paint(); } }
   try {
     new PerformanceObserver(function (l) {
-      l.getEntries().forEach(function (e) { if (!capDone) { lt += e.duration; ltN++; } });
+      l.getEntries().forEach(function (e) { ltAll += e.duration; ltAllN++; if (!capDone) { lt += e.duration; ltN++; } });
     }).observe({ entryTypes: ['longtask'] });
   } catch (e) {}
   function sfxStates() {
-    var a = 0, m = 0, p = 0, tot = 0;
+    var m = 0, p = 0, tot = 0;
     try { Object.keys(SFX).forEach(function (k) { tot++; var s = SFX[k].readyState; if (s >= 1) m++; if (s >= 2) p++; }); } catch (e) {}
     return { total: tot, metadata: m, playable: p };
+  }
+  function hookSfx() {
+    if (hooked) return; hooked = true;
+    try {
+      Object.keys(SFX).forEach(function (k) {
+        var a = SFX[k];
+        if (a.readyState >= 1) R.meta[k] = 'pre'; /* sudah siap sebelum hook dipasang */
+        a.addEventListener('loadedmetadata', function () { if (R.meta[k] == null) R.meta[k] = now(); });
+        a.addEventListener('playing', function () {
+          R.playing++;
+          if (blueAt && tapAt && R.tapToPlay == null) { R.tapToPlay = now() - tapAt; R.tapKey = k; paint(); }
+        });
+      });
+    } catch (e) {}
   }
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH ms (sejak navigasi)');
-    x.push('dcl: ' + (t.dcl || '-'));
-    x.push('capsule: ' + (t.capsule || '-'));
+    x.push('BENCH v2 ms (sejak navigasi)');
+    x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
+    x.push('boot start: ' + (t.bootStart || '-'));
+    x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
     x.push('blue klik: ' + (t.blue || '-'));
-    x.push('frame1 setelah blue: ' + (t.frame1 || '-') + (t.frame1 && t.blue ? ' (+' + (t.frame1 - t.blue) + ')' : ''));
-    x.push('tap->bunyi pertama: ' + (R.tapToPlay != null ? R.tapToPlay + ' ms' : '-'));
+    x.push('frame1 (lastFrameOK#2): ' + (t.frame1 || '-') + (t.frame1 && t.blue ? ' (+' + (t.frame1 - t.blue) + ')' : ''));
+    x.push('raf2 setelah blue: ' + (t.raf2 || '-') + (t.raf2 && t.blue ? ' (+' + (t.raf2 - t.blue) + ')' : ''));
+    x.push('tap->bunyi: ' + (R.tapToPlay != null ? R.tapToPlay + 'ms ' + (R.tapKey || '') : '-') + '  tap/play: ' + R.taps + '/' + R.playing);
+    if (R.sfxAtBootStart) x.push('SFX @bootStart meta/play: ' + R.sfxAtBootStart.metadata + '/' + R.sfxAtBootStart.playable);
     if (R.sfxAtCapsule) x.push('SFX @capsule meta/play: ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.playable + ' dari ' + R.sfxAtCapsule.total);
+    if (R.finishGuess) x.push('capsule krn: ' + R.finishGuess);
     x.push('longtask sblm capsule: ' + ltN + 'x / ' + Math.round(lt) + 'ms');
-    x.push('SW: ' + (R.sw || '-') + ' | net: ' + (R.net || '-'));
     box.firstChild.textContent = x.join('\n');
   }
   function snapshot() {
     R.sfxFinal = sfxStates();
+    R.longtaskBeforeCapsule = { n: ltN, ms: Math.round(lt) };
+    R.longtaskTotal = { n: ltAllN, ms: Math.round(ltAll) };
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
+    R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
+    R.swNow = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
+    R.bootRepeatFlag = 'n/a(dibaca setelah boot)';
+    try { R.res = performance.getEntriesByType('resource').length; } catch (e) {}
     return JSON.stringify(R);
   }
+  /* boot start = saat 07-boot menambahkan canvas matrix ke #boot-matrix (satu kali, di awal IIFE) */
+  var mx = document.getElementById('boot-matrix');
+  if (mx) new MutationObserver(function (m, ob) {
+    if (R.t.bootStart == null) { mark('bootStart'); R.sfxAtBootStart = sfxStates(); hookSfx(); ob.disconnect(); }
+  }).observe(mx, { childList: true });
+  var ch = document.getElementById('boot-choices');
+  if (ch) new MutationObserver(function () {
+    if (ch.classList.contains('on') && !capDone) {
+      capDone = true; R.sfxAtCapsule = sfxStates(); mark('capsule'); hookSfx();
+      if (R.t.bootStart != null) {
+        R.bootToCapsule = R.t.capsule - R.t.bootStart;
+        var potato = typeof IS_POTATO !== 'undefined' && IS_POTATO, mx2 = potato ? 12000 : 8000;
+        R.finishGuess = R.bootToCapsule >= mx2 - 300 ? 'maxMs (' + mx2 + ')' : (R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total ? 'readiness 16/16' : 'tidak jelas');
+      }
+      paint();
+    }
+  }).observe(ch, { attributes: true, attributeFilter: ['class'] });
   document.addEventListener('DOMContentLoaded', function () {
     box = document.createElement('div');
-    box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#7fffb0;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #2a6;max-width:70vw;white-space:pre;pointer-events:none';
+    box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#7fffb0;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #2a6;max-width:80vw;white-space:pre;pointer-events:none';
     box.appendChild(document.createElement('div'));
     var b = document.createElement('button');
     b.textContent = 'COPY JSON';
@@ -557,23 +597,21 @@ if ('serviceWorker' in navigator) {
     box.appendChild(b);
     document.body.appendChild(box);
     mark('dcl');
-    R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
-    R.sw = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
-    var ch = document.getElementById('boot-choices');
-    if (ch) new MutationObserver(function () {
-      if (ch.classList.contains('on') && !capDone) { capDone = true; R.sfxAtCapsule = sfxStates(); mark('capsule'); }
-    }).observe(ch, { attributes: true, attributeFilter: ['class'] });
     var blue = document.getElementById('boot-cap-blue');
     if (blue) blue.addEventListener('click', function () {
-      blueAt = now(); mark('blue'); var f0 = typeof lastFrameOK !== 'undefined' ? lastFrameOK : 0;
-      (function poll() { if (typeof lastFrameOK !== 'undefined' && lastFrameOK !== f0) { mark('frame1'); return; } if (now() - blueAt < 8000) requestAnimationFrame(poll); })();
+      blueAt = now(); mark('blue');
+      var f0 = typeof lastFrameOK !== 'undefined' ? lastFrameOK : 0, changes = 0, last = f0;
+      /* perubahan #1 = startRenderLoop() menulis lastFrameOK; #2 = frame pertama selesai */
+      (function poll() {
+        if (typeof lastFrameOK !== 'undefined' && lastFrameOK !== last) { last = lastFrameOK; changes++; if (changes >= 2) { mark('frame1'); return; } }
+        if (now() - blueAt < 10000) requestAnimationFrame(poll);
+      })();
+      requestAnimationFrame(function () { requestAnimationFrame(function () { mark('raf2'); }); });
     }, true);
+    paint();
   });
   window.addEventListener('load', function () { mark('load'); });
-  document.addEventListener('pointerdown', function () { if (blueAt) tapAt = now(); }, true);
-  document.addEventListener('playing', function (e) {
-    if (R.tapToPlay == null && tapAt && e.target && e.target.tagName === 'AUDIO') { R.tapToPlay = now() - tapAt; paint(); }
-  }, true);
+  document.addEventListener('pointerdown', function () { if (blueAt) { tapAt = now(); R.taps++; paint(); } }, true);
 })();
 </script>
 </body>
