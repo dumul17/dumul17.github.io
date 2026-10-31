@@ -293,7 +293,8 @@
     pLast=p;
     fill.style.width=p+'%';pct.textContent=p+'%';
     paintTelemetry(false);
-    if(elapsed>=minMs && (readyRatio>=1 || elapsed>=maxMs))finish();
+    /* Gate = aset halaman siap (window load: gambar nebula/milky-way), bukan audio: tap pertama tetap ±0.4 dtk lewat safePlay walau audio belum siap (probe). maxMs = safety net. */
+    if(elapsed>=minMs && (document.readyState==='complete' || elapsed>=maxMs))finish();
     else requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
