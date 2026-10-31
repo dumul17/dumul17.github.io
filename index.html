@@ -318,7 +318,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=122"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=123"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -587,6 +587,7 @@ if ('serviceWorker' in navigator) {
     R.sfxFinal = sfxStates();
     R.longtaskBeforeCapsule = { n: ltN, ms: Math.round(lt) };
     R.longtaskTotal = { n: ltAllN, ms: Math.round(ltAll) };
+    try { R.ver = {}; Array.prototype.forEach.call(document.scripts, function (sc) { var m = /\/([^\/?]+)\?v=(\d+)/.exec(sc.src || ''); if (m && /^(01-core|07-boot)/.test(m[1])) R.ver[m[1]] = +m[2]; }); R.legacy = /[?&]legacy=1/.test(location.search); R.loadAfterCapsule = R.t.load != null && R.t.capsule != null ? R.t.load - R.t.capsule : null; } catch (e) {}
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
     R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
     R.swNow = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
@@ -619,7 +620,7 @@ if ('serviceWorker' in navigator) {
       if (R.t.bootStart != null) {
         R.bootToCapsule = R.t.capsule - R.t.bootStart;
         /* bootStart ditandai agak telat (setelah seluruh 07-boot.js selesai), jadi jangan bandingkan ke angka persis. Logika pasti: readiness cuma bisa jadi sebab kalau 16/16 sudah metadata. */
-        R.finishGuess = R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total ? 'readiness 16/16' : 'maxMs (readiness belum ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.total + ')';
+        R.finishGuess = window.__bootFinish || (R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total ? 'readiness 16/16' : 'maxMs (readiness belum ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.total + ')');
       }
       paint();
     }
