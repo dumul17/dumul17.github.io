@@ -511,7 +511,7 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 <script>
-/* BENCH v2 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
+/* BENCH v3 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   var R = { t: {}, meta: {}, taps: 0, playing: 0 }, lt = 0, ltN = 0, ltAll = 0, ltAllN = 0, capDone = false, blueAt = 0, tapAt = 0, box, hooked = false;
@@ -544,7 +544,7 @@ if ('serviceWorker' in navigator) {
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v2 ms (sejak navigasi)');
+    x.push('BENCH v3 ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -566,9 +566,22 @@ if ('serviceWorker' in navigator) {
     R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
     R.swNow = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
     R.bootRepeatFlag = 'n/a(dibaca setelah boot)';
-    try { R.res = performance.getEntriesByType('resource').length; } catch (e) {}
+    try {
+      var rs = performance.getEntriesByType('resource'); R.res = rs.length; R.aud = [];
+      rs.forEach(function (e) { if (/\.opus/.test(e.name)) R.aud.push([e.name.replace(/^.*\//, '').replace(/\?.*$/, ''), Math.round(e.startTime), Math.round(e.responseStart), Math.round(e.responseEnd), e.transferSize]); });
+    } catch (e) {}
     return JSON.stringify(R);
   }
+  /* waktu eksekusi tiap <script defer>: event 'load' script defer terpicu setelah script itu selesai dieksekusi.
+     Selisih antar-script berurutan ~ biaya eksekusi script (+ tunggu download kalau belum ada). */
+  R.scr = {};
+  try {
+    Array.prototype.forEach.call(document.scripts, function (s) {
+      if (!s.src) return;
+      var n = s.src.replace(/^.*\//, '').replace(/\?.*$/, '');
+      s.addEventListener('load', function () { R.scr[n] = now(); });
+    });
+  } catch (e) {}
   /* boot start = saat 07-boot menambahkan canvas matrix ke #boot-matrix (satu kali, di awal IIFE) */
   var mx = document.getElementById('boot-matrix');
   if (mx) new MutationObserver(function (m, ob) {
@@ -580,8 +593,8 @@ if ('serviceWorker' in navigator) {
       capDone = true; R.sfxAtCapsule = sfxStates(); mark('capsule'); hookSfx();
       if (R.t.bootStart != null) {
         R.bootToCapsule = R.t.capsule - R.t.bootStart;
-        var potato = typeof IS_POTATO !== 'undefined' && IS_POTATO, mx2 = potato ? 12000 : 8000;
-        R.finishGuess = R.bootToCapsule >= mx2 - 300 ? 'maxMs (' + mx2 + ')' : (R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total ? 'readiness 16/16' : 'tidak jelas');
+        /* bootStart ditandai agak telat (setelah seluruh 07-boot.js selesai), jadi jangan bandingkan ke angka persis. Logika pasti: readiness cuma bisa jadi sebab kalau 16/16 sudah metadata. */
+        R.finishGuess = R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total ? 'readiness 16/16' : 'maxMs (readiness belum ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.total + ')';
       }
       paint();
     }
