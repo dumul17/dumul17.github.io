@@ -1344,12 +1344,23 @@ function drawFocusFx(now){
   g.restore();
 }
 function bhDragAllowed(){if(typeof isLayoutEdit==="function"&&isLayoutEdit())return false;return !CAMERA_MODE||!FOCUS.list||FOCUS.list[FOCUS.i].id==='bh';}
+/* Lebar #cap-bh di-cache: offsetWidth dibaca tepat setelah style.transform ditulis = layout paksa tiap frame pan/zoom (zoom sabuk, anim fokus cam, geser).
+   Kunci cache: teks + class + counter (resize / orientasi / font selesai dimuat). Lebar 0 (caption disembunyikan) tidak di-cache. */
+var _capW={k:'',w:0,n:0};
+window.addEventListener('resize',function(){_capW.n++;});
+try{if(document.fonts){if(document.fonts.ready)document.fonts.ready.then(function(){_capW.n++;});if(document.fonts.addEventListener)document.fonts.addEventListener('loadingdone',function(){_capW.n++;});}}catch(eCW){}
+function capBhW(){
+  var b=(typeof CAPS!=='undefined'&&CAPS)?CAPS.bh:null;if(!b)return 0;
+  var k=b.textContent+'|'+b.className+'|'+_capW.n;
+  if(k===_capW.k&&_capW.w>0)return _capW.w;
+  var w=b.offsetWidth;_capW.k=k;_capW.w=w;return w;
+}
 function syncBHDom(){
   try{
     var bhEl=document.getElementById('bh');if(!bhEl||!W)return;
     var p=camBH();
     bhEl.style.transform='translate('+Math.round(p[0]-BH.R*8)+'px,'+Math.round(p[1]-BH.R*5)+'px)';
-    if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
+    if(CAPS&&CAPS.bh)CAPS.bh.style.transform='translate('+Math.round(p[0]-capBhW()/2+3)+'px,'+Math.round(p[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
   }catch(e){}
 }
 var _camUpOn=false,_freeReset=false;

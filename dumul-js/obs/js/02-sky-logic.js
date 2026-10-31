@@ -1967,7 +1967,7 @@ function layout(){
   var bhEl=$('#bh');bhEl.style.width=Math.round(BH.R*16)+'px';bhEl.style.height=Math.round(BH.R*10)+'px';
   var bhp=camBH();
   bhEl.style.transform='translate('+Math.round(bhp[0]-BH.R*8)+'px,'+Math.round(bhp[1]-BH.R*5)+'px)';
-  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-CAPS.bh.offsetWidth/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
+  CAPS.bh.style.transform='translate('+Math.round(bhp[0]-capBhW()/2+3)+'px,'+Math.round(bhp[1]+BH.R*1.7*BHZ)+'px)'+STG.up;
   fxPlace(false); /* tombol hit bintang SFX (layout awal) */
   buildSprite();
   PORTALS.forEach(function(p){
