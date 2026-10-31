@@ -1670,7 +1670,7 @@ var AV_FAST=(function(){
   if(navigator.deviceMemory&&navigator.deviceMemory<4)return false;
   return true;
 })();
-var AV={_dbg:/[?&]muffdbg/.test(location.search),ctx:null,an:null,lpf:null,sources:{},data:null,prev:null,ready:false,fallback:false,level:0,bass:0,mid:0,high:0,beat:0,peak:0,glitchUntil:0,avgFlux:0,lastBeatT:0,skip:0,atten:0,_tick:0};
+var AV={_dbg:false,ctx:null,an:null,lpf:null,sources:{},data:null,prev:null,ready:false,fallback:false,level:0,bass:0,mid:0,high:0,beat:0,peak:0,glitchUntil:0,avgFlux:0,lastBeatT:0,skip:0,atten:0,_tick:0};
 /* The analyser path intentionally follows the proven dumul.html recipe:
    one AudioContext + one AnalyserNode, FFT 1024, smoothed spectrum and a
    low-frequency spectral-flux beat detector. Playback remains owned by the
@@ -1892,6 +1892,7 @@ function spatialRelease(){
 }
 /* Ada 2 jalur: (A) lowpass Web Audio (kalau graph jalan), (B) fallback volume <audio> (potato / WebView yang
    gagal createMediaElementSource) supaya efek "tenggelam" tetap kedengeran. */
+/* muffdbg overlay: no-op tanpa AV._dbg. Jangan hapus call di updateSpatialAttenuation — 19 hanya menyalakan flag. */
 function spatialDbg(msg){
   if(!AV._dbg)return;
   var el=document.getElementById('muff-dbg');
@@ -1920,7 +1921,7 @@ function updateSpatialAttenuation(){
     try{activeSfx.volume=Math.max(.06,(activeSfx._bv||.85)*(1-.88*Math.pow(AV.atten,.8))*(window.UIS?UIS.duckMul():1));}catch(eV){}
   }
   if(!document.hidden)spatialHint(t);   /* toast nggak perlu muncul saat tab tersembunyi */
-  spatialDbg('MUFFLE '+(useLpf?'LPF':'VOLUME-FALLBACK')+'\npotato='+IS_POTATO+' fb='+AV.fallback+' ready='+AV.ready+' lpf='+!!AV.lpf+'\nctx='+(AV.ctx?AV.ctx.state:'none')+'\nsect.on='+SECT.on+' busy='+SECT.busy+' cam='+CAMERA_MODE+'\ntarget='+t.toFixed(2)+' atten='+AV.atten.toFixed(2));
+  if(AV._dbg)spatialDbg('MUFFLE '+(useLpf?'LPF':'VOLUME-FALLBACK')+'\npotato='+IS_POTATO+' fb='+AV.fallback+' ready='+AV.ready+' lpf='+!!AV.lpf+'\nctx='+(AV.ctx?AV.ctx.state:'none')+'\nsect.on='+SECT.on+' busy='+SECT.busy+' cam='+CAMERA_MODE+'\ntarget='+t.toFixed(2)+' atten='+AV.atten.toFixed(2));
 }
 /* Render loop (rAF) berhenti saat tab hidden / PWA minimize, padahal audio tetap jalan: muffle & wiring harus tetap diurus.
    Timer tetap hidup selama ada audio yang diputar. */

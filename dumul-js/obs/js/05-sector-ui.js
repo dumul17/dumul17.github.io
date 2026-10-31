@@ -298,7 +298,7 @@ function drawSectorOverview(now,age){
     var p=gSky(bx+mx,by+my);
     s.gx=p[0];s.gy=p[1];   /* posisi hantu — muffle overview di 01-core spatialTargetBase */
   }
-  try{if(/[?&]dbg\b/.test(location.search)){g.save();g.fillStyle='rgba(255,255,255,.5)';g.font='9px monospace';g.textAlign='left';g.textBaseline='top';
+  try{if(typeof PERF!=='undefined'&&PERF&&/[?&]dbg\b/.test(location.search)){g.save();g.fillStyle='rgba(255,255,255,.5)';g.font='9px monospace';g.textAlign='left';g.textBaseline='top';
     g.fillText('build 2026-10-06a \u00b7 PLE '+(PLEIADES.scale||0).toFixed(1),8,top+4);g.restore();}}catch(eD){}
 }
 /* Interlocking status per sektor: tiga ◉ (ring + titik tengah), masing-masing punya warna sendiri dan menyala sendiri-sendiri:
@@ -788,207 +788,38 @@ function sectJumpTo(s,carry,always){
   return true;
 }
 
-/* ---------- PROBE PERFORMA (aktif hanya dengan ?perf=1 atau localStorage dumul_perf=1) ----------
-   Ukur: interval antar frame (rAF) vs waktu JS per frame + waktu per tahap. Kalau interval besar tapi JS kecil =>
-   beban ada di GPU/compositor, bukan di JS. Titik jank mencatat konteks: panel terbuka? SFX main? mode sektor? */
-var PX={sky:0,lines:0,stars:0,pulse:0,ast:0,hole:0,all:0,pa:0,pw:0,pb:0,slow:0,mw:0,pt:0,neb:0,ptr:0,ptm:0,ptb:0};   /* saklar diagnosa (diubah dengan ketuk overlay); semua 0/1 = normal */
-var PX_MODES=['normal','panel HIDDEN','asteroid OFF','bintang OFF','milky way OFF','portal3d OFF','nebula/plate OFF','SEMUA OFF (loop kosong)'];
-/* override style inline pada #music-player untuk diagnosa biaya render panel (dikembalikan ke '' tiap ganti mode) */
-var PX_PANEL={'panel HIDDEN':{visibility:'hidden'},'panel OPAQUE':{background:'#040a10'},'panel NO-CLIP':{overflow:'visible',contain:'none',borderRadius:'0'},'panel NO-WILLCHANGE':{willChange:'auto'},'panel NO-SHADOW':{boxShadow:'none'}};
-var PERF=false;try{PERF=/[?&](perf|probe)=1(&|$)/.test(location.search)||localStorage.getItem('dumul_perf')==='1';}catch(ePf){}
-var PP={fs:0,t0:0,last:0,cur:{},tot:{},n:0,isum:0,jsum:0,jank:0,ev:[],el:null,upd:0,pnl:null,imax:0};
-/* PROBE OTOMATIS v3 (?probe=1, otomatis menyalakan PERF). Masuk sektor -> tunggu 3 dtk -> urutan: normal, TES1, normal, TES2, normal, ... (tiap tes diapit 'normal').
-   Tiap langkah: 1,2 dtk settle + 3 dtk ukur. Angka ms = rata-rata terpangkas (buang 10% terkecil & 10% terbesar), supaya stall tidak merusak dan selisih kecil tetap terlihat
-   (median murni cuma bisa loncat per 16,6 ms = 1 vsync). Selisih tiap tes dibanding rata-rata 'normal' kiri-kanannya. '~' = selisih di dalam noise (noise = median selisih antar-'normal'),
-   '!' = banyak stall. Hasil: overlay rapi + tombol SALIN, disimpan di localStorage (dumul_probe_last) untuk dibandingkan dengan run berikutnya. Semua config dikembalikan di akhir. */
-/* v4: probe jalan di DUA konteks. 'sec' = di dalam sektor (daftar tes lama), 'ov' = overview (milky way / portal3d / nebula+plate / asteroid). Konteks ditentukan probeCtx() saat layar stabil 3 dtk;
-   tiap konteks cukup sekali per muat halaman (PROBE.dn). Pindah konteks di tengah jalan = dibatalkan, mulai ulang otomatis di konteks baru. SALIN hasil overview dulu sebelum masuk sektor (overlay diganti). */
+/* ---------- PERF / PROBE STUB (body pindah ke 19-auto-debug.js: installPerf / installProbe) ----------
+   Tanpa ?debug=1: no-op, zero cost. Dengan ?debug=1&perf|probe=1: 19 override pmk/pBegin/pEnd/probe* setelah load.
+   Call site di frame() TIDAK diubah. FS governor di bawah tetap produksi. */
+var PX={sky:0,lines:0,stars:0,pulse:0,ast:0,hole:0,all:0,pa:0,pw:0,pb:0,slow:0,mw:0,pt:0,neb:0,ptr:0,ptm:0,ptb:0};
+var PX_MODES=['normal'];   /* 19 installPerf mengisi daftar lengkap */
+var PX_PANEL={};
+var PERF=false;   /* dinyalakan 19-auto-debug.js (installPerf). JANGAN baca URL/localStorage di sini: tanpa 19, ?perf=1 akan nyalakan gl.finish() di 17 pl3dMkGpu */
+var PP={fs:0,t0:0,last:0,cur:{},tot:{},n:0,isum:0,jsum:0,jank:0,ev:[],el:null,upd:0,pnl:null,imax:0,mode:0,ad:0};
 var PROBE={arm:false,on:false,done:false,i:0,t0:0,iv:[],js:[],el:null,S:null,inS:0,txu:0,res:[],ctx:'',c0:'',dn:{},tests:null,seq:null};
 try{PROBE.arm=/[?&]probe=1(&|$)/.test(location.search);}catch(ePr){}
-/* ?pin=1 = orbit portal dikunci di puncak (sisi jauh dari planet), ?pin=2 = dikunci di titik terendah (dekat limb, terburuk: flare + puing). Tanpa pin orbit jalan (90 dtk/putaran) dan tiap tes kena fase beda -> flag '!'. Hanya overview. */
-var PROBE_SET='';try{var _ps=/[?&]pset=([a-z]+)(&|$)/.exec(location.search);if(_ps)PROBE_SET=_ps[1];}catch(ePs){}   /* ?probe=1&pset=bio = set tes biolum/tanah (kerlip, rotasi, biome, kota, bands, fps) + kolom rf/s, gap, gpu */
+var PROBE_SET='';try{var _ps=/[?&]pset=([a-z]+)(&|$)/.exec(location.search);if(_ps)PROBE_SET=_ps[1];}catch(ePs){}
 var PROBE_PIN=0;try{var _pm=/[?&]pin=([12])(&|$)/.exec(location.search);if(_pm)PROBE_PIN=+_pm[1];}catch(ePn){}
-function probeFreeze(on){try{if(typeof PT3D==='undefined')return;if(on&&PROBE_PIN&&PROBE.ctx==='ov'){PT3D.orbFreeze=1;PT3D.orbPhi=PROBE_PIN===2?4.712389:1.5708;}else PT3D.orbFreeze=0;}catch(e){}}
-var PROBE_TESTS_SEC=[
-  ['aurora OFF',function(){PL3D_CFG.auroraOn=false;}],
-  ['efek planet OFF (4)',function(){var C=PL3D_CFG;C.auroraOn=C.flareOn=C.debrisOn=C.boltOn=false;}],
-  ['rotasi planet OFF',function(){PL3D_CFG.rotK=0;}],
-  ['drone 3D OFF',function(){DR3D_CFG.on=false;}],
-  ['PLANET OFF total',function(){PL3D_CFG.on=false;}],
-  ['asteroid OFF',function(){PX.ast=1;}],
-  ['bintang OFF',function(){PX.stars=1;}],
-  ['garis rasi OFF',function(){PX.lines=1;}],
-  ['langit OFF',function(){PX.sky=1;}],
-  ['pulse+TX OFF',function(){PX.pulse=1;}],
-  ['lubang hitam OFF',function(){PX.hole=1;}],
-  ['SEMUA OFF (kosong)',function(){PX.all=1;}]];
-var PROBE_TESTS_BIO=[
-  ['kerlip OFF',function(){PL3D_CFG.cityTw=0;}],
-  ['tanah+awan diam',function(){PL3D_CFG.rotK=0;PL3D_CFG.cloudDrift=0;}],
-  ['diam+kerlip OFF',function(){var C=PL3D_CFG;C.rotK=0;C.cloudDrift=0;C.cityTw=0;}],
-  ['biome OFF',function(){PL3D_CFG.bioA=0;}],
-  ['kota OFF',function(){PL3D_CFG.cityA=0;}],
-  ['fade OFF',function(){PL3D_CFG.fade=0;}],
-  ['qSlow OFF (q penuh)',function(){PL3D_CFG.qSlow=0;}],
-  ['bandMin 3',function(){PL3D_CFG.bandMin=3;}],
-  ['bands 3',function(){PL3D_CFG.bands=3;}],
-  ['bands 1',function(){PL3D_CFG.bands=1;}],
-  ['fps 30',function(){PL3D_CFG.fps=30;}],
-  ['aurora OFF',function(){PL3D_CFG.auroraOn=false;}],
-  ['PLANET OFF total',function(){PL3D_CFG.on=false;}]];
-/* overview: tiga kandidat (milky way = kandidat cache offscreen, portal3d = render GL tiap 2 frame, nebula/plate = plate + tint langit non-MW) + asteroid sebagai pembanding skala */
-var PROBE_TESTS_OV=[
-  ['portal3d OFF',function(){PX.pt=1;}],
-  ['portal cincin GL OFF',function(){PX.ptr=1;}],
-  ['portal mulut OFF',function(){PX.ptm=1;}],
-  ['portal petir+kilau OFF',function(){PX.ptb=1;}],
-  ['asteroid OFF',function(){PX.ast=1;}],
-  ['SEMUA OFF (kosong)',function(){PX.all=1;}]];
-function probeSeqOf(T){var q=[['normal',function(){}]];for(var k=0;k<T.length;k++){q.push(T[k]);q.push(['normal',function(){}]);}return q;}
-/* konteks layar sekarang: 'sec' (di dalam sektor), 'ov' (overview tenang: tanpa transisi, tanpa window menu sektor, tanpa zoom-in wormhole), '' = belum cocok */
-function probeCtx(){
-  if(typeof SECT==='undefined'||typeof PL3D_CFG==='undefined')return '';
-  if(SECT.cur&&!SECT.on)return 'sec';
-  if(SECT.on&&!SECT.cur&&!SECT.busy){
-    try{if(typeof smenuHidesSky==='function'&&smenuHidesSky())return '';}catch(e){}
-    try{if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringOwned&&WORMHOLE.ringOwned())return '';}catch(e){}
-    return 'ov';
-  }
-  return '';
-}
-function probeSave(){var C=PL3D_CFG;PROBE.S={a:C.auroraOn,f:C.flareOn,d:C.debrisOn,b:C.boltOn,r:C.rotK,o:C.on,dr:(typeof DR3D_CFG!=='undefined'?DR3D_CFG.on:true),tw:C.cityTw,cd:C.cloudDrift,ba:C.bioA,ca:C.cityA,bn:C.bands,fp:C.fps,bm:C.bandMin,fd:C.fade,qq:C.q,qs:C.qSlow};}
-function probeRestore(){var C=PL3D_CFG,S=PROBE.S;if(S){C.auroraOn=S.a;C.flareOn=S.f;C.debrisOn=S.d;C.boltOn=S.b;C.rotK=S.r;C.on=S.o;if(S.tw!==undefined){C.cityTw=S.tw;C.cloudDrift=S.cd;C.bioA=S.ba;C.cityA=S.ca;C.bands=S.bn;C.fps=S.fp;C.bandMin=S.bm;if(S.qq!==undefined){C.fade=S.fd;C.q=S.qq;C.qSlow=S.qs;}}if(typeof DR3D_CFG!=='undefined')DR3D_CFG.on=S.dr;}PX.ast=0;PX.stars=0;PX.lines=0;PX.all=0;PX.sky=0;PX.pulse=0;PX.hole=0;PX.mw=0;PX.pt=0;PX.neb=0;PX.ptr=0;PX.ptm=0;PX.ptb=0;}
-function probeP(x,n){x=String(x);while(x.length<n)x+=' ';return x;}
-function probeL(x,n){x=String(x);while(x.length<n)x=' '+x;return x;}
-function probeSg(v,d){return (v>=0?'+':'')+v.toFixed(d);}
-function probeCopy(btn){
-  var t=PROBE.txt||'';
-  function ok(){btn.textContent='TERSALIN';setTimeout(function(){btn.textContent='SALIN';},1500);}
-  function fb(){try{var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0;left:0;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);ok();}catch(e){btn.textContent='GAGAL';}}
-  try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb);return;}}catch(e){}
-  fb();
-}
-function probeUi(){
-  if(PROBE.box)return;
-  var bx=document.createElement('div'),pr=document.createElement('pre'),row=document.createElement('div'),b1=document.createElement('button'),b2=document.createElement('button'),bs='font:inherit;color:inherit;background:rgba(255,210,127,.1);border:1px solid rgba(255,210,127,.5);border-radius:4px;padding:5px 12px;';
-  bx.style.cssText='position:fixed;left:4px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:99998;max-width:calc(100vw - 8px);box-sizing:border-box;padding:6px 8px;background:rgba(2,8,14,.9);border:1px solid rgba(255,210,127,.3);border-radius:6px;font:10px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#ffd27f;pointer-events:none';
-  pr.style.cssText='margin:0;font:inherit;white-space:pre;overflow:hidden';
-  row.style.cssText='display:none;gap:8px;margin-top:6px';
-  b1.textContent='SALIN';b1.style.cssText=bs;b1.onclick=function(){probeCopy(b1);};
-  b2.textContent='TUTUP';b2.style.cssText=bs;b2.onclick=function(){bx.style.display='none';};
-  row.appendChild(b1);row.appendChild(b2);bx.appendChild(pr);bx.appendChild(row);document.body.appendChild(bx);
-  PROBE.box=bx;PROBE.el=pr;PROBE.row=row;
-}
-/* fin=true: hasil akhir (tombol aktif, simpan teks untuk SALIN). fin=false: status jalan (tidak menangkap sentuhan). */
-function probeShow(t,fin){
-  probeUi();
-  PROBE.box.style.display='block';
-  PROBE.el.textContent=t;
-  PROBE.row.style.display=fin?'flex':'none';
-  PROBE.box.style.pointerEvents=fin?'auto':'none';
-  if(fin)PROBE.txt=t;
-}
-function probeTrim(a){
-  if(!a.length)return 0;
-  var b=a.slice().sort(function(x,y){return x-y;}),lo=Math.floor(b.length*.1),hi=Math.max(lo+1,Math.ceil(b.length*.9)),s=0,k;
-  for(k=lo;k<hi;k++)s+=b[k];
-  return s/(hi-lo);
-}
-function probeReport(R){
-  var b4=0,b5=0,b6=0,k,bs=[],dl=[],nz=0,base=0,t,b0,b1,bm,d,fl,tx,rows=[],qs='',prev=null,best=null,nOk=0,df;
-  var T=PROBE.tests,ctx=PROBE.ctx,lk=ctx==='ov'?'dumul_probe_last_ov':'dumul_probe_last',verdict='';
-  for(k=0;k<R.length;k+=2){bs.push(R[k][1]);b4+=R[k][4]||0;if((R[k][5]||0)>b5)b5=R[k][5];b6+=R[k][6]||0;}
-  for(k=0;k+1<bs.length;k++)dl.push(Math.abs(bs[k]-bs[k+1]));
-  dl.sort(function(x,y){return x-y;});nz=dl.length?dl[Math.floor(dl.length/2)]:0;
-  for(k=0;k<bs.length;k++)base+=bs[k];base/=Math.max(1,bs.length);
-  try{qs=location.search.replace(/^\?/,'');}catch(e){}
-  tx='HASIL PROBE ['+(ctx==='ov'?'OVERVIEW':'SEKTOR')+(ctx==='ov'&&PROBE_PIN?(PROBE_PIN===2?' orbit DEKAT limb':' orbit JAUH'):'')+']   dpr x'+(+DPR).toFixed(2)+'   kanvas '+cv.width+'x'+cv.height+'\n'+
-     'normal '+base.toFixed(1)+' ms = '+(1000/base).toFixed(0)+' fps   (noise +-'+nz.toFixed(1)+' ms)\n'+
-     (b4>0?'refresh tanah '+(b4/Math.max(1,bs.length)).toFixed(1)+'/dtk   gap maks '+b5.toFixed(0)+' ms   gpu '+(b6/Math.max(1,bs.length)).toFixed(1)+' ms/pita\n':'')+
-     '------------------------------------------\n'+
-     probeP('tes (dimatikan)',19)+probeL('ms',6)+probeL('hemat',8)+probeL('fps',7)+probeL('rf/s',6)+probeL('gap',6)+probeL('gpu',6)+'\n';
-  for(k=0;k<T.length;k++){
-    t=R[2*k+1];b0=R[2*k][1];b1=R[2*k+2][1];bm=(b0+b1)/2;d=bm-t[1];df=1000/t[1]-1000/bm;
-    fl=(Math.abs(d)<Math.max(nz,2)?'~':' ')+(t[2]>t[1]*1.6?'!':' ');
-    tx+=probeP(T[k][0],19)+probeL(t[1].toFixed(1),6)+probeL(probeSg(d,1),8)+probeL(probeSg(df,1),7)+probeL((t[4]||0).toFixed(1),6)+probeL((t[5]||0).toFixed(0),6)+probeL((t[6]||0).toFixed(1),6)+' '+fl+'\n';
-    if(fl.charAt(0)!=='~'&&T[k][0].indexOf('SEMUA')<0){nOk++;if(!best||d>best.d)best={n:T[k][0],d:d};}
-    if(ctx==='ov'&&(T[k][0]==='milky way OFF'||T[k][0]==='portal3d OFF'))verdict+=T[k][0].replace(' OFF','')+': '+((d>=3&&fl.charAt(0)!=='~')?'>= 3 ms, cache/jarangkan layak':'< 3 ms atau dalam noise, tidak usah repot')+' ('+probeSg(d,1)+' ms)\n';
-  }
-  tx+='------------------------------------------\n'+
-      '+ hemat saat dimatikan   ~ dalam noise\n'+
-      '! banyak stall (angka kurang pasti)\n'+
-      'rf/s refresh penuh tanah per dtk   gap jeda terpanjang (ms)   gpu tunggu GPU per pita (ms)\n';
-  tx+=verdict;
-  tx+=best?('Menonjol: '+best.n+' ('+probeSg(best.d,1)+' ms)\n'):'Tidak ada komponen tunggal yang menonjol\n(biaya tersebar rata)\n';
-  try{prev=JSON.parse(localStorage.getItem(lk)||'null');}catch(e){}
-  if(prev&&prev.base)tx+='Run lalu: dpr x'+(+prev.dpr).toFixed(2)+'  '+prev.base.toFixed(1)+' ms  ('+probeSg(base-prev.base,1)+' ms sekarang)\n';
-  try{localStorage.setItem(lk,JSON.stringify({dpr:+DPR,base:base,nz:nz,q:qs,ts:Date.now()}));}catch(e){}
-  tx+='fs: '+['off','auto','paksa slow'][FS.mode]+(FS.slow?' (slow aktif)':'')+'   ?'+qs;
-  return tx;
-}
-function probeBegin(now){probeRestore();try{PROBE.seq[PROBE.i][1]();}catch(e){}PROBE.t0=now;PROBE.iv=[];PROBE.js=[];PROBE.gs=0;PROBE.gn=0;PROBE.pfR=0;PROBE.pfT=0;}
-function probeMed(a,q){if(!a.length)return 0;var b=a.slice().sort(function(x,y){return x-y;});return b[Math.min(b.length-1,Math.floor(b.length*q))];}
-function probeTick(now,iv,js){
-  if(!PROBE.arm)return;
-  var cx=probeCtx();
-  if(!PROBE.on){
-    if(now<12000||!cx||PROBE.dn[cx]||cx!==PROBE.c0){PROBE.inS=0;PROBE.c0=(cx&&!PROBE.dn[cx])?cx:'';return;}   /* konteks harus sama & stabil 3 dtk; konteks yang sudah selesai dilewati */
-    if(!PROBE.inS)PROBE.inS=now;
-    if(now-PROBE.inS<3000)return;
-    PROBE.ctx=cx;PROBE.tests=cx==='ov'?PROBE_TESTS_OV:(PROBE_SET==='bio'?PROBE_TESTS_BIO:PROBE_TESTS_SEC);PROBE.seq=probeSeqOf(PROBE.tests);
-    probeSave();probeFreeze(true);PROBE.on=true;PROBE.i=0;PROBE.res=[];probeBegin(now);return;
-  }
-  if(cx!==PROBE.ctx&&!PX.all){PROBE.on=false;PROBE.inS=0;PROBE.c0='';probeRestore();probeFreeze(false);probeShow('PROBE dibatalkan (pindah '+(PROBE.ctx==='ov'?'dari overview':'dari sektor')+').\nDiam di overview / sektor 3 dtk, otomatis mulai ulang.',false);return;}
-  var el=now-PROBE.t0;
-  if(el>1200&&iv>0&&iv<1000){PROBE.iv.push(iv);PROBE.js.push(js);var gq=(PP.cur&&PP.cur['pl.gpu'])||0;if(gq>0){PROBE.gs+=gq;PROBE.gn++;}}
-  if(el>1200&&!PROBE.pfR){PROBE.pfR=1;PROBE.pfT=performance.now();try{if(PL3D.pf){PL3D.pf.n=0;PL3D.pf.max=0;PL3D.pf.last=0;}}catch(ePf2){}}   /* mulai hitung refresh tanah setelah settle 1,2 dtk */
-  if(now-PROBE.txu>400){PROBE.txu=now;probeShow('PROBE ['+(PROBE.ctx==='ov'?'OVERVIEW':'SEKTOR')+'] '+(PROBE.i+1)+'/'+PROBE.seq.length+'   '+PROBE.seq[PROBE.i][0]+'\nsisa +-'+Math.max(0,Math.round((PROBE.seq.length-PROBE.i)*4.2-el/1000))+' dtk   (jangan sentuh layar)',false);}
-  if(el<4200)return;
-  var pfq=null,pfd=0;try{pfq=PL3D.pf||null;}catch(ePf3){}if(PROBE.pfT)pfd=(performance.now()-PROBE.pfT)/1000;
-  PROBE.res.push([PROBE.seq[PROBE.i][0],probeTrim(PROBE.iv),probeMed(PROBE.iv,.9),probeMed(PROBE.js,.5),(pfq&&pfd>.5)?pfq.n/pfd:0,pfq?pfq.max:0,PROBE.gn?PROBE.gs/PROBE.gn:0]);   /* [4] refresh penuh tanah/dtk, [5] jeda terpanjang antar refresh (ms), [6] tunggu GPU per pita (ms) */
-  PROBE.i++;
-  if(PROBE.i<PROBE.seq.length){probeBegin(now);return;}
-  probeRestore();probeFreeze(false);PROBE.dn[PROBE.ctx]=1;PROBE.on=false;PROBE.c0='';PROBE.inS=0;
-  probeShow(probeReport(PROBE.res),true);
-}
-function pmk(n){if(!PERF)return;var t=performance.now();PP.cur[n]=(PP.cur[n]||0)+(t-PP.t0);PP.t0=t;}
-function pBegin(){if(!PERF)return;PP.fs=PP.t0=performance.now();PP.cur={};AST_DRAWN=0;}
-function pEnd(now){
-  if(!PERF)return;
-  pmk('end');
-  var js=performance.now()-PP.fs,iv=PP.last?now-PP.last:0;PP.last=now;PP.ad=AST_DRAWN;try{probeTick(now,iv,js);}catch(ePt){}
-  if(iv>0&&iv<1000){
-    PP.n++;PP.isum+=iv;PP.jsum+=js;if(iv>PP.imax)PP.imax=iv;
-    for(var k in PP.cur)PP.tot[k]=(PP.tot[k]||0)+PP.cur[k];
-    if(iv>34){
-      PP.jank++;
-      var top='',tv=0;for(var k2 in PP.cur)if(PP.cur[k2]>tv){tv=PP.cur[k2];top=k2;}
-      var pn=PP.pnl||(PP.pnl=document.getElementById('music-player'));
-      PP.ev.push((iv|0)+'ms js'+(js|0)+' '+top+(tv|0)+' '+(pn&&pn.classList.contains('open')?'PANEL ':'')+(activeSfx&&!activeSfx.paused?'SFX ':'')+(SECT.on?'OVW':'SEC'));
-      if(PP.ev.length>6)PP.ev.shift();
-    }
-  }
-  if(now-PP.upd>700){
-    PP.upd=now;
-    if(!PP.el){var d=document.createElement('pre');d.style.cssText='position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:4px 6px;font:9px/1.25 monospace;color:#9ff;background:rgba(0,0,0,.72);pointer-events:auto;white-space:pre';document.body.appendChild(d);PP.el=d;PP.mode=0;
-      d.addEventListener('click',function(){
-        PP.mode=(PP.mode+1)%PX_MODES.length;var m=PP.mode;
-        var nm=PX_MODES[m];
-        PX.pa=nm==='panel anim OFF'?1:0;PX.pw=nm==='wave OFF'?1:0;PX.pb=nm==='bars OFF'?1:0;PX.slow=nm==='panel anim ~8fps'?1:0;PX.sky=nm==='langit OFF'?1:0;PX.lines=nm==='garis rasi OFF'?1:0;PX.stars=nm==='bintang OFF'?1:0;PX.pulse=nm==='pulse+TX OFF'?1:0;PX.ast=nm==='asteroid OFF'?1:0;PX.hole=nm==='lubang hitam OFF'?1:0;PX.mw=nm==='milky way OFF'?1:0;PX.pt=nm==='portal3d OFF'?1:0;PX.neb=nm==='nebula/plate OFF'?1:0;PX.all=nm.indexOf('SEMUA')===0?1:0;
-        var mpn=document.getElementById('music-player');
-        if(mpn){for(var pk in PX_PANEL)for(var pp in PX_PANEL[pk])mpn.style[pp]='';var ov=PX_PANEL[nm];if(ov)for(var pp2 in ov)mpn.style[pp2]=ov[pp2];}
-        PP.n=PP.isum=PP.jsum=PP.jank=PP.imax=0;PP.tot={};PP.ev=[];
-      },true);}
-    var n=PP.n||1,arr=[];for(var k3 in PP.tot)arr.push([k3,PP.tot[k3]/n]);arr.sort(function(a,b){return b[1]-a[1];});
-    var tx='['+PX_MODES[PP.mode|0]+'] ketuk=ganti\nfps '+(1000/(PP.isum/n)).toFixed(0)+'  int '+(PP.isum/n).toFixed(1)+'ms (max '+(PP.imax|0)+')  js '+(PP.jsum/n).toFixed(1)+'ms\nfs: '+['off','auto','paksa'][FS.mode]+(FS.slow?' SLOW ('+(FS.why||'paksa')+')':' normal')+'  ema '+FS.ema.toFixed(0)+'ms\njank>34ms: '+PP.jank+'/'+PP.n+'\n';
-    for(var i=0;i<Math.min(6,arr.length);i++)tx+=arr[i][0]+' '+arr[i][1].toFixed(2)+'\n';
-    var av=0;for(var ai2=0;ai2<AST.length;ai2++)if(AST[ai2]._vis)av++;
-    tx+='batu: gambar '+(PP.ad|0)+' / _vis '+av+' / total '+AST.length+'\n';
-    tx+=PP.ev.join('\n');
-    PP.el.textContent=tx;
-    if(PP.n>240){PP.n=PP.isum=PP.jsum=PP.jank=PP.imax=0;PP.tot={};PP.ev=[];}   /* jendela bergulir ~4 dtk */
-  }
-}
+var PROBE_TESTS_SEC=[],PROBE_TESTS_BIO=[],PROBE_TESTS_OV=[];
+function probeFreeze(){}
+function probeSeqOf(T){return[['normal',function(){}]];}
+function probeCtx(){return'';}
+function probeSave(){}
+function probeRestore(){}
+function probeP(x,n){return String(x);}
+function probeL(x,n){return String(x);}
+function probeSg(v,d){return String(v);}
+function probeCopy(){}
+function probeUi(){}
+function probeShow(){}
+function probeTrim(){return 0;}
+function probeReport(){return'';}
+function probeBegin(){}
+function probeMed(){return 0;}
+function probeTick(){}
+function pmk(n){}
+function pBegin(){if(PERF)AST_DRAWN=0;}
+function pEnd(now){}
 
 /* Cap 60fps untuk layar >=110Hz (120/144): tanpa ini sky berat dirender 2x lebih sering dari yang bisa dilihat.
    Layar 60Hz tidak tersentuh. capVs = interval vsync terkecil yang teramati (estimasi refresh). Kalau estimasi meleset
