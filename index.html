@@ -315,7 +315,7 @@
 <script defer src="dumul-js/obs/js/01-core.js?v=142"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=138"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=110"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=140"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=141"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=123"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=121"></script>
@@ -329,8 +329,18 @@
 /* Live counter: dimuat BELAKANGAN (setelah window load + idle) supaya Firebase dari gstatic nggak rebutan bandwidth dengan boot & audio.
    Path + ?v= di import() harus sama persis dengan SHELL service-worker.js (check-sky.js memeriksa). Gagal muat = counter tetap tersembunyi. */
 (function () {
-  function go() { try { import('./dumul-js/obs/js/11-live-count.js?v=3').catch(function () {}); } catch (e) {} }
-  function idle() { if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 6000 }); else setTimeout(go, 3000); }
+  /* v22: evaluasi modul Firebase (~90ms di HP) jangan jatuh di boot atau di tengah animasi. Tunggu: boot selesai (bootDone) + wormhole/sektor tidak sibuk; cek tiap 1,5 dtk.
+     Batas: setelah ~60 dtk menunggu boot, lanjut asal tidak sedang transisi. ?nolive=1 = counter tidak dimuat sama sekali (A/B lag). */
+  var tries = 0;
+  function go() {
+    var w = window.WORMHOLE, s = window.SECT, boot = (typeof bootDone !== 'undefined' && bootDone);
+    if ((!boot && tries++ < 40) || (w && w.busy) || (s && s.busy)) { setTimeout(go, 1500); return; }
+    try { import('./dumul-js/obs/js/11-live-count.js?v=4').catch(function () {}); } catch (e) {}
+  }
+  function idle() {
+    if (/[?&]nolive=1(&|$)/.test(location.search)) return;
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 6000 }); else setTimeout(go, 3000);
+  }
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
@@ -347,7 +357,7 @@
    check-sky.js mengecualikan file ini. Naikkan ?v= kalau file-nya diubah. */
 (function () {
   if (!/[?&]debug=1(&|$)/.test(location.search)) return;
-  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=11'; s.async = true; document.body.appendChild(s); }
+  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=12'; s.async = true; document.body.appendChild(s); }
   if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
 })();
 </script>
