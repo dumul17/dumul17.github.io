@@ -317,7 +317,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=140"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=179"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=123"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=118"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=119"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=13"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=40"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=8"></script>
@@ -343,7 +343,7 @@
    check-sky.js mengecualikan file ini. Naikkan ?v= kalau file-nya diubah. */
 (function () {
   if (!/[?&]debug=1(&|$)/.test(location.search)) return;
-  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=5'; s.async = true; document.body.appendChild(s); }
+  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=6'; s.async = true; document.body.appendChild(s); }
   if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
 })();
 </script>
@@ -519,113 +519,6 @@ if ('serviceWorker' in navigator) {
   paint();
   function boot() { setTimeout(ask, 1500); }
   if (document.readyState === 'complete') boot(); else window.addEventListener('load', boot);
-})();
-</script>
-<script>
-/* TRACE (?trace=1) — penangkap PP-11, read-only: tidak mengubah perilaku boot. Nol biaya tanpa ?trace=1. Hapus blok ini setelah selesai ukur.
-   Sumber data: Long Animation Frames (per-script: compile vs eksekusi), longtask, resource timing script, paint. Tombol: COPY SUMMARY (JSON ringkas) / SAVE TRACE (JSON trace-event, buka di DevTools Performance atau ui.perfetto.dev). */
-(function () {
-  if (!/[?&]trace=1(&|$)/.test(location.search)) return;
-  var loaf = [], lt = [], paints = {}, marks = {}, support = { loaf: 0, longtask: 0 };
-  function r(x) { return Math.round(x || 0); }
-  function now() { return r(performance.now()); }
-  function short(u) { return String(u || '').replace(/^.*\//, '').replace(/\?.*$/, '') || '(inline)'; }
-  function pick(e) {
-    var sc = [];
-    (e.scripts || []).forEach(function (s) {
-      sc.push({ u: short(s.sourceURL), f: s.sourceFunctionName || '', k: s.invokerType || '', i: short(s.invoker),
-        s: r(s.startTime), c: r(s.executionStart - s.startTime), d: r(s.duration), fl: r(s.forcedStyleAndLayoutDuration), p: r(s.pauseDuration) });
-    });
-    return { s: r(e.startTime), d: r(e.duration), b: r(e.blockingDuration), rs: r(e.renderStart), sl: r(e.styleAndLayoutStart), sc: sc };
-  }
-  try { new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { loaf.push(pick(e)); }); }).observe({ type: 'long-animation-frame', buffered: true }); support.loaf = 1; } catch (e) {}
-  try { new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { lt.push([r(e.startTime), r(e.duration)]); }); }).observe({ type: 'longtask', buffered: true }); support.longtask = 1; } catch (e) {}
-  try { new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { paints[e.name] = r(e.startTime); }); }).observe({ type: 'paint', buffered: true }); } catch (e) {}
-  try { new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { paints.LCP = r(e.startTime); }); }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch (e) {}
-  document.addEventListener('DOMContentLoaded', function () { marks.dcl = now(); });
-  window.addEventListener('load', function () { marks.load = now(); });
-  var ch = document.getElementById('boot-choices');
-  if (ch) new MutationObserver(function () { if (ch.classList.contains('on') && marks.capsule == null) { marks.capsule = now(); paint(); } }).observe(ch, { attributes: true, attributeFilter: ['class'] });
-  document.addEventListener('click', function (ev) { var t = ev.target; if (t && t.closest && t.closest('#boot-cap-blue') && marks.blue == null) marks.blue = now(); }, true);
-
-  function scripts() {
-    var out = [];
-    try {
-      performance.getEntriesByType('resource').forEach(function (e) {
-        if (/\.js(\?|$)/.test(e.name)) out.push([short(e.name), r(e.startTime), r(e.responseStart), r(e.responseEnd), e.transferSize | 0, e.decodedBodySize | 0]);
-      });
-    } catch (e) {}
-    return out;
-  }
-  function summary() {
-    var cap = marks.capsule == null ? 1e9 : marks.capsule, per = {}, tot = { frames: loaf.length, ms: 0, blocking: 0, preFrames: 0, preMs: 0, preBlocking: 0 };
-    loaf.forEach(function (f) {
-      tot.ms += f.d; tot.blocking += f.b;
-      if (f.s < cap) { tot.preFrames++; tot.preMs += f.d; tot.preBlocking += f.b; }
-      f.sc.forEach(function (s) {
-        var key = s.u + '|' + s.k + '|' + s.f;
-        var p = per[key] || (per[key] = { u: s.u, k: s.k, f: s.f, n: 0, dur: 0, cmp: 0, max: 0, forced: 0, pre: 0 });
-        p.n++; p.dur += s.d; p.cmp += s.c; p.forced += s.fl; if (s.d > p.max) p.max = s.d; if (s.s < cap) p.pre += s.d;
-      });
-    });
-    var top = Object.keys(per).map(function (k) { return per[k]; }).sort(function (a, b) { return b.dur - a.dur; }).slice(0, 30);
-    var heavy = loaf.slice().sort(function (a, b) { return b.d - a.d; }).slice(0, 12);
-    var ltPre = 0, ltPreN = 0, ltAll = 0;
-    lt.forEach(function (x) { ltAll += x[1]; if (x[0] < cap) { ltPre += x[1]; ltPreN++; } });
-    return JSON.stringify({
-      meta: { ua: navigator.userAgent, url: location.search, exportedAt: new Date().toISOString(), support: support,
-        sw: navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller',
-        net: (navigator.connection && navigator.connection.effectiveType) || 'n/a', cores: navigator.hardwareConcurrency, mem: navigator.deviceMemory },
-      marks: marks, paints: paints, totals: tot, longtask: { preCapsule: [ltPreN, ltPre], total: [lt.length, ltAll] },
-      perScript: top, heaviestFrames: heavy, scriptRes: scripts(), longtasks: lt.slice(0, 60)
-    });
-  }
-  function traceJson() {
-    var ev = [], pid = 1, names = { 1: 'LoAF frames', 2: 'script (compile+exec)', 3: 'longtask', 4: 'script download', 5: 'marks' };
-    Object.keys(names).forEach(function (t) { ev.push({ ph: 'M', name: 'thread_name', pid: pid, tid: +t, args: { name: names[t] } }); });
-    ev.push({ ph: 'M', name: 'process_name', pid: pid, tid: 0, args: { name: 'obs ?trace=1' } });
-    loaf.forEach(function (f) {
-      ev.push({ name: 'LoAF', cat: 'loaf', ph: 'X', ts: f.s * 1000, dur: f.d * 1000, pid: pid, tid: 1, args: { blocking: f.b, renderStart: f.rs, styleLayoutStart: f.sl } });
-      f.sc.forEach(function (s) {
-        ev.push({ name: s.u + (s.f ? ' ' + s.f : '') + ' [' + s.k + ']', cat: 'script', ph: 'X', ts: s.s * 1000, dur: s.d * 1000, pid: pid, tid: 2, args: { compileMs: s.c, forcedLayoutMs: s.fl, invoker: s.i } });
-      });
-    });
-    lt.forEach(function (x) { ev.push({ name: 'longtask', cat: 'longtask', ph: 'X', ts: x[0] * 1000, dur: x[1] * 1000, pid: pid, tid: 3 }); });
-    scripts().forEach(function (s) { ev.push({ name: s[0], cat: 'net', ph: 'X', ts: s[1] * 1000, dur: Math.max(1, s[3] - s[1]) * 1000, pid: pid, tid: 4, args: { ttfb: s[2] - s[1], bytes: s[4], decoded: s[5] } }); });
-    Object.keys(marks).forEach(function (k) { ev.push({ name: k, ph: 'i', s: 'g', ts: marks[k] * 1000, pid: pid, tid: 5 }); });
-    Object.keys(paints).forEach(function (k) { ev.push({ name: k, ph: 'i', s: 'g', ts: paints[k] * 1000, pid: pid, tid: 5 }); });
-    return JSON.stringify({ traceEvents: ev, displayTimeUnit: 'ms' });
-  }
-  var box, body;
-  function paint() {
-    if (!box) return;
-    var s = JSON.parse(summary()), x = [];
-    x.push('TRACE ms  dcl ' + (marks.dcl || '-') + '  load ' + (marks.load || '-') + '  capsule ' + (marks.capsule || '-'));
-    x.push('LoAF ' + s.totals.frames + 'x / ' + s.totals.ms + 'ms (blok ' + s.totals.blocking + ')  sblm capsule ' + s.totals.preFrames + 'x / ' + s.totals.preMs + 'ms');
-    x.push('support LoAF:' + support.loaf + ' longtask:' + support.longtask);
-    s.perScript.slice(0, 6).forEach(function (p) { x.push(p.u + ' ' + p.k + ' ' + p.dur + 'ms (cmp ' + p.cmp + ' x' + p.n + ')'); });
-    body.textContent = x.join('\n');
-  }
-  document.addEventListener('DOMContentLoaded', function () {
-    box = document.createElement('div');
-    box.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.8);color:#ffd27f;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #b80;max-width:92vw;white-space:pre;pointer-events:none';
-    body = document.createElement('div'); box.appendChild(body);
-    function btn(label, fn) {
-      var b = document.createElement('button');
-      b.textContent = label; b.style.cssText = 'pointer-events:auto;margin:4px 4px 0 0;font:10px monospace;padding:3px 6px';
-      b.onclick = function (ev) { ev.stopPropagation(); fn(b); }; box.appendChild(b);
-    }
-    btn('COPY SUMMARY', function (b) { var s = summary(); try { navigator.clipboard.writeText(s); b.textContent = 'COPIED'; } catch (e) { prompt('Copy:', s); } });
-    btn('SAVE TRACE', function (b) {
-      try {
-        var u = URL.createObjectURL(new Blob([traceJson()], { type: 'application/json' })), a = document.createElement('a');
-        a.href = u; a.download = 'obs-trace-' + Date.now() + '.json'; document.body.appendChild(a); a.click(); a.remove(); b.textContent = 'SAVED';
-      } catch (e) { b.textContent = 'ERR'; }
-    });
-    btn('REFRESH', function () { paint(); });
-    document.body.appendChild(box); paint();
-    setInterval(paint, 2000);
-  });
 })();
 </script>
 <script>
