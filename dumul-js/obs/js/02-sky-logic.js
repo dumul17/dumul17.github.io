@@ -1445,7 +1445,59 @@ function nebAng(a,b){return((a-b+540)%360)-180;}   /* selisih hue terpendek a-b,
 /* Versi nebula berwarna sektor. Hue SEMUA blob digeser ke hue tema sektor tapi variasi relatifnya dipertahankan (SPREAD): ungu/pink/teal asli jadi
    biru/violet/cyan di autumn, oranye/merah/rose di summer, dst. Terang piksel tetap, bintang putih tetap putih (saturasi rendah tidak disentuh).
    Warna aksen sektor (acc) menarik hue di sekitar posisinya. Latar gelap gambar -> transparan (MASK). Di-bake lazy, sekali per sektor. */
+/* v13: bake nebula bertint per sektor DICICIL (dulu satu frame ~200ms: loop HSL per piksel -> spike terowongan ~+1.5 dtk). nebTint() sekarang non-blocking: mulai job (irisan ~3ms per setTimeout) dan return null
+   sampai selesai; sectDrawSky melewati sektor itu (fade-in 450ms kalau selesai terlambat). Dipanggil lebih awal dari sectJumpTo/sectZoomIn supaya sudah jadi sebelum layar terbuka. nebTintSync = jalur lama (fallback). */
+var NEBJ=null;
 function nebTint(s){
+  if(!NEB.base||!s||!s.sky)return null;
+  var c=NEB.tint[s.k];if(c)return c;
+  if(!NEB.MASK||NEB.tintSync)return nebTintSync(s);
+  if(NEBJ&&(NEBJ.base!==NEB.base||NEBJ.tint!==NEB.tint)){if(NEBJ.tm)clearTimeout(NEBJ.tm);NEBJ=null;}   /* base/tint diganti (resize, tuning) -> job basi dibuang */
+  if(!NEBJ){NEBJ={k:s.k,s:s,base:NEB.base,tint:NEB.tint,st:0,i:0,tm:0};NEBJ.tm=setTimeout(nebTintStep,0);}
+  return null;
+}
+function nebTintStep(){
+  var J=NEBJ;if(!J)return;J.tm=0;
+  if(NEB.base!==J.base||NEB.tint!==J.tint){NEBJ=null;return;}
+  var t0=performance.now();
+  try{
+    if(J.st===0){
+      var w=J.base.width,h=J.base.height,s=J.s,A=s.sky.acc,k=w/(W+2*plateM),bd=null,rgb;
+      try{bd=J.base.getContext('2d').getImageData(0,0,w,h).data;}catch(eG){bd=null;}
+      if(!bd){NEB.tintSync=1;NEBJ=null;return;}   /* getImageData ditolak -> jalur lama (blend 'color') */
+      J.w=w;J.h=h;J.bd=bd;J.c=document.createElement('canvas');J.c.width=w;J.c.height=h;
+      J.x=J.c.getContext('2d');J.id=J.x.createImageData(w,h);J.d=J.id.data;
+      J.lo=NEB.MASK[0];J.hi=NEB.MASK[1];J.A=A;J.hA=0;J.ax=0;J.ay=0;J.R=Math.max(w,h)*.9*.7;
+      rgb=s.sky.rgb.split(',');nebHsl(+rgb[0],+rgb[1],+rgb[2]);J.hS=NEBH[0];J.sS=NEBH[1];
+      if(A){rgb=A.rgb.split(',');nebHsl(+rgb[0],+rgb[1],+rgb[2]);J.hA=NEBH[0];J.ax=(plateM+W*A.x)*k;J.ay=(plateM+H*A.y)*k;}
+      J.sf=1+NEB.SATMIX*(J.sS/.6-1);J.st=1;
+    }else if(J.st===1){
+      var wg,d=J.d,bd2=J.bd,n=d.length,i=J.i,lim,lo=J.lo,hi=J.hi,A2=J.A,hS=J.hS,hA=J.hA,ax=J.ax,ay=J.ay,R=J.R,sf=J.sf,w2=J.w,p,m,hb,nh,ns,l,q,pp;
+      while(i<n){
+        lim=Math.min(n,i+16384);
+        for(;i<lim;i+=4){
+          m=(.3*bd2[i]+.59*bd2[i+1]+.11*bd2[i+2]-lo)/(hi-lo);m=m<0?0:m>1?1:m;
+          if(m<=0)continue;
+          d[i+3]=(m*m*(3-2*m)*255)|0;
+          nebHsl(bd2[i],bd2[i+1],bd2[i+2]);
+          hb=hS;
+          if(A2){p=i>>2;wg=1-Math.sqrt(Math.pow(p%w2-ax,2)+Math.pow(((p/w2)|0)-ay,2))/R;if(wg>0)hb=hS+nebAng(hA,hS)*(wg>1?1:wg);}
+          nh=(hb+nebAng(NEBH[0],NEB.HC)*NEB.SPREAD+720)%360/360;
+          ns=NEBH[1]*sf;ns=ns>1?1:ns;l=NEBH[2];
+          q=l<.5?l*(1+ns):l+ns-l*ns;pp=2*l-q;
+          d[i]=nebC(pp,q,nh+1/3)*255;d[i+1]=nebC(pp,q,nh)*255;d[i+2]=nebC(pp,q,nh-1/3)*255;
+        }
+        if(performance.now()-t0>3)break;
+      }
+      J.i=i;if(i>=n)J.st=2;
+    }else{
+      J.x.putImageData(J.id,0,0);J.c._m=1;J.c._t=performance.now();
+      NEB.tint[J.k]=J.c;NEBJ=null;return;
+    }
+  }catch(eJ){NEB.tintSync=1;NEBJ=null;return;}
+  J.tm=setTimeout(nebTintStep,0);
+}
+function nebTintSync(s){
   if(!NEB.base||!s||!s.sky)return null;
   var c=NEB.tint[s.k];if(c)return c;
   var w=NEB.base.width,h=NEB.base.height,A=s.sky.acc,k=w/(W+2*plateM),bd=null,x;

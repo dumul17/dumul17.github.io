@@ -309,6 +309,7 @@ function chargeP(now){
 function go(dest,pos,R,onCover){
   if(!usable()||!init())return false;
   if(state==='travel'||state==='enter'||state==='exit')return false;
+  if(WP){WP.r=[];WP.t=0;WP.s={};WP.ph='';}   /* v13: 'enter' tak pernah direkam (tick return dulu) -> statistik menumpuk lintas dive & frame zoom pertama = jeda antar-dive (7108ms palsu) */
   whPrewarm();   /* v7: sinkron di awal go — hitch = latensi klik, bukan patah di tengah enter (bukan setTimeout 60) */
   var sp=pos&&pos[0]!=null&&pos[1]!=null?toScr(pos[0],pos[1]):null,
       x=sp?sp[0]:(S&&S.x!=null?S.x:winW()*.5),y=sp?sp[1]:(S&&S.y!=null?S.y:winH()*.5),

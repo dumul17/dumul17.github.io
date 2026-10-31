@@ -2297,10 +2297,11 @@ function sectDrawSky(){
       s=SECT.list[i];t=s.sky&&SKYT[s.k];
       if(!t||t.v<.01)continue;
       A=nebTint(s);if(!A)continue;
+      var rp=A._t?Math.min(1,(performance.now()-A._t)/450):1;   /* v13: baru selesai di-bake -> fade-in, bukan pop */
       g.save();
-      if(A._m){g.globalAlpha=t.v*NEB.SDIM;g.fillStyle='rgb(2,5,10)';g.fillRect(0,0,W,H);}   /* nebula bertopeng: gelapkan plate (nebula overview) dulu biar nggak dobel + latar pekat */
+      if(A._m){g.globalAlpha=t.v*NEB.SDIM*rp;g.fillStyle='rgb(2,5,10)';g.fillRect(0,0,W,H);}   /* nebula bertopeng: gelapkan plate (nebula overview) dulu biar nggak dobel + latar pekat */
       if(zn>.01){
-        g.globalAlpha=t.v*NEB.A_SEC*zn;
+        g.globalAlpha=t.v*NEB.A_SEC*zn*rp;
         plateBlit(A,plateM,W+2*plateM,H+2*plateM,1+(skyZoom-1)*NEB.ZF,skyPan.x*.14,skyPan.y*.14);
       }
       g.restore();

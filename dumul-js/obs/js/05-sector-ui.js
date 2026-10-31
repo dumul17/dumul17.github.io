@@ -47,6 +47,7 @@ function skyWarmStep(){
 }
 function sectZoomIn(s){
   if(SECT.busy||!s||s.bx==null)return;
+  try{nebTint(s);}catch(eNt){}   /* v13: pastikan bake nebula bertint sudah jalan (biasanya sudah dimulai di sectJumpTo) */
   SECT.warmQ=null;SECT.warmMs=null;window.__plSt={rs:0,fl:0,mx:0,fin:0};   /* hitung resize/render-penuh planet3d sejak zoom-in (panel whperf) */
   SECT.busy=true;SECT.phase='in';SECT.cur=null;SECT.target=s;SECT.t0=performance.now();
   try{if(typeof setCameraMode==='function'&&CAMERA_MODE)setCameraMode(false);}catch(e){}
@@ -758,6 +759,7 @@ function sgNum(s){return String((s&&(s.name||s.k))||'').toUpperCase();}   /* nam
    Dari sektor: jalur sektor ke sektor (tujuan harus kuning = s.drn). Dari overview (F2): WORMHOLE.gate dari cincin portal overview, sectZoomIn jalan di bawah terowongan saat layar tertutup; tanpa wormhole (reduce-motion dll) = sectZoomIn biasa. */
 function sectJumpTo(s,carry,always){
   if(!s||SECT.busy||SW||whBusy()||!s.ids||!s.ids.length)return false;
+  try{nebTint(s);}catch(eNt){}   /* v13: bake nebula bertint DICICIL sejak sebelum terbang (selesai jauh sebelum terowongan membuka) */
   if(SECT.cur){
     if(s===SECT.cur)return false;
     lisDecide(function(){
