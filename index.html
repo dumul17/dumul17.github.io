@@ -311,15 +311,15 @@
 <script defer src="dumul-js/obs/i18n.js?v=32"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=141"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=142"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=138"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=110"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=140"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=179"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=123"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=119"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=13"></script>
-<script defer src="dumul-js/obs/js/09-wormhole.js?v=40"></script>
+<script defer src="dumul-js/obs/js/09-wormhole.js?v=41"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=8"></script>
 <script>
 /* Live counter: dimuat BELAKANGAN (setelah window load + idle) supaya Firebase dari gstatic nggak rebutan bandwidth dengan boot & audio.
@@ -343,7 +343,7 @@
    check-sky.js mengecualikan file ini. Naikkan ?v= kalau file-nya diubah. */
 (function () {
   if (!/[?&]debug=1(&|$)/.test(location.search)) return;
-  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=6'; s.async = true; document.body.appendChild(s); }
+  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=7'; s.async = true; document.body.appendChild(s); }
   if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
 })();
 </script>
