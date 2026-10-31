@@ -230,6 +230,7 @@
   function enterObservatory(){
     if(bs.classList.contains('off'))return;
     bs.classList.add('off');
+    try{performance.mark('obs-blue');}catch(eM){}
     matrixAlive=false;
     if(matrixRAF){cancelAnimationFrame(matrixRAF);matrixRAF=0;}
     bootDone=true;
@@ -243,6 +244,7 @@
   }
   function finish(){
     if(done)return;done=true;
+    try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
     fill.style.width='100%';pct.textContent='100%';sig.classList.add('on');
     if(quoteEl)quoteEl.classList.add('on');
     if(statusEl)statusEl.innerHTML=

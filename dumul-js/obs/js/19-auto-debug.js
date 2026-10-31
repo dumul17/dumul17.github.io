@@ -47,6 +47,98 @@
   var MODE = URL_MODE || (PERF_FROM_LS ? 'perf' : '');
   if (!flag('debug') && !window.__WH_AD_FORCE) return;
 
+  /* ---------- TRACE (PP-11): tangkap Long Animation Frames / longtask / resource script ----------
+     Observer 'buffered' → data sejak navigasi tetap ikut walau file ini baru dimuat setelah window load (buffer browser maks ±200 entri).
+     Penanda capsule/Blue dari performance.mark('obs-capsule'|'obs-blue') di 07-boot.js. Nol biaya tanpa ?debug=1. */
+  var TR = { loaf: [], lt: [], paints: {}, sup: { loaf: 0, longtask: 0 } };
+  function trR(x) { return Math.round(x || 0); }
+  function trShort(u) { return String(u || '').replace(/^.*\//, '').replace(/\?.*$/, '') || '(inline)'; }
+  function trPick(e) {
+    var sc = [];
+    (e.scripts || []).forEach(function (s) {
+      sc.push({ u: trShort(s.sourceURL), f: s.sourceFunctionName || '', k: s.invokerType || '', i: trShort(s.invoker),
+        s: trR(s.startTime), c: trR(s.executionStart - s.startTime), d: trR(s.duration), fl: trR(s.forcedStyleAndLayoutDuration) });
+    });
+    return { s: trR(e.startTime), d: trR(e.duration), b: trR(e.blockingDuration), rs: trR(e.renderStart), sl: trR(e.styleAndLayoutStart), sc: sc };
+  }
+  function trObs(type, fn) {
+    try { new PerformanceObserver(function (l) { l.getEntries().forEach(fn); }).observe({ type: type, buffered: true }); return 1; } catch (e) { return 0; }
+  }
+  TR.sup.loaf = trObs('long-animation-frame', function (e) { TR.loaf.push(trPick(e)); });
+  TR.sup.longtask = trObs('longtask', function (e) { TR.lt.push([trR(e.startTime), trR(e.duration)]); });
+  trObs('paint', function (e) { TR.paints[e.name] = trR(e.startTime); });
+  trObs('largest-contentful-paint', function (e) { TR.paints.LCP = trR(e.startTime); });
+  function trMarks() {
+    var m = {}, nav = null;
+    try { nav = performance.getEntriesByType('navigation')[0]; } catch (e) {}
+    if (nav) { m.dcl = trR(nav.domContentLoadedEventEnd); m.load = trR(nav.loadEventStart); }
+    ['obs-capsule', 'obs-blue'].forEach(function (n) {
+      try { var e = performance.getEntriesByName(n)[0]; if (e) m[n.slice(4)] = trR(e.startTime); } catch (e2) {}
+    });
+    return m;
+  }
+  function trScripts() {
+    var out = [];
+    try {
+      performance.getEntriesByType('resource').forEach(function (e) {
+        if (/\.js(\?|$)/.test(e.name)) out.push([trShort(e.name), trR(e.startTime), trR(e.responseStart), trR(e.responseEnd), e.transferSize | 0, e.decodedBodySize | 0]);
+      });
+    } catch (e) {}
+    return out;
+  }
+  function traceSummary() {
+    var marks = trMarks(), cap = marks.capsule == null ? 1e9 : marks.capsule, per = {};
+    var tot = { frames: TR.loaf.length, ms: 0, blocking: 0, preFrames: 0, preMs: 0, preBlocking: 0 };
+    TR.loaf.forEach(function (f) {
+      tot.ms += f.d; tot.blocking += f.b;
+      if (f.s < cap) { tot.preFrames++; tot.preMs += f.d; tot.preBlocking += f.b; }
+      f.sc.forEach(function (s) {
+        var key = s.u + '|' + s.k + '|' + s.f;
+        var p = per[key] || (per[key] = { u: s.u, k: s.k, f: s.f, n: 0, dur: 0, cmp: 0, max: 0, forced: 0, pre: 0, at: s.s });
+        p.n++; p.dur += s.d; p.cmp += s.c; p.forced += s.fl; if (s.d > p.max) p.max = s.d; if (s.s < cap) p.pre += s.d;
+      });
+    });
+    var top = Object.keys(per).map(function (k) { return per[k]; }).sort(function (a, b) { return b.dur - a.dur; }).slice(0, 30);
+    var heavy = TR.loaf.slice().sort(function (a, b) { return b.d - a.d; }).slice(0, 12);
+    var ltPre = 0, ltPreN = 0, ltAll = 0;
+    TR.lt.forEach(function (x) { ltAll += x[1]; if (x[0] < cap) { ltPre += x[1]; ltPreN++; } });
+    return JSON.stringify({
+      meta: { ua: navigator.userAgent, url: location.search, exportedAt: new Date().toISOString(), support: TR.sup,
+        sw: navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller',
+        net: (navigator.connection && navigator.connection.effectiveType) || 'n/a', cores: navigator.hardwareConcurrency, mem: navigator.deviceMemory },
+      marks: marks, paints: TR.paints, totals: tot, longtask: { preCapsule: [ltPreN, ltPre], total: [TR.lt.length, ltAll] },
+      perScript: top, heaviestFrames: heavy, scriptRes: trScripts(), longtasks: TR.lt.slice(0, 60)
+    });
+  }
+  function traceJson() {
+    var ev = [], pid = 1, marks = trMarks(), names = { 1: 'LoAF frames', 2: 'script (compile+exec)', 3: 'longtask', 4: 'script download', 5: 'marks' };
+    Object.keys(names).forEach(function (t) { ev.push({ ph: 'M', name: 'thread_name', pid: pid, tid: +t, args: { name: names[t] } }); });
+    ev.push({ ph: 'M', name: 'process_name', pid: pid, tid: 0, args: { name: 'obs trace' } });
+    TR.loaf.forEach(function (f) {
+      ev.push({ name: 'LoAF', cat: 'loaf', ph: 'X', ts: f.s * 1000, dur: f.d * 1000, pid: pid, tid: 1, args: { blocking: f.b, renderStart: f.rs, styleLayoutStart: f.sl } });
+      f.sc.forEach(function (s) {
+        ev.push({ name: s.u + (s.f ? ' ' + s.f : '') + ' [' + s.k + ']', cat: 'script', ph: 'X', ts: s.s * 1000, dur: s.d * 1000, pid: pid, tid: 2, args: { compileMs: s.c, forcedLayoutMs: s.fl, invoker: s.i } });
+      });
+    });
+    TR.lt.forEach(function (x) { ev.push({ name: 'longtask', cat: 'longtask', ph: 'X', ts: x[0] * 1000, dur: x[1] * 1000, pid: pid, tid: 3 }); });
+    trScripts().forEach(function (s) { ev.push({ name: s[0], cat: 'net', ph: 'X', ts: s[1] * 1000, dur: Math.max(1, s[3] - s[1]) * 1000, pid: pid, tid: 4, args: { ttfb: s[2] - s[1], bytes: s[4], decoded: s[5] } }); });
+    Object.keys(marks).forEach(function (k) { ev.push({ name: k, ph: 'i', s: 'g', ts: marks[k] * 1000, pid: pid, tid: 5 }); });
+    Object.keys(TR.paints).forEach(function (k) { ev.push({ name: k, ph: 'i', s: 'g', ts: TR.paints[k] * 1000, pid: pid, tid: 5 }); });
+    return JSON.stringify({ traceEvents: ev, displayTimeUnit: 'ms' });
+  }
+  function traceCopy() {
+    var s = traceSummary(), n = TR.loaf.length;
+    try { navigator.clipboard.writeText(s).then(function () { log('trace summary disalin (' + n + ' frame)'); }, function () { prompt('Copy:', s); }); }
+    catch (e) { prompt('Copy:', s); }
+  }
+  function traceSave() {
+    try {
+      var u = URL.createObjectURL(new Blob([traceJson()], { type: 'application/json' })), a = document.createElement('a');
+      a.href = u; a.download = 'obs-trace-' + Date.now() + '.json'; document.body.appendChild(a); a.click(); a.remove();
+      log('trace file disimpan (buka di ui.perfetto.dev / DevTools Performance)');
+    } catch (e) { log('trace save gagal: ' + e.message); }
+  }
+
   var MODES = [
     { id: 'whperf', label: 'Dive', hint: 'auto-dive wormhole overview → sektor (sama tiap putaran, balik ke overview di sela-sela), rekam panel whperf' },
     { id: 'probe', label: 'Probe', hint: 'diam di overview/sektor sampai PROBE selesai, hasil ditangkap otomatis' },
@@ -891,6 +983,13 @@
     }
     if (acts.childNodes.length) panel.appendChild(acts);
 
+    /* Trace (PP-11): selalu tersedia, apa pun modenya */
+    var trRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:6px');
+    trRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'trace:'));
+    trRow.appendChild(btn('Copy', traceCopy));
+    trRow.appendChild(btn('Save', traceSave));
+    panel.appendChild(trRow);
+
     /* —— 2 tombol utama: Hasil + Export —— */
     var main = mk('div', 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px');
     var btnHasil = btn('Hasil', function () {
@@ -967,6 +1066,9 @@
     exportJSON: exportJSON,
     exportTXT: exportTXT,
     exportAll: exportAll,
+    traceSummary: traceSummary,
+    traceCopy: traceCopy,
+    traceSave: traceSave,
     cfg: CFG,
     mode: MODE,
     get store() { return store.slice(); },
