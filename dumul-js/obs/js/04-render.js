@@ -1577,6 +1577,30 @@ function drawRipple(x,y,r,rgbStr,alpha,glow){
   g.drawImage(sp.c,x-sp.pad,y-sp.pad,sp.pad*2,sp.pad*2);
   g.globalAlpha=prev;
 }
+/* v22: PRE-WARM sprite cincin trigger. drawTriggerVisuals hanya jalan di mode sektor (bukan overview), jadi ~135 sprite (kanvas kecil + stroke) per sektor baru
+   dibuat lazim di detik-detik pertama sektor = bagian dari frame pertama yang macet ~170ms di HP. Di sini semua warna TRIGGERS x radius 5.5..16.5 (step .5, non-glow)
+   dibuat lebih awal, dicicil (budget 2.5ms per irisan) HANYA saat boot selesai dan wormhole/sektor tidak sibuk. Murni isi cache (tanpa efek samping).
+   Matikan untuk A/B: ?whdbg=nowarmring. Status di window.__rw = {n,tot,ms}. */
+var RW={i:0,list:null,ms:0,on:true};
+try{RW.on=!/[?&]whdbg=[a-z,]*nowarmring/.test(location.search);}catch(eRW){}
+function ringWarmStep(){
+  try{
+    if(!RW.on)return;
+    var w=window.WORMHOLE,s=window.SECT;
+    if(typeof bootDone==='undefined'||!bootDone||document.hidden||(w&&w.busy)||(s&&s.busy)||typeof TRIGGERS==='undefined'){setTimeout(ringWarmStep,1200);return;}
+    if(!RW.list){
+      var seen={},k,rg,q,L=[];
+      for(k in TRIGGERS){rg=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rg&&!seen[rg]){seen[rg]=1;for(q=5.5;q<=16.5;q+=.5)L.push([rg,q]);}}
+      RW.list=L;
+    }
+    var t0=performance.now(),it;
+    while(RW.i<RW.list.length&&performance.now()-t0<2.5){it=RW.list[RW.i++];getRingSprite(it[0],it[1],false);}
+    RW.ms+=performance.now()-t0;
+    window.__rw={n:RW.i,tot:RW.list.length,ms:Math.round(RW.ms)};
+    if(RW.i<RW.list.length)setTimeout(ringWarmStep,45);
+  }catch(eRs){}
+}
+(function(){var go=function(){setTimeout(ringWarmStep,3000);};if(document.readyState==='complete')go();else window.addEventListener('load',go);})();
 function getStarSprite(rgbStr){
   var hit=STAR_SPRITE_CACHE[rgbStr];
   if(hit)return hit;

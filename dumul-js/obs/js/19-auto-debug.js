@@ -556,7 +556,7 @@
           if (window.__plSt) out.push('planet3d sejak zoom-in: resize ' + window.__plSt.rs + ' | render-penuh ' + window.__plSt.fl + ' (terlama ' + window.__plSt.mx + 'ms' + (/(^|,)plfin(,|$)/.test(WH_DBG) ? ', GPU' : ', js') + ')');   /* diisi 05-sector-ui.js (blok u>=1 fase in) */
           var el = document.getElementById('whperf') || document.body.appendChild(document.createElement('div'));
           el.id = 'whperf'; el.style.cssText = 'position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
-          el.textContent = 'whperf (tap = tutup) zoom=' + (I.zoom ? 'on' : 'off') + ' dpr=' + I.dpr.toFixed(2) + ' dbg=' + (WH_DBG || '-') + ' | build v19 ring=' + I.ring + ' step=' + I.step + ' bloom=' + (I.nobloom ? 'zoomOFF' : 'on') + ' tele=' + (typeof SCP3D_WHALT !== 'undefined' ? SCP3D_WHALT : 'LAMA(13 belum v16)') + ' cov=' + (typeof WORMHOLE !== 'undefined' && ('covered' in WORMHOLE) ? 'ok' : 'LAMA') + '\n' + out.join('\n'); el.onclick = function () { el.remove(); };
+          el.textContent = 'whperf (tap = tutup) zoom=' + (I.zoom ? 'on' : 'off') + ' dpr=' + I.dpr.toFixed(2) + ' dbg=' + (WH_DBG || '-') + ' | build v19 ring=' + I.ring + ' step=' + I.step + ' bloom=' + (I.nobloom ? 'zoomOFF' : 'on') + ' tele=' + (typeof SCP3D_WHALT !== 'undefined' ? SCP3D_WHALT : 'LAMA(13 belum v16)') + ' cov=' + (typeof WORMHOLE !== 'undefined' && ('covered' in WORMHOLE) ? 'ok' : 'LAMA') + ' ringwarm=' + (window.__rw ? window.__rw.n + '/' + window.__rw.tot + ' ' + window.__rw.ms + 'ms' : 'off') + '\n' + out.join('\n'); el.onclick = function () { el.remove(); };
         } catch (e) {}
       };
 

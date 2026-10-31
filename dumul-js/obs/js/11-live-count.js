@@ -48,10 +48,20 @@ try {
       if (!s.val()) return;
       onDisconnect(me).remove().then(() => set(me, true)).catch(() => {});
     });
+    /* v22: update DOM dikoalesi (burst presence = 1 tulis) dan ditunda selama wormhole/sektor sibuk; tulis hanya kalau nilainya berubah. */
+    let pend = null, last = -1, tm = 0;
+    const busy = () => { const w = window.WORMHOLE, s = window.SECT; return !!((w && w.busy) || (s && s.busy)); };
+    const flush = () => {
+      tm = 0;
+      if (pend == null) return;
+      if (busy()) { tm = setTimeout(flush, 800); return; }
+      const n = pend; pend = null;
+      if (n !== last) { last = n; num.textContent = n; if (lab) lab.textContent = word(n); }
+      if (el.hidden) el.hidden = false;
+    };
     onValue(ref(db, 'presence'), (s) => {
-      num.textContent = s.size;   /* jumlah perangkat unik */
-      if (lab) lab.textContent = word(s.size);
-      el.hidden = false;
+      pend = s.size;   /* jumlah perangkat unik */
+      if (!tm) tm = setTimeout(flush, 400);
     }, () => { el.hidden = true; });
   }
 } catch (e) { /* diam saja */ }
