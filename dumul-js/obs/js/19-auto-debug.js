@@ -49,6 +49,24 @@
   var MODE = URL_MODE || (PERF_FROM_LS ? 'perf' : '');
   if (!flag('debug') && !window.__WH_AD_FORCE) return;
 
+  /* v22 (diagnosa hitch exit, A/B murni, hanya di mode ?debug=1):
+       ?whdbg=nohud  = semua DOM HUD (anak langsung <body>, kecuali #sky, #wh-canvas, #whperf, #boot-screen, #bh/#cap-bh, UI debug) visibility:hidden selama wormhole aktif
+       ?whdbg=nohole = DOM lubang hitam (#bh, #cap-bh) disembunyikan; sprite BH di kanvas dilewati di 03-gargantua.js (WH_NOHOLE)
+     Kelas di <html> ditoggle polling 100ms mengikuti WORMHOLE.on. Bisa digabung: ?whdbg=nohud,nohole */
+  (function () {
+    var m = /[?&]whdbg=([a-z,]+)/.exec(Q), f = m ? ',' + m[1] + ',' : '', nh = f.indexOf(',nohud,') >= 0, nb = f.indexOf(',nohole,') >= 0, de = document.documentElement, st;
+    if (!nh && !nb) return;
+    st = document.createElement('style'); st.id = 'wh-nohud-css';
+    st.textContent = (nh ? 'html.wh-nohud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not([id^="wh-ad"]):not(script):not(style){visibility:hidden!important}' : '')
+      + (nb ? 'html.wh-nohole #bh,html.wh-nohole #cap-bh{visibility:hidden!important}' : '');
+    (document.head || de).appendChild(st);
+    setInterval(function () {
+      var on = false;
+      try { on = typeof WORMHOLE !== 'undefined' && !!WORMHOLE.on; } catch (e) {}
+      de.classList.toggle('wh-nohud', nh && on); de.classList.toggle('wh-nohole', nb && on);
+    }, 100);
+  })();
+
   /* ---------- INSTALLERS (Langkah 1a): body PERF / PROBE / WP / muff dimiliki 19 ----------
      Dipanggil saat flag mode aktif. Override global supaya setelah 05/09 di-stub, tooling tetap hidup.
      Idempotent (flag __WH_AD_inst*). Sementara 05/09 masih punya body: override function ref = 19 ambil alih. */
@@ -477,10 +495,11 @@
                 sc += S[i].duration || 0; fl += S[i].forcedStyleAndLayoutDuration || 0;
                 if ((S[i].duration || 0) > bn) { bn = S[i].duration; src = String(S[i].sourceURL || '').split('/').pop().split('?')[0] + ':' + (S[i].sourceFunctionName || S[i].invoker || '?'); }
               }
-              var rn = e.renderStart > 0 ? Math.max(0, end - e.renderStart) : 0, sl = e.styleAndLayoutStart > 0 ? Math.max(0, end - e.styleAndLayoutStart) : 0;
+              var rn = e.renderStart > 0 ? Math.max(0, end - e.renderStart) : 0, sl = e.styleAndLayoutStart > 0 ? Math.max(0, end - e.styleAndLayoutStart) : 0,
+                  pr = e.renderStart > 0 ? Math.max(0, e.renderStart - e.startTime) : 0;   /* v22: pre = awal frame -> renderStart (sebelum rAF mulai). pre besar + script kecil = main thread menunggu/terblokir di luar JS kita */
               var L = WP.lf[pp[1]] || (WP.lf[pp[1]] = []);
               var ls = S.slice().sort(function (x, y) { return (y.duration || 0) - (x.duration || 0); }).slice(0, 3).map(function (z) { return (z.invokerType || '?') + ':' + String(z.sourceURL || '').split('/').pop().split('?')[0] + ':' + (z.sourceFunctionName || z.invoker || '?') + ' ' + Math.round(z.duration || 0); }).join(' ; ');
-              L.push({ o: e.startTime - pp[0], d: e.duration, sc: sc, rn: rn, sl: sl, fl: fl, bd: e.blockingDuration || 0, src: src, ls: ls });
+              L.push({ o: e.startTime - pp[0], d: e.duration, pr: pr, sc: sc, rn: rn, sl: sl, fl: fl, bd: e.blockingDuration || 0, src: src, ls: ls });
               L.sort(function (x, y) { return y.d - x.d; }); if (L.length > 3) L.length = 3;
             });
           }).observe({ type: _tn, buffered: false });
@@ -552,7 +571,7 @@
           out.push('terburuk: ' + w.map(function (x) { return x[0] + '@' + x[2] + ' ' + x[1].toFixed(0) + 'ms(js ' + x[3].toFixed(0) + ' sky ' + x[4].toFixed(0) + ')'; }).join(' | '));
           if (typeof window.__whMk === 'string') out.push('sectStep(in) ms: ' + window.__whMk);
           try { out.push('sky frame() >150ms (fase +ms: total | fungsi ms): ' + (WFB.length ? WFB.map(function (x) { return '[' + x.ph + ' +' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + (x.bk.length ? x.bk.map(function (b) { return b[0] + ' ' + Math.round(b[1]); }).join(', ') : '(tak terinci)'); }).join('  ;  ') : 'tidak ada')); } catch (eFB) {}
-          try { ['zoom', 'tunnel', 'exit'].forEach(function (ph) { var L = WP.lf && WP.lf[ph]; out.push(WP.lfSup + ' ' + ph + ' >60ms (+ms dlm fase: total | script | render | s+l | forced | sumber | skrip teratas): ' + (L && L.length ? L.map(function (x) { return '[+' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + Math.round(x.sc) + ' | ' + Math.round(x.rn) + ' | ' + Math.round(x.sl) + ' | ' + Math.round(x.fl) + ' | ' + (x.src || '-') + ' | ' + (x.ls || '-'); }).join('  ;  ') : 'tidak ada')); }); } catch (eL) {}
+          try { ['zoom', 'tunnel', 'exit'].forEach(function (ph) { var L = WP.lf && WP.lf[ph]; out.push(WP.lfSup + ' ' + ph + ' >60ms (+ms dlm fase: total | pre | script | render | s+l | forced | sumber | skrip teratas): ' + (L && L.length ? L.map(function (x) { return '[+' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + Math.round(x.pr || 0) + ' | ' + Math.round(x.sc) + ' | ' + Math.round(x.rn) + ' | ' + Math.round(x.sl) + ' | ' + Math.round(x.fl) + ' | ' + (x.src || '-') + ' | ' + (x.ls || '-'); }).join('  ;  ') : 'tidak ada')); }); } catch (eL) {}
           if (window.__plSt) out.push('planet3d sejak zoom-in: resize ' + window.__plSt.rs + ' | render-penuh ' + window.__plSt.fl + ' (terlama ' + window.__plSt.mx + 'ms' + (/(^|,)plfin(,|$)/.test(WH_DBG) ? ', GPU' : ', js') + ')');   /* diisi 05-sector-ui.js (blok u>=1 fase in) */
           var el = document.getElementById('whperf') || document.body.appendChild(document.createElement('div'));
           el.id = 'whperf'; el.style.cssText = 'position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';

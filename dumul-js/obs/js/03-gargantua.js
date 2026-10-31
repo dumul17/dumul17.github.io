@@ -284,6 +284,7 @@ function drawHoleFallback(now,age){
   g.restore();
 }
 function drawHoleSafe(now,age){
+  if(WH_NOHOLE&&typeof WORMHOLE!=='undefined'&&WORMHOLE.on)return;   /* ?whdbg=nohole: lewati juga drawHoleFallback */
   try{
     drawHole(now,age);
     /* Some older engines fail silently around offscreen canvas sprites. */
@@ -299,6 +300,7 @@ function drawHoleSafe(now,age){
    BH_LENS_DY = posisi busur secondary lens (lengkung lensa atas+bawah) relatif ke posisi aslinya. Ini yang di-tuning (.22-.24).
    Keduanya terpisah supaya menurunkan lensa nggak ikut menurunkan serat cakram. */
 var BH_DISK_DY=.20,BH_LENS_DY=0;
+var WH_NOHOLE=/[?&]whdbg=([a-z,]*,)?nohole(,|&|$)/.test(location.search);   /* diagnosa exit: ?whdbg=nohole = sprite BH tidak digambar selama wormhole aktif (DOM #bh disembunyikan oleh 19-auto-debug.js) */
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3);
   sc*=ARV;   /* keluar dari terowongan (sektor -> overview / lompat sektor): BH tujuan dari jauh -> penuh */
