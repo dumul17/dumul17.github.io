@@ -469,7 +469,7 @@
           WP.lfSup = _tn === 'longtask' ? 'longtask' : 'LoAF';
           new PerformanceObserver(function (l) {
             l.getEntries().forEach(function (e) {
-              if (e.duration < 150) return;
+              if (e.duration < 60) return;   /* v21: 60ms (dulu 150) */
               var sc = 0, fl = 0, src = '', i, S = e.scripts || [], bn = 0, pp = null, pt = WP.pt || [], end = e.startTime + e.duration;
               for (i = pt.length - 1; i >= 0; i--) if (pt[i][0] <= e.startTime + 1) { pp = pt[i]; break; }
               if (!pp || (pp[1] !== 'zoom' && pp[1] !== 'tunnel' && pp[1] !== 'exit')) return;   /* hanya selama dive; boot/idle diabaikan */
@@ -479,7 +479,8 @@
               }
               var rn = e.renderStart > 0 ? Math.max(0, end - e.renderStart) : 0, sl = e.styleAndLayoutStart > 0 ? Math.max(0, end - e.styleAndLayoutStart) : 0;
               var L = WP.lf[pp[1]] || (WP.lf[pp[1]] = []);
-              L.push({ o: e.startTime - pp[0], d: e.duration, sc: sc, rn: rn, sl: sl, fl: fl, bd: e.blockingDuration || 0, src: src });
+              var ls = S.slice().sort(function (x, y) { return (y.duration || 0) - (x.duration || 0); }).slice(0, 3).map(function (z) { return (z.invokerType || '?') + ':' + String(z.sourceURL || '').split('/').pop().split('?')[0] + ':' + (z.sourceFunctionName || z.invoker || '?') + ' ' + Math.round(z.duration || 0); }).join(' ; ');
+              L.push({ o: e.startTime - pp[0], d: e.duration, sc: sc, rn: rn, sl: sl, fl: fl, bd: e.blockingDuration || 0, src: src, ls: ls });
               L.sort(function (x, y) { return y.d - x.d; }); if (L.length > 3) L.length = 3;
             });
           }).observe({ type: _tn, buffered: false });
@@ -551,7 +552,7 @@
           out.push('terburuk: ' + w.map(function (x) { return x[0] + '@' + x[2] + ' ' + x[1].toFixed(0) + 'ms(js ' + x[3].toFixed(0) + ' sky ' + x[4].toFixed(0) + ')'; }).join(' | '));
           if (typeof window.__whMk === 'string') out.push('sectStep(in) ms: ' + window.__whMk);
           try { out.push('sky frame() >150ms (fase +ms: total | fungsi ms): ' + (WFB.length ? WFB.map(function (x) { return '[' + x.ph + ' +' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + (x.bk.length ? x.bk.map(function (b) { return b[0] + ' ' + Math.round(b[1]); }).join(', ') : '(tak terinci)'); }).join('  ;  ') : 'tidak ada')); } catch (eFB) {}
-          try { ['zoom', 'tunnel', 'exit'].forEach(function (ph) { var L = WP.lf && WP.lf[ph]; out.push(WP.lfSup + ' ' + ph + ' >150ms (+ms dlm fase: total | script | render | s+l | forced | sumber): ' + (L && L.length ? L.map(function (x) { return '[+' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + Math.round(x.sc) + ' | ' + Math.round(x.rn) + ' | ' + Math.round(x.sl) + ' | ' + Math.round(x.fl) + ' | ' + (x.src || '-'); }).join('  ;  ') : 'tidak ada')); }); } catch (eL) {}
+          try { ['zoom', 'tunnel', 'exit'].forEach(function (ph) { var L = WP.lf && WP.lf[ph]; out.push(WP.lfSup + ' ' + ph + ' >60ms (+ms dlm fase: total | script | render | s+l | forced | sumber | skrip teratas): ' + (L && L.length ? L.map(function (x) { return '[+' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + Math.round(x.sc) + ' | ' + Math.round(x.rn) + ' | ' + Math.round(x.sl) + ' | ' + Math.round(x.fl) + ' | ' + (x.src || '-') + ' | ' + (x.ls || '-'); }).join('  ;  ') : 'tidak ada')); }); } catch (eL) {}
           if (window.__plSt) out.push('planet3d sejak zoom-in: resize ' + window.__plSt.rs + ' | render-penuh ' + window.__plSt.fl + ' (terlama ' + window.__plSt.mx + 'ms' + (/(^|,)plfin(,|$)/.test(WH_DBG) ? ', GPU' : ', js') + ')');   /* diisi 05-sector-ui.js (blok u>=1 fase in) */
           var el = document.getElementById('whperf') || document.body.appendChild(document.createElement('div'));
           el.id = 'whperf'; el.style.cssText = 'position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
@@ -569,8 +570,9 @@
             if (typeof cb !== 'function') return _raw.call(window, cb);
             return _raw.call(window, function (ts) {
               var t = performance.now(), ph = WP.ph;
+              if (WP._rr !== WP.r) { WP._rr = WP.r; if (WP.r.length === 0) { WP.ra = {}; WP.lf = {}; WFB.length = 0; } }   /* v21: go() di 09 mengganti WP.r = [] langsung (bukan lewat rec) -> reset di sini */
               try { return cb.call(this, ts); } finally {
-                if (ph === 'zoom' || ph === 'tunnel' || ph === 'exit') {
+                if ((ph === 'zoom' || ph === 'tunnel' || ph === 'exit') && WP.t && t - WP.t < 150) {   /* v21: hanya selama tick wormhole masih jalan; sesudah exit selesai, frame sky biasa tidak ikut dihitung */
                   var d = performance.now() - t, lb;
                   if (d < 0.3) lb = '(kecil)';
                   else { lb = cb.__wl; if (!lb) { lb = cb === window.frame ? 'frame(sky)' : (cb.name || String(cb).replace(/\s+/g, ' ').slice(0, 48)); try { cb.__wl = lb; } catch (eL) {} } }
