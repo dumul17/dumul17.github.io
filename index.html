@@ -311,13 +311,13 @@
 <script defer src="dumul-js/obs/i18n.js?v=32"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=140"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=141"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=138"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=110"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=140"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=179"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=123"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=115"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=116"></script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=13"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=40"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=8"></script>
@@ -380,9 +380,20 @@
 <script>
 /* PWA: daftar service worker + lapor lagu yang didengar >50% biar disimpan buat revisit */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('service-worker.js').catch(function () {});
-  });
+  /* PP-12: first visit → jangan install SW (fetch ulang ±35 URL SHELL) selagi boot berjalan; tunggu 'obs-entered' (Blue ditekan) atau fallback 25 dtk.
+     Kunjungan terkontrol (sudah ada controller) langsung register seperti sebelumnya. */
+  (function () {
+    var regd = false;
+    function reg() {
+      if (regd) return; regd = true;
+      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    }
+    window.addEventListener('load', function () {
+      if (navigator.serviceWorker.controller || window.__obsEntered) { reg(); return; }
+      window.addEventListener('obs-entered', function () { setTimeout(reg, 1500); }, { once: true });
+      setTimeout(reg, 25000);
+    });
+  })();
   (function () {
     var seen = new WeakSet(), sent = {};
     function hook(a) {
