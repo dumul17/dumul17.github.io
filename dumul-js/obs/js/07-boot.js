@@ -99,18 +99,24 @@
     try{return imgSettled(typeof NEB!=='undefined'&&NEB.img)&&imgSettled(typeof MW!=='undefined'&&MW.img);}catch(e){return true;}
   }
   var MODS=['AST3D','SCP3D','DR3D','PT3D','PL3D'];
+  /* v128: bobot unit = BIAYA RELATIF pekerjaan (ms, dari bench itel A6610L: build 3D per modul + warm shader ±5,5 dtk), bukan jumlah unit.
+     Tetap jujur: bar hanya naik saat pekerjaan nyata SELESAI, tanpa komponen waktu. Bedanya, unit yang makan 5 dtk (warm) kini mengisi ±48% bar,
+     bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
+  var WT_PAGE=500,WT_MODS=[1200,1100,1800,600,750],WT_WARM=5500;
+  var WT_SUM=WT_PAGE+WT_WARM+WT_MODS.reduce(function(a,b){return a+b;},0);
   function threeStatus(elapsed){
-    var settled=0,pend=0,st=[],i,o,s,fin;
+    var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){
       o=window[MODS[i]];s=o?o.state:-1;st.push(s);
       fin=(s===2||s===3)||(dclDone&&(s===-1||(s===0&&elapsed>4000)));
+      fins.push(!!fin);
       if(fin)settled++;
       else if(i<4)pend++;   /* 4 modul pertama mengantre ke THREE_WARM saat selesai build */
     }
     var wq=window.THREE_WARM,wTot=wq?(wq.total||0):0,wDone=wq?(wq.done||0):0,exp=wTot+pend;
     var drained=!wq||(!wq.busy&&!wq.q.length);
     var warmOk=pend===0&&drained;
-    return {mods:settled,total:MODS.length,st:st,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,warmFrac:warmOk?1:(exp?Math.min(1,wDone/exp):0)};
+    return {mods:settled,total:MODS.length,st:st,fins:fins,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,warmFrac:warmOk?1:(exp?Math.min(1,wDone/exp):0)};
   }
   var lastPanel='';
   function paintPanel(ready,th,complete){
@@ -195,9 +201,11 @@
     var elapsed=performance.now()-t0;
     var ready=pageReady(),th=threeStatus(elapsed);
     var complete=ready&&th.mods>=th.total&&th.warmOk;
-    /* Progres jujur: unit selesai / total unit. Tanpa komponen waktu, tanpa clamp +5%: bar naik persis saat unit selesai (main thread diblokir build 0,4-1,8 dtk, jadi ia naik per potongan).
+    /* Progres jujur: bobot biaya unit selesai / total bobot (v128). Tanpa komponen waktu, tanpa clamp +5%: bar naik persis saat unit selesai (main thread diblokir build 0,4-1,8 dtk, jadi ia naik per potongan).
        Floor + cap 99: 100% hanya dituliskan finish() saat semua unit selesai. Monoton (tidak turun walau gambar lazy mulai di-fetch dan 'ready' berbalik false). */
-    var p=Math.min(99,Math.floor(((ready?1:0)+th.mods+th.warmFrac)/(th.total+2)*100));
+    var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM,wi;
+    for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
+    var p=Math.min(99,Math.floor(wDone/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
     fill.style.width=p+'%';pct.textContent=p+'%';
