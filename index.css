@@ -7,8 +7,8 @@ body{background:radial-gradient(120% 80% at 50% 28%,#10222f 0%,#08121b 55%,#0408
 /* scanline default dimatikan (bikin langit kusam). Mau balik: background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px). Versi pink body.konami .scan di bawah tetap jalan. */
 header{position:fixed;top:0;left:0;right:0;z-index:3;text-align:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px 0;pointer-events:none}
 h1{position:relative;margin:0;display:inline-block;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-h1::before{content:'';position:absolute;top:50%;left:50%;width:0%;height:2px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:width .3s ease,opacity .3s ease;z-index:-1}
-h1.gl::before{width:140%;opacity:.85}
+h1::before{content:'';position:absolute;top:50%;left:50%;width:140%;height:2px;transform:translate(-50%,-50%) scaleX(0);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:transform .3s ease,opacity .3s ease;z-index:-1}
+h1.gl::before{transform:translate(-50%,-50%) scaleX(1);opacity:.85}
 .kicker{display:block;font:600 12px/1 'Syne',sans-serif;letter-spacing:.55em;padding-left:.55em;text-transform:uppercase;color:#6ee5ff}
 .big{display:block;margin-top:9px;white-space:nowrap;font:800 clamp(20px,min(7vw,10vh),56px)/1.02 'Syne',sans-serif;letter-spacing:.06em;padding-left:.06em;text-transform:uppercase;color:#eaf6ff;text-shadow:0 0 22px rgba(110,229,255,.45),0 0 2px rgba(255,255,255,.35)}
 .sub{margin:10px 0 0;font-size:11px;letter-spacing:.32em;padding-left:.32em;text-transform:uppercase;color:rgba(184,198,214,.72)}
@@ -163,8 +163,8 @@ body.owl-open #owl-panel,body.owl-open #owl-backdrop,body.owl-open #owl-source{p
 /* Brand: scale type to panel width (same idea as #last-signal / mode-toast — no ellipsis cut-off) */
 #owl-panel .owl-brand{text-align:center;padding:2px 18px 10px;border-bottom:1px solid rgba(110,229,255,.12);overflow:hidden}
 #owl-panel-title{position:relative;margin:0 auto;display:block;width:100%;max-width:100%;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#owl-panel-title::before{content:'';position:absolute;top:50%;left:50%;width:0%;height:2px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:width .3s ease,opacity .3s ease;z-index:-1}
-#owl-panel-title.gl::before{width:140%;opacity:.85}
+#owl-panel-title::before{content:'';position:absolute;top:50%;left:50%;width:140%;height:2px;transform:translate(-50%,-50%) scaleX(0);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:transform .3s ease,opacity .3s ease;z-index:-1}
+#owl-panel-title.gl::before{transform:translate(-50%,-50%) scaleX(1);opacity:.85}
 #owl-panel .owl-brand .kicker{display:block;font:600 8.5px/1 'Syne',sans-serif;letter-spacing:.36em;padding-left:.36em;text-transform:uppercase;color:#6ee5ff}
 /* Fluid title: always show full "OBSERVATORY" — width 100%, letter-spacing scales down on narrow panels */
 #owl-panel .owl-brand .big{display:block;margin-top:5px;width:100%;box-sizing:border-box;font:800 15px/1.1 'Syne',sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#eaf6ff;text-shadow:0 0 12px rgba(110,229,255,.35);white-space:nowrap;overflow:visible;text-align:center}
@@ -294,8 +294,8 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 /* Brand: sama dengan panel owl (kicker + judul + kutipan owl); tap = glitch (kelas .gl, keyframes owlGl/owlGk dipakai bersama) */
 #boot-brand{text-align:center;padding:0 4px 9px;margin-bottom:10px;border-bottom:1px solid rgba(110,229,255,.12)}
 #boot-title{position:relative;isolation:isolate;margin:0;display:block;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#boot-title::before{content:'';position:absolute;top:50%;left:50%;width:0%;height:2px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:width .3s ease,opacity .3s ease;z-index:-1}
-#boot-title.gl::before{width:140%;opacity:.85}
+#boot-title::before{content:'';position:absolute;top:50%;left:50%;width:140%;height:2px;transform:translate(-50%,-50%) scaleX(0);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:transform .3s ease,opacity .3s ease;z-index:-1}
+#boot-title.gl::before{transform:translate(-50%,-50%) scaleX(1);opacity:.85}
 #boot-title .bt-k{display:block;font:600 8.5px/1 'Syne',sans-serif;letter-spacing:.36em;padding-left:.36em;text-transform:uppercase;color:#6ee5ff}
 #boot-title .bt-b{display:block;margin-top:5px;font:800 clamp(16px,5vw,19px)/1.1 'Syne',sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#eaf6ff;text-shadow:0 0 12px rgba(110,229,255,.35);white-space:nowrap}
 #boot-title.gl .bt-b{animation:owlGl .65s steps(1,end)}
