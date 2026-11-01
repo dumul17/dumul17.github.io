@@ -83,8 +83,14 @@ var DUMUL_CHARS=(function(){
   function chHop(w){
     if(!chEl||chCalm)return;
     var n=chEl.querySelector(w==='o'?'.bc-owl':'.bc-tele');if(!n)return;
-    n.classList.remove('hop');void n.offsetWidth;n.classList.add('hop');
-    setTimeout(function(){n.classList.remove('hop');},520);
+    /* tanpa forced reflow: lepas class sekarang, pasang lagi di frame berikutnya */
+    var tk=n._ht=(n._ht||0)+1;
+    n.classList.remove('hop');
+    requestAnimationFrame(function(){
+      if(n._ht!==tk)return;
+      n.classList.add('hop');
+      setTimeout(function(){if(n._ht===tk)n.classList.remove('hop');},520);
+    });
   }
   function chTalk(){
     if(!chEl||chCalm)return;
@@ -129,14 +135,18 @@ var DUMUL_CHARS=(function(){
     if(!chCalm){setTimeout(function(){chBlink('t');},1400);setTimeout(function(){chBlink('o');},2500);}
   }
   /* Brand = sama dengan panel owl: tap judul / kutipan -> glitch (kelas .gl, CSS di index.css memakai keyframes owlGl/owlGk). */
-  var bTitle=document.getElementById('boot-title'),bCore=document.getElementById('boot-core'),bGlT=0;
+  var bTitle=document.getElementById('boot-title'),bCore=document.getElementById('boot-core'),bGlT=0,bGlN=0;
   function bootGlitch(e){
     if(e)e.stopPropagation();
     if(!bTitle||!bCore||reduce)return;
+    var tk=++bGlN;   /* tanpa forced reflow (tap owl sebelumnya = 2x reflow: chHop + ini) */
     bTitle.classList.remove('gl');bCore.classList.remove('gl');
-    void bTitle.offsetWidth;
-    bTitle.classList.add('gl');bCore.classList.add('gl');
-    clearTimeout(bGlT);bGlT=setTimeout(function(){bTitle.classList.remove('gl');bCore.classList.remove('gl');},700);
+    clearTimeout(bGlT);
+    requestAnimationFrame(function(){
+      if(bGlN!==tk)return;
+      bTitle.classList.add('gl');bCore.classList.add('gl');
+      bGlT=setTimeout(function(){bTitle.classList.remove('gl');bCore.classList.remove('gl');},700);
+    });
     try{haptic(8);}catch(eH){}
   }
   if(bTitle)bTitle.addEventListener('pointerdown',bootGlitch);

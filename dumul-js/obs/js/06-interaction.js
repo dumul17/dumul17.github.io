@@ -109,7 +109,7 @@ document.addEventListener('pointerdown',function(e){
       t=setTimeout(function(){
         var ok=!document.hidden&&!panel.classList.contains('on')&&Math.random()>.35;
         if(ok){try{var cs=getComputedStyle(btn);if(cs.display==='none'||cs.visibility==='hidden'||+cs.opacity===0)ok=false;}catch(e){}}
-        if(ok){btn.classList.remove('shine');void btn.offsetWidth;btn.classList.add('shine');}
+        if(ok){btn.classList.remove('shine');requestAnimationFrame(function(){btn.classList.add('shine');});}
         arm(false);
       },first?(7000+Math.random()*8000):(20000+Math.random()*40000));
     }
@@ -141,13 +141,17 @@ document.addEventListener('pointerdown',function(e){
   /* Panel brand + link icons glitch; glitchUntil shakes sky layer briefly (header-era feel, scoped to this tap) */
   function brandGlitch(){
     if(!brand||(typeof SW!=='undefined'&&SW))return;
+    var tk=brand._gn=(brand._gn||0)+1;   /* tanpa forced reflow */
     brand.classList.remove('gl');panel.classList.remove('gl');
-    void brand.offsetWidth;
-    brand.classList.add('gl');panel.classList.add('gl');
-    try{glitchUntil=performance.now()+650;}catch(eG){}
-    clearTimeout(brand._t);brand._t=setTimeout(function(){
-      brand.classList.remove('gl');panel.classList.remove('gl');
-    },700);
+    clearTimeout(brand._t);
+    requestAnimationFrame(function(){
+      if(brand._gn!==tk)return;
+      brand.classList.add('gl');panel.classList.add('gl');
+      try{glitchUntil=performance.now()+650;}catch(eG){}
+      brand._t=setTimeout(function(){
+        brand.classList.remove('gl');panel.classList.remove('gl');
+      },700);
+    });
     try{haptic(8);}catch(e){}
   }
   function swallow(e){e.stopPropagation();}
