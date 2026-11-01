@@ -26,6 +26,7 @@ var TXFX=(function(){
   /* Orbit di atmosfer planet (bukan berdiri diam di tanah): drone mengitari titik jangkar di atas permukaan. ru = radius sepanjang horizon (px), rs = radius kedalaman (px, ke/menjauhi horizon),
      lift = tinggi di atas tanah (px x skala), bob = naik-turun ringan, per = ms per putaran, counter = parallax LAWAN rotasi planet (1 = jangkar diam di layar, 0 = ikut berputar bersama tanah),
      pose = 0 drone tetap pose terbang (tanpa kaki mendarat), 1 = pose mendarat. */
+  var DRONE_LABEL=false;   /* true = tampilkan teks RX/TX di atas kepala drone; false = sembunyikan */
   var DRONE_ORB={ru:23,rs:23,lift:34,bob:0.2,per:17000,counter:0,pose:0,depth:180};   /* depth = batas atas kedalaman (px di bawah horizon) tempat drone mendarat; makin besar = orbit makin turun ke bawah layar; skala drone + radius orbit otomatis ikut perspektif (sg/46), tinggi terbang tidak */
   /* Clamp kiri-kanan orbit drone (seperti teleskop: margin max(48, 8% lebar)): kalau posisi di tanah keluar batas, ug digeser balik ke batas, jadi drone nahan di tepi dan tetap menempel tanah (tinggi ikut lengkung planet), tidak hilang / lompat. */
   function plClampU(ug,sg,now){
@@ -308,7 +309,7 @@ var TXFX=(function(){
         if(typeof DR3D!=='undefined'){DR3D.land=T.land;DR3D.orbTan=T.tan||null;}
         drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,T.sc);
         if(typeof DR3D!=='undefined')DR3D.orbTan=null;
-        if(T.txt)label(T.x,T.y-26*T.sc,T.txt,T.col,T.al);
+        if(DRONE_LABEL&&T.txt)label(T.x,T.y-26*T.sc,T.txt,T.col,T.al);
       }
       drawHold(now);   /* cincin tahan di atas planet juga, supaya cincin di drone yang mendarat tidak tertutup */
     }finally{g.restore();}
