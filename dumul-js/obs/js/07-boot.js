@@ -114,14 +114,17 @@
     try{[AMB,MUSIC_COLLAP].forEach(function(a){if(a)l.push(a);});}catch(eA){}
     return (audioEls=l);
   }
-  /* v132: simpan 2 BGM ke cache SW (sekali, berurutan) beberapa detik setelah Blue, saat BGM sudah main dan buffering awal aman. Tanpa menunggu aturan 50%.
+  /* v132/v133: simpan 2 BGM ke cache SW (sekali, berurutan) beberapa detik setelah Blue, saat BGM sudah main dan buffering awal aman. Tanpa menunggu aturan 50%.
      Dilewati kalau data saver / 2G / SW belum mengontrol halaman. SW melewati file yang sudah tersimpan. */
   function cacheBgm(){
     try{
       var c=navigator.connection;if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return;
-      var ctl=navigator.serviceWorker&&navigator.serviceWorker.controller;if(!ctl)return;
+      if(!navigator.serviceWorker)return;
       var urls=audioList().map(function(a){return a.currentSrc||a.src;}).filter(Boolean);
-      if(urls.length)ctl.postMessage({type:'CACHE_AUDIO_LIST',urls:urls});
+      if(!urls.length)return;
+      /* v133: pakai serviceWorker.ready (bukan .controller). Telemetri v132: kunjungan pertama, controller baru ada di 39,9 dtk (install SW 15,8 dtk) -> postMessage 6 dtk
+         setelah Blue (25,4 dtk) kena controller=null dan diam-diam batal. SW menerima message dari registration.active tanpa harus mengontrol halaman. */
+      navigator.serviceWorker.ready.then(function(reg){try{if(reg.active)reg.active.postMessage({type:'CACHE_AUDIO_LIST',urls:urls});}catch(eP){}});
     }catch(eC){}
   }
   window.addEventListener('obs-entered',function(){setTimeout(cacheBgm,6000);},{once:true});
@@ -174,7 +177,7 @@
       row(T('boot.starmap'),ready?T('boot.locked'):T('boot.aligning'),ready),
       row(T('boot.mods'),th.mods+'/'+th.total,th.mods>=th.total),
       row(T('boot.warm'),warmTxt,th.warmOk),
-      row(T('boot.audio'),au?(au.ok?T('boot.ready'):(au.n+'/'+au.total)):T('boot.waiting'),!!(au&&au.ok))
+      row(T('boot.audio')+' (BGM)',au?(au.ok?T('boot.ready'):(au.n+'/'+au.total)):T('boot.waiting'),!!(au&&au.ok))
     ].join('\n');
     if(html!==lastPanel){lastPanel=html;statusEl.innerHTML=html;}
   }
