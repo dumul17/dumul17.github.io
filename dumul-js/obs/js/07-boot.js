@@ -61,20 +61,29 @@
       warmSlot(a);
     }
   }
+  /* v129 (diagnostik, tanpa mengubah perilaku): catat tiap slot warm audio -> window.__warmLog, dibaca bench (R.warmLog).
+     Baris: [nama, mulai ms, lepas ms, sebab, readyState, networkState, warmActive saat lepas, kode error media].
+     sebab: meta = loadedmetadata, err = error, abort = abort, tmo = WARM_SLOT_MS habis, exc = exception di load().
+     __warmMax = konkurensi tertinggi yang pernah terjadi (harus <= WARM_CONC). Tujuan: cari tahu kenapa 19 file mulai dalam ~190 ms padahal WARM_CONC=2. */
+  var WLOG=window.__warmLog=window.__warmLog||[];
+  function warmName(a){try{return (a.currentSrc||a.src||'').replace(/^.*\//,'').replace(/\?.*$/,'');}catch(eN){return '?';}}
   function warmSlot(a){
-    var fin=false,tm=0;
-    function rel(){
+    var fin=false,tm=0,t1=Math.round(performance.now()),nm=warmName(a);
+    function rel(why){
       if(fin)return;fin=true;
       clearTimeout(tm);
-      try{a.removeEventListener('loadedmetadata',rel);a.removeEventListener('error',rel);a.removeEventListener('abort',rel);}catch(eR){}
+      try{a.removeEventListener('loadedmetadata',onEv);a.removeEventListener('error',onEv);a.removeEventListener('abort',onEv);}catch(eR){}
+      try{if(WLOG.length<40)WLOG.push([nm,t1,Math.round(performance.now()),why,a.readyState,a.networkState,warmActive,a.error?a.error.code:0]);}catch(eG){}
       warmActive--;warmPump();
     }
+    function onEv(ev){rel(ev&&ev.type==='loadedmetadata'?'meta':(ev&&ev.type)||'?');}
     warmActive++;
+    try{window.__warmMax=Math.max(window.__warmMax||0,warmActive);}catch(eX){}
     try{
-      a.addEventListener('loadedmetadata',rel);a.addEventListener('error',rel);a.addEventListener('abort',rel);
-      tm=setTimeout(rel,WARM_SLOT_MS);
+      a.addEventListener('loadedmetadata',onEv);a.addEventListener('error',onEv);a.addEventListener('abort',onEv);
+      tm=setTimeout(function(){rel('tmo');},WARM_SLOT_MS);
       a.preload='metadata';a.load();
-    }catch(eL){rel();}
+    }catch(eL){rel('exc');}
   }
   function warmRest(){
     if(warmed)return;warmed=true;
