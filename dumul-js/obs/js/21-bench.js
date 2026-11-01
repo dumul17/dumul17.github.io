@@ -1,3 +1,4 @@
+'use strict';
 /* BENCH v3 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
