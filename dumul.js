@@ -2347,17 +2347,6 @@ try{
       }
     }
     if(((++tickN)&15)===0)tint();
-    /* governor: 2 jendela x 2.5 detik di bawah 40fps (setelah 4 detik pemanasan) => hemat daya otomatis */
-    if(p&&last&&now-startedAt>4000){
-      var dt=now-last;
-      if(dt<250){
-        acc+=dt;frames++;
-        if(acc>=2500){
-          bad=(frames*1000/acc<40)?bad+1:0;acc=0;frames=0;
-          if(bad>=2&&autoGov&&lowPref===null&&!auto){auto=true;applyFx();toast('Visuals lightened to keep playback smooth');}
-        }
-      }
-    }
     last=now;
     if(p&&!document.hidden)raf=requestAnimationFrame(tick);
     else{setBeat(0);last=0;acc=0;frames=0;}
