@@ -46,6 +46,31 @@ let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
 let hot=__L>0.16||v>0||frac>0.1||listen>0.4||bass>0.42;
 let waveStep=(_perf>=3?9.6:(_perf===2?12.8:16))/sdpr; /* dalam piksel fisik: DPR 1.6 -> 6/8/10 CSS px (sama seperti sebelumnya) */
+/* ── DEBUG ?perfdbg=1 : tidak mengubah visual, hanya baca ── */
+window.__dmPerf=_perf;
+if(window.__dmDbgOn===undefined)window.__dmDbgOn=/[?&]perfdbg=1/.test(location.search);
+if(window.__dmDbgOn){
+  let D=window.__dmDbg;
+  if(!D){D=window.__dmDbg={el:null,ema:16.7,t0:Q,tl:Q,n:0,lv:[0,0,0,0],drops:0,rises:0,last:_perf,slow:0,tot:0,fn:0};
+    D.el=document.createElement("div");
+    D.el.style.cssText="position:fixed;left:6px;top:calc(6px + env(safe-area-inset-top,0px));z-index:99999;pointer-events:none;font:10px/1.35 monospace;color:#9ff;background:rgba(0,0,0,.72);padding:4px 6px;border:1px solid rgba(110,229,255,.4);white-space:pre";
+    document.body.appendChild(D.el);}
+  if(rawDt<250){D.ema+=(rawDt-D.ema)*0.05;D.tot++;if(rawDt>25)D.slow++;}
+  D.n++;D.lv[_perf]++;
+  if(_perf<D.last)D.drops++;else if(_perf>D.last)D.rises++;
+  D.last=_perf;
+  if(Q-D.tl>500){
+    let secs=(Q-D.t0)/1000,tot=D.lv[1]+D.lv[2]+D.lv[3]||1;
+    D.el.textContent=
+      "perf now "+_perf+"  drops "+D.drops+"  rises "+D.rises+"\n"+
+      "time L3 "+Math.round(D.lv[3]*100/tot)+"%  L2 "+Math.round(D.lv[2]*100/tot)+"%  L1 "+Math.round(D.lv[1]*100/tot)+"%\n"+
+      "ms/frame "+D.ema.toFixed(1)+"  fps "+(D.n/secs).toFixed(0)+"  slow>25ms "+(D.slow*100/(D.tot||1)).toFixed(1)+"%\n"+
+      "dpr "+(window.devicePixelRatio||1).toFixed(2)+"  a "+a+"  css "+i+"x"+u+"  px "+t.width+"x"+t.height+"\n"+
+      "wave step "+waveStep.toFixed(2)+"css = "+(waveStep*a).toFixed(1)+"px fisik\n"+
+      "hot "+(hot?1:0)+"  level "+__L.toFixed(2)+"  bass "+bass.toFixed(2);
+    D.tl=Q;
+  }
+}
 let meshLinkMul=_perf>=2?1:0.72;
 let doGlitchBars=_perf>=2;
 let doSparks=_perf>=2&&treble>0.12;
