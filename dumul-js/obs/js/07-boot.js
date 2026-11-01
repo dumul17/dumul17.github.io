@@ -46,23 +46,42 @@
   var maxMs=isRepeatVisit?10000:20000;
   var max3d=isRepeatVisit?12000:(IS_POTATO?9000:15000);
   var capTimer=0;
-  /* Metadata 16 SFX dihangatkan DI DALAM Observatory (setelah Blue), bukan saat boot. Satu jalur retry tetap milik safePlay.
-     Antrean = 16 SFX lalu BGM/GARG (preload='none' di 01-core; ikut dihangatkan seperti sebelum v125 supaya tombol musik pertama tidak cold). 3 file per 400 ms. */
-  var warmed=false;
+  /* v127: metadata 16 SFX (lalu BGM/GARG, preload='none' di 01-core) dihangatkan mulai SAAT CAPSULE TAMPIL (finish()), bukan setelah Blue +4,2 dtk.
+     Alasan (telemetri v126 itel A6610L): boot 12,2 dtk memblokir main thread 89%, jaringan nganggur, audio baru dimulai setelah Blue -> tap pertama cold. Saat capsule tampil
+     main thread bebas (build + warm shader sudah selesai). Berbasis penyelesaian: maks WARM_CONC (2) elemen sekaligus, elemen berikutnya jalan setelah loadedmetadata/error
+     elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
+     Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
+  var WARM_CONC=2,WARM_SLOT_MS=8000,warmed=false,warmQ=[],warmActive=0,warmHold=0;
+  function warmPump(){
+    var gap=warmHold-performance.now();
+    if(gap>0){setTimeout(warmPump,gap+20);return;}
+    while(warmActive<WARM_CONC&&warmQ.length){
+      var a=warmQ.shift();
+      try{if(!a||a.readyState>=1||!a.paused||a._retrying||a._want)continue;}catch(eE){continue;}
+      warmSlot(a);
+    }
+  }
+  function warmSlot(a){
+    var fin=false,tm=0;
+    function rel(){
+      if(fin)return;fin=true;
+      clearTimeout(tm);
+      try{a.removeEventListener('loadedmetadata',rel);a.removeEventListener('error',rel);a.removeEventListener('abort',rel);}catch(eR){}
+      warmActive--;warmPump();
+    }
+    warmActive++;
+    try{
+      a.addEventListener('loadedmetadata',rel);a.addEventListener('error',rel);a.addEventListener('abort',rel);
+      tm=setTimeout(rel,WARM_SLOT_MS);
+      a.preload='metadata';a.load();
+    }catch(eL){rel();}
+  }
   function warmRest(){
     if(warmed)return;warmed=true;
     try{performance.mark('obs-warm');}catch(eM){}
-    var q=stars.slice();
-    try{[MUSIC_COLLAP,AMB,GARG].forEach(function(a){if(a)q.push(a);});}catch(e){}
-    (function step(){
-      for(var n=0;n<3&&q.length;n++){
-        var a=q.shift();
-        try{
-          if(a&&a.readyState<1&&a.paused&&!a._retrying&&!a._want){a.preload='metadata';a.load();}
-        }catch(e){}
-      }
-      if(q.length)setTimeout(step,400);
-    })();
+    warmQ=stars.slice();
+    try{[MUSIC_COLLAP,AMB,GARG].forEach(function(a){if(a)warmQ.push(a);});}catch(e){}
+    warmPump();
   }
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
@@ -118,8 +137,8 @@
     startRenderLoop();
     window.__obsEntered=true;
     try{window.dispatchEvent(new Event('obs-entered'));}catch(eEv){}   /* PP-12: index.html mendaftarkan SW setelah ini */
-    var wr=window.requestIdleCallback||function(f){return setTimeout(f,300);};
-    wr(function(){setTimeout(warmRest,1200);},{timeout:3000});   /* setelah frame pertama (±0.5s di SM-T837A) */
+    warmHold=performance.now()+1500;   /* tahan antrean audio selama frame pertama sektor */
+    warmRest();   /* no-op kalau sudah jalan sejak capsule tampil */
     setTimeout(function(){try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(eW){}},2600);   /* pre-warm panel owl + music (06-interaction.js): buka pertama tidak hitch */
     setTimeout(function(){if(bs&&bs.parentNode)bs.remove();},850);
   }
@@ -137,6 +156,7 @@
       choicesEl.classList.add('on');
       choicesEl.setAttribute('aria-hidden','false');
     }
+    setTimeout(warmRest,400);   /* v127: mulai hangatkan audio sesudah capsule ter-paint */
     capTimer=setTimeout(function(){
       capTimer=0;
       if(bs.classList.contains('off'))return;
