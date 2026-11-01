@@ -80,9 +80,11 @@
     'boot.detected':{en:'DETECTED',id:'TERDETEKSI'},'boot.buffering':{en:'BUFFERING',id:'MEMUAT'},'boot.aligning':{en:'ALIGNING',id:'MENYELARASKAN'},
     'boot.nominal':{en:'NOMINAL',id:'NORMAL'},'boot.ready':{en:'READY',id:'SIAP'},'boot.stable':{en:'STABLE',id:'STABIL'},
     'boot.mods':{en:'3D MODULES',id:'MODUL 3D'},'boot.warm':{en:'3D WARM-UP',id:'PEMANASAN 3D'},'boot.waiting':{en:'WAITING',id:'MENUNGGU'},
-    'boot.locked':{en:'LOCKED',id:'TERKUNCI'},'boot.online':{en:'ONLINE',id:'AKTIF'},'boot.open':{en:'OPEN',id:'TERBUKA'},'boot.complete':{en:'COMPLETE',id:'SELESAI'},
+    'boot.locked':{en:'LOCKED',id:'TERKUNCI'},'boot.online':{en:'ONLINE',id:'AKTIF'},'boot.open':{en:'OPEN',id:'TERBUKA'},'boot.complete':{en:'COMPLETE',id:'SELESAI'},'boot.allready':{en:'ALL SYSTEMS READY',id:'SEMUA SISTEM SIAP'},
     'boot.red':{en:'Red',id:'Merah'},'boot.blue':{en:'Blue',id:'Biru'},'boot.or':{en:'or',id:'atau'},
     'boot.red.aria':{en:'View Source Code',id:'Lihat Kode Sumber'},'boot.blue.aria':{en:'Enter Observatory',id:'Masuk Observatorium'},
+    'boot.tap.t1':{en:"Hang on, I'm lighting up the stars.",id:"Sabar ya, aku lagi nyalain bintang-bintangnya."},'boot.tap.t2':{en:"Don't worry, I'm keeping an eye on the loading.",id:"Tenang, loading-nya aku jagain."},
+    'boot.tap.t3':{en:"Pick blue to come on in.",id:"Pilih biru buat masuk, ya."},'boot.tap.t4':{en:"A bit slow today... your phone is catching its breath.",id:"Agak lambat nih... HP kamu lagi ngatur napas."},
 
     /* player */
     'mp.kicker':{en:"Dumul's Observatory",id:'Observatorium Dumul'},
