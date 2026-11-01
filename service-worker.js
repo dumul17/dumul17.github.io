@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v294'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v295'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -39,7 +39,7 @@ const SHELL = [
   'dumul-js/obs/js/05-sector-ui.js?v=181',
   'dumul-js/obs/js/06-interaction.js?v=125',
   'dumul-js/obs/js/07-boot.js?v=136',
-  'dumul-js/obs/js/08-tx-drone.js?v=14',
+  'dumul-js/obs/js/08-tx-drone.js?v=15',
   'dumul-js/obs/js/09-wormhole.js?v=44',
   'dumul-js/obs/js/10-ui-sound.js?v=8',
   'dumul-js/obs/js/11-live-count.js?v=5',
@@ -55,7 +55,7 @@ const SHELL = [
   'dumul-js/obs/img/nebula.webp?v=1',
   'dumul-js/obs/img/milky-way.webp?v=3',
   'dumul.css?v=1',
-  'dumul.js?v=3',
+  'dumul.js?v=4',
   'dumul-app.js?v=1',
   'og.webp',
   'collapsars-cover.webp',
@@ -64,14 +64,30 @@ const SHELL = [
   'icons/icon-512.png'
 ];
 
+const VER_RE = /[?&]v=\d+(&|$)/;          /* URL versi (immutable) */
+const NAV_TIMEOUT = 4000;                 /* navigasi: tunggu network maks 4 dtk kalau sudah ada salinan cache */
 const MEDIA_RE = /\.(opus|mp3|ogg|oga|m4a|aac|wav|flac|webm|mp4)$/i;
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
+    /* URL ber-?v= dianggap immutable: kalau sudah ada di shell cache versi sebelumnya, disalin (nol byte unduhan).
+       Halaman HTML & aset tanpa ?v= tetap diambil ulang. Konsekuensi: file yang diedit WAJIB bump ?v= (check-sky.js). */
+    const oldNames = (await caches.keys()).filter((k) => k.startsWith('dumul-shell-') && k !== SHELL_CACHE);
+    const olds = [];
+    for (const n of oldNames) olds.push(await caches.open(n));
     await Promise.allSettled(
-      SHELL.map((u) => cache.add(new Request(u, { cache: 'reload' })))
+      SHELL.map(async (u) => {
+        if (VER_RE.test(u)) {
+          const abs = new URL(u, self.registration.scope).href;
+          for (const oc of olds) {
+            const hit = await oc.match(abs);
+            if (hit) { await cache.put(abs, hit); return; }
+          }
+        }
+        await cache.add(new Request(u, { cache: 'reload' }));
+      })
     );
     await self.skipWaiting();
   })());
@@ -116,7 +132,12 @@ self.addEventListener('fetch', (event) => {
   if (req.headers.has('range')) return;
 
   if (req.mode === 'navigate') {
-    event.respondWith(networkFirst(req));
+    event.respondWith(networkFirst(req, event));
+    return;
+  }
+
+  if (url.origin === self.location.origin && VER_RE.test(url.search)) {
+    event.respondWith(cacheFirst(req));    /* ?v= immutable: tanpa revalidate tiap load */
     return;
   }
 
@@ -254,19 +275,31 @@ async function serveAudio(req, url) {
 
 /* ---------------- HALAMAN & ASET ---------------- */
 
-async function networkFirst(req) {
+async function cacheFirst(req) {
+  const hit = await caches.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (res && res.ok) {
+    const c = await caches.open(RUNTIME_CACHE);
+    c.put(req, res.clone());
+  }
+  return res;
+}
+
+async function networkFirst(req, event) {
   const cache = await caches.open(SHELL_CACHE);
-  try {
-    const res = await fetch(req);
+  const cached = await caches.match(req, { ignoreSearch: true });
+  const net = fetch(req).then((res) => {
     if (res && res.ok) cache.put(req, res.clone());
     return res;
-  } catch (err) {
-    return (
-      (await caches.match(req, { ignoreSearch: true })) ||
-      (await caches.match('index.html')) ||
-      Response.error()
-    );
+  });
+  const fallback = async () => cached || (await caches.match('index.html')) || Response.error();
+  if (!cached) {                               /* belum ada salinan: tunggu network apa adanya */
+    try { return await net; } catch (err) { return fallback(); }
   }
+  event.waitUntil(net.catch(() => {}));        /* kalau timeout menang, network tetap lanjut memperbarui cache */
+  const slow = new Promise((r) => setTimeout(() => r(null), NAV_TIMEOUT));
+  try { return (await Promise.race([net, slow])) || cached; } catch (err) { return cached; }
 }
 
 async function staleWhileRevalidate(req, event) {

@@ -1195,7 +1195,7 @@ try{
   owl.setAttribute('aria-label','Open session log and observatory');
   owl.setAttribute('title','Drag to move · tap to open');
   owl.setAttribute('aria-expanded','false');
-  owl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 14.2c.9.9 2.1 1.3 3 1.3s2.1-.4 3-1.3"/><path d="M7.2 7.8C8.4 6.6 10 6 12 6s3.6.6 4.8 1.8"/><path d="M4.8 11.2c.3-1.6 1-2.8 1.8-3.6"/><path d="M19.2 11.2c-.3-1.6-1-2.8-1.8-3.6"/></svg>';
+  owl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 3.5 L8.6 6.6 C10.2 6 13.8 6 15.4 6.6 L19.5 3.5 C20.3 6 20.6 8.5 20.5 11.5 C20.3 16.5 16.8 20.5 12 20.5 C7.2 20.5 3.7 16.5 3.5 11.5 C3.4 8.5 3.7 6 4.5 3.5 Z"/><circle cx="8.4" cy="11.6" r="2.8"/><circle cx="15.6" cy="11.6" r="2.8"/><circle cx="8.4" cy="11.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.6" cy="11.6" r="1.1" fill="currentColor" stroke="none"/><path d="M10.6 14.3 H13.4 L12 17.4 Z" fill="currentColor"/></svg>';
   dock.appendChild(owl);
   bodyRoot.appendChild(dock);
 
