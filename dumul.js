@@ -405,7 +405,16 @@ try{
     return{synced:false,lines:plain.map(function(s){return{t:0,text:s};})};
   }
   /* Lirik di hero: satu baris saja, tepat di bawah spektrum. Efek decode (huruf acak → jadi teks) + glitch. */
-  var hl=null,hlT=null,hlRaf=0,hlTok=0;
+  var hl=null,hlT=null,hlSr=null,hlRaf=0,hlTok=0;
+  /* restart animasi class tanpa forced reflow: lepas class sekarang, pasang lagi di frame berikutnya
+     (style recalc terjadi di antara keduanya). Menggantikan `void el.offsetWidth`. */
+  function rst(el,cls,drop){
+    if(!el)return;
+    var tk=el._rt=(el._rt||0)+1;
+    el.classList.remove(cls);
+    if(drop)el.classList.remove(drop);
+    requestAnimationFrame(function(){if(el._rt===tk&&el.isConnected)el.classList.add(cls);});
+  }
   var SCR='#%&*+=<>/\\|01░▒';
   function hlEl(){
     if(hl&&hl.isConnected)return hl;
@@ -414,11 +423,11 @@ try{
     hl=document.getElementById('dm-hl');
     if(!hl){
       hl=document.createElement('div');hl.id='dm-hl';
-      hl.setAttribute('aria-live','polite');
-      hlT=document.createElement('span');hlT.className='dm-hl-t';
-      hl.appendChild(hlT);
+      hlT=document.createElement('span');hlT.className='dm-hl-t';hlT.setAttribute('aria-hidden','true');
+      hlSr=document.createElement('span');hlSr.className='dm-hl-sr';hlSr.setAttribute('aria-live','polite');
+      hl.appendChild(hlT);hl.appendChild(hlSr);
       wrap.parentNode.insertBefore(hl,wrap.nextSibling);
-    }else hlT=hl.querySelector('.dm-hl-t');
+    }else{hlT=hl.querySelector('.dm-hl-t');hlSr=hl.querySelector('.dm-hl-sr');}
     return hl;
   }
   function hlClear(){
@@ -429,13 +438,13 @@ try{
   function hlShow(text){
     var el=hlEl();if(!el)return;
     var tok=++hlTok;if(hlRaf){cancelAnimationFrame(hlRaf);hlRaf=0;}
-    if(!text){el.classList.remove('on');return;}
+    if(!text){el.classList.remove('on');if(hlSr)hlSr.textContent='';return;}
+    if(hlSr)hlSr.textContent=text;
     var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
-    hlT.classList.remove('dm-hl-hard');hlT.classList.remove('dm-hl-glitch');void hlT.offsetWidth;
     el.classList.add('on');
     try{if(window.__dmReplaceToast)window.__dmReplaceToast();}catch(e){}
     if(reduce){hlT.textContent=text;return;}
-    hlT.classList.add('dm-hl-glitch');
+    rst(hlT,'dm-hl-glitch','dm-hl-hard');
     var n=text.length,dur=Math.min(750,320+n*14),t0=performance.now(),lastSw=0;
     function step(now){
       hlRaf=0;if(tok!==hlTok)return;
@@ -492,7 +501,7 @@ try{
   }
 
   /* ---------- satu loop buat semuanya ---------- */
-  var anSkip=0;
+  var anSkip=0,listenOn=null,listenVal='';
   function loop(now){
     raf=0;
     var playing=!audio.paused&&!audio.ended;
@@ -533,9 +542,10 @@ try{
     }
     try{
       var root=document.documentElement;
-      if(A.listen>0.15)root.classList.add('dm-listening');
-      else root.classList.remove('dm-listening');
-      root.style.setProperty('--dm-listen',A.listen.toFixed(3));
+      var lOn=A.listen>0.15;
+      if(lOn!==listenOn){listenOn=lOn;root.classList.toggle('dm-listening',lOn);}
+      var lv=A.listen<.002?'0.000':A.listen.toFixed(3);
+      if(lv!==listenVal){listenVal=lv;root.style.setProperty('--dm-listen',lv);}
     }catch(e){}
     if(playing){lyricsStep();uiStep();}
     seekAmp+=((playing?1:0)-seekAmp)*.12;
@@ -768,9 +778,14 @@ try{
     var n=performance.now();if(n-kwLast<2500)return;kwLast=n;
     try{
       var a=window.__dmA;if(a){a.fracture=Math.max(a.fracture||0,.7);a.fracX=.2+Math.random()*.6;}
-      if(hlT){hlT.classList.remove('dm-hl-hard');void hlT.offsetWidth;hlT.classList.add('dm-hl-hard');}
-      seekGlitch(320);
-      if(KW2.test(text)){var hh=document.querySelector('h1.display');if(hh&&window.__dmGlitch)window.__dmGlitch(hh);}
+      /* stagger: teks sekarang, seek bar +1 frame, H1 +2 frame (bukan semuanya di frame yang sama) */
+      if(hlT)rst(hlT,'dm-hl-hard');
+      requestAnimationFrame(function(){
+        seekGlitch(320);
+        if(KW2.test(text))requestAnimationFrame(function(){
+          var hh=document.querySelector('h1.display');if(hh&&window.__dmGlitch)window.__dmGlitch(hh);
+        });
+      });
     }catch(e){}
   }
 
@@ -865,11 +880,14 @@ try{
 
   /* ---------- DUMUL nge-glitch pas disentuh/diklik ---------- */
   function glitch(h){
+    var tk=h._gt=(h._gt||0)+1;
     h.classList.remove('dm-glitching');
-    void h.offsetWidth;
-    h.classList.add('dm-glitching');
     clearTimeout(h._g);
-    h._g=setTimeout(function(){h.classList.remove('dm-glitching');},700);
+    requestAnimationFrame(function(){
+      if(h._gt!==tk)return;
+      h.classList.add('dm-glitching');
+      h._g=setTimeout(function(){h.classList.remove('dm-glitching');},700);
+    });
   }
   window.__dmGlitch=glitch;
   document.addEventListener('pointerdown',function(e){
