@@ -14,7 +14,7 @@ _perf=3,_ftEMA=16.6,_frameN=0,_slowN=0,_clean=0,_need=3,
 /* glow node = sprite radial (di-cache per warna), bukan shadowBlur: tanpa blur pass per node per frame */
 _gl={},_glow=function(c){var s=_gl[c];if(s)return s;s=document.createElement("canvas");s.width=s.height=64;var x=s.getContext("2d"),r=parseInt(c.slice(1,3),16),g2=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16),gd=x.createRadialGradient(32,32,0,32,32,32);gd.addColorStop(0,"rgba("+r+","+g2+","+b+",.95)");gd.addColorStop(.22,"rgba("+r+","+g2+","+b+",.6)");gd.addColorStop(.5,"rgba("+r+","+g2+","+b+",.2)");gd.addColorStop(1,"rgba("+r+","+g2+","+b+",0)");x.fillStyle=gd;x.fillRect(0,0,64,64);return _gl[c]=s},
 k=(Q)=>{
-let rawDt=Q-d;d=Q;
+let rawDt=Q-d;d=Q;let __ts=performance.now();
 let c=Math.min(32,rawDt)/16.666;
 /* EMA frame time → performanceLevel 1|2|3 */
 /* frame lambat (>25 ms) per jendela 60 frame: >=6 -> turun 1 level; 0 selama _need jendela berturut -> naik 1 level (makin lama kalau sering turun lagi) */
@@ -25,6 +25,8 @@ if((++_frameN%60)===0){
   else _clean=0;
   _slowN=0;
 }
+if(window.__dmDbgOn===undefined)window.__dmDbgOn=/[?&]perfdbg=1/.test(location.search);
+if(window.__dmDbgOn){if(window.__dmLock===undefined){var __m=/[?&]lock=([123])/.exec(location.search);window.__dmLock=__m?+__m[1]:0;}if(window.__dmLock)_perf=window.__dmLock;}
 let __A=window.__dmA||{level:0,beatAt:0,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:.5,listen:0,sig:"default",blips:[]};
 let __L=Math.max(__A.level||0,__A.memory||0);
 let s=__A.phase>0?__A.phase:Q*0.001;
@@ -67,6 +69,7 @@ if(window.__dmDbgOn){
       "ms/frame "+D.ema.toFixed(1)+"  fps "+(D.n/secs).toFixed(0)+"  slow>25ms "+(D.slow*100/(D.tot||1)).toFixed(1)+"%\n"+
       "dpr "+(window.devicePixelRatio||1).toFixed(2)+"  a "+a+"  css "+i+"x"+u+"  px "+t.width+"x"+t.height+"\n"+
       "wave step "+waveStep.toFixed(2)+"css = "+(waveStep*a).toFixed(1)+"px fisik\n"+
+      "JS draw "+(D.draw||0).toFixed(1)+"ms  lock "+(window.__dmLock||"off")+"\n"+
       "hot "+(hot?1:0)+"  level "+__L.toFixed(2)+"  bass "+bass.toFixed(2);
     D.tl=Q;
   }
@@ -204,6 +207,7 @@ for(let ni=0;ni<p.length;ni++){
 }
 /* Beat smear bars */
 if(v>0&&nR()>0.5){let h=nR()*u,y=2+nR()*8;l.globalAlpha=g*0.35;l.fillStyle=nR()>0.5?"#6ee5ff":"#ff7ad9";l.fillRect(0,h,i,y)}
+if(window.__dmDbgOn&&window.__dmDbg){let dm=performance.now()-__ts;window.__dmDbg.draw=window.__dmDbg.draw?window.__dmDbg.draw*0.95+dm*0.05:dm;}
 l.restore();
 o=_vis?requestAnimationFrame(k):0};
 let _io=null;if("IntersectionObserver"in window){_io=new IntersectionObserver(function(es){var e=es[es.length-1];_vis=e.isIntersecting;window.__dmHeroVis=_vis;if(_vis&&!o){d=performance.now();o=requestAnimationFrame(k)}},{rootMargin:"80px"});_io.observe(r)}
