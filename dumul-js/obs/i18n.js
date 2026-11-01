@@ -149,7 +149,7 @@
     'tune.sub.pl':{en:'Planet // Tune',id:'Planet // Setelan'},'tune.sub.dr':{en:'Drone // Tune',id:'Drone // Setelan'},'tune.sub.pt':{en:'Portal // Tune',id:'Portal // Setelan'},'tune.sub.tele':{en:'Telescope // Tune',id:'Teleskop // Setelan'},'tune.saved.tele':{en:'TELESCOPE SETTINGS SAVED',id:'SETELAN TELESKOP TERSIMPAN'},
     'tune.on':{en:'On',id:'Nyala'},'tune.off':{en:'Off',id:'Mati'},
     'tune.tele.go':{en:'Bring along',id:'Ajak kemana saja'},'tune.tele.bub':{en:'Bubble messages',id:'Pesan bubble'},'tune.tele.led':{en:'LED color',id:'Warna LED'},
-    'tune.tele.hover':{en:'Hover',id:'Melayang'},'tune.tele.spin':{en:'Spin',id:'Putar'},
+    'tune.tele.hover':{en:'Hover',id:'Melayang'},'tune.tele.spin':{en:'Spin',id:'Putar'},'tune.tele.flip':{en:'Flip',id:'Balik'},
     'tune.led.0':{en:'Green',id:'Hijau'},'tune.led.1':{en:'Amber',id:'Amber'},'tune.led.2':{en:'White',id:'Putih'},'tune.led.3':{en:'Blue',id:'Biru'},'tune.led.4':{en:'Violet',id:'Ungu'},
 
     /* kamera / HUD */
