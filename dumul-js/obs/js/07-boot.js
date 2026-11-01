@@ -51,7 +51,10 @@
      main thread bebas (build + warm shader sudah selesai). Berbasis penyelesaian: maks WARM_CONC (2) elemen sekaligus, elemen berikutnya jalan setelah loadedmetadata/error
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
-  var WARM_CONC=2,WARM_SLOT_MS=8000,warmed=false,warmQ=[],warmActive=0,warmHold=0;
+  /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
+  var WARM_CONC=4,WARM_SLOT_MS=8000,warmed=false,warmQ=[],warmActive=0,warmHold=0;
+  try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(8,+wcm[1]));}catch(eWc){}
+  window.__warmConc=WARM_CONC;
   function warmPump(){
     var gap=warmHold-performance.now();
     if(gap>0){setTimeout(warmPump,gap+20);return;}
@@ -62,7 +65,7 @@
     }
   }
   /* v129 (diagnostik, tanpa mengubah perilaku): catat tiap slot warm audio -> window.__warmLog, dibaca bench (R.warmLog).
-     Baris: [nama, mulai ms, lepas ms, sebab, readyState, networkState, warmActive saat lepas, kode error media].
+     Baris: [nama, mulai ms, lepas ms, sebab, readyState, networkState, warmActive saat lepas, kode error media, jumlah abort diabaikan (v130)].
      sebab: meta = loadedmetadata, err = error, abort = abort, tmo = WARM_SLOT_MS habis, exc = exception di load().
      __warmMax = konkurensi tertinggi yang pernah terjadi (harus <= WARM_CONC). Tujuan: cari tahu kenapa 19 file mulai dalam ~190 ms padahal WARM_CONC=2. */
   var WLOG=window.__warmLog=window.__warmLog||[];
@@ -73,10 +76,16 @@
       if(fin)return;fin=true;
       clearTimeout(tm);
       try{a.removeEventListener('loadedmetadata',onEv);a.removeEventListener('error',onEv);a.removeEventListener('abort',onEv);}catch(eR){}
-      try{if(WLOG.length<40)WLOG.push([nm,t1,Math.round(performance.now()),why,a.readyState,a.networkState,warmActive,a.error?a.error.code:0]);}catch(eG){}
+      try{if(WLOG.length<40)WLOG.push([nm,t1,Math.round(performance.now()),why,a.readyState,a.networkState,warmActive,a.error?a.error.code:0,a._wab||0]);}catch(eG){}
       warmActive--;warmPump();
     }
-    function onEv(ev){rel(ev&&ev.type==='loadedmetadata'?'meta':(ev&&ev.type)||'?');}
+    /* v130: 'abort' DIABAIKAN. Telemetri v129 (3 run, 19/19 slot): load() pada elemen preload='none' menembakkan 'abort' dalam 15-40 ms (readyState 0, networkState 3)
+       padahal pemuatan lanjut sesudahnya (metadata tiba 10+ dtk kemudian). Melepas slot di 'abort' membuat semua 19 file mulai dalam ±200 ms dan WARM_CONC tak berlaku.
+       Slot kini dilepas hanya oleh loadedmetadata / error / WARM_SLOT_MS. Jumlah abort tetap dicatat (kolom ke-9 warmLog). */
+    function onEv(ev){
+      if(ev&&ev.type==='abort'){a._wab=(a._wab||0)+1;return;}
+      rel(ev&&ev.type==='loadedmetadata'?'meta':(ev&&ev.type)||'?');
+    }
     warmActive++;
     try{window.__warmMax=Math.max(window.__warmMax||0,warmActive);}catch(eX){}
     try{
