@@ -539,6 +539,36 @@ if ('serviceWorker' in navigator) {
 /* BENCH v3 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
+  /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
+     Inline script ini jalan sebelum script defer, jadi wrapper terpasang sebelum modul memanggil rIC. Untuk menguji apakah rIC warm steps penyebab capsule 'beku'. */
+  var RIC_HOLD = /[?&]ric=hold(&|$)/.test(location.search);
+  if (RIC_HOLD && window.requestIdleCallback) {
+    var _ric = window.requestIdleCallback.bind(window), _q = [], _entered = false;
+    window.requestIdleCallback = function (fn, o) { if (_entered) return _ric(fn, o); _q.push([fn, o]); return -_q.length; };
+    window.addEventListener('obs-entered', function () { _entered = true; setTimeout(function () { _q.splice(0).forEach(function (a) { _ric(a[0], a[1]); }); }, 1500); }, { once: true });
+  }
+  var LOAF = [], EVT = [];
+  function fileOf(u) { try { return String(u || '').split('?')[0].split('/').pop(); } catch (e) { return ''; } }
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (e) {
+        if (e.duration < 120) return;
+        var sc = (e.scripts || []).slice().sort(function (a, b) { return b.duration - a.duration; }).slice(0, 3).map(function (x) {
+          return [fileOf(x.sourceURL), x.sourceFunctionName || '', String(x.invokerType || '').replace('event-listener', 'evt').replace('classic-script', 'cs').replace('user-callback', 'cb').replace('resolve-promise', 'prom'), Math.round(x.duration)];
+        });
+        LOAF.push([Math.round(e.startTime), Math.round(e.duration), Math.round(e.blockingDuration || 0), sc]);
+      });
+    }).observe({ type: 'long-animation-frame', buffered: true });
+  } catch (e) {}
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (e) {
+        if (e.duration < 100 || EVT.length >= 20) return;
+        /* [event, startTime, input delay, processing, total] */
+        EVT.push([e.name, Math.round(e.startTime), Math.round(e.processingStart - e.startTime), Math.round(e.processingEnd - e.processingStart), Math.round(e.duration)]);
+      });
+    }).observe({ type: 'event', durationThreshold: 80, buffered: true });
+  } catch (e) {}
   var R = { t: {}, meta: {}, ls: {}, cp: {}, playLog: [], tapLog: [], taps: 0, playing: 0 }, playReq = {}, playRs = {}, LT = [], LP = { pre: { n: 0, ms: 0 }, cap2blue: { n: 0, ms: 0 }, blue2f1: { n: 0, ms: 0 }, after: { n: 0, ms: 0 } }, lt = 0, ltN = 0, ltAll = 0, ltAllN = 0, capDone = false, blueAt = 0, tapAt = 0, box, hooked = false;
   function now() { return Math.round(performance.now()); }
   function mark(k) { if (R.t[k] == null) { R.t[k] = now(); paint(); } }
@@ -589,7 +619,7 @@ if ('serviceWorker' in navigator) {
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v6 ms (sejak navigasi)');
+    x.push('BENCH v7 ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -609,6 +639,9 @@ if ('serviceWorker' in navigator) {
   function snapshot() {
     R.sfxFinal = sfxStates();
     R.ltPhase = LP;
+    R.ric = RIC_HOLD ? 'hold' : 'normal';
+    R.loaf = LOAF.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8); /* [start, dur, blocking, [[file, fungsi, invoker, ms] x3]] */
+    R.evt = EVT; /* [event, start, inputDelay, processing, total] untuk event >=100ms (klik Blue dll) */
     R.ltTop = LT.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10); /* [startTime, durasi] terpanjang; bandingkan dgn t.capsule/blue/frame1 dan marks */
     try { var m0 = performance.getEntriesByName('obs-t0')[0], mw = performance.getEntriesByName('obs-warm')[0]; R.t0Start = m0 ? Math.round(m0.startTime) : null; R.warmStart = mw ? Math.round(mw.startTime) : null; R.t0mode = /[?&]legacy=1/.test(location.search) ? 'legacy' : (/[?&]t0=capsule/.test(location.search) ? 'capsule' : 'dcl'); } catch (e) {}
     R.longtaskBeforeCapsule = { n: ltN, ms: Math.round(lt) };
