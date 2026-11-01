@@ -164,6 +164,9 @@ function skyCam(uu,ee){
   if(!sk||S.vx==null)return null;
   Wv=sk.clientWidth||winW();Hv=sk.clientHeight||winH();m=sm(uu);k=Math.exp(S.lnK*ee);
   tx=(Wv*.5-S.vx)*m;ty=(Hv*.5-S.vy)*m;
+  /* clamp: tepi canvas #sky tidak boleh masuk ke dalam layar (portal dekat tepi -> translate ke tengah lebih cepat dari scale -> celah, milky-way "kepotong").
+     Dengan origin = portal, tepi kiri/atas ada di S.vx-S.vx*k+tx; syarat tetap menutup layar: tx<=vx*(k-1), tx>=-(Wv-vx)*(k-1). Return di bawah memakai tx/ty hasil clamp, jadi terowongan tetap sejajar. */
+  if(k>1){tx=Math.max(-(Wv-S.vx)*(k-1),Math.min(S.vx*(k-1),tx));ty=Math.max(-(Hv-S.vy)*(k-1),Math.min(S.vy*(k-1),ty));}
   sk.style.willChange='transform,opacity';if(WH_DBG.indexOf('nosky')>=0)sk.style.visibility='hidden';sk.style.transformOrigin=S.vx+'px '+S.vy+'px';
   sk.style.transform='translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px) scale('+k.toFixed(4)+')';
   sk.style.opacity=(1-.92*sm((ee-.5)/.5)).toFixed(3);   /* langit meredup menjelang tertutup terowongan (membesar jadi buram) */
