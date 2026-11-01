@@ -166,10 +166,11 @@
     <div class="bp-row bp-tog bp-wide"><span class="bp-k" data-i18n="tune.tele.bub">Bubble messages</span><button type="button" id="bp-tele-bub" class="bp-switch" aria-pressed="true">On</button></div>
     <div class="bp-sec t3-sec" data-i18n="tune.sec.body">Body</div>
     <div class="bp-row bp-tog"><span class="bp-k" data-i18n="tune.tele.led">LED color</span><span class="bp-leds" role="group" data-i18n-aria="tune.tele.led" aria-label="LED color"><button type="button" class="bp-led" data-i="0" style="--c:57,255,20" aria-label="Green" title="Green" data-i18n-aria="tune.led.0"></button><button type="button" class="bp-led" data-i="1" style="--c:255,176,32" aria-label="Amber" title="Amber" data-i18n-aria="tune.led.1"></button><button type="button" class="bp-led" data-i="2" style="--c:235,245,255" aria-label="White" title="White" data-i18n-aria="tune.led.2"></button><button type="button" class="bp-led" data-i="3" style="--c:88,150,255" aria-label="Blue" title="Blue" data-i18n-aria="tune.led.3"></button><button type="button" class="bp-led" data-i="4" style="--c:176,132,255" aria-label="Violet" title="Violet" data-i18n-aria="tune.led.4"></button></span></div>
-    <label class="bp-row"><span class="bp-k" data-i18n="tune.size">Size</span><input type="range" class="bp-range" id="tp-size" min="50" max="250" step="1" value="100"><output id="tp-size-v">100%</output></label>
+    <label class="bp-row"><span class="bp-k" data-i18n="tune.size">Size</span><input type="range" class="bp-range" id="tp-size" min="20" max="100" step="1" value="40"><output id="tp-size-v">40%</output></label>
     <div class="bp-sec t3-sec" data-i18n="tune.sec.move">Motion</div>
-    <label class="bp-row"><span class="bp-k" data-i18n="tune.tele.hover">Hover</span><input type="range" class="bp-range" id="tp-spd" min="0" max="300" step="1" value="100"><output id="tp-spd-v">100%</output></label>
-    <label class="bp-row"><span class="bp-k" data-i18n="tune.tele.spin">Spin</span><input type="range" class="bp-range" id="tp-spin" min="0" max="300" step="1" value="100"><output id="tp-spin-v">100%</output></label>
+    <label class="bp-row"><span class="bp-k" data-i18n="tune.tele.hover">Hover</span><input type="range" class="bp-range" id="tp-spd" min="0" max="100" step="1" value="33"><output id="tp-spd-v">33%</output></label>
+    <label class="bp-row"><span class="bp-k" data-i18n="tune.tele.spin">Spin</span><input type="range" class="bp-range" id="tp-spin" min="0" max="100" step="1" value="33"><output id="tp-spin-v">33%</output></label>
+    <label class="bp-row"><span class="bp-k" data-i18n="tune.tele.flip">Flip</span><input type="range" class="bp-range" id="tp-flip" min="0" max="100" step="1" value="50"><output id="tp-flip-v">50%</output></label>
   </div>
   <div class="bp-page" data-page="pl" hidden></div>   <!-- Planet / Drone / Portal: baris slider dibuat 18-tune3d.js dari knob CFG -->
   <div class="bp-page" data-page="dr" hidden></div>
@@ -310,20 +311,20 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=31"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=33"></script>
+<script defer src="dumul-js/obs/i18n.js?v=34"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=143"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=139"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=140"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=111"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=143"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=181"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=133"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
-<script defer src="dumul-js/obs/js/08-tx-drone.js?v=13"></script>
+<script defer src="dumul-js/obs/js/08-tx-drone.js?v=14"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=43"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=8"></script>
 <script>
@@ -347,11 +348,11 @@
 </script>
 <script defer src="dumul-js/obs/js/12-ast3d.js?v=13"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=11"></script>
-<script defer src="dumul-js/obs/js/14-drone3d.js?v=10"></script>
+<script defer src="dumul-js/obs/js/14-drone3d.js?v=11"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=27"></script>
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=6"></script>
-<script defer src="dumul-js/obs/js/17-planet3d.js?v=35"></script>
-<script defer src="dumul-js/obs/js/18-tune3d.js?v=17"></script>
+<script defer src="dumul-js/obs/js/17-planet3d.js?v=36"></script>
+<script defer src="dumul-js/obs/js/18-tune3d.js?v=18"></script>
 <script>
 /* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
    (semua script defer sudah jalan, global SECT/WORMHOLE/PROBE ada). Sengaja TIDAK di SHELL service-worker.js dan bukan <script src> di atas;
