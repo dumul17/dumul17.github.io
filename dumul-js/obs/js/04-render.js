@@ -511,7 +511,6 @@ function drawFloatingTelescope(now){
 
     TELESCOPE.x+=dx*Math.min(1,dt*7.5);
     TELESCOPE.y+=dy*Math.min(1,dt*7.5);
-    TELESCOPE.ang+=dt*5.0; /* Spin while warping */
 
     /* Arrived near the star (< 25px) */
     if(dist<25){
@@ -541,7 +540,6 @@ function drawFloatingTelescope(now){
       TELESCOPE.ocx+=(TELESCOPE.targetX-TELESCOPE.ocx)*ok;TELESCOPE.ocy+=(TELESCOPE.targetY-TELESCOPE.ocy)*ok;
       TELESCOPE.x=TELESCOPE.ocx+Math.cos(TELESCOPE.orbitAngle)*orbitRadius;
       TELESCOPE.y=TELESCOPE.ocy+Math.sin(TELESCOPE.orbitAngle)*orbitRadius;
-      TELESCOPE.ang=TELESCOPE.orbitAngle+Math.PI/2; /* Face tangent to orbit */
     }
   }else{
     /* Mode 'drift' — original free-float motion */
@@ -558,7 +556,6 @@ function drawFloatingTelescope(now){
     TELESCOPE.vy+=(TELESCOPE.ty-TELESCOPE.vy)*ease;
     TELESCOPE.x+=TELESCOPE.vx*dt*TELE_CFG.spd;   /* spd/spin: setelan hover teleskop */
     TELESCOPE.y+=TELESCOPE.vy*dt*TELE_CFG.spd;
-    TELESCOPE.ang+=TELESCOPE.va*dt*TELE_CFG.spin;
 
     /* Soft bounce inside the viewport — avoids the old toroidal teleport that
        made the telescope flicker/jump on mobile near the edges. */
@@ -585,6 +582,21 @@ function drawFloatingTelescope(now){
       }
     }
   }catch(ePc){}
+
+  /* Moncong (+x badan) selalu menghadap arah gerak: sudut dikejar halus lewat selisih terpendek (360° tanpa lompat), semua mode (drift/warp/orbit).
+     Dihitung dari pergeseran posisi nyata per frame; loncatan besar (pindah sektor/teleport) diabaikan, sudut ditahan. */
+  try{
+    var hpx=TELESCOPE._hx,hpy=TELESCOPE._hy;
+    if(hpx!=null&&dt>0){
+      var hdx=TELESCOPE.x-hpx,hdy=TELESCOPE.y-hpy,hst=Math.hypot(hdx,hdy);
+      if(hst>.0005&&hst<220){
+        var hd=(Math.atan2(hdy,hdx)-TELESCOPE.ang)%6.283185;if(hd>3.141593)hd-=6.283185;else if(hd<-3.141593)hd+=6.283185;
+        var hk=TELESCOPE.mode==='warp'?9:(TELESCOPE.mode==='orbit'?6:2.2);
+        TELESCOPE.ang+=hd*(1-Math.exp(-dt*hk*TELE_CFG.spin));   /* slider Spin tele = kecepatan nolehnya moncong (360°); 0 = sudut ditahan */
+      }
+    }
+    TELESCOPE._hx=TELESCOPE.x;TELESCOPE._hy=TELESCOPE.y;
+  }catch(eHd){}
 
   /* margin used by edge-wrap ghost copies during draw (all modes). */
   var margin=110;

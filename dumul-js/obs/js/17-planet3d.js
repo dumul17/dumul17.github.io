@@ -1376,7 +1376,7 @@ function planetGroundAt(ug,sg,now,lift){
 function planetLandPick(xs,ys,now,frac){
   if(!planetGroundOk())return null;
   var F=pl3dGroundFrame(),R=F.R,q=pl3dScr(xs,ys),xu=(frac!=null)?PW*frac:Math.max(PW*.14,Math.min(PW*.5,q[0])),
-      ddx=xu-F.cxs,limb=F.gm.cy-Math.sqrt(Math.max(0,R*R-ddx*ddx)),sg=Math.max(14,Math.min(46,(PH-limb)*.5)),yu=limb+sg,
+      ddx=xu-F.cxs,limb=F.gm.cy-Math.sqrt(Math.max(0,R*R-ddx*ddx)),sg=Math.max(14,Math.min((typeof TXFX!=='undefined'&&TXFX.ORB&&TXFX.ORB.depth)||46,(PH-limb)*.8)),yu=limb+sg,
       dx=xu-F.cxs,dy=(PH-yu)-F.cys,rr=Math.hypot(dx,dy),phi=Math.atan2(dy,dx);
   var sgp=R-rr;
   return {u:(phi-F.phi0+pl3dRotAng(now,R)*sgp/PL3D_CFG.rotRef)*R,s:sgp};

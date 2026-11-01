@@ -16,24 +16,23 @@
 var DR3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
-  size:30,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini. Kelipatan 5 supaya kena snap slider panel tuning (dulu 28) */
-  half:15,        /* setengah lebar kamera ortho (satuan model) */
-  resMin:128,resMax:160,
+  size:20,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini. Kelipatan 5 supaya kena snap slider panel tuning (dulu 28) */
+  half:50,        /* setengah lebar kamera ortho (satuan model) */
+  resMin:128,resMax:196,
   minDt:40,       /* jeda minimum antar render GPU (ms). Sprite cuma ~30 px dan gerakannya pelan, jadi 40 ms (~25 fps) tidak terlihat bedanya; posisi tetap 60 fps karena digambar 2D. 0 = render tiap frame (perilaku lama) */
   /* knob tuning (tab Drone di panel owl; 1 = perilaku asli, ini = DEFAULT): */
-  spin:1,         /* kecepatan putar jari-jari muka */
   bob:1,          /* amplitudo melayang naik-turun + goyang badan */
   lean:1,         /* seberapa condong ke depan saat terbang */
   flame:1,        /* panjang api thruster */
-  turn:1,         /* kecepatan nolehnya badan ke arah terbang (>1 = lebih sigap) */
   light:1,        /* pengali semua lampu (kunci hangat, rim, fill, hemisphere) */
   halo:1,         /* pengali halo lembut 2D di bawah drone */
-  swayK:1,        /* pengali bob + lean sekaligus (satu slider 'Sway' di panel tuning; 1 = apa adanya, 0 = diam) */
-  glowK:1         /* pengali light + halo sekaligus (satu slider 'Glow' di panel tuning) */
+  glowK:1         /* pengali light + halo sekaligus (slider 'Glow' di panel tuning, 0..1; 1 = 100% = GLOW_T x lampu/halo lama, jadi tipis) */
 };
 try{
   if(/[?&]drone3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_drone3d')==='0')DR3D_CFG.on=false;
 }catch(eD3){}
+var DR3D_EL=.8;   /* sin(elevasi kamera ~53°): sumbu z dunia di layar tertekan ke 0.8, jadi arah layar dikoreksi sebelum jadi yaw */
+var GLOW_T=.4,FLAME_T=2;   /* GLOW_T: 100% slider Glow = 40% dari kuat lama (tipis); FLAME_T: 100% slider Flame = 2x panjang lama */
 var DR3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,yaw:null,lean:null,mdl:null,res:0,err:'',m:{},o:{},
   px:0,py:0,pt:0,vx:0,vy:0,yawA:0,hasV:false,lastNow:-1,lastR:-1e9,c2:null,x2:null,dirty:false,lastCol:'',ar:.43,ag:.9,ab:1};
 
@@ -306,23 +305,25 @@ function dr3dUpdate(now,x,y,col){
   vx=DR3D.vx;vy=DR3D.vy;sp=Math.hypot(vx,vy);
 
   /* menghadap arah terbang, nolehnya lambat (hidung = -z; layar x -> dunia x, layar y -> dunia z) */
-  if(sp>.004){
-    var tgt=Math.atan2(-vx,-vy);
+  var ot=DR3D.orbTan,otOk=!!ot&&Math.hypot(ot[0],ot[1])>1e-4,tgt=null,tau=320;   /* orbTan (dari 08-tx-drone.js) = arah singgung orbit di layar: moncong ikut arah putaran orbit, bukan gerak tanah planet */
+  if(otOk){tgt=Math.atan2(-ot[0],-ot[1]/DR3D_EL);tau=110;}
+  else if(sp>.004)tgt=Math.atan2(-vx,-vy/DR3D_EL);
+  if(tgt!==null){
     if(!DR3D.hasV){DR3D.yawA=tgt;DR3D.hasV=true;}
-    else DR3D.yawA+=dr3dAngDiff(DR3D.yawA,tgt)*(1-Math.exp(-Math.min(60,dt||16)*Math.max(.05,DR3D_CFG.turn)/320));
+    else DR3D.yawA+=dr3dAngDiff(DR3D.yawA,tgt)*(1-Math.exp(-Math.min(60,dt||16)/tau));
   }
   DR3D.yaw.rotation.y=DR3D.yawA;
   /* condong tipis ke depan sesuai kecepatan, melayang pelan */
-  var ln=Math.min(.32,sp*6)*DR3D_CFG.lean*DR3D_CFG.swayK,tt=now*.001,bb=DR3D_CFG.bob*DR3D_CFG.swayK;
+  var ln=Math.min(.32,sp*6)*DR3D_CFG.lean,tt=now*.001,bb=DR3D_CFG.bob;
   var LD=Math.max(0,Math.min(1,DR3D.land||0)),fl=1-LD;   /* DR3D.land (diisi 08-tx-drone.js): 0 terbang ... 1 mendarat -> tidak melayang/condong */
   DR3D.lean.rotation.x=(-ln+.025*bb*Math.sin(tt*1.1))*fl;
   DR3D.lean.rotation.z=.03*bb*Math.sin(tt*.8+.8)*fl;
   DR3D.mdl.position.y=.3*bb*Math.sin(tt*1.2)*fl;
 
   /* jari-jari muka berputar pelan; api thruster berdenyut halus */
-  o.spin.rotation.z=(DR3D.spinA=(DR3D.spinA||0)+(DR3D.spinT?Math.min(100,now-DR3D.spinT):0)*.0004*DR3D_CFG.spin);DR3D.spinT=now;   /* diintegrasi: ganti kecepatan lewat slider tidak bikin jari-jari melompat */
+  o.spin.rotation.z=(DR3D.spinA=(DR3D.spinA||0)+(DR3D.spinT?Math.min(100,now-DR3D.spinT):0)*.0004);DR3D.spinT=now;   /* diintegrasi: ganti kecepatan lewat slider tidak bikin jari-jari melompat */
   var i;
-  for(i=0;i<o.flames.length;i++)o.flames[i].scale.z=(.75+.18*Math.sin(now*.009+i*1.7)+ln*.8)*(1-.75*LD)*DR3D_CFG.flame;
+  for(i=0;i<o.flames.length;i++)o.flames[i].scale.z=(.75+.18*Math.sin(now*.009+i*1.7)+ln*.8)*(1-.75*LD)*DR3D_CFG.flame*FLAME_T;
 
   /* warna interlock (col = 'r,g,b') -> jari-jari muka */
   if(col!==DR3D.lastCol){
@@ -336,9 +337,9 @@ function dr3dUpdate(now,x,y,col){
   /* kunci hangat dari arah Gargantua */
   try{
     var bp=camBH(),dx=bp[0]-x,dy=bp[1]-y,d=Math.hypot(dx,dy)||1,fall=Math.max(.3,Math.min(1.25,1.25-d/(Math.max(W,H)*.9)));
-    o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*fall*DR3D_CFG.light*DR3D_CFG.glowK;
+    o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*fall*DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;
   }catch(eL){}
-  var lk=DR3D_CFG.light*DR3D_CFG.glowK;o.rim.intensity=1.1*lk;o.hemi.intensity=.45*lk;o.fill.intensity=.55*lk;
+  var lk=DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;o.rim.intensity=1.1*lk;o.hemi.intensity=.45*lk;o.fill.intensity=.55*lk;
   /* render GPU dibatasi (minDt); hasil disalin ke kanvas 2D kecil supaya frame yang dilewati tinggal drawImage (isi buffer WebGL tidak dijamin utuh antar frame) */
   if(!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
     r.render(sc,DR3D.cam);
@@ -360,7 +361,7 @@ function drone3dDraw(g,x,y,col,a,now,sc){
     var S=DR3D_CFG.size*(sc||1);
     g.save();
     /* halo lembut di bawah (sama seperti 2D) supaya drone gelap tetap kebaca di langit hitam */
-    var hk=DR3D_CFG.halo*DR3D_CFG.glowK;
+    var hk=DR3D_CFG.halo*DR3D_CFG.glowK*GLOW_T;
     if(hk>0.001){g.fillStyle='rgba('+col+','+Math.min(1,.10*a*hk)+')';g.beginPath();g.arc(x,y,S*.30,0,6.283);g.fill();
     g.fillStyle='rgba('+col+','+Math.min(1,.14*a*hk)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();}
     g.globalAlpha=a>1?1:(a<0?0:a);

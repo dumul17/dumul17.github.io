@@ -115,13 +115,10 @@ var T3D=(function(){
     after:function(){},
     rows:[
       /* Badan */
-      ['size','Size','Ukuran',15,75,1,0,'px','','body'],
-      ['spin','Spin','Putar',0,4,100,0,'%','','body'],
-      ['turn','Turn','Tolehan',.2,4,100,0,'%','','body'],
-      ['swayK','Sway','Goyang',0,3,100,0,'%','','body'],               /* gabungan Float (bob) + Lean */
+      ['size','Size','Ukuran',10,50,1,0,'px','','body'],
       /* Efek */
-      ['flame','Flame','Api',0,2.5,100,0,'%','','fx'],
-      ['glowK','Glow','Pendar',0,3,100,0,'%','','fx']                  /* gabungan Light + Halo */
+      ['flame','Flame','Api',0,1,100,0,'%','','fx'],
+      ['glowK','Glow','Pendar',0,1,100,0,'%','','fx']                  /* gabungan Light + Halo */
     ]});
 
   defGroup('pt',{key:'dumul_tune_pt',root:function(){return window.PT3D_CFG;},

@@ -16,7 +16,7 @@ var SCP3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   half:64,       /* kotak gambar -half..half (satuan lokal teleDrawBody) */
-  resMin:128,resMax:384,
+  resMin:128,resMax:256,
   /* Pose IDLE (di overview & di sektor): teleskop tidak datar — mengayun 3D pelan + condong ke arah gerakannya (bank/lean).
      Tersambung ke panel tuning tab Tele: SPIN = kecepatan + besar ayunan (0 = pose beku, tetap miring 3D), HOVER = kecepatan melayang -> makin kencang makin condong.
      pitch/yaw/roll = besar ayunan (rad, di spin 1×) · bank = seberapa condong ke arah gerak (0 = mati) · ref = kecepatan (px/s) yang dianggap "penuh"
@@ -320,6 +320,13 @@ function scp3dUpdate(now,mm){
   SCP3D.ip+=dtI*spinK;
   var ip=SCP3D.ip,amp=Math.max(.3,Math.min(1.4,.3+.7*spinK)),
       ix=.34+(I.on?I.pitch:.24)*amp*Math.sin(ip*.37),iy=.22+(I.on?I.yaw:.30)*amp*Math.sin(ip*.23),iz=(I.on?I.roll:.05)*amp*Math.sin(ip*.51);
+  /* FLIP (slider Flip tab Tele): badan berguling 180° di sumbu hidung (+x) tiap ~7 s / flip, supaya sisi bawah kelihatan. 0 = tidak pernah (selalu sisi atas).
+     Fase diakumulasi per detik (geser slider tidak bikin loncat); berhenti di sudut kelipatan 360° kalau slider 0. */
+  var fK=(typeof TELE_CFG!=='undefined'&&isFinite(TELE_CFG.flip))?Math.max(0,TELE_CFG.flip):0;
+  SCP3D.fp=(SCP3D.fp||0)+dtI*fK;
+  var FC=7,fn=Math.floor(SCP3D.fp/FC),fu=Math.min(1,(SCP3D.fp-fn*FC)/FC/.3),fe=fu<.5?4*fu*fu*fu:1-Math.pow(-2*fu+2,3)/2,
+      fT=fK>.01?Math.PI*(fn+fe):2*Math.PI*Math.round((SCP3D.fo||0)/(2*Math.PI));
+  SCP3D.fo=(SCP3D.fo||0)+(fT-(SCP3D.fo||0))*(fK>.01?1:(1-Math.exp(-dtI*4)));
   var bk=SCP3D.bk||(SCP3D.bk={x:0,y:0,z:0,vx:0,vy:0,px:null,py:null,pt:0});
   if(I.on&&TL){
     var bx0=TL.x,by0=TL.y;
@@ -345,6 +352,7 @@ function scp3dUpdate(now,mm){
   qA.setFromAxisAngle(ax[2],bk.z);qB.premultiply(qA);
   qA.setFromAxisAngle(ax[1],bk.y);qB.premultiply(qA);
   qA.setFromAxisAngle(ax[0],bk.x);qB.premultiply(qA);   /* condong ke arah gerak (ruang layar) */
+  qA.setFromAxisAngle(ax[0],SCP3D.fo||0);qB.premultiply(qA);   /* flip: guling di sumbu hidung */
   if(tl&&tl.k!=null){
     qT.setFromAxisAngle(ax[1],tl.ty||0);                                   /* yaw: arah hidung terhadap kamera */
     qA.setFromAxisAngle(ax[2],tl.tr||0);qT.premultiply(qA);                /* roll layar: kokpit menghadap atas */

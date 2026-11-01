@@ -357,8 +357,9 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     skyBake();
   }
   /* ---- tab Tele ---- */
-  var TK=['spd','spin','size'],tin={},tout={},tBub=document.getElementById('bp-tele-bub'),tAuto=document.getElementById('bp-tele-auto'),tLeds=[].slice.call(panel.querySelectorAll('.bp-led'));
+  var TK=['spd','spin','size','flip'],tin={},tout={},tBub=document.getElementById('bp-tele-bub'),tAuto=document.getElementById('bp-tele-auto'),tLeds=[].slice.call(panel.querySelectorAll('.bp-led'));
   TK.forEach(function(k){tin[k]=document.getElementById('tp-'+k);tout[k]=document.getElementById('tp-'+k+'-v');});
+  function tsc(k){return 100/TELE_RNG[k][1];}   /* skala tampilan slider tele: nilai asli x tsc = 0..100% (max semua 100%) */
   function teleStored(){var o=null;try{o=JSON.parse(localStorage.getItem(TELE_CFG_KEY)||'null');}catch(e){}return teleCfgNorm(o);}
   function teleDirty(){var st=teleStored();if(st.bubble!==TELE_CFG.bubble||st.led!==TELE_CFG.led)return true;return TK.some(function(k){return Math.abs(st[k]-TELE_CFG[k])>.004;});}
   function teleBubbleOff(){   /* bubble yang lagi tampil ikut dimatikan */
@@ -369,7 +370,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
     if(tBub){var bo=!!TELE_CFG.bubble;tBub.setAttribute('aria-pressed',bo?'true':'false');tBub.textContent=tx(bo?'tune.on':'tune.off',bo?'On':'Off');tBub.classList.toggle('off',!bo);}
     try{lisAutoSync();}catch(e){}
     tLeds.forEach(function(b,i){var on=i===TELE_CFG.led;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');});
-    TK.forEach(function(k){var el=tin[k];if(el){el.value=String(Math.round(TELE_CFG[k]*100));fill(el);}if(tout[k])tout[k].textContent=Math.round(TELE_CFG[k]*100)+'%';});
+    TK.forEach(function(k){var el=tin[k],pv=Math.round(TELE_CFG[k]*tsc(k));if(el){el.value=String(pv);fill(el);}if(tout[k])tout[k].textContent=pv+'%';});
   }
   /* ---- umum ---- */
   function paint(){
@@ -462,7 +463,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   tLeds.forEach(function(b,i){b.addEventListener('click',function(e){e.stopPropagation();teleLedSet(i);paint();haptic(6);});});
   TK.forEach(function(k){
     if(!tin[k])return;
-    tin[k].addEventListener('input',function(){TELE_CFG[k]=teleCfgClamp(k,tin[k].value/100);paint();});
+    tin[k].addEventListener('input',function(){var v=tin[k].value/tsc(k),dv=teleCfgDef()[k];if(Math.abs(v-dv)<.02)v=dv;TELE_CFG[k]=teleCfgClamp(k,v);paint();});   /* dekat default = snap ke nilai default persis */
   });
   if(astBtn)astBtn.addEventListener('click',function(e){e.stopPropagation();AST_CFG.on=AST_CFG.on?0:1;paint();haptic(6);});
   if(astRingBtn)astRingBtn.addEventListener('click',function(e){e.stopPropagation();AST_CFG.ring=AST_CFG.ring?0:1;astResize();paint();haptic(6);});   /* 1 = sabuk di limb planet, 0 = sabuk lama */
