@@ -504,3 +504,9 @@ html.k-blur .backdrop-blur,html.k-blur [class*="blur-["],html.k-blur #dm-bar,htm
 html.k-scan [class*="z-[5]"]{display:none!important}
 html.k-listen.dm-listening #dm-notes,html.k-listen.dm-listening [class*="space-y-[1px]"],html.k-listen.dm-listening .dm-lyrics{opacity:1!important;transition:none!important}
 html.k-listen section.dm-hero::after{display:none!important}
+
+/* ---- stage 3: backdrop-filter dibuang dari elemen fixed (owl, log, toast, fab).
+   Blur 5-6px di elemen kecil nyaris nggak kelihatan, tapi di GPU lemah (mis. Unisoc) tiap frame
+   hero dirender ulang, backdrop di belakangnya ikut dihitung ulang. Background dinaikkan sedikit sebagai ganti. ---- */
+#dm-owl,#dm-log,#dm-log-toast,#dm-top-fab{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+#dm-owl{background:rgba(6,14,20,.93)}
