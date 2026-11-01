@@ -79,6 +79,7 @@
     'boot.lens':{en:'LENS',id:'LENSA'},'boot.signal':{en:'SIGNAL',id:'SINYAL'},'boot.boot':{en:'BOOT',id:'BOOT'},
     'boot.detected':{en:'DETECTED',id:'TERDETEKSI'},'boot.buffering':{en:'BUFFERING',id:'MEMUAT'},'boot.aligning':{en:'ALIGNING',id:'MENYELARASKAN'},
     'boot.nominal':{en:'NOMINAL',id:'NORMAL'},'boot.ready':{en:'READY',id:'SIAP'},'boot.stable':{en:'STABLE',id:'STABIL'},
+    'boot.mods':{en:'3D MODULES',id:'MODUL 3D'},'boot.warm':{en:'3D WARM-UP',id:'PEMANASAN 3D'},'boot.waiting':{en:'WAITING',id:'MENUNGGU'},
     'boot.locked':{en:'LOCKED',id:'TERKUNCI'},'boot.online':{en:'ONLINE',id:'AKTIF'},'boot.open':{en:'OPEN',id:'TERBUKA'},'boot.complete':{en:'COMPLETE',id:'SELESAI'},
     'boot.red':{en:'Red',id:'Merah'},'boot.blue':{en:'Blue',id:'Biru'},'boot.or':{en:'or',id:'atau'},
     'boot.red.aria':{en:'View Source Code',id:'Lihat Kode Sumber'},'boot.blue.aria':{en:'Enter Observatory',id:'Masuk Observatorium'},
