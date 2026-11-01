@@ -42,6 +42,8 @@ try{
   var lastTime='',dragging=false,seekPct=0,seekAmp=0,PAD=8;
   var wctx=elWave.getContext('2d');
   var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* DEBUG bisect: ?perfdbg=1&kill=h1,hl,blur,scan,listen -> pasang class k-* di <html> (lihat akhir dumul.css) */
+  try{var km=/[?&]kill=([\w,]+)/.exec(location.search);if(km&&/[?&]perfdbg=1/.test(location.search))km[1].split(',').forEach(function(k){document.documentElement.classList.add('k-'+k);});}catch(e){}
 
   /* seek bar bergelombang: played line + sine + dot.
      Canvas resize hanya saat ukuran berubah; paint foreground ~30fps (bukan 60). */

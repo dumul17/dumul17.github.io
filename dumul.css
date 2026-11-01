@@ -251,10 +251,11 @@ body.dm-has-bar{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px));back
 #dm-seek:focus-visible{outline:2px solid #ff7ad9;outline-offset:1px;border-radius:6px}
 /* DUMUL glitch on tap */
 h1.display{position:relative;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-h1.display::before,h1.display::after{content:attr(data-text);position:absolute;left:0;right:0;top:0;bottom:0;text-align:center;white-space:nowrap;pointer-events:none;opacity:0;text-shadow:none;mix-blend-mode:screen}
+h1.display::before,h1.display::after{content:attr(data-text);position:absolute;left:0;right:0;top:0;bottom:0;text-align:center;white-space:nowrap;pointer-events:none;opacity:0;text-shadow:none}
 h1.display::before{color:#ff2bd6}
 h1.display::after{color:#22e6ff}
-h1.display.dm-glitching{will-change:transform,clip-path;animation:dm-shake .65s steps(1,end)}
+html.dm-fx h1.display{will-change:transform}
+h1.display.dm-glitching{animation:dm-shake .65s steps(1,end)}
 h1.display.dm-glitching::before{animation:dm-slice-a .65s steps(1,end)}
 h1.display.dm-glitching::after{animation:dm-slice-b .65s steps(1,end)}
 @keyframes dm-shake{
@@ -495,3 +496,11 @@ html.dm-lowfx section.dm-hero::after,html.dm-lowfx #dm-bar::after{display:none!i
 #dm-keys dt{white-space:nowrap}
 #dm-keys dd{margin:0}
 #dm-keys kbd{display:inline-block;min-width:22px;padding:0 6px;border:1px solid rgba(110,229,255,.3);border-radius:4px;color:#6ee5ff;font:500 12px/20px ui-monospace,SFMono-Regular,Menlo,monospace;text-align:center}
+
+/* ---- DEBUG bisect: ?perfdbg=1&kill=h1,hl,blur,scan,listen (tidak aktif tanpa param) ---- */
+html.k-h1 h1.display,html.k-h1 h1.display::before,html.k-h1 h1.display::after{animation:none!important}
+html.k-hl #dm-hl .dm-hl-t{animation:none!important}
+html.k-blur .backdrop-blur,html.k-blur [class*="blur-["],html.k-blur #dm-bar,html.k-blur #dm-owl,html.k-blur #dm-log,html.k-blur section.dm-hero canvas{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;filter:none!important}
+html.k-scan [class*="z-[5]"]{display:none!important}
+html.k-listen.dm-listening #dm-notes,html.k-listen.dm-listening [class*="space-y-[1px]"],html.k-listen.dm-listening .dm-lyrics{opacity:1!important;transition:none!important}
+html.k-listen section.dm-hero::after{display:none!important}
