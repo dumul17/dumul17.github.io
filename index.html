@@ -318,7 +318,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=129"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=130"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -673,6 +673,9 @@ if ('serviceWorker' in navigator) {
     R.glCall = GLC; /* [indeks renderer, compile|render, start, ms] 2 panggilan pertama >30 ms */
     R.ric = RIC_HOLD ? 'hold' : 'normal';
     R.loaf = LOAF.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8); /* [start, dur, blocking, [[file, fungsi, invoker, ms] x3]] */
+    /* v130: LoAF sesudah capsule tampil (top 8 menurut durasi) + penanda timeout/auto-enter. R.loaf di atas = top 8 seluruh sesi, hampir semuanya pra-capsule. */
+    try { var tc = R.t.capsule; R.loafCap = tc == null ? [] : LOAF.filter(function (x) { return x[0] >= tc; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8); } catch (e) { R.loafCap = []; }
+    R.bootTimeout = !!window.__bootTimeout; R.bootFinish = window.__bootFinish || null; R.warmConc = window.__warmConc != null ? window.__warmConc : null;
     R.evt = EVT; /* [event, start, inputDelay, processing, total] untuk event >=100ms (klik Blue dll) */
     R.ltTop = LT.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10); /* [startTime, durasi] terpanjang; bandingkan dgn t.capsule/blue/frame1 dan marks */
     try { var m0 = performance.getEntriesByName('obs-t0')[0], mw = performance.getEntriesByName('obs-warm')[0]; R.t0Start = m0 ? Math.round(m0.startTime) : null; R.warmStart = mw ? Math.round(mw.startTime) : null; R.t0mode = /[?&]legacy=1/.test(location.search) ? 'legacy' : (/[?&]t0=capsule/.test(location.search) ? 'capsule' : 'dcl'); } catch (e) {}
