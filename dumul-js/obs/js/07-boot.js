@@ -97,9 +97,38 @@
   function warmRest(){
     if(warmed)return;warmed=true;
     try{performance.mark('obs-warm');}catch(eM){}
-    warmQ=stars.slice();
-    try{[MUSIC_COLLAP,AMB,GARG].forEach(function(a){if(a)warmQ.push(a);});}catch(e){}
+    warmQ=warmQ.concat(stars);   /* v132: sisa antrean BGM (kalau ?wc=1) tetap di depan; AMB/MUSIC_COLLAP TIDAK di-load() ulang di sini (memutus request yang sedang jalan) */
+    try{if(GARG)warmQ.push(GARG);}catch(e){}
     warmPump();
+  }
+  /* v132: audio di bar + gate = HANYA 2 BGM (constellation.opus = AMB, collapsars.opus = MUSIC_COLLAP); UI sound = synth Web Audio (10-ui-sound.js), tanpa file.
+     16 SFX stellar + GARG TIDAK ikut bar/gate: metadata-nya tetap dihangatkan di belakang setelah capsule tampil (warmRest), unduh offline lewat chip 'Simpan offline' di panel owl.
+     Satuan = elemen yang metadata-nya BENAR-BENAR ada (readyState>=1) atau gagal permanen (a.error), dibaca langsung dari elemen (bukan dari slot warm).
+     Warm BGM dimulai di awal boot (jaringan nganggur selama boot, lihat telemetri v126), cuma 2 request sehingga tidak berebut seperti 19 file.
+     Gate menunggu BGM paling lama AUDIO_CAP; lewat itu capsule tetap tampil dan bar tidak dipaksa 100% (lanjut naik lewat startPost). */
+  var AUDIO_CAP=isRepeatVisit?6000:(IS_POTATO?8000:11000);
+  var audioEls=null;
+  function audioList(){
+    if(audioEls)return audioEls;
+    var l=[];
+    try{[AMB,MUSIC_COLLAP].forEach(function(a){if(a)l.push(a);});}catch(eA){}
+    return (audioEls=l);
+  }
+  /* v132: simpan 2 BGM ke cache SW (sekali, berurutan) beberapa detik setelah Blue, saat BGM sudah main dan buffering awal aman. Tanpa menunggu aturan 50%.
+     Dilewati kalau data saver / 2G / SW belum mengontrol halaman. SW melewati file yang sudah tersimpan. */
+  function cacheBgm(){
+    try{
+      var c=navigator.connection;if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return;
+      var ctl=navigator.serviceWorker&&navigator.serviceWorker.controller;if(!ctl)return;
+      var urls=audioList().map(function(a){return a.currentSrc||a.src;}).filter(Boolean);
+      if(urls.length)ctl.postMessage({type:'CACHE_AUDIO_LIST',urls:urls});
+    }catch(eC){}
+  }
+  window.addEventListener('obs-entered',function(){setTimeout(cacheBgm,6000);},{once:true});
+  function audioStatus(){
+    var l=audioList(),n=0,i;
+    for(i=0;i<l.length;i++){try{if(l[i].readyState>=1||l[i].error)n++;}catch(eS){n++;}}
+    return {n:n,total:l.length,ok:n>=l.length};
   }
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
@@ -120,8 +149,8 @@
   /* v128: bobot unit = BIAYA RELATIF pekerjaan (ms, dari bench itel A6610L: build 3D per modul + warm shader ±5,5 dtk), bukan jumlah unit.
      Tetap jujur: bar hanya naik saat pekerjaan nyata SELESAI, tanpa komponen waktu. Bedanya, unit yang makan 5 dtk (warm) kini mengisi ±48% bar,
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
-  var WT_PAGE=500,WT_MODS=[1200,1100,1800,600,750],WT_WARM=5500;
-  var WT_SUM=WT_PAGE+WT_WARM+WT_MODS.reduce(function(a,b){return a+b;},0);
+  var WT_PAGE=500,WT_MODS=[1200,1100,1800,600,750],WT_WARM=5500,WT_AUDIO=4000;   /* v131: WT_AUDIO = porsi audio di bar (±27%): bar berhenti ±73% saat capsule tampil, sisanya naik saat audio benar-benar siap */
+  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_MODS.reduce(function(a,b){return a+b;},0);
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){
@@ -137,14 +166,15 @@
     return {mods:settled,total:MODS.length,st:st,fins:fins,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,warmFrac:warmOk?1:(exp?Math.min(1,wDone/exp):0)};
   }
   var lastPanel='';
-  function paintPanel(ready,th,complete){
+  function paintPanel(ready,th,complete,au){
     if(!statusEl)return;
     var warmTxt=th.warmOk?T('boot.ready'):((!th.wDone&&!th.wTot)?T('boot.waiting'):(th.wDone+'/'+th.exp));
     var html=[
       row(T('boot.observer'),complete?T('boot.online'):T('boot.detected'),complete),
       row(T('boot.starmap'),ready?T('boot.locked'):T('boot.aligning'),ready),
       row(T('boot.mods'),th.mods+'/'+th.total,th.mods>=th.total),
-      row(T('boot.warm'),warmTxt,th.warmOk)
+      row(T('boot.warm'),warmTxt,th.warmOk),
+      row(T('boot.audio'),au?(au.ok?T('boot.ready'):(au.n+'/'+au.total)):T('boot.waiting'),!!(au&&au.ok))
     ].join('\n');
     if(html!==lastPanel){lastPanel=html;statusEl.innerHTML=html;}
   }
@@ -166,21 +196,23 @@
     setTimeout(function(){try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(eW){}},2600);   /* pre-warm panel owl + music (06-interaction.js): buka pertama tidak hitch */
     setTimeout(function(){if(bs&&bs.parentNode)bs.remove();},850);
   }
-  function finish(complete,ready,th){
+  function finish(c){
     if(done)return;done=true;
+    var th=c.th,ready=c.ready,complete=c.complete;
     try{window.__boot3d={t:Math.round(performance.now()),done:th.mods+(th.warmOk?1:0),total:th.total+1,st:th.st,warm:th.warmOk,gate:true};}catch(e3){}
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
-    /* Bar hanya 100% kalau semua unit benar-benar selesai. Kalau finish karena max3d, bar tetap di angka asli dan baris panel menunjukkan apa yang belum selesai. */
-    if(complete){fill.style.width='100%';pct.textContent='100%';}
+    /* Bar hanya 100% kalau SEMUA unit (termasuk audio, v131) benar-benar selesai. Kalau belum, bar tetap di angka asli; startPost() melanjutkannya sesudah capsule tampil. */
+    paintBar(c);
     sig.classList.add('on');
     if(quoteEl)quoteEl.classList.add('on');
-    paintPanel(ready,th,complete);
+    paintPanel(ready,th,complete,c.au);
     /* Capsule gate: wait for user choice. maxMs = timeout: tidak ada Red/Blue sampai habis -> masuk otomatis (tanpa haptic, jalur enterObservatory yang sama). */
     if(choicesEl){
       choicesEl.classList.add('on');
       choicesEl.setAttribute('aria-hidden','false');
     }
     setTimeout(warmRest,400);   /* v127: mulai hangatkan audio sesudah capsule ter-paint */
+    startPost();   /* v131: bar + panel lanjut mengikuti audio sampai siap / boot screen hilang */
     capTimer=setTimeout(function(){
       capTimer=0;
       if(bs.classList.contains('off'))return;
@@ -214,24 +246,43 @@
       }
     });
   }
-  var pLast=0;
-  function tick(){
-    var elapsed=performance.now()-t0;
-    var ready=pageReady(),th=threeStatus(elapsed);
-    var complete=ready&&th.mods>=th.total&&th.warmOk;
-    /* Progres jujur: bobot biaya unit selesai / total bobot (v128). Tanpa komponen waktu, tanpa clamp +5%: bar naik persis saat unit selesai (main thread diblokir build 0,4-1,8 dtk, jadi ia naik per potongan).
-       Floor + cap 99: 100% hanya dituliskan finish() saat semua unit selesai. Monoton (tidak turun walau gambar lazy mulai di-fetch dan 'ready' berbalik false). */
-    var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM,wi;
+  var pLast=0,postT=0;
+  /* Satu sumber kebenaran untuk bar + panel (dipakai tick() sebelum capsule dan startPost() sesudahnya).
+     Progres jujur: bobot biaya unit selesai / total bobot (v128) + audio (v131). Tanpa komponen waktu, tanpa clamp +5%.
+     Floor + cap 99: 100% hanya ditulis paintBar() saat SEMUA unit selesai. Monoton (tidak turun walau gambar lazy mulai di-fetch dan 'ready' berbalik false). */
+  function calc(elapsed){
+    var ready=pageReady(),th=threeStatus(elapsed),au=audioStatus();
+    var vis=ready&&th.mods>=th.total&&th.warmOk;
+    var complete=vis&&(au.ok||elapsed>=AUDIO_CAP);   /* gate capsule */
+    var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
     var p=Math.min(99,Math.floor(wDone/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
-    fill.style.width=p+'%';pct.textContent=p+'%';
-    paintPanel(ready,th,false);
-    if(complete||elapsed>=max3d){window.__bootFinish=complete?'gate':'cap3d';finish(complete,ready,th);}
+    return {ready:ready,th:th,au:au,complete:complete,all:vis&&au.ok,p:p};
+  }
+  function paintBar(c){
+    var v=c.all?100:c.p;
+    fill.style.width=v+'%';pct.textContent=v+'%';
+  }
+  function startPost(){
+    if(postT)return;
+    postT=setInterval(function(){
+      if(bs.classList.contains('off')){clearInterval(postT);postT=0;return;}
+      var c=calc(performance.now()-t0);
+      paintBar(c);paintPanel(c.ready,c.th,c.complete,c.au);
+      if(c.all){clearInterval(postT);postT=0;try{window.__bootAudioAll=Math.round(performance.now());}catch(eB){}}
+    },250);
+  }
+  function tick(){
+    var elapsed=performance.now()-t0,c=calc(elapsed);
+    paintBar(c);
+    paintPanel(c.ready,c.th,false,c.au);
+    if(c.complete||elapsed>=max3d){window.__bootFinish=c.complete?'gate':'cap3d';finish(c);}
     else requestAnimationFrame(tick);
   }
-  paintPanel(false,threeStatus(0),false);
+  try{warmQ=[AMB,MUSIC_COLLAP].filter(Boolean);warmPump();}catch(eW){}   /* v132: warm 2 BGM sejak awal boot */
+  paintPanel(false,threeStatus(0),false,null);
   requestAnimationFrame(tick);
 })();
 
