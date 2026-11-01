@@ -27,6 +27,9 @@ if((++_frameN%60)===0){
 }
 if(window.__dmDbgOn===undefined)window.__dmDbgOn=/[?&]perfdbg=1/.test(location.search);
 if(window.__dmDbgOn){if(window.__dmLock===undefined){var __m=/[?&]lock=([123])/.exec(location.search);window.__dmLock=__m?+__m[1]:0;}if(window.__dmLock)_perf=window.__dmLock;}
+/* kualitas gambar: dikunci level 3 (L3). Governor _perf tetap dihitung/ditampilkan, tapi hanya dipakai kalau ?adapt=1 */
+if(window.__dmAdaptOn===undefined)window.__dmAdaptOn=/[?&]adapt=1/.test(location.search);
+let _pq=window.__dmAdaptOn?_perf:3;
 let __A=window.__dmA||{level:0,beatAt:0,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:.5,listen:0,sig:"default",blips:[]};
 let __L=Math.max(__A.level||0,__A.memory||0);
 let s=__A.phase>0?__A.phase:Q*0.001;
@@ -47,7 +50,7 @@ let vAmp=0.78*sig.amp*(1+bass*0.14)*(1+listen*0.05);
 let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
 let hot=__L>0.16||v>0||frac>0.1||listen>0.4||bass>0.42;
-let waveStep=(_perf>=3?9.6:(_perf===2?12.8:16))/sdpr; /* dalam piksel fisik: DPR 1.6 -> 6/8/10 CSS px (sama seperti sebelumnya) */
+let waveStep=(_pq>=3?9.6:(_pq===2?12.8:16))/sdpr; /* dalam piksel fisik: DPR 1.6 -> 6/8/10 CSS px (sama seperti sebelumnya) */
 /* ── DEBUG ?perfdbg=1 : tidak mengubah visual, hanya baca ── */
 window.__dmPerf=_perf;
 if(window.__dmDbgOn===undefined)window.__dmDbgOn=/[?&]perfdbg=1/.test(location.search);
@@ -74,9 +77,9 @@ if(window.__dmDbgOn){
     D.tl=Q;
   }
 }
-let meshLinkMul=_perf>=2?1:0.72;
-let doGlitchBars=_perf>=2;
-let doSparks=_perf>=2&&treble>0.12;
+let meshLinkMul=_pq>=2?1:0.72;
+let doGlitchBars=_pq>=2;
+let doSparks=_pq>=2&&treble>0.12;
 l.save();l.globalAlpha=g;
 /* ── wave layers (always full visual presence; step only thins sampling) ── */
 for(let y=0;y<waveLayers.length;y++){
@@ -118,7 +121,7 @@ for(let y=0;y<waveLayers.length;y++){
   if(y===0){
     l.beginPath();l.strokeStyle="#e6f9ff";l.lineWidth=0.4*thin;l.globalAlpha=g*0.55*(0.7+Math.sin(s*9)*0.3)*(1+listen*0.2);
     moved=false;
-    let coreStep=(_perf>=3?4.8:(_perf===2?6.4:8))/sdpr;
+    let coreStep=(_pq>=3?4.8:(_pq===2?6.4:8))/sdpr;
     for(let fe=0;fe<i;fe+=coreStep){
       let sp=window.__dmSp?window.__dmSp(fe/i):0;
       let pt=w+Math.sin(fe*0.05+s*5)*0.5+sp*Math.sin(fe*0.13+s*35)*16*vAmp;
@@ -133,7 +136,7 @@ for(let y=0;y<waveLayers.length;y++){
 }
 /* Treble sparks — density scales with perf; skipped entirely on level 1 */
 if(doSparks){
-  let nSp=Math.floor(treble*(_perf>=3?6:3)*(1+listen));
+  let nSp=Math.floor(treble*(_pq>=3?6:3)*(1+listen));
   for(let h=0;h<nSp;h++){
     if(nR()>treble*0.85)continue;
     let sx=nR()*i,sy=sinkY+(nR()-0.5)*u*0.35;
@@ -150,7 +153,7 @@ if(doSparks){
 /* Horizontal glitch bars — secondary detail; thinner on low perf */
 if(doGlitchBars){
   l.globalAlpha=g*0.18;
-  let nBars=_perf>=3?3:1;
+  let nBars=_pq>=3?3:1;
   for(let h=0;h<nBars;h++)if(nR()>0.6){let y=nR()*u;l.fillStyle=nR()>0.5?"#6ee5ff":"#ff7ad9";l.fillRect(K,y,i*(0.2+nR()*0.6),1)}
 }
 /* Interactive blips */
@@ -179,11 +182,11 @@ p.forEach((h)=>{
   if(sig.sink>0.4)h.y+=(sinkY-h.y)*0.004*c*sig.sink;
 });
 /* Snapshot for handoff continuity — rarer on low perf */
-if((++_meshSnap%(_perf>=3?20:32))===0)window.__dmMeshLive={w:i,h:u,nodes:p.map(h=>({x:h.x,y:h.y,ox:h.ox,oy:h.oy,vx:h.vx,vy:h.vy,r:h.r,color:h.color,glow:h.glow,phase:h.phase}))};
+if((++_meshSnap%(_pq>=3?20:32))===0)window.__dmMeshLive={w:i,h:u,nodes:p.map(h=>({x:h.x,y:h.y,ox:h.ox,oy:h.oy,vx:h.vx,vy:h.vy,r:h.r,color:h.color,glow:h.glow,phase:h.phase}))};
 /* Links — full on 2/3, sparser distance on level 1 */
 l.lineWidth=0.6*(1+listen*0.3);
 let linkR=110*meshLinkMul*(1+listen*0.15*sig.mesh);
-let linkStep=_perf>=2?1:2; /* skip every other pair index on potato */
+let linkStep=_pq>=2?1:2; /* skip every other pair index on potato */
 for(let h=0;h<p.length;h+=linkStep){
   for(let y=h+1;y<p.length;y+=linkStep){
     let B=p[h],w=p[y],ie=Math.hypot(B.x-w.x,B.y-w.y);
