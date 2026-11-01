@@ -38,10 +38,10 @@
   <div id="boot-scan" aria-hidden="true"></div>
   <div id="boot-core">
     <div id="boot-title">DUMUL//OBSERVATORY</div>
-    <div id="boot-status">[ OBSERVER ]        <span class="ok" data-i18n="boot.detected">DETECTED</span>
-[ AUDIO ]           CONNECTING
-[ STAR MAP ]        SYNC
-[ SIGNAL ]          STABLE</div>
+    <div id="boot-status">[ OBSERVER    ]  <span class="ok" data-i18n="boot.detected">DETECTED</span>
+[ STAR MAP    ]  ALIGNING
+[ 3D MODULES  ]  0/5
+[ 3D WARM-UP  ]  WAITING</div>
     <div id="boot-bar"><div id="boot-fill"></div></div>
     <div id="boot-pct">0%</div>
     <div id="boot-signal">&gt; SIGNAL TRANSMITTED</div>
@@ -309,7 +309,7 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=31"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=32"></script>
+<script defer src="dumul-js/obs/i18n.js?v=33"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=143"></script>
@@ -318,7 +318,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=124"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=126"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -344,7 +344,7 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=12"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=13"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=11"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=10"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=27"></script>
@@ -547,7 +547,31 @@ if ('serviceWorker' in navigator) {
     window.requestIdleCallback = function (fn, o) { if (_entered) return _ric(fn, o); _q.push([fn, o]); return -_q.length; };
     window.addEventListener('obs-entered', function () { _entered = true; setTimeout(function () { _q.splice(0).forEach(function (a) { _ric(a[0], a[1]); }); }, 1500); }, { once: true });
   }
-  var LOAF = [], EVT = [];
+  var LOAF = [], EVT = [], GLN = [], GLC = [];
+  /* v8: ukur pembuatan WebGLRenderer (konteks + MSAA) dan compile/render pertama per renderer; dipasang begitu THREE termuat. Hanya di ?bench=1. */
+  (function () {
+    var tries = 0, iv = setInterval(function () {
+      try {
+        if (window.THREE && THREE.WebGLRenderer && !THREE.__benchWrapped) {
+          clearInterval(iv); THREE.__benchWrapped = true;
+          var Orig = THREE.WebGLRenderer;
+          var W2 = function (o) {
+            var t0 = performance.now(), r = new Orig(o), d = performance.now() - t0;
+            if (GLN.length < 12) GLN.push([Math.round(t0), Math.round(d), o && o.antialias ? 1 : 0]);
+            var n = GLN.length - 1;
+            ['compile', 'render'].forEach(function (k) {
+              var f = r[k], c = 0;
+              r[k] = function () { var a = performance.now(), v = f.apply(this, arguments), e = performance.now() - a; if (c++ < 2 && e > 30 && GLC.length < 24) GLC.push([n, k, Math.round(a), Math.round(e)]); return v; };
+            });
+            return r;
+          };
+          W2.prototype = Orig.prototype;
+          try { Object.keys(Orig).forEach(function (k) { W2[k] = Orig[k]; }); } catch (e) {}
+          THREE.WebGLRenderer = W2;
+        } else if (++tries > 2000) clearInterval(iv);
+      } catch (e) { clearInterval(iv); }
+    }, 20);
+  })();
   function fileOf(u) { try { return String(u || '').split('?')[0].split('/').pop(); } catch (e) { return ''; } }
   try {
     new PerformanceObserver(function (l) {
@@ -619,7 +643,7 @@ if ('serviceWorker' in navigator) {
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v7 ms (sejak navigasi)');
+    x.push('BENCH v9 ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -639,6 +663,9 @@ if ('serviceWorker' in navigator) {
   function snapshot() {
     R.sfxFinal = sfxStates();
     R.ltPhase = LP;
+    R.boot3d = window.__boot3d || null; /* {t, done, total, st[AST3D,SCP3D,DR3D,PT3D,PL3D], warm, gate} saat capsule tampil */
+    R.glNew = GLN; /* [start, ms, antialias] per WebGLRenderer (urutan = urutan dibuat) */
+    R.glCall = GLC; /* [indeks renderer, compile|render, start, ms] 2 panggilan pertama >30 ms */
     R.ric = RIC_HOLD ? 'hold' : 'normal';
     R.loaf = LOAF.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8); /* [start, dur, blocking, [[file, fungsi, invoker, ms] x3]] */
     R.evt = EVT; /* [event, start, inputDelay, processing, total] untuk event >=100ms (klik Blue dll) */
@@ -697,7 +724,7 @@ if ('serviceWorker' in navigator) {
     mark('dcl');
     var blue = document.getElementById('boot-cap-blue');
     if (blue) blue.addEventListener('click', function () {
-      blueAt = now(); mark('blue'); R.sfxAtBlue = sfxStates();
+      blueAt = now(); mark('blue'); R.sfxAtBlue = sfxStates(); try { R.bgmAtBlue = { AMB: AMB.readyState, COLLAP: MUSIC_COLLAP.readyState, GARG: GARG.readyState }; } catch (e) {}
       var f0 = typeof lastFrameOK !== 'undefined' ? lastFrameOK : 0, changes = 0, last = f0;
       /* perubahan #1 = startRenderLoop() menulis lastFrameOK; #2 = frame pertama selesai */
       (function poll() {
