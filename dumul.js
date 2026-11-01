@@ -2184,6 +2184,7 @@ try{
   function ss(k,v){try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v);}catch(e){}return null;}
   /* Fresh open = full visuals. Low-power hanya kalau dipilih manual (berlaku selama sesi tab) atau auto-lighten dinyalakan. */
   var lowPref=ss('dm_lowfx'),auto=false,autoGov=ls('dm_autogov')==='1',hap=ls('dm_haptic')==='1';
+  window.__dmAutoGov=autoGov;
   var ROWS='[class*="space-y-[1px]"] > div';
   var chips={};
 
@@ -2223,7 +2224,7 @@ try{
       toast(isLow()?'Low-power visuals on':'Full visuals on');
     }));
     deck.appendChild(chip('gov','Auto-lighten when laggy',autoGov,function(){
-      autoGov=!autoGov;ls('dm_autogov',autoGov?'1':'0');sync();
+      autoGov=!autoGov;ls('dm_autogov',autoGov?'1':'0');window.__dmAutoGov=autoGov;sync();
       toast(autoGov?'Auto-lighten on':'Auto-lighten off (always full visuals)');
     }));
     if(navigator.vibrate)deck.appendChild(chip('hap','Haptic bass',hap,function(){

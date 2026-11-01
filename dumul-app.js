@@ -10,12 +10,15 @@ Error generating stack: `+o.message+`
 _NOISE=(function(){var a=new Float32Array(256),i;for(i=0;i<256;i++)a[i]=Math.random();return a})(),
 _nIdx=0,nR=function(){return _NOISE[_nIdx++&255]},
 /* Adaptive density from frame time (not quality cliff) */
-_perf=3,_ftEMA=16.6,_frameN=0,_slowN=0,_clean=0,_need=3,
+_perf=3,_fps=60,_stab=false,_ftEMA=16.6,_frameN=0,_slowN=0,_clean=0,_need=3,
 /* glow node = sprite radial (di-cache per warna), bukan shadowBlur: tanpa blur pass per node per frame */
 _gl={},_glow=function(c){var s=_gl[c];if(s)return s;s=document.createElement("canvas");s.width=s.height=64;var x=s.getContext("2d"),r=parseInt(c.slice(1,3),16),g2=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16),gd=x.createRadialGradient(32,32,0,32,32,32);gd.addColorStop(0,"rgba("+r+","+g2+","+b+",.95)");gd.addColorStop(.22,"rgba("+r+","+g2+","+b+",.6)");gd.addColorStop(.5,"rgba("+r+","+g2+","+b+",.2)");gd.addColorStop(1,"rgba("+r+","+g2+","+b+",0)");x.fillStyle=gd;x.fillRect(0,0,64,64);return _gl[c]=s},
 k=(Q)=>{
 let rawDt=Q-d;d=Q;let __ts=performance.now();
 let c=Math.min(32,rawDt)/16.666;
+if(rawDt>0&&rawDt<250)_fps+=(1000/rawDt-_fps)*0.02;
+if(_fps<40)_stab=true;else if(_fps>=45)_stab=false;
+let stab=_stab&&window.__dmAutoGov===true;
 /* EMA frame time → performanceLevel 1|2|3 */
 /* frame lambat (>25 ms) per jendela 60 frame: >=6 -> turun 1 level; 0 selama _need jendela berturut -> naik 1 level (makin lama kalau sering turun lagi) */
 if(rawDt>25&&rawDt<250)_slowN++;
@@ -98,7 +101,7 @@ for(let y=0;y<waveLayers.length;y++){
   let gapCenter=fx*i;
   let moved=false;
   for(let fe=0;fe<i;fe+=waveStep){
-    if(nR()<Mn)continue;
+    if(!stab&&nR()<Mn)continue;
     let sp=window.__dmSp?window.__dmSp(fe/i):0;
     let pt=w+Math.sin(fe*0.02+s*2+y)*(y===0?1.2:0.6)*sig.breath+sp*Math.sin(fe*0.13+s*35+y*1.3)*(y===0?16:12)*vAmp;
     /* keep wave inside mesh vertical band */
@@ -113,7 +116,7 @@ for(let y=0;y<waveLayers.length;y++){
       if(Math.abs(dx)<gapHalf*0.35)continue;
     }
     if(!moved){l.moveTo(fe+K+offX,pt+offY);moved=true;}
-    else l.lineTo(fe+K*((nR()>0.5)?1:0)+offX,pt+offY);
+    else l.lineTo(fe+(stab?0:K*((nR()>0.5)?1:0))+offX,pt+offY);
   }
   if(glowK){let ga0=l.globalAlpha,lw0=l.lineWidth;l.lineJoin="round";l.lineCap="round";l.lineWidth=lw0*7*glowK;l.globalAlpha=ga0*0.09;l.stroke();l.lineWidth=lw0*3.2*glowK;l.globalAlpha=ga0*0.18;l.stroke();l.lineWidth=lw0;l.globalAlpha=ga0;l.lineJoin="miter";l.lineCap="butt";}
   l.stroke();l.shadowBlur=0;
