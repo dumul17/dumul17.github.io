@@ -41,7 +41,8 @@
     <div id="boot-status">[ OBSERVER    ]  <span class="ok" data-i18n="boot.detected">DETECTED</span>
 [ STAR MAP    ]  ALIGNING
 [ 3D MODULES  ]  0/5
-[ 3D WARM-UP  ]  WAITING</div>
+[ 3D WARM-UP  ]  WAITING
+[ AUDIO       ]  WAITING</div>
     <div id="boot-bar"><div id="boot-fill"></div></div>
     <div id="boot-pct">0%</div>
     <div id="boot-signal">&gt; SIGNAL TRANSMITTED</div>
@@ -318,7 +319,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=130"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=132"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -444,7 +445,7 @@ if ('serviceWorker' in navigator) {
   var chip = document.getElementById('owl-ofl'), lab = document.getElementById('owl-ofl-t'), row = document.getElementById('owl-sys-ofl');
   if (!chip || !lab) return;
   if (!('serviceWorker' in navigator) || !('caches' in window)) { if (row && row.parentNode) row.parentNode.removeChild(row); return; }
-  var SIZE_MB = 75;          /* perkiraan total ukuran semua lagu */
+  var SIZE_MB = 66;          /* perkiraan total ukuran semua lagu */
   var KEY = 'ofl_choice';    /* 'yes' = pernah menekan tombol -> kunjungan berikutnya lanjut diam-diam (bukan data seluler / hemat data) */
   var STR = {
     en: { idle: 'Save offline {d}/{t}', wait: 'Offline…', sync: 'Saving {d}/{t}', done: 'Offline ready', na: 'Offline N/A', part: 'Retry {d}/{t}',

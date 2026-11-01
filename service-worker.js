@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v285'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v287'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -38,7 +38,7 @@ const SHELL = [
   'dumul-js/obs/js/04-render.js?v=142',
   'dumul-js/obs/js/05-sector-ui.js?v=180',
   'dumul-js/obs/js/06-interaction.js?v=124',
-  'dumul-js/obs/js/07-boot.js?v=130',
+  'dumul-js/obs/js/07-boot.js?v=132',
   'dumul-js/obs/js/08-tx-drone.js?v=13',
   'dumul-js/obs/js/09-wormhole.js?v=43',
   'dumul-js/obs/js/10-ui-sound.js?v=8',
@@ -91,6 +91,9 @@ self.addEventListener('message', (event) => {
   if (!d) return;
   if (d.type === 'CACHE_AUDIO' && typeof d.url === 'string') {
     event.waitUntil(cacheAudio(d.url));
+  } else if (d.type === 'CACHE_AUDIO_LIST' && Array.isArray(d.urls)) {
+    /* v132: beberapa file berurutan (bukan paralel) supaya tidak berebut bandwidth dengan lagu yang sedang diputar */
+    event.waitUntil((async () => { for (const u of d.urls.slice(0, 4)) { if (typeof u === 'string') await cacheAudio(u); } })());
   } else if (d.type === 'PRECACHE_AUDIO') {
     event.waitUntil(precacheAll());
   } else if (d.type === 'AUDIO_STATUS') {
