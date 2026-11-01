@@ -343,9 +343,7 @@ html.dm-listening .dm-lyrics {
   transition: opacity 0.9s ease;
   pointer-events: auto;
 }
-html.dm-listening section.dm-hero canvas {
-  filter: contrast(calc(1 + var(--dm-listen, 0) * 0.28)) brightness(calc(1 + var(--dm-listen, 0) * 0.08));
-}
+/* (filter contrast/brightness di canvas hero dihapus: biaya per-frame di resolusi penuh; canvas sudah menaikkan alpha & glow lewat listen) */
 html.dm-listening section.dm-hero {
   box-shadow: 0 0 calc(40px * var(--dm-listen, 0)) rgba(110,229,255,calc(var(--dm-listen, 0) * 0.18));
 }
