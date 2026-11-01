@@ -318,7 +318,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=142"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=180"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=124"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=128"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=129"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -400,7 +400,11 @@ if ('serviceWorker' in navigator) {
     var regd = false;
     function reg() {
       if (regd) return; regd = true;
-      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+      window.__swRegAt = Math.round(performance.now());   /* v129 diagnostik: dibaca bench (R.swRegAt/R.swLog) */
+      navigator.serviceWorker.register('service-worker.js').then(function (r) {
+        var w = r.installing || r.waiting || r.active; window.__swLog = window.__swLog || [];
+        if (w) { window.__swLog.push([w.state, Math.round(performance.now())]); w.addEventListener('statechange', function () { window.__swLog.push([w.state, Math.round(performance.now())]); }); }
+      }).catch(function () {});
     }
     window.addEventListener('load', function () {
       if (navigator.serviceWorker.controller || window.__obsEntered) { reg(); return; }
@@ -610,6 +614,7 @@ if ('serviceWorker' in navigator) {
     }).observe({ entryTypes: ['longtask'] });
   } catch (e) {}
   window.addEventListener('obs-entered', function () { mark('entered'); });
+  try { if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', function () { mark('swctl'); }); } catch (e) {}   /* v129: kapan SW mengambil alih halaman */
   function sfxStates() {
     var m = 0, p = 0, tot = 0;
     try { Object.keys(SFX).forEach(function (k) { tot++; var s = SFX[k].readyState; if (s >= 1) m++; if (s >= 2) p++; }); } catch (e) {}
@@ -677,6 +682,7 @@ if ('serviceWorker' in navigator) {
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
     R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
     R.swNow = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
+    R.swRegAt = window.__swRegAt != null ? window.__swRegAt : null; R.swLog = window.__swLog || []; R.warmLog = window.__warmLog || []; R.warmMax = window.__warmMax || 0;   /* v129 diagnostik */
     R.bootRepeatFlag = 'n/a(dibaca setelah boot)';
     try {
       var rs = performance.getEntriesByType('resource'); R.res = rs.length; R.aud = [];
