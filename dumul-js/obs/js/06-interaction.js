@@ -328,6 +328,7 @@ function constellationHitDist(x,y){
 /* F10: gestur PORTAL sektor (PTG: tap = menu, tahan = balik overview) dihapus — portal sektor pensiun. Menu sektor dibuka dari tombol HUD #mode-bh; balik overview = tombol KE OVERVIEW di window menu (16-sector-menu.js). BH mini hanya bisa di-drag. */
 function beginBHDrag(e){
   if(reduce||SW||drag.on||BHSC<.05)return false;
+  if(e.target.closest&&e.target.closest('#boot-screen'))return false;   /* layar boot masih tampil: tap karakter/judul/capsule tidak boleh jadi tap portal (menu sektor kebuka) / drag BH di bawahnya */
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block')||document.body.classList.contains('smenu-open'))return false;

@@ -1,5 +1,51 @@
 'use strict';
 /* 07-boot.js — boot, layout editor, render loop */
+/* ===== Karakter Teleskop + Dumb Owl (SVG dipakai bersama: layar boot + panel pamitan EXITP di bawah) =====
+   Satu sumber supaya tampilan sama di dua tempat. Sengaja TANPA <defs>/id (dua salinan di DOM tidak bentrok). Isi dibuat SOLID berlapis (dasar + highlight + bayangan)
+   di atas piringan latar (dc-disc), bukan outline di atas latar gelap. Kelas kait untuk CSS/JS: tl-m(-n|-smile|-soft) mulut, tl-blush, tl-glow lensa, tl-eyes / ow-eyes (kedip), ow-beak. */
+var DUMUL_CHARS=(function(){
+  var tele=[
+    '<svg class="ex-tele" viewBox="0 0 64 64" aria-hidden="true">',
+    '<circle class="dc-disc" cx="32" cy="32" r="30.5" fill="#0f2c3f" stroke="#6ee5ff" stroke-opacity=".6" stroke-width="1.2"/>',
+    '<g stroke="#8fc3da" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M33 42 L22 60"/><path d="M33 42 L33 61"/><path d="M33 42 L45 60"/></g>',
+    '<circle cx="33" cy="41" r="3.4" fill="#2f7596" stroke="#a9f3ff" stroke-width="1.3"/>',
+    '<g transform="rotate(-16 33 32)">',
+      '<rect x="49" y="27" width="9" height="10" rx="3" fill="#2a6784" stroke="#8eeeff" stroke-width="1.3"/>',
+      '<rect x="12" y="22" width="40" height="20" rx="8" fill="#1f5b7c" stroke="#8eeeff" stroke-width="1.6"/>',
+      '<rect x="15" y="23.4" width="34" height="3.6" rx="1.8" fill="#6cc0e2" opacity=".55"/>',
+      '<rect x="15" y="37.2" width="34" height="3.2" rx="1.6" fill="#0a2535" opacity=".5"/>',
+      '<rect x="6" y="20" width="9" height="24" rx="4" fill="#2d7195" stroke="#8eeeff" stroke-width="1.6"/>',
+      '<ellipse class="tl-glow" cx="7.5" cy="32" rx="2.2" ry="9" fill="#c8fbff"/>',
+      '<g class="tl-eyes"><circle cx="26" cy="30" r="3" fill="#fff"/><circle cx="38" cy="30" r="3" fill="#fff"/>',
+        '<circle cx="26.6" cy="30.4" r="1.5" fill="#0d1b26"/><circle cx="38.6" cy="30.4" r="1.5" fill="#0d1b26"/></g>',
+      '<g class="tl-blush" fill="#ff8fd6" opacity=".85"><circle cx="21" cy="35.5" r="2.2"/><circle cx="43" cy="35.5" r="2.2"/></g>',
+      '<g fill="none" stroke="#f4feff" stroke-width="1.7" stroke-linecap="round">',
+        '<path class="tl-m tl-m-n" d="M29 37.3 q3 .5 6 0"/>',
+        '<path class="tl-m tl-m-smile" d="M28 36 q4 4.6 8 0"/>',
+        '<path class="tl-m tl-m-soft" d="M29.5 38.4 q2.5 -2.4 5 0"/>',
+      '</g>',
+    '</g></svg>'
+  ].join('');
+  var owl=[
+    '<svg class="ex-owl" viewBox="0 0 64 64" aria-hidden="true">',
+    '<circle class="dc-disc" cx="32" cy="32" r="30.5" fill="#2a1431" stroke="#ff9ad9" stroke-opacity=".6" stroke-width="1.2"/>',
+    '<g stroke="#ffb3e0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">',
+      '<path d="M15 33 C9 37 10 47 18 50 Z" fill="#5c316f"/><path d="M49 33 C55 37 54 47 46 50 Z" fill="#5c316f"/>',
+      '<path d="M16.5 11 L23 20 L14 22 Z" fill="#5c316f"/><path d="M47.5 11 L41 20 L50 22 Z" fill="#5c316f"/>',
+      '<path d="M32 10 C20 10 14 20 14 33 C14 47 22 55 32 55 C42 55 50 47 50 33 C50 20 44 10 32 10Z" fill="#6f3f84"/>',
+      '<ellipse cx="32" cy="46" rx="8.5" ry="6.5" fill="#a874ba" stroke="none" opacity=".6"/>',
+      '<circle cx="24" cy="29" r="8" fill="#8a57a3"/><circle cx="40" cy="29" r="8" fill="#8a57a3"/>',
+      '<path d="M26 47 q6 3 12 0 M27 51.5 q5 2.5 10 0" fill="none" opacity=".6" stroke-width="1.2"/>',
+      '<path d="M26 55 v4 M32 55.5 v4 M38 55 v4" fill="none"/>',
+    '</g>',
+    '<g class="ow-eyes"><circle cx="24" cy="29" r="4" fill="#fff0f9"/><circle cx="40" cy="29" r="4" fill="#fff0f9"/>',
+      '<circle cx="25" cy="29.8" r="2" fill="#1a0f1c"/><circle cx="41" cy="29.8" r="2" fill="#1a0f1c"/>',
+      '<circle cx="25.6" cy="29" r=".7" fill="#fff"/><circle cx="41.6" cy="29" r=".7" fill="#fff"/></g>',
+    '<path class="ow-beak" d="M29.5 36.5 L34.5 36.5 L32 42Z" fill="#ffc4e6" stroke="#ffc4e6" stroke-width="1" stroke-linejoin="round"/></svg>'
+  ].join('');
+  return {tele:tele,owl:owl};
+})();
+
 /* ---------- v41.4 boot / media warm-up ----------
    First visit → full boot + matrix rain. Repeat visit in same session →
    timeout capsule + batas tunggu lebih pendek (sessionStorage flag). v126: tanpa minMs / Tier-0; progres = unit kerja nyata. */
@@ -17,13 +63,85 @@
   var bootT0=performance.now();
   var statusEl=document.getElementById('boot-status');
   var quoteEl=document.getElementById('boot-quote');
-  /* v126: panel status = kondisi NYATA (bukan frame telemetri palsu yang berputar). Tiap baris dibaca dari state asli: layout/gambar, modul 3D, antrean warm-up shader. */
-  function padLabel(s,n){
-    s=String(s);
-    while(s.length<n)s+=' ';
-    return s;
+
+  /* ---- Karakter boot: Dumb Owl (kiri, di atas Merah) + Teleskop (kanan, di atas Biru), di atas judul. SVG = DUMUL_CHARS (sama dgn panel pamitan).
+     Peran: (1) lensa teleskop makin terang mengikuti persen; boot lama -> teleskop kalem + owl ngantuk; capsule tampil -> teleskop senyum + owl melek;
+            (2) condong + menyala ke capsule masing-masing (hover/fokus/tekan Merah->owl, Biru->teleskop); (3) tap = bubble kecil (owl "..." + glitch judul);
+            (4) teleskop "membacakan" status: mulut bergerak sebentar tiap baris status berganti.
+     Prinsip beban: TANPA animasi infinite & TANPA rAF sendiri. Semua gerak = ganti class/atribut sesekali (kedip lewat setTimeout, bicara = class 650 ms),
+     progres cuma set satu CSS variable saat angka persen berubah. reduced-motion / IS_POTATO -> kelas .calm (tanpa gerak, state tetap tampil). */
+  var chEl=document.getElementById('boot-chars'),chBub=null,chBubT=0,chTalkT=0,chBlTt=0,chBlTo=0,chTapN=0,chPct=-1,chSlow=false,chRdy=false,
+      chCalm=!!(reduce||(typeof IS_POTATO!=='undefined'&&IS_POTATO));
+  function chAlive(){return !!(bs&&bs.parentNode&&!bs.classList.contains('off'));}
+  function chAttr(k,v){if(chEl&&chEl.getAttribute(k)!==v)chEl.setAttribute(k,v);}
+  function chHL(c,on){if(chEl)chEl.classList.toggle(c,on);}
+  function chSay(w,txt){
+    if(!chBub)return;
+    chBub.textContent=txt;chBub.setAttribute('data-w',w);chBub.classList.add('on');
+    clearTimeout(chBubT);chBubT=setTimeout(function(){chBub.classList.remove('on');},2600);
   }
-  function row(label,val,ok){return '[ '+padLabel(label,12)+']  '+(ok?'<span class="ok">'+val+'</span>':val);}
+  function chHop(w){
+    if(!chEl||chCalm)return;
+    var n=chEl.querySelector(w==='o'?'.bc-owl':'.bc-tele');if(!n)return;
+    n.classList.remove('hop');void n.offsetWidth;n.classList.add('hop');
+    setTimeout(function(){n.classList.remove('hop');},520);
+  }
+  function chTalk(){
+    if(!chEl||chCalm)return;
+    chEl.classList.add('talk');clearTimeout(chTalkT);
+    chTalkT=setTimeout(function(){chEl.classList.remove('talk');},650);
+  }
+  function chProg(v){
+    if(!chEl||chRdy||v===chPct)return;
+    chPct=v;chEl.style.setProperty('--bp',(v/100).toFixed(2));
+  }
+  function chSlowOn(){chSlow=true;chAttr('data-tm','soft');chAttr('data-om','sleepy');}
+  function chReadyOn(){
+    if(chRdy||!chEl)return;
+    chRdy=true;chSlow=false;chAttr('data-tm','smile');chAttr('data-om','awake');
+    chEl.style.setProperty('--bp','1');chEl.classList.add('pick');
+    chHop('t');
+  }
+  function chReact(w){chHop(w);if(w==='o'){chHL('hl-red',false);chSay('o','...');}}
+  function chBlink(w){   /* kedip acak 2,6-6 dtk; berhenti sendiri begitu boot screen hilang */
+    var k=w==='o'?'blo':'blt';
+    clearTimeout(w==='o'?chBlTo:chBlTt);
+    if(!chAlive())return;
+    chEl.classList.add(k);
+    setTimeout(function(){chEl.classList.remove(k);},140);
+    var t=setTimeout(function(){chBlink(w);},2600+Math.random()*3400);
+    if(w==='o')chBlTo=t;else chBlTt=t;
+  }
+  function chTap(w,e){
+    if(e)e.stopPropagation();
+    if(capTimer)armCap();   /* pengunjung aktif -> timeout masuk otomatis dihitung ulang (hanya kalau timeout sedang berjalan; Merah yang sudah ditekan tetap membatalkannya) */
+    if(w==='o'){chSay('o','...');chHop('o');bootGlitch();return;}
+    try{haptic(6);}catch(eH){}
+    chSay('t',T(chRdy?'boot.tap.t3':(chSlow?'boot.tap.t4':((chTapN++&1)?'boot.tap.t2':'boot.tap.t1'))));
+    chHop('t');
+  }
+  if(chEl){
+    chEl.innerHTML='<div class="bc bc-owl">'+DUMUL_CHARS.owl+'</div><div class="bc bc-tele">'+DUMUL_CHARS.tele+'</div><span class="bc-bub"></span>';
+    chBub=chEl.querySelector('.bc-bub');
+    chAttr('data-tm','n');chAttr('data-om','awake');
+    if(chCalm)chEl.classList.add('calm');
+    chEl.addEventListener('pointerdown',function(e){var b=e.target.closest&&e.target.closest('.bc');if(b)chTap(b.classList.contains('bc-owl')?'o':'t',e);});
+    if(!chCalm){setTimeout(function(){chBlink('t');},1400);setTimeout(function(){chBlink('o');},2500);}
+  }
+  /* Brand = sama dengan panel owl: tap judul / kutipan -> glitch (kelas .gl, CSS di index.css memakai keyframes owlGl/owlGk). */
+  var bTitle=document.getElementById('boot-title'),bCore=document.getElementById('boot-core'),bGlT=0;
+  function bootGlitch(e){
+    if(e)e.stopPropagation();
+    if(!bTitle||!bCore||reduce)return;
+    bTitle.classList.remove('gl');bCore.classList.remove('gl');
+    void bTitle.offsetWidth;
+    bTitle.classList.add('gl');bCore.classList.add('gl');
+    clearTimeout(bGlT);bGlT=setTimeout(function(){bTitle.classList.remove('gl');bCore.classList.remove('gl');},700);
+    try{haptic(8);}catch(eH){}
+  }
+  if(bTitle)bTitle.addEventListener('pointerdown',bootGlitch);
+  if(quoteEl)quoteEl.addEventListener('pointerdown',bootGlitch);
+  /* v126: panel status = kondisi NYATA (bukan frame telemetri palsu yang berputar). Tiap baris dibaca dari state asli: layout/gambar, modul 3D, antrean warm-up shader. */
   /* Quote fades in mid-boot, stays through the handoff. */
   setTimeout(function(){if(quoteEl)quoteEl.classList.add('on');},1600);
 
@@ -40,6 +158,12 @@
   var choicesEl=document.getElementById('boot-choices');
   var capBlue=document.getElementById('boot-cap-blue');
   var capRed=document.getElementById('boot-cap-red');
+  /* karakter condong + menyala ke capsule yang disorot (owl = Merah, teleskop = Biru) */
+  [[capBlue,'hl-blue'],[capRed,'hl-red']].forEach(function(pr){
+    var bt=pr[0],cl=pr[1];if(!bt)return;
+    ['pointerenter','focus'].forEach(function(ev){bt.addEventListener(ev,function(){chHL(cl,true);});});
+    ['pointerleave','blur'].forEach(function(ev){bt.addEventListener(ev,function(){chHL(cl,false);});});
+  });
   /* v126: TIDAK ADA Tier-0 dan TIDAK ADA minMs. Boot tidak memuat audio sama sekali; capsule tampil begitu pekerjaan nyata selesai (lihat tick()).
      max3d  = batas atas menunggu pekerjaan boot (kalau ada modul macet): capsule tetap tampil, progres bar tetap menunjukkan angka asli (tidak dipaksa 100%).
      maxMs  = TIMEOUT capsule: dihitung sejak capsule tampil; kalau Red/Blue tidak ditekan sampai habis -> masuk Observatory otomatis (jalur sama dgn Blue). */
@@ -168,23 +292,84 @@
     var warmOk=pend===0&&drained;
     return {mods:settled,total:MODS.length,st:st,fins:fins,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,warmFrac:warmOk?1:(exp?Math.min(1,wDone/exp):0)};
   }
-  var lastPanel='';
+  /* Status = SATU baris. Tiap baris muncul sebagai ">" (sedang jalan) dan jadi "✓" begitu selesai; baris yang selesai antre sesuai URUTAN SELESAI
+     di perangkat itu (jadi urutan beda antar HP tidak masalah), tiap baris tampil minimal sebentar lalu fade ke baris berikutnya; semua selesai -> fade kosong.
+     paintPanel() cuma mengisi data (R, doneQ); yang menggambar adalah stageStep() (interval 100 ms, berhenti saat boot screen hilang). */
+  var R=[],doneQ=[],cur=-1,curDone=false,curAt=0,fadeEnd=0,nxt=-1,nxtDone=false,lastHtml='',stT=0;
+  function rowHtml(i,done){
+    if(i===-2)return '<span class="ok">\u2713 '+T('boot.allready')+'</span>';   /* baris penutup menetap */
+    var r=R[i],t=r.label+'  '+r.val;
+    return done?'<span class="ok">\u2713 '+t+'</span>':'&gt; '+t;
+  }
+  function stApply(i,done){
+    cur=i;curDone=done;curAt=performance.now();
+    var h=i===-1?'':rowHtml(i,done);
+    if(h!==lastHtml){lastHtml=h;statusEl.innerHTML=h;if(h)chTalk();}   /* teleskop "membacakan" baris baru */
+    statusEl.classList.toggle('pn',i>=0&&!done);
+    statusEl.classList.remove('out');
+  }
+  function movedOn(){var j;for(j=0;j<R.length;j++){if(j!==cur&&R[j]&&!R[j].q&&R[j].at>curAt)return true;}return false;}   /* ada baris belum-selesai lain yang angkanya berubah sejak baris ini tampil */
+  function stageStep(){
+    if(!statusEl)return;
+    var now=performance.now(),j,best=-1,want,wantDone=false,dwell;
+    if(fadeEnd){if(now<fadeEnd)return;fadeEnd=0;stApply(nxt,nxtDone);return;}
+    if(cur===-2)return;   /* sudah di baris penutup: tidak berubah lagi */
+    if(cur>=0&&!curDone&&!R[cur].q){   /* baris jalan: angka ikut hidup (mis. 3/5 -> 4/5) */
+      var h=rowHtml(cur,false);
+      if(h!==lastHtml){lastHtml=h;statusEl.innerHTML=h;}
+    }
+    dwell=curDone?(doneQ.length>2?260:(doneQ.length?420:800)):(doneQ.length?380:0);
+    if(cur>=0&&now-curAt<dwell)return;
+    if(doneQ.length){want=doneQ.shift();wantDone=true;}
+    else if(cur>=0&&!curDone&&!R[cur].q&&!(now-curAt>=700&&movedOn()))return;   /* masih jalan: tetap, kecuali baris lain baru bergerak (min 700 ms per baris) */
+    else{
+      /* pilih baris belum-selesai yang angkanya paling baru berubah (aktivitas terbaru), bukan urutan tetap */
+      for(j=0;j<R.length;j++){if(R[j]&&!R[j].q&&(best<0||R[j].at>R[best].at))best=j;}
+      want=best;
+      if(want<0){want=-2;wantDone=true;}   /* semua baris sudah selesai & ditampilkan -> baris penutup, tidak fade ke kosong */
+    }
+    if(want===cur){stApply(want,wantDone);return;}   /* baris yang sama baru selesai: ganti di tempat, tanpa fade */
+    if(cur<0){stApply(want,wantDone);return;}
+    nxt=want;nxtDone=wantDone;
+    statusEl.classList.add('out');fadeEnd=now+230;
+  }
   function paintPanel(ready,th,complete,au){
     if(!statusEl)return;
     var warmTxt=th.warmOk?T('boot.ready'):((!th.wDone&&!th.wTot)?T('boot.waiting'):(th.wDone+'/'+th.exp));
-    var html=[
-      row(T('boot.observer'),complete?T('boot.online'):T('boot.detected'),complete),
-      row(T('boot.starmap'),ready?T('boot.locked'):T('boot.aligning'),ready),
-      row(T('boot.mods'),th.mods+'/'+th.total,th.mods>=th.total),
-      row(T('boot.warm'),warmTxt,th.warmOk),
-      row(T('boot.audio')+' (BGM)',au?(au.ok?T('boot.ready'):(au.n+'/'+au.total)):T('boot.waiting'),!!(au&&au.ok))
-    ].join('\n');
-    if(html!==lastPanel){lastPanel=html;statusEl.innerHTML=html;}
+    var d=[
+      [T('boot.observer'),complete?T('boot.online'):T('boot.detected'),complete],
+      [T('boot.starmap'),ready?T('boot.locked'):T('boot.aligning'),ready],
+      [T('boot.mods'),th.mods+'/'+th.total,th.mods>=th.total],
+      [T('boot.warm'),warmTxt,th.warmOk],
+      [T('boot.audio')+' (BGM)',au?(au.ok?T('boot.ready'):(au.n+'/'+au.total)):T('boot.waiting'),!!(au&&au.ok)]
+    ],i,r,now=performance.now();
+    for(i=0;i<d.length;i++){
+      r=R[i]||(R[i]={q:false,at:now,val:''});
+      r.label=d[i][0];
+      if(r.val!==d[i][1]){r.val=d[i][1];r.at=now;}
+      r.ok=!!d[i][2];
+      if(r.ok&&!r.q){r.q=true;doneQ.push(i);}   /* antre sesuai urutan selesai */
+    }
+    stageStep();
   }
+  stT=setInterval(function(){
+    if(bs.classList.contains('off')||!bs.parentNode){clearInterval(stT);stT=0;return;}
+    stageStep();
+  },100);
   function enterObservatory(){
     if(bs.classList.contains('off'))return;
     if(capTimer){clearTimeout(capTimer);capTimer=0;}
     bs.classList.add('off');
+    /* Perisai tap-tembus: boot screen langsung pointer-events:none tapi masih tampak memudar ±0,8 dtk. Tap pada karakter/judul yang masih kelihatan (mis. pas timeout otomatis)
+       jatuh ke sky dan mengenai portal di bawahnya -> menu sektor kebuka. Selama jendela fade, event pointer/klik ditelan di fase capture window (sebelum listener document 06-interaction.js).
+       Dipasang cuma sebentar lalu dilepas: nol biaya sesudahnya. */
+    (function(){
+      var until=performance.now()+1100,T4=['pointerdown','pointerup','click','touchstart','touchend'],opt={capture:true,passive:true},tm=0;
+      function off(){clearTimeout(tm);T4.forEach(function(t){window.removeEventListener(t,sh,opt);});}
+      function sh(e){if(e.timeStamp<until)e.stopPropagation();else off();}   /* timeStamp = saat event DIBUAT: tap saat fade tetap ditelan walau main thread sempat jank dan baru diproses telat */
+      T4.forEach(function(t){window.addEventListener(t,sh,opt);});
+      tm=setTimeout(off,2500);
+    })();
     try{performance.mark('obs-blue');}catch(eM){}
     matrixAlive=false;
     if(matrixKill){try{matrixKill();}catch(eMk){}matrixKill=null;}
@@ -207,6 +392,7 @@
     /* Bar hanya 100% kalau SEMUA unit (termasuk audio, v131) benar-benar selesai. Kalau belum, bar tetap di angka asli; startPost() melanjutkannya sesudah capsule tampil. */
     paintBar(c);
     sig.classList.add('on');
+    chReadyOn();
     if(quoteEl)quoteEl.classList.add('on');
     paintPanel(ready,th,complete,c.au);
     /* Capsule gate: wait for user choice. maxMs = timeout: tidak ada Red/Blue sampai habis -> masuk otomatis (tanpa haptic, jalur enterObservatory yang sama). */
@@ -216,6 +402,10 @@
     }
     setTimeout(warmRest,400);   /* v127: mulai hangatkan audio sesudah capsule ter-paint */
     startPost();   /* v131: bar + panel lanjut mengikuti audio sampai siap / boot screen hilang */
+    armCap();
+  }
+  function armCap(){   /* timeout capsule; di-arm ulang kalau pengunjung menyentuh karakter (aktif), supaya tap karakter tidak berbarengan dengan masuk otomatis */
+    if(capTimer)clearTimeout(capTimer);
     capTimer=setTimeout(function(){
       capTimer=0;
       if(bs.classList.contains('off'))return;
@@ -226,12 +416,14 @@
   if(capBlue){
     capBlue.addEventListener('click',function(){
       haptic(12);
+      try{chReact('t');}catch(eCh){}
       enterObservatory();
     });
   }
   if(capRed){
     capRed.addEventListener('click',function(){
       haptic(12);
+      try{chReact('o');}catch(eCh){}
       if(capTimer){clearTimeout(capTimer);capTimer=0;}   /* pengunjung aktif -> timeout dibatalkan */
       try{
         window.open('https://github.com/dumul17/dumul17.github.io/blob/main/index.html','_blank','noopener');
@@ -267,6 +459,7 @@
   function paintBar(c){
     var v=c.all?100:c.p;
     fill.style.width=v+'%';pct.textContent=v+'%';
+    chProg(v);
   }
   function startPost(){
     if(postT)return;
@@ -279,6 +472,7 @@
   }
   function tick(){
     var elapsed=performance.now()-t0,c=calc(elapsed);
+    if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000))chSlowOn();   /* boot terasa lama: teleskop kalem, owl ngantuk */
     paintBar(c);
     paintPanel(c.ready,c.th,false,c.au);
     if(c.complete||elapsed>=max3d){window.__bootFinish=c.complete?'gate':'cap3d';finish(c);}
@@ -375,36 +569,7 @@ var EXITP=(function(){
     {w:'t',k:'exit.l5',m:'soft'},
     {w:'t',k:'exit.l6',m:'smile'}
   ];
-  var TELE_SVG='<svg class="ex-tele" viewBox="0 0 64 64" aria-hidden="true">'+
-    '<g stroke="#3e5f72" stroke-width="2.2" stroke-linecap="round" fill="none"><path d="M33 42 L22 60"/><path d="M33 42 L33 61"/><path d="M33 42 L45 60"/></g>'+
-    '<circle cx="33" cy="41" r="3.2" fill="#143042" stroke="#6ee5ff" stroke-width="1.2"/>'+
-    '<g transform="rotate(-16 33 32)">'+
-      '<rect x="49" y="27" width="9" height="10" rx="3" fill="#10222e" stroke="#6ee5ff" stroke-width="1.2"/>'+
-      '<rect x="12" y="22" width="40" height="20" rx="8" fill="#0d1b26" stroke="#6ee5ff" stroke-width="1.4"/>'+
-      '<rect x="6" y="20" width="9" height="24" rx="4" fill="#10222e" stroke="#6ee5ff" stroke-width="1.4"/>'+
-      '<ellipse class="tl-glow" cx="7.5" cy="32" rx="2.2" ry="9" fill="#6ee5ff"/>'+
-      '<circle cx="26" cy="30" r="3" fill="#eafcff"/><circle cx="38" cy="30" r="3" fill="#eafcff"/>'+
-      '<circle cx="26.6" cy="30.4" r="1.4" fill="#0d1b26"/><circle cx="38.6" cy="30.4" r="1.4" fill="#0d1b26"/>'+
-      '<g class="tl-blush" fill="#ff9ad9" opacity=".5"><circle cx="21" cy="35.5" r="2.2"/><circle cx="43" cy="35.5" r="2.2"/></g>'+
-      '<g fill="none" stroke="#8eeeff" stroke-width="1.7" stroke-linecap="round">'+
-        '<path class="tl-m tl-m-n" d="M29 37.3 q3 .5 6 0"/>'+
-        '<path class="tl-m tl-m-smile" d="M28 36 q4 4.6 8 0"/>'+
-        '<path class="tl-m tl-m-soft" d="M29.5 38.4 q2.5 -2.4 5 0"/>'+
-      '</g>'+
-    '</g></svg>';
-  var OWL_SVG='<svg class="ex-owl" viewBox="0 0 64 64" aria-hidden="true">'+
-    '<g stroke="#ffb3e0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+
-      '<path d="M32 10 C20 10 14 20 14 33 C14 47 22 55 32 55 C42 55 50 47 50 33 C50 20 44 10 32 10Z" fill="#1a0f1c"/>'+
-      '<path d="M17 12 L22 20 M47 12 L42 20" fill="none"/>'+
-      '<path d="M15 33 C9 37 10 47 18 50 M49 33 C55 37 54 47 46 50" fill="none"/>'+
-      '<circle cx="24" cy="29" r="8" fill="#2a1630"/><circle cx="40" cy="29" r="8" fill="#2a1630"/>'+
-      '<path d="M26 47 q6 3 12 0 M27 51.5 q5 2.5 10 0" fill="none" opacity=".5" stroke-width="1.2"/>'+
-      '<path d="M26 55 v4 M32 55.5 v4 M38 55 v4" fill="none"/>'+
-    '</g>'+
-    '<circle cx="24" cy="29" r="4" fill="#ffe3f3"/><circle cx="40" cy="29" r="4" fill="#ffe3f3"/>'+
-    '<circle cx="25" cy="29.8" r="2" fill="#1a0f1c"/><circle cx="41" cy="29.8" r="2" fill="#1a0f1c"/>'+
-    '<circle cx="25.6" cy="29" r=".7" fill="#fff"/><circle cx="41.6" cy="29" r=".7" fill="#fff"/>'+
-    '<path class="ow-beak" d="M29.5 36.5 L34.5 36.5 L32 42Z" fill="#ffb3e0" stroke="#ffb3e0" stroke-width="1" stroke-linejoin="round"/></svg>';
+  var TELE_SVG=DUMUL_CHARS.tele,OWL_SVG=DUMUL_CHARS.owl;   /* SVG bersama (didefinisikan di atas file; juga dipakai layar boot) */
   function build(){
     if(P)return;
     var d=document,b=d.body;
