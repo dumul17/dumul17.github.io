@@ -2,7 +2,7 @@
 /* 07-boot.js — boot, layout editor, render loop */
 /* ---------- v41.4 boot / media warm-up ----------
    First visit → full boot + matrix rain. Repeat visit in same session →
-   shortened minMs via sessionStorage flag. */
+   timeout capsule + batas tunggu lebih pendek (sessionStorage flag). v126: tanpa minMs / Tier-0; progres = unit kerja nyata. */
 (function(){
   var bs=document.getElementById('boot-screen'),fill=document.getElementById('boot-fill'),pct=document.getElementById('boot-pct'),sig=document.getElementById('boot-signal'),mx=document.getElementById('boot-matrix');
   var matrixRAF=0,matrixAlive=false;
@@ -17,36 +17,13 @@
   var bootT0=performance.now();
   var statusEl=document.getElementById('boot-status');
   var quoteEl=document.getElementById('boot-quote');
-  /* Fixed-width labels so the panel stays tidy while lines cycle. */
-  var teleFrames=[
-    [T('boot.observer'),T('boot.detected')],
-    [T('boot.audio'),T('boot.buffering')],
-    [T('boot.starmap'),T('boot.aligning')],
-    [T('boot.lens'),T('boot.nominal')],
-    [T('boot.audio'),T('boot.ready')],
-    [T('boot.signal'),T('boot.stable')],
-    [T('boot.starmap'),T('boot.locked')]
-  ];
-  var teleIdx=0,teleLast=0;
+  /* v126: panel status = kondisi NYATA (bukan frame telemetri palsu yang berputar). Tiap baris dibaca dari state asli: layout/gambar, modul 3D, antrean warm-up shader. */
   function padLabel(s,n){
     s=String(s);
     while(s.length<n)s+=' ';
     return s;
   }
-  function paintTelemetry(force){
-    if(!statusEl)return;
-    var now=performance.now();
-    if(!force&&now-teleLast<1100)return;
-    teleLast=now;
-    var rows=[];
-    for(var r=0;r<4;r++){
-      var f=teleFrames[(teleIdx+r)%teleFrames.length];
-      rows.push('[ '+padLabel(f[0],12)+']  <span class="ok">'+f[1]+'</span>');
-    }
-    teleIdx++;
-    statusEl.innerHTML=rows.join('\n');
-  }
-  paintTelemetry(true);
+  function row(label,val,ok){return '[ '+padLabel(label,12)+']  '+(ok?'<span class="ok">'+val+'</span>':val);}
   /* Quote fades in mid-boot, stays through the handoff. */
   setTimeout(function(){if(quoteEl)quoteEl.classList.add('on');},1600);
 
@@ -59,42 +36,24 @@
   var matrixKill=function(){try{if(window.__rain)window.__rain.kill();}catch(eRk){}};
   try{if(mx)mx.setAttribute('data-boot','1');}catch(eDb){}
 
-  var stars=STELLAR_KEYS.map(function(k){return SFX[k];}),t0=bootT0,done=false; /* semua audio SFX dari registry */
-  /* Baseline perangkat nyata: capsule selalu lewat maxMs (0/16 metadata), jadi tuas efektif = gate Tier-0 + maxMs lebih pendek. */
-  var minMs=isRepeatVisit?1500:(IS_POTATO?5000:3200);
-  var maxMs=isRepeatVisit?3000:(IS_POTATO?9000:6000);
+  var stars=STELLAR_KEYS.map(function(k){return SFX[k];}),t0=bootT0,done=false; /* 16 SFX dari registry (SKY.sfx) */
   var choicesEl=document.getElementById('boot-choices');
   var capBlue=document.getElementById('boot-cap-blue');
   var capRed=document.getElementById('boot-cap-red');
-  /* PP-2/PP-3: Tier-0 = SFX yang paling mungkin dibunyikan pertama (aldebaran = tap pertama di probe; Orion). Hanya ini yang di-load saat boot,
-     preload='metadata' + gate readyState>=1. JANGAN 'auto': di Chrome Android itu menarik file penuh (±3 MB/file, terbukti di probe) dan bikin Tier-0 lebih lambat; tap pertama tetap lewat safePlay (±0.3-0.4 dtk). Sisanya dihangatkan setelah masuk (warmRest). */
-  var tier0=['aldebaran','betel','rigel'].map(function(k){return SFX[k];}).filter(Boolean);
-  if(!tier0.length)tier0=stars.slice(0,3);
-  /* 9.4b (pass 6, rev v124): Tier-0 JANGAN di-load di awal IIFE (saat 18 script defer masih dieksekusi), tapi juga JANGAN menunggu capsule/Blue:
-     bench 6 run menunjukkan Tier-0 'setelah capsule' baru mulai 2-4 dtk kemudian, bertabrakan dgn klik Blue (frame1 +0.5 dtk) dan 1/3 run tap aldebaran cold (1.47 dtk).
-     Default sekarang = setelah DOMContentLoaded (script defer selesai). Gate capsule sudah lepas dari 'load' (pageReady), jadi Tier-0 lebih awal tidak lagi menahan capsule.
-     A/B: ?t0=capsule (v123) | ?legacy=1 (v118: Tier-0 di awal + gate 'load'). */
-  var LEGACY=false,T0MODE='dcl';
-  try{LEGACY=/[?&]legacy=1/.test(location.search);if(/[?&]t0=capsule/.test(location.search))T0MODE='capsule';}catch(eLg){}
-  var tier0Started=false;
-  function startTier0(){
-    if(tier0Started)return;tier0Started=true;
-    try{performance.mark('obs-t0');}catch(eM){}
-    tier0.forEach(function(a){try{a.preload='metadata';a.load();}catch(e){}});
-  }
-  if(LEGACY)startTier0();
-  else if(T0MODE==='dcl'){
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(startTier0,0);},{once:true});
-    else setTimeout(startTier0,0);
-  }
-  function tier0Count(){var n=0;for(var i=0;i<tier0.length;i++)if(tier0[i].readyState>=1)n++;return n;}
-  /* Hangatkan sisa audio bertahap (3 file per 400ms) agar tidak bersaing dgn frame pertama / SW install. Satu jalur retry tetap milik safePlay. */
+  /* v126: TIDAK ADA Tier-0 dan TIDAK ADA minMs. Boot tidak memuat audio sama sekali; capsule tampil begitu pekerjaan nyata selesai (lihat tick()).
+     max3d  = batas atas menunggu pekerjaan boot (kalau ada modul macet): capsule tetap tampil, progres bar tetap menunjukkan angka asli (tidak dipaksa 100%).
+     maxMs  = TIMEOUT capsule: dihitung sejak capsule tampil; kalau Red/Blue tidak ditekan sampai habis -> masuk Observatory otomatis (jalur sama dgn Blue). */
+  var maxMs=isRepeatVisit?10000:20000;
+  var max3d=isRepeatVisit?12000:(IS_POTATO?9000:15000);
+  var capTimer=0;
+  /* Metadata 16 SFX dihangatkan DI DALAM Observatory (setelah Blue), bukan saat boot. Satu jalur retry tetap milik safePlay.
+     Antrean = 16 SFX lalu BGM/GARG (preload='none' di 01-core; ikut dihangatkan seperti sebelum v125 supaya tombol musik pertama tidak cold). 3 file per 400 ms. */
   var warmed=false;
   function warmRest(){
     if(warmed)return;warmed=true;
     try{performance.mark('obs-warm');}catch(eM){}
-    var q=stars.filter(function(a){return tier0.indexOf(a)<0;});
-    try{q.push(MUSIC_COLLAP,AMB,GARG);}catch(e){}
+    var q=stars.slice();
+    try{[MUSIC_COLLAP,AMB,GARG].forEach(function(a){if(a)q.push(a);});}catch(e){}
     (function step(){
       for(var n=0;n<3&&q.length;n++){
         var a=q.shift();
@@ -105,23 +64,56 @@
       if(q.length)setTimeout(step,400);
     })();
   }
-  function readyCount(){return tier0Count();}
-  /* 9.4a (pass 6): gate capsule dilepas dari window 'load'. Siap = layout() sudah jalan (W>0: font siap / fallback 1.5 dtk di boot()) dan gambar nebula/milky-way
-     (dibuat lazy di 02-sky-logic) tidak sedang di-fetch. Gambar gagal -> .complete true -> tidak menahan. maxMs tetap safety net. */
+  /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
+       1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
+       5 unit  modul 3D: AST3D, SCP3D, DR3D, PT3D, PL3D, masing-masing state 2 (siap) atau 3 (gagal/nonaktif). PL3D sudah termasuk shader warm-up sendiri.
+       1 unit  warm-up : antrean THREE_WARM (compile+render pertama AST3D/SCP3D/DR3D/PT3D), pecahan = done/(total+modul yang belum push).
+     PENTING: modul 3D (12-17) baru didefinisikan SESUDAH 07-boot jalan, jadi sebelum DCL "belum ada" = BELUM SELESAI (bukan dilewati). Dulu minMs menutupi ini;
+     tanpa minMs, gate akan lolos palsu begitu layout() jalan. Setelah DCL: modul tetap undefined = file gagal dimuat -> dianggap selesai (tidak ditunggu);
+     modul state 0 setelah 4 dtk = tidak pernah mulai -> tidak ditunggu. */
+  var dclDone=(document.readyState==='complete');
+  if(!dclDone)document.addEventListener('DOMContentLoaded',function(){dclDone=true;},{once:true});
   function imgSettled(im){return !im||im.complete;}
   function pageReady(){
+    if(!dclDone){if(document.readyState==='complete')dclDone=true;else return false;}
     if(!W)return false;
     try{return imgSettled(typeof NEB!=='undefined'&&NEB.img)&&imgSettled(typeof MW!=='undefined'&&MW.img);}catch(e){return true;}
   }
+  var MODS=['AST3D','SCP3D','DR3D','PT3D','PL3D'];
+  function threeStatus(elapsed){
+    var settled=0,pend=0,st=[],i,o,s,fin;
+    for(i=0;i<MODS.length;i++){
+      o=window[MODS[i]];s=o?o.state:-1;st.push(s);
+      fin=(s===2||s===3)||(dclDone&&(s===-1||(s===0&&elapsed>4000)));
+      if(fin)settled++;
+      else if(i<4)pend++;   /* 4 modul pertama mengantre ke THREE_WARM saat selesai build */
+    }
+    var wq=window.THREE_WARM,wTot=wq?(wq.total||0):0,wDone=wq?(wq.done||0):0,exp=wTot+pend;
+    var drained=!wq||(!wq.busy&&!wq.q.length);
+    var warmOk=pend===0&&drained;
+    return {mods:settled,total:MODS.length,st:st,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,warmFrac:warmOk?1:(exp?Math.min(1,wDone/exp):0)};
+  }
+  var lastPanel='';
+  function paintPanel(ready,th,complete){
+    if(!statusEl)return;
+    var warmTxt=th.warmOk?T('boot.ready'):((!th.wDone&&!th.wTot)?T('boot.waiting'):(th.wDone+'/'+th.exp));
+    var html=[
+      row(T('boot.observer'),complete?T('boot.online'):T('boot.detected'),complete),
+      row(T('boot.starmap'),ready?T('boot.locked'):T('boot.aligning'),ready),
+      row(T('boot.mods'),th.mods+'/'+th.total,th.mods>=th.total),
+      row(T('boot.warm'),warmTxt,th.warmOk)
+    ].join('\n');
+    if(html!==lastPanel){lastPanel=html;statusEl.innerHTML=html;}
+  }
   function enterObservatory(){
     if(bs.classList.contains('off'))return;
+    if(capTimer){clearTimeout(capTimer);capTimer=0;}
     bs.classList.add('off');
     try{performance.mark('obs-blue');}catch(eM){}
     matrixAlive=false;
     if(matrixKill){try{matrixKill();}catch(eMk){}matrixKill=null;}
     if(matrixRAF){cancelAnimationFrame(matrixRAF);matrixRAF=0;}
     bootDone=true;
-    startTier0();   /* no-op kalau sudah jalan */
     try{sessionStorage.setItem('obs_booted','1');}catch(eSs){}   /* PP-9 */
     startRenderLoop();
     window.__obsEntered=true;
@@ -131,22 +123,26 @@
     setTimeout(function(){try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(eW){}},2600);   /* pre-warm panel owl + music (06-interaction.js): buka pertama tidak hitch */
     setTimeout(function(){if(bs&&bs.parentNode)bs.remove();},850);
   }
-  function finish(){
+  function finish(complete,ready,th){
     if(done)return;done=true;
+    try{window.__boot3d={t:Math.round(performance.now()),done:th.mods+(th.warmOk?1:0),total:th.total+1,st:th.st,warm:th.warmOk,gate:true};}catch(e3){}
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
-    if(!LEGACY&&T0MODE==='capsule')requestAnimationFrame(function(){setTimeout(startTier0,0);});   /* ?t0=capsule (v123) */
-    fill.style.width='100%';pct.textContent='100%';sig.classList.add('on');
+    /* Bar hanya 100% kalau semua unit benar-benar selesai. Kalau finish karena max3d, bar tetap di angka asli dan baris panel menunjukkan apa yang belum selesai. */
+    if(complete){fill.style.width='100%';pct.textContent='100%';}
+    sig.classList.add('on');
     if(quoteEl)quoteEl.classList.add('on');
-    if(statusEl)statusEl.innerHTML=
-      '[ '+padLabel(T('boot.observer'),12)+']  <span class="ok">'+T('boot.online')+'</span>\n'+
-      '[ '+padLabel(T('boot.starmap'),12)+']  <span class="ok">'+T('boot.locked')+'</span>\n'+
-      '[ '+padLabel(T('boot.signal'),12)+']  <span class="ok">'+T('boot.open')+'</span>\n'+
-      '[ '+padLabel(T('boot.boot'),12)+']  <span class="ok">'+T('boot.complete')+'</span>';
-    /* Capsule gate: wait for user choice instead of auto-entering. */
+    paintPanel(ready,th,complete);
+    /* Capsule gate: wait for user choice. maxMs = timeout: tidak ada Red/Blue sampai habis -> masuk otomatis (tanpa haptic, jalur enterObservatory yang sama). */
     if(choicesEl){
       choicesEl.classList.add('on');
       choicesEl.setAttribute('aria-hidden','false');
     }
+    capTimer=setTimeout(function(){
+      capTimer=0;
+      if(bs.classList.contains('off'))return;
+      window.__bootTimeout=true;
+      enterObservatory();
+    },maxMs);
   }
   if(capBlue){
     capBlue.addEventListener('click',function(){
@@ -157,6 +153,7 @@
   if(capRed){
     capRed.addEventListener('click',function(){
       haptic(12);
+      if(capTimer){clearTimeout(capTimer);capTimer=0;}   /* pengunjung aktif -> timeout dibatalkan */
       try{
         window.open('https://github.com/dumul17/dumul17.github.io/blob/main/index.html','_blank','noopener');
       }catch(e){
@@ -175,22 +172,20 @@
   }
   var pLast=0;
   function tick(){
-    var now=performance.now(),elapsed=now-t0;
-    var ready=LEGACY?(document.readyState==='complete'):pageReady();
-    var readyRatio=LEGACY?(readyCount()/tier0.length):(ready?1:0);
-    var timeRatio=Math.min(1,Math.max(0,elapsed/minMs));
-    var p=Math.min(99,Math.round((timeRatio*.72+readyRatio*.28)*100));
-    if(elapsed>=minMs)p=Math.min(99,Math.max(p,90+Math.round(readyRatio*9)));
-    /* PP-2 anti-jump: maks +5%/tick (frame jank / batch event tidak bikin bar loncat). */
-    if(p>pLast+5)p=pLast+5;
+    var elapsed=performance.now()-t0;
+    var ready=pageReady(),th=threeStatus(elapsed);
+    var complete=ready&&th.mods>=th.total&&th.warmOk;
+    /* Progres jujur: unit selesai / total unit. Tanpa komponen waktu, tanpa clamp +5%: bar naik persis saat unit selesai (main thread diblokir build 0,4-1,8 dtk, jadi ia naik per potongan).
+       Floor + cap 99: 100% hanya dituliskan finish() saat semua unit selesai. Monoton (tidak turun walau gambar lazy mulai di-fetch dan 'ready' berbalik false). */
+    var p=Math.min(99,Math.floor(((ready?1:0)+th.mods+th.warmFrac)/(th.total+2)*100));
     if(p<pLast)p=pLast;
     pLast=p;
     fill.style.width=p+'%';pct.textContent=p+'%';
-    paintTelemetry(false);
-    /* Gate = pageReady() (layout + gambar), bukan window 'load' dan bukan audio: tap pertama tetap ±0.4 dtk lewat safePlay walau audio belum siap (probe). maxMs = safety net. */
-    if(elapsed>=minMs && (ready || elapsed>=maxMs)){window.__bootFinish=ready?'gate':'maxMs';finish();}
+    paintPanel(ready,th,false);
+    if(complete||elapsed>=max3d){window.__bootFinish=complete?'gate':'cap3d';finish(complete,ready,th);}
     else requestAnimationFrame(tick);
   }
+  paintPanel(false,threeStatus(0),false);
   requestAnimationFrame(tick);
 })();
 

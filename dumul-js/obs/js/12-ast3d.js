@@ -27,10 +27,10 @@ var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,nx:[-1e9,-1e9,-1e9],
 /* Warm-up shader: render pertama sebuah renderer Three.js mengompilasi program shader (ratusan ms di HP) -> hitch pas drone/batu/teleskop pertama muncul; setSize pertama (realokasi framebuffer MSAA) juga mahal, jadi ukuran kanvas diset di build.
    compile() cuma MEMINDAHKAN stall itu; jadi dipanggil saat idle (layar boot, user belum main), satu renderer per giliran supaya tidak numpuk.
    Dipakai juga oleh 13-scope3d.js dan 14-drone3d.js. */
-var THREE_WARM={q:[],busy:false};
+var THREE_WARM={q:[],busy:false,total:0,done:0};   /* total/done: dibaca 07-boot (progres warm-up di panel boot) */
 function threeWarm(r,sc,cam,pre){
   try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;}catch(e){}
-  THREE_WARM.q.push({r:r,sc:sc,cam:cam,pre:pre});
+  THREE_WARM.q.push({r:r,sc:sc,cam:cam,pre:pre});THREE_WARM.total++;
   if(!THREE_WARM.busy)threeWarmNext();
 }
 function threeWarmNext(){
@@ -40,6 +40,7 @@ function threeWarmNext(){
   var run=function(){
     try{if(it.pre)it.pre();}catch(e){}   /* pra-ukur kanvas (W/H sudah valid di layar boot) */
     try{it.r.compile(it.sc,it.cam);it.r.render(it.sc,it.cam);}catch(e){}   /* compile + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
+    THREE_WARM.done++;
     setTimeout(threeWarmNext,150);
   };
   if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2000});else setTimeout(run,300);
