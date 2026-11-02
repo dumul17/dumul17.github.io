@@ -72,6 +72,7 @@ var DUMUL_CHARS=(function(){
      progres cuma set satu CSS variable saat angka persen berubah. reduced-motion / IS_POTATO -> kelas .calm (tanpa gerak, state tetap tampil). */
   var chEl=document.getElementById('boot-chars'),chBub=null,chBubT=0,chTalkT=0,chBlTt=0,chBlTo=0,chTapN=0,chPct=-1,chSlow=false,chRdy=false,
       chCalm=!!(reduce||(typeof IS_POTATO!=='undefined'&&IS_POTATO));
+  if(chCalm&&bs)bs.classList.add('run');   /* v149: calm/potato -> tanpa glitch bar idle */
   function chAlive(){return !!(bs&&bs.parentNode&&!bs.classList.contains('off'));}
   function chAttr(k,v){if(chEl&&chEl.getAttribute(k)!==v)chEl.setAttribute(k,v);}
   function chHL(c,on){if(chEl)chEl.classList.toggle(c,on);}
@@ -593,42 +594,13 @@ var DUMUL_CHARS=(function(){
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
      Animator rAF sendiri (bukan bergantung pada tick/startPost) supaya sapuan ke 100% tetap selesai walau interval startPost sudah berhenti. Berhenti kalau boot screen hilang. */
   var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
-  /* v149: glitch sesekali di #boot-bar + teks 0% selama idle. CSS class only; mati begitu persen > 0 / calm / potato. */
-  var barEl=document.getElementById('boot-bar'),barIdleT=0,barIdleOn=false,barIdleGen=0;
-  function barIdleStop(){
-    if(!barIdleOn)return;barIdleOn=false;
-    clearTimeout(barIdleT);barIdleGen++;
-    if(barEl)barEl.classList.remove('idle-gl');
-    if(pct)pct.classList.remove('idle-gl');
-  }
-  function barIdlePulse(){
-    if(!barIdleOn||chCalm||!bs||bs.classList.contains('off')||pV>0){barIdleStop();return;}
-    var gen=++barIdleGen;
-    if(barEl)barEl.classList.remove('idle-gl');
-    if(pct)pct.classList.remove('idle-gl');
-    requestAnimationFrame(function(){
-      if(gen!==barIdleGen)return;
-      if(barEl)barEl.classList.add('idle-gl');
-      if(pct)pct.classList.add('idle-gl');
-      setTimeout(function(){
-        if(gen!==barIdleGen)return;
-        if(barEl)barEl.classList.remove('idle-gl');
-        if(pct)pct.classList.remove('idle-gl');
-      },560);
-    });
-    barIdleT=setTimeout(barIdlePulse,1400+Math.random()*1200);
-  }
-  function barIdleStart(){
-    if(barIdleOn||chCalm||pV>0)return;
-    barIdleOn=true;
-    barIdleT=setTimeout(barIdlePulse,350+Math.random()*450);
-  }
+  /* v149: glitch bar 0% = CSS-only (index.css, jalan sejak first paint). Di sini cuma mematikannya lewat class .run di #boot-screen begitu persen > 0 (barShow) atau calm/potato. */
   function barShow(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
     pV=v;fill.style.width=v+'%';pct.textContent=v+'%';
     chProg(v);
-    if(v>0)barIdleStop();
+    if(v>0)bs.classList.add('run');
   }
   function barStep(now){
     pRaf=0;
@@ -641,7 +613,6 @@ var DUMUL_CHARS=(function(){
     var t=c.all?100:c.p;
     if(t>pTgt)pTgt=t;
     if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
-    if(pV<=0&&t<=0)barIdleStart();
   }
   function startPost(){
     if(postT)return;
