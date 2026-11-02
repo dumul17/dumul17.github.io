@@ -192,7 +192,40 @@
     b.textContent = 'COPY JSON';
     b.style.cssText = 'pointer-events:auto;margin-top:4px;font:10px monospace;padding:3px 6px;display:block';
     b.onclick = function (ev) { ev.stopPropagation(); var s = snapshot(); try { navigator.clipboard.writeText(s); b.textContent = 'COPIED'; } catch (e) { prompt('Copy:', s); } console.log('[bench]', s); };
+    b.style.display = 'inline-block'; b.style.marginRight = '4px';
     box.appendChild(b);
+    /* v10: export dump ke file .json / .txt (cadangan kalau clipboard diblok). Nama: bench-YYYYMMDD-HHMMSS.* */
+    function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()); }
+    function toTxt(s) {
+      var o = JSON.parse(s), out = ['BENCH DUMP', 'url: ' + location.href, 'waktu: ' + new Date().toISOString(), '', '== RINGKASAN ==', box.firstChild.textContent, '', '== DETAIL =='];
+      Object.keys(o).forEach(function (k) {
+        var v = o[k];
+        if (Array.isArray(v)) { out.push(k + ' (' + v.length + '):'); v.forEach(function (r) { out.push('  ' + JSON.stringify(r)); }); }
+        else if (v && typeof v === 'object') out.push(k + ': ' + JSON.stringify(v));
+        else out.push(k + ': ' + v);
+      });
+      return out.join('\n');
+    }
+    function saveFile(name, text, mime) {
+      try {
+        var u = URL.createObjectURL(new Blob([text], { type: mime })), a = document.createElement('a');
+        a.href = u; a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 1500);
+        return true;
+      } catch (e) { return false; }
+    }
+    [['SAVE JSON', 'json', 'application/json'], ['SAVE TXT', 'txt', 'text/plain']].forEach(function (c) {
+      var x = document.createElement('button');
+      x.textContent = c[0];
+      x.style.cssText = 'pointer-events:auto;margin-top:4px;margin-right:4px;font:10px monospace;padding:3px 6px;display:inline-block';
+      x.onclick = function (ev) {
+        ev.stopPropagation();
+        var s = snapshot(), t = c[1] === 'json' ? JSON.stringify(JSON.parse(s), null, 2) : toTxt(s);
+        if (saveFile('bench-' + stamp() + '.' + c[1], t, c[2])) { x.textContent = 'SAVED'; setTimeout(function () { x.textContent = c[0]; }, 1500); }
+        else prompt('Copy:', t);
+      };
+      box.appendChild(x);
+    });
     document.body.appendChild(box);
     mark('dcl');
     var blue = document.getElementById('boot-cap-blue');
