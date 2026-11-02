@@ -147,7 +147,7 @@
     R.longtaskTotal = { n: ltAllN, ms: Math.round(ltAll) };
     try { R.ver = {}; Array.prototype.forEach.call(document.scripts, function (sc) { var m = /\/([^\/?]+)\?v=(\d+)/.exec(sc.src || ''); if (m && /^(01-core|07-boot)/.test(m[1])) R.ver[m[1]] = +m[2]; }); R.legacy = /[?&]legacy=1/.test(location.search); R.loadAfterCapsule = R.t.load != null && R.t.capsule != null ? R.t.load - R.t.capsule : null; } catch (e) {}
     R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
-    R.ds = window.__ds != null ? window.__ds : null; R.dr3dT = window.__dr3dT || null;   /* v12: irisan build drone (14-drone3d v13): ds 1 = diiris, 0 = sinkron (?ds=0); dr3dT = ms tiap tahap (harus 8 elemen) */
+    R.ds = window.__ds != null ? window.__ds : null; R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null;   /* v8: irisan scp3dBuild (13-scope3d v14): ss 1 = diiris, 0 = sinkron (?ss=0); scp3dT = ms tiap tahap (8 elemen) */   /* v12: irisan build drone (14-drone3d v13): ds 1 = diiris, 0 = sinkron (?ds=0); dr3dT = ms tiap tahap (harus 8 elemen) */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
     R.net = (navigator.connection && navigator.connection.effectiveType) || 'n/a';
     R.swNow = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';

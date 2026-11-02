@@ -171,7 +171,7 @@ function scp3dEnv(r){
 }
 
 /* ---------- model pesawat ---------- */
-function scp3dBuild(){
+function* scp3dBuildG(){
   var T=THREE,cv=document.createElement('canvas');
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
@@ -181,7 +181,9 @@ function scp3dBuild(){
   var sc=new T.Scene(),H=SCP3D_CFG.half;
   var cam=new T.OrthographicCamera(-H,H,H,-H,-300,300);cam.position.set(0,0,100);cam.lookAt(0,0,0);
   SCP3D.sc=sc;SCP3D.cam=cam;
+  yield;   /* ---- tahap 0 selesai: renderer + scene ---- */
   var env=scp3dEnv(r),m=SCP3D.m,o=SCP3D.o,DS=T.DoubleSide,PI=Math.PI;
+  yield;   /* ---- tahap 1 selesai: env PMREM ---- */
   var face=scp3dFaceTex();
   m.hull=new T.MeshStandardMaterial({color:0x44505c,metalness:.6,roughness:.5,flatShading:true,envMap:env,envMapIntensity:.8});
   m.face=new T.MeshStandardMaterial({map:face.map,emissiveMap:face.emi,emissive:0xffffff,emissiveIntensity:1.45,metalness:.5,roughness:.55,envMap:env,envMapIntensity:.9,side:DS});
@@ -197,6 +199,7 @@ function scp3dBuild(){
   m.led2=new T.MeshBasicMaterial({color:0x3a4248,toneMapped:false});   /* LED indikator interlock (padam = kaca gelap) */
   m.ion=new T.MeshBasicMaterial({color:0x1fe81a,toneMapped:false,transparent:true,opacity:.85,depthWrite:false,blending:T.AdditiveBlending,side:DS});
   m.ionCore=new T.MeshBasicMaterial({color:0x9dff7a,toneMapped:false,transparent:true,opacity:.8,depthWrite:false,blending:T.AdditiveBlending,side:DS});
+  yield;   /* ---- tahap 2 selesai: tekstur kanvas + material ---- */
   var glowTex=scp3dGlowTex();
   function sprite(color,s){
     var sp=new T.Sprite(new T.SpriteMaterial({map:glowTex,color:color,transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false}));
@@ -243,6 +246,7 @@ function scp3dBuild(){
     var lg=sprite(a[4],15);lg.position.set(XN+8.8,a[0],3);root.add(lg);o[a[3]]=lg;
   });
 
+  yield;   /* ---- tahap 3 selesai: badan, pelat muka, cincin, neon, antena ---- */
   /* kokpit: bezel segi-8 + kaca berisi ruang bercahaya cyan */
   var wx=1.2,tilt=Math.atan((zf(XA)-zf(XN))/(XN-XA)),wg=new T.Group();
   wg.position.set(wx,0,zf(wx));wg.rotation.y=tilt;root.add(wg);
@@ -264,6 +268,7 @@ function scp3dBuild(){
     [-1,1].forEach(function(e){pg.add(box(2.6,2.2,2.6,m.dark,e*5.2,-s*4.9,0));});   /* braket ke badan */
   });
 
+  yield;   /* ---- tahap 4 selesai: kokpit + pod kaca ---- */
   /* blok mesin + dua thruster ion hijau */
   var EX=XA-4;
   root.add(box(8,20.5,12,m.dark,EX,0,0));
@@ -282,16 +287,31 @@ function scp3dBuild(){
     o.fl.push(f1);o.fl2.push(f2);o.eg.push(eg);
   });
 
+  yield;   /* ---- tahap 5 selesai: blok mesin + thruster ---- */
   /* cahaya: kunci hangat dari arah BH (diset tiap frame), fill cyan, rim magenta, hemisphere ungu */
   o.key=new T.DirectionalLight(0xffc88c,1.5*Math.PI);sc.add(o.key);
   o.rim=new T.DirectionalLight(0xff4fd8,1.1*Math.PI);o.rim.position.set(-60,30,-40);sc.add(o.rim);
   var fill=new T.DirectionalLight(0x40e8ff,.55*Math.PI);fill.position.set(-40,-30,60);sc.add(fill);
   sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.4*Math.PI));
+  yield;   /* ---- tahap 6 selesai: cahaya ---- */
   SCP3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam,function(){   /* pra-ukur: skala teleskop konstan (DPR dibatasi 2) -> res selalu resMin; cocok dgn scp3dUpdate, jadi tanpa setSize di frame pertama */
     SCP3D.res=SCP3D_CFG.resMin;r.setPixelRatio(1);r.setSize(SCP3D.res,SCP3D.res,false);
   });   /* kompilasi shader saat idle, bukan di render pertama */
 }
+
+/* Build dipecah jadi 8 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG (14-drone3d.js). Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
+   tahap berikut di-unshift sehingga urutan antar modul tidak berubah. ?ss=0 = sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__scp3dT, dicatat bench (R.scp3dT, R.ss). */
+var SCP3D_SLICE=(function(){var on=true;try{on=!/[?&]ss=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ss=on?1:0;}catch(e2){}return on;})();
+function scp3dDrive(it,tm){
+  var t0=performance.now(),r=it.next();
+  try{tm.push(Math.round(performance.now()-t0));window.__scp3dT=tm;}catch(e){}
+  if(r.done)return;
+  if(SCP3D_SLICE&&typeof THREE_Q!=='undefined'){
+    THREE_Q.q.unshift(function(){try{scp3dDrive(it,tm);}catch(e){scp3dFail(e&&e.message||e);}});
+  }else scp3dDrive(it,tm);
+}
+function scp3dBuild(){scp3dDrive(scp3dBuildG(),[]);}
 
 /* ---------- per frame ---------- */
 function scp3dUpdate(now,mm){
