@@ -25,6 +25,8 @@ var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,nx:[-1e9,-1e9,-1e9],
 /* Warm-up shader: render pertama sebuah renderer Three.js mengompilasi program shader (ratusan ms di HP) -> hitch pas drone/batu/teleskop pertama muncul; setSize pertama (realokasi framebuffer MSAA) juga mahal, jadi ukuran kanvas diset di build.
    compile() cuma MEMINDAHKAN stall itu; jadi dipanggil saat idle (layar boot, user belum main), satu renderer per giliran supaya tidak numpuk.
    Dipakai juga oleh 13-scope3d.js dan 14-drone3d.js. */
+/* ?ca=0 mematikan compileAsync (12 + 17): A/B bench jalur compile sinkron vs async. Default NYALA. Tercatat di JSON bench (R.ca). */
+var THREE_CA=(function(){var on=true;try{on=!/[?&]ca=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ca=on?1:0;}catch(e){}return on;})();
 var THREE_WARM={q:[],busy:false,total:0,done:0};   /* total/done: dibaca 07-boot (progres warm-up di panel boot) */
 function threeWarm(r,sc,cam,pre){
   try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;}catch(e){}
@@ -44,7 +46,7 @@ function threeWarmNext(){
     };
     /* r158+: compileAsync memakai KHR_parallel_shader_compile (link shader di luar main thread). Tanpa ekstensi itu three jatuh ke compile sinkron, jadi tidak lebih buruk.
        Batas 4 dtk: kalau promise macet, lanjut sinkron supaya progres boot tidak tertahan. */
-    if(it.r.compileAsync){
+    if(THREE_CA&&it.r.compileAsync){
       var d=false,go=function(){if(d)return;d=true;fin();};
       setTimeout(go,4000);
       try{it.r.compileAsync(it.sc,it.cam).then(go,go);}catch(e){go();}

@@ -722,7 +722,7 @@ function pl3dBuild(){
      Batas 4 dtk / tanpa compileAsync -> langsung warmSync seperti sebelumnya. */
   var warm=function(){
     if(PL3D.state!==1)return;
-    if(!r.compileAsync){warmSync();return;}
+    if(!r.compileAsync||(typeof THREE_CA!=='undefined'&&!THREE_CA)){warmSync();return;}   /* ?ca=0 (12-ast3d.js) = jalur sinkron */
     var d=false,go=function(){if(d)return;d=true;warmSync();};
     setTimeout(go,4000);
     try{pl3dUniforms(performance.now());r.compileAsync(PL3D.sc,PL3D.cam).then(go,go);}catch(e){go();}
