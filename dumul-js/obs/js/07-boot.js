@@ -179,6 +179,9 @@ var DUMUL_CHARS=(function(){
      maxMs  = TIMEOUT capsule: dihitung sejak capsule tampil; kalau Red/Blue tidak ditekan sampai habis -> masuk Observatory otomatis (jalur sama dgn Blue). */
   var maxMs=isRepeatVisit?10000:20000;
   var max3d=isRepeatVisit?12000:(IS_POTATO?9000:15000);
+  /* v148: HARD_CAP = plafon mutlak dari t0. Bench itel: 5 modul state=2 tapi warmOk masih false → cap3d lama memaksa kapsul
+     sebelum THREE_WARM + SFX selesai. Setelah modul settle, kita terus nunggu warmOk+SFX sampai HARD_CAP (bukan max3d). */
+  var HARD_CAP=isRepeatVisit?32000:(IS_POTATO?40000:45000);
   var capTimer=0;
   /* v142: batas tunggu pekerjaan boot TIDAK memakan jatah warm-up kalau yang lambat adalah jaringan. Selama three.js belum tiba (atau baru tiba lambat), batas diperpanjang
      sebesar kelebihan waktunya di atas 3 dtk (maks +8 dtk). Plafon mutlak = max3d + 8 dtk, jadi offline/macet tetap tidak menahan capsule selamanya. */
@@ -622,10 +625,19 @@ var DUMUL_CHARS=(function(){
     if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000))chSlowOn();   /* boot terasa lama: teleskop kalem, owl ngantuk */
     paintBar(c);
     paintPanel(c.ready,c.th,false,c.au,c.sx);
-    /* v145 strict: cap3d hanya paksa kalau 3D/page belum vis. Kalau vis sudah true, nunggu complete (BGM+SFX nyata / plafon audio). */
+    /* v148 strict: 
+       - complete → kapsul (BGM+SFX+vis nyata, atau plafon audio)
+       - vis true → jangan cap3d; biarkan complete (SFX_CAP dari warmAt)
+       - 5 modul sudah settle tapi !vis (biasanya warmOk masih false di itel) → lanjut sampai complete / HARD_CAP
+       - modul macet (mods < total) → cap3d di max3d seperti dulu
+       - HARD_CAP → paksa apapun (anti hang) */
     if(c.complete){window.__bootFinish='gate';finish(c);}
-    else if(elapsed>=cap3dNow(elapsed)&&!c.vis){window.__bootFinish='cap3d';finish(c);}
-    else requestAnimationFrame(tick);
+    else if(elapsed>=HARD_CAP){window.__bootFinish='cap3d';finish(c);}
+    else if(elapsed>=cap3dNow(elapsed)&&!c.vis){
+      var modsDone=c.th&&c.th.mods>=c.th.total;
+      if(modsDone)requestAnimationFrame(tick);   /* nunggu warmOk + SFX */
+      else{window.__bootFinish='cap3d';finish(c);}
+    }else requestAnimationFrame(tick);
   }
   try{warmQ=[AMB,MUSIC_COLLAP].filter(Boolean);warmPump();}catch(eW){}   /* v132: warm 2 BGM sejak awal boot */
   paintPanel(false,threeStatus(0),false,null,null);
