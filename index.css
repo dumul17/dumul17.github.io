@@ -307,24 +307,37 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 #boot-status .ok{color:#8eeeff;text-shadow:0 0 7px rgba(110,229,255,.35),0 0 3px #02070b}
 #boot-status.pn::after{content:'\2588';margin-left:.35em;opacity:.7;animation:bootCur 1s steps(1,end) infinite}
 @keyframes bootCur{50%{opacity:0}}
-#boot-bar{height:5px;margin-top:9px;border:1px solid rgba(110,229,255,.30);background:rgba(110,229,255,.035);overflow:hidden}
+#boot-bar{position:relative;height:9px;margin-top:9px;border:1px solid rgba(110,229,255,.30);background:rgba(110,229,255,.07);overflow:hidden}
 #boot-fill{height:100%;width:0;background:linear-gradient(90deg,rgba(110,229,255,.28),#6ee5ff,rgba(110,229,255,.72));box-shadow:0 0 13px rgba(110,229,255,.45);transition:width .16s linear}
-/* v149: glitch sesekali saat bar masih 0% (idle). CSS only + class toggle; mati begitu persen > 0 / reduced-motion / potato. */
-#boot-bar.idle-gl{animation:bootBarGl .55s steps(1,end)}
-#boot-pct.idle-gl{animation:bootPctGl .55s steps(1,end)}
+/* v149: glitch saat bar masih 0% (idle). CSS-ONLY, jalan sejak first paint (sebelum 07-boot.js ada); 07-boot.js hanya menambah class .run di #boot-screen begitu persen > 0 (atau calm/potato) -> semua animasi ini mati.
+   Siklus 2,6 dtk: burst ±0,4 dtk lalu diam. Irisan neon di ::after (transform/opacity) terlihat walau fill masih lebar 0. */
+#boot-bar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:22%;background:linear-gradient(90deg,rgba(255,120,200,0),rgba(255,120,200,.8) 30%,rgba(120,255,230,.9) 70%,rgba(120,255,230,0));opacity:0;pointer-events:none}
+#boot-screen:not(.run) #boot-bar{animation:bootBarSh 2.6s steps(1,end) infinite}
+#boot-screen:not(.run) #boot-bar::after{will-change:transform,opacity;animation:bootBarGl 2.6s steps(1,end) infinite}
+#boot-screen:not(.run) #boot-pct{animation:bootPctGl 2.6s steps(1,end) infinite}
+@keyframes bootBarSh{
+  0%,100%{transform:none;border-color:rgba(110,229,255,.30)}
+  3%{transform:translateX(-3px);border-color:rgba(255,120,200,.6)}
+  9%{transform:translateX(4px);border-color:rgba(120,255,220,.75)}
+  13%{transform:translateX(-1px);border-color:rgba(110,229,255,.55)}
+  16%{transform:none;border-color:rgba(110,229,255,.30)}
+}
 @keyframes bootBarGl{
-  0%,100%{transform:none;filter:none;border-color:rgba(110,229,255,.30)}
-  18%{transform:translateX(-3px);filter:hue-rotate(-50deg) saturate(1.9);border-color:rgba(255,120,200,.55)}
-  42%{transform:translateX(4px);filter:hue-rotate(140deg) saturate(2.1);border-color:rgba(120,255,220,.7)}
-  68%{transform:translateX(-1px);filter:hue-rotate(-25deg);border-color:rgba(110,229,255,.55)}
+  0%,100%{opacity:0;transform:translateX(0)}
+  3%{opacity:1;transform:translateX(30%)}
+  6%{opacity:0;transform:translateX(30%)}
+  9%{opacity:1;transform:translateX(330%)}
+  12%{opacity:.8;transform:translateX(140%)}
+  16%{opacity:0;transform:translateX(140%)}
 }
 @keyframes bootPctGl{
-  0%,100%{transform:none;opacity:1;text-shadow:0 0 4px #02070b;color:rgba(184,224,238,.75)}
-  18%{transform:translateX(-2px);opacity:.85;text-shadow:0 0 6px rgba(255,120,200,.5);color:rgba(255,180,220,.9)}
-  42%{transform:translateX(3px);opacity:1;text-shadow:0 0 8px rgba(110,255,230,.55);color:rgba(180,255,240,.95)}
-  68%{transform:translateX(-1px);color:rgba(184,224,238,.9)}
+  0%,100%{transform:none;color:rgba(184,224,238,.75);text-shadow:0 0 4px #02070b}
+  3%{transform:translateX(-2px);color:rgba(255,180,220,.95);text-shadow:0 0 6px rgba(255,120,200,.5)}
+  9%{transform:translateX(3px);color:rgba(180,255,240,.95);text-shadow:0 0 8px rgba(110,255,230,.55)}
+  13%{transform:translateX(-1px);color:rgba(184,224,238,.9);text-shadow:0 0 4px #02070b}
+  16%{transform:none;color:rgba(184,224,238,.75);text-shadow:0 0 4px #02070b}
 }
-@media (prefers-reduced-motion:reduce){#boot-bar.idle-gl,#boot-pct.idle-gl{animation:none!important}}
+@media (prefers-reduced-motion:reduce){#boot-bar,#boot-bar::after,#boot-pct{animation:none!important}}
 /* Bar "hidup" saat main thread diblok (build 3D 0,7-2,2 dtk): sheen + denyut ujung memakai transform/opacity -> jalan di compositor, tetap bergerak walau JS/layout macet.
    Persen TIDAK berubah (tetap jujur); ini hanya penanda "masih bekerja". Berhenti saat boot screen hilang dan di prefers-reduced-motion. */
 #boot-fill{position:relative;overflow:hidden}
@@ -483,7 +496,7 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
   #boot-title .bt-k { font-size: 7.5px !important; }
   #boot-quote { margin-top: 3px !important; font-size: 8px !important; }
   #boot-status { font-size: 9px !important; }
-  #boot-bar { margin-top: 5px !important; height: 4px !important; }
+  #boot-bar { margin-top: 5px !important; height: 7px !important; }
   #boot-pct { margin-top: 2px !important; font-size: 8px !important; }
   #boot-row { margin-top: 2px !important; }
   #boot-log { font-size: 8px !important; }
