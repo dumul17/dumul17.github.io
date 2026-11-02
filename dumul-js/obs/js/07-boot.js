@@ -286,7 +286,7 @@ var DUMUL_CHARS=(function(){
   /* v128: bobot unit = BIAYA RELATIF pekerjaan (ms, dari bench itel A6610L: build 3D per modul + warm shader ±5,5 dtk), bukan jumlah unit.
      Tetap jujur: bar hanya naik saat pekerjaan nyata SELESAI, tanpa komponen waktu. Bedanya, unit yang makan 5 dtk (warm) kini mengisi ±48% bar,
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
-  var WT_PAGE=500,WT_MODS=[1200,1100,1800,600,750],WT_WARM=5500,WT_AUDIO=4000;   /* v131: WT_AUDIO = porsi audio di bar (±27%): bar berhenti ±73% saat capsule tampil, sisanya naik saat audio benar-benar siap */
+  var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000;   /* kalibrasi ulang (three r186 + antrean threeLoad, bench itel A6610L 4 run): build AST 0,7 / SCP 1,6 / DR 2,15 / PT 0,8 / PL 0,8 dtk, warm ±5 dtk */   /* v131: WT_AUDIO = porsi audio di bar (±27%): bar berhenti ±73% saat capsule tampil, sisanya naik saat audio benar-benar siap */
   var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_MODS.reduce(function(a,b){return a+b;},0);
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
@@ -466,10 +466,27 @@ var DUMUL_CHARS=(function(){
     pLast=p;
     return {ready:ready,th:th,au:au,complete:complete,all:vis&&au.ok,p:p};
   }
-  function paintBar(c){
-    var v=c.all?100:c.p;
-    fill.style.width=v+'%';pct.textContent=v+'%';
+  /* Haluskan angka: TARGET tetap jujur (calc/c.p, bobot unit selesai); yang ditampilkan MENGEJAR target secara eksponensial (BAR_TAU) dengan laju minimum (BAR_MIN %/dtk).
+     Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
+     Animator rAF sendiri (bukan bergantung pada tick/startPost) supaya sapuan ke 100% tetap selesai walau interval startPost sudah berhenti. Berhenti kalau boot screen hilang. */
+  var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
+  function barShow(){
+    var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
+    if(v===pV)return;
+    pV=v;fill.style.width=v+'%';pct.textContent=v+'%';
     chProg(v);
+  }
+  function barStep(now){
+    pRaf=0;
+    var dt=Math.min(64,Math.max(0,now-pAt)),gap=pTgt-pShown;pAt=now;
+    if(gap>0)pShown=Math.min(pTgt,pShown+Math.max(gap*(1-Math.exp(-dt/BAR_TAU)),Math.min(BAR_MIN*dt/1000,gap)));
+    barShow();
+    if(pShown<pTgt&&!bs.classList.contains('off'))pRaf=requestAnimationFrame(barStep);
+  }
+  function paintBar(c){
+    var t=c.all?100:c.p;
+    if(t>pTgt)pTgt=t;
+    if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
   }
   function startPost(){
     if(postT)return;
