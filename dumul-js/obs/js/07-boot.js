@@ -196,7 +196,7 @@ var DUMUL_CHARS=(function(){
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
   /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
-  var WARM_CONC=4,WARM_SLOT_MS=8000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
+  var WARM_CONC=4,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
   try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(8,+wcm[1]));}catch(eWc){}
   window.__warmConc=WARM_CONC;
   function warmPump(){
@@ -234,7 +234,14 @@ var DUMUL_CHARS=(function(){
     try{window.__warmMax=Math.max(window.__warmMax||0,warmActive);}catch(eX){}
     try{
       a.addEventListener('loadedmetadata',onEv);a.addEventListener('error',onEv);a.addEventListener('abort',onEv);
-      tm=setTimeout(function(){rel('tmo');},WARM_SLOT_MS);
+      /* v150: slot TIDAK dilepas di WARM_SLOT_MS selama elemen masih benar-benar memuat (networkState 2, belum ada metadata); dicek tiap 1 dtk sampai WARM_SLOT_MAX.
+         Telemetri v149 (5 run, itel 4g): saat jaringan lambat, metadata tiba ±8,2 dtk, sedikit di atas WARM_SLOT_MS=8000 -> 'tmo' massal (14/19), slot lepas padahal unduhan lanjut,
+         antrean berikutnya mulai -> konkurensi nyata melebihi WARM_CONC dan bandwidth makin tipis. Slot macet sungguhan (bukan loading) tetap dilepas di WARM_SLOT_MS. */
+      tm=setTimeout(function chk(){
+        if(fin)return;
+        try{if(a.networkState===2&&a.readyState<1&&performance.now()-t1<WARM_SLOT_MAX){tm=setTimeout(chk,1000);return;}}catch(eC){}
+        rel('tmo');
+      },WARM_SLOT_MS);
       a.preload='metadata';a.load();
     }catch(eL){rel('exc');}
   }
