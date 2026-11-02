@@ -319,6 +319,14 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 #boot-screen.off #boot-fill::after,#boot-screen.off #boot-fill::before{animation:none}
 @media (prefers-reduced-motion:reduce){#boot-fill::after,#boot-fill::before{animation:none}#boot-fill::before{opacity:.6}}
 #boot-pct{margin-top:5px;text-align:right;font-size:9px;letter-spacing:.16em;color:rgba(184,224,238,.75);text-shadow:0 0 4px #02070b}
+/* Log boot SATU baris: sebaris dengan persen (kiri = log, kanan = persen). Baris ini memang sudah ada (cuma berisi "0%" di kanan), jadi tinggi panel sama persis dengan sebelum ada log.
+   Font log = font persen (9px / 8px landscape) dan line-height:1 (glif \u2713 dari font cadangan tidak menaikkan tinggi baris). */
+#boot-row{display:flex;align-items:baseline;gap:8px;margin-top:5px}
+#boot-row #boot-pct{margin-top:0 !important;flex:none}
+#boot-log{flex:1 1 auto;min-width:0;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px;letter-spacing:.05em;color:rgba(184,224,238,.6);text-shadow:0 0 5px #02070b;pointer-events:none}
+#boot-log .ok{color:rgba(142,238,255,.8)}
+#boot-log .pn{color:rgba(184,224,238,.95)}
+#boot-log .pn::after{content:'\2588';margin-left:.35em;opacity:.7;animation:bootCur 1s steps(1,end) infinite}
 #boot-signal{margin-top:10px;font-size:10px;letter-spacing:.13em;color:#eafcff;opacity:0;transform:translateY(4px);transition:opacity .35s,transform .35s;text-shadow:0 0 8px rgba(110,229,255,.65)}
 #boot-signal.on{opacity:1;transform:none}
 #boot-quote{
@@ -423,6 +431,7 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 @media(prefers-reduced-motion:reduce){
   #boot-quote,#boot-choices,#boot-status{transition-duration:.01s}
   #boot-status.pn::after{animation:none}
+  #boot-log .pn::after{animation:none}
   #boot-title.gl .bt-b,#boot-title.gl .bt-k,#boot-core.gl #boot-quote{animation:none!important}
 }
 @media(max-width:600px){
@@ -460,6 +469,8 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
   #boot-status { font-size: 9px !important; }
   #boot-bar { margin-top: 5px !important; height: 4px !important; }
   #boot-pct { margin-top: 2px !important; font-size: 8px !important; }
+  #boot-row { margin-top: 2px !important; }
+  #boot-log { font-size: 8px !important; }
   #boot-signal { margin-top: 5px !important; font-size: 9px !important; }
   #boot-choices { margin-top: 7px !important; gap: 10px !important; }
   .boot-cap { width: 44px !important; height: 18px !important; }
