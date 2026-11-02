@@ -16,6 +16,7 @@ var SCP3D_CFG={
   on:true,
   lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   half:64,       /* kotak gambar -half..half (satuan lokal teleDrawBody) */
+  envSize:256,   /* ukuran cube PMREM env pantulan (teleskop + drone). Default 256 = tampilan lama. Turunkan (128/64) buat hemat CPU saat boot; A/B lewat ?envsz=N (dibatasi 32..256, dibulatkan ke pangkat 2) */
   resMin:128,resMax:256,
   /* Pose IDLE (di overview & di sektor): teleskop tidak datar — mengayun 3D pelan + condong ke arah gerakannya (bank/lean).
      Tersambung ke panel tuning tab Tele: SPIN = kecepatan + besar ayunan (0 = pose beku, tetap miring 3D), HOVER = kecepatan melayang -> makin kencang makin condong.
@@ -145,6 +146,14 @@ function scp3dGlowTex(){
   x.fillStyle=gr;x.fillRect(0,0,64,64);
   return new T.CanvasTexture(c);
 }
+/* ukuran cube PMREM: knob SCP3D_CFG.envSize, override ?envsz=N (A/B). Dibulatkan ke pangkat 2 dalam 32..256; terbaca di window.__envsz (dicatat bench). */
+function scp3dEnvSize(){
+  var n=SCP3D_CFG.envSize||256;
+  try{var m=/[?&]envsz=(\d+)(?:&|#|$)/.exec(location.search);if(m)n=+m[1];}catch(e){}
+  n=Math.max(32,Math.min(256,n|0));n=Math.pow(2,Math.round(Math.log(n)/Math.LN2));
+  try{window.__envsz=n;}catch(e2){}
+  return n;
+}
 /* env kecil buat pantulan logam: bola gradien gelap->ungu + dua softbox (magenta & cyan); gagal -> tanpa env */
 function scp3dEnv(r){
   try{
@@ -156,7 +165,7 @@ function scp3dEnv(r){
     mag.position.set(32,14,20);mag.lookAt(0,0,0);sc.add(mag);
     var cy=new T.Mesh(new T.PlaneGeometry(26,10),new T.MeshBasicMaterial({color:new T.Color(.35,1.3,1.7),side:T.DoubleSide}));
     cy.position.set(-30,-6,18);cy.lookAt(0,0,0);sc.add(cy);
-    var pm=new T.PMREMGenerator(r),rt=pm.fromScene(sc,.02);pm.dispose();
+    var sz=scp3dEnvSize(),pm=new T.PMREMGenerator(r),rt=pm.fromScene(sc,.02,.1,100,{size:sz});pm.dispose();
     return rt.texture;
   }catch(e){return null;}
 }
