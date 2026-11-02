@@ -136,7 +136,7 @@ function pt3dSeg(T,a0,a1,r0,r1){
   var g=new T.ExtrudeGeometry(s,{depth:.16,bevelEnabled:true,bevelThickness:.018,bevelSize:.012,bevelSegments:1,curveSegments:12});
   g.translate(0,0,-.08);return g;
 }
-function pt3dBuild(){
+function* pt3dBuildG(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI;
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
@@ -144,7 +144,9 @@ function pt3dBuild(){
   PT3D.r=r;
   var sc=new T.Scene(),H=PT3D_CFG.half,cam=new T.OrthographicCamera(-H,H,H,-H,-20,20);
   cam.position.set(0,0,10);cam.lookAt(0,0,0);PT3D.sc=sc;PT3D.cam=cam;
+  yield;   /* ---- tahap 0 selesai: renderer + scene + kamera ---- */
   var tex=pt3dCircuitTex(T);PT3D.tex=tex;
+  yield;   /* ---- tahap 1 selesai: tekstur sirkuit (kanvas 1024) ---- */
   var tg=new T.Group();tg.rotation.order='ZXY';sc.add(tg);PT3D.tilt=tg;   /* P4: kemiringan = yaw -> pitch -> roll (ZXY = Rz*Rx*Ry); grp di dalamnya cuma berputar di bidang cincin */
   var grp=new T.Group();tg.add(grp);PT3D.grp=grp;
   var N=12,gap=.075,i,a0,a1,m,mesh,IR=PT3D_CFG.inR;
@@ -153,6 +155,7 @@ function pt3dBuild(){
     m=new T.MeshStandardMaterial({color:PT3D_CFG.plateCol,metalness:.75,roughness:.45,emissive:new T.Color(0x35f3ff),emissiveMap:tex,emissiveIntensity:.8});   /* hex r128 tidak dikonversi ke linear: logam 'gelap' harus gelap */
     mesh=new T.Mesh(pt3dSeg(T,a0,a1,PT3D_CFG.inR+.012,1-.012),m);grp.add(mesh);PT3D.mats.push(m);
   }
+  yield;   /* ---- tahap 2 selesai: kelompok + 12 plat (material + geometri) ---- */
   /* garis cahaya tipis: tepi dalam = aksen lilac (ringAcc), tepi luar = cyan ringCol (additive) */
   var gm1=new T.MeshBasicMaterial({color:0x9c7cff,transparent:true,opacity:.75,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,side:T.DoubleSide});
   var gm2=new T.MeshBasicMaterial({color:0x35f3ff,transparent:true,opacity:.28,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,side:T.DoubleSide});
@@ -163,14 +166,29 @@ function pt3dBuild(){
   var rim=new T.DirectionalLight(0xff4fd8,.85*Math.PI);rim.position.set(-1.2,-.7,.8);sc.add(rim);
   sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.35*Math.PI));
   var fill=new T.DirectionalLight(0x40e8ff,.5*Math.PI);fill.position.set(-.8,.5,1);sc.add(fill);
+  yield;   /* ---- tahap 3 selesai: garis cahaya + lampu ---- */
   /* pra-ukur ke resolusi overview (setSize pertama = realokasi framebuffer MSAA yang mahal) */
   try{
     var res0=pt3dRes(Math.max(40,(typeof BH!=='undefined'?BH.R:26)*ptOvK()));
     PT3D.res=res0;r.setPixelRatio(1);r.setSize(res0,res0,false);
   }catch(eP){}
+  yield;   /* ---- tahap 4 selesai: setSize pra-ukur ---- */
   PT3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam);
 }
+/* Build dipecah jadi 6 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG / scp3dBuildG. Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
+   tahap berikut di-unshift sehingga urutan antar modul tidak berubah. ?ps=0 = sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__pt3dT, dicatat bench (R.pt3dT, R.ps).
+   Kalau PT3D.state berubah dari 1 di antara dua tahap (mis. webglcontextlost -> pt3dFail), tahap berikutnya berhenti dan tidak menimpa state=3. */
+var PT3D_SLICE=(function(){var on=true;try{on=!/[?&]ps=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ps=on?1:0;}catch(e2){}return on;})();
+function pt3dDrive(it,tm){
+  var t0=performance.now(),r=it.next();
+  try{tm.push(Math.round(performance.now()-t0));window.__pt3dT=tm;}catch(e){}
+  if(r.done)return;
+  if(PT3D_SLICE&&typeof THREE_Q!=='undefined'){
+    THREE_Q.q.unshift(function(){if(PT3D.state!==1)return;try{pt3dDrive(it,tm);}catch(e){pt3dFail(e&&e.message||e);}});
+  }else pt3dDrive(it,tm);
+}
+function pt3dBuild(){pt3dDrive(pt3dBuildG(),[]);}
 /* Pengali radius cincin overview terhadap BH.R: dihitung supaya radius luar portal overview (ukuran slider 1x) = ovMenu x radius cincin menu sektor.
    Menu ada di ruang layar asli (CSS px), overview di ruang virtual #stage (skala STG.k di tablet/desktop; HP landscape k=1), jadi dibagi k.
    BHSC / BHZ / ukuran slider teleskop tetap ikut karena mereka mengalikan R di portal3dOverview, bukan masuk ke K ini. */

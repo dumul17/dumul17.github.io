@@ -678,13 +678,14 @@ var PL3D_FS=[
 ].join('\n');
 
 function pl3dBuild(){
-  var T=THREE;
+  var T=THREE,tp0=performance.now(),tpa=0,tpb=0;   /* v39: waktu tahap (ms) -> window.__pl3dT (3 elemen: renderer+scene, noise+material+mesh, resize+jadwal warm); TANPA irisan, hanya ukur */
   var cv=document.createElement('canvas');
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:false,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);r.setPixelRatio(1);
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();pl3dFail('webglcontextlost');},false);
   var P=PL3D_CFG.pal,L=PL3D_CFG.lightCol;
   PL3D.r=r;PL3D.sc=new T.Scene();PL3D.cam=new T.Camera();
+  tpa=performance.now();
   /* tekstur noise 256x256 (tileable, deterministik): R = acak(x,y), G = R digeser (+37,+17), B = acak kedua (ukuran batu) */
   var nz=new Uint8Array(256*256*4),nr=new Uint8Array(256*256),nb=new Uint8Array(256*256),ni,nx,ny,sd=1337;
   for(ni=0;ni<nr.length;ni++){sd=(Math.imul(sd,1664525)+1013904223)>>>0;nr[ni]=sd>>>24;}
@@ -704,6 +705,7 @@ function pl3dBuild(){
   PL3D.mat=new T.ShaderMaterial({uniforms:PL3D.uni,vertexShader:PL3D_VS,fragmentShader:PL3D_FS,transparent:false,depthTest:false,depthWrite:false,blending:T.NoBlending});
   var mesh=new T.Mesh(new T.PlaneGeometry(2,2),PL3D.mat);
   mesh.frustumCulled=false;mesh.renderOrder=-10;PL3D.sc.add(mesh);
+  tpb=performance.now();
   pl3dResize();
   /* kompilasi shader sekarang (saat idle/boot), lalu cek hasilnya: shader error di three TIDAK melempar, jadi diperiksa lewat diagnostics program */
   var warmSync=function(){
@@ -728,6 +730,7 @@ function pl3dBuild(){
     try{pl3dUniforms(performance.now());r.compileAsync(PL3D.sc,PL3D.cam).then(go,go);}catch(e){go();}
   };
   if(typeof requestIdleCallback==='function')requestIdleCallback(warm,{timeout:2500});else setTimeout(warm,400);
+  try{var tpc=performance.now();window.__pl3dT=[Math.round(tpa-tp0),Math.round(tpb-tpa),Math.round(tpc-tpb)];}catch(eT){}
 }
 
 /* ukuran strip + kanvas 2D penyimpan hasil (kanvas WebGL offscreen tidak dijamin menyimpan isinya antar-task) */
