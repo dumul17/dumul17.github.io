@@ -118,15 +118,18 @@ function* dr3dBuildG(){
   DR3D.sc=sc;DR3D.cam=cam;
   var m=DR3D.m,o=DR3D.o;
   yield;   /* ---- tahap 0 selesai: renderer + scene ---- */
-  var env=null;try{if(typeof scp3dEnv==='function')env=scp3dEnv(r);}catch(eE){env=null;}   /* env pantulan yang sama dgn teleskop (kalau 13-scope3d.js ada) */
-  var ei=env?.8:0;
-  yield;   /* ---- tahap 1 selesai: env PMREM ---- */
+  /* DRONE TANPA ENV (v15): PMREM drone ±0,64-0,96 dtk di itel (bench 3 Nov) dan tidak bisa diiris. Default sekarang TANPA env; metalness dikali DR3D_MF supaya logam
+     tidak jadi hitam (tanpa env logam cuma memantulkan lampu). ?denv=1 = env PMREM seperti v14 (A/B / rollback), ?dmf=N (0..1) = faktor metalness tanpa env.
+     Tahap 1 tetap ada (yield kosong) supaya dr3dT tetap 8 elemen dan logPoll/bench tidak berubah. */
+  var env=null;if(DR3D_ENV){try{if(typeof scp3dEnv==='function')env=scp3dEnv(r);}catch(eE){env=null;}}   /* env pantulan yang sama dgn teleskop (kalau 13-scope3d.js ada) */
+  var ei=env?.8:0,mf=env?1:DR3D_MF;
+  yield;   /* ---- tahap 1 selesai: env PMREM (atau dilewati) ---- */
   /* palet teleskop */
-  m.hull=new T.MeshStandardMaterial({map:dr3dBodyTex(),color:0xffffff,metalness:.6,roughness:.5,envMap:env,envMapIntensity:ei});
-  m.recess=new T.MeshStandardMaterial({color:0x1b2229,metalness:.7,roughness:.45,envMap:env,envMapIntensity:ei});
-  m.dark=new T.MeshStandardMaterial({color:0x2b333c,metalness:.8,roughness:.42,side:DS,envMap:env,envMapIntensity:ei*1.2});
-  m.steel=new T.MeshStandardMaterial({color:0x44505c,metalness:.6,roughness:.5,side:DS,envMap:env,envMapIntensity:ei});
-  m.cap=new T.MeshStandardMaterial({color:0x74818c,metalness:.7,roughness:.35,envMap:env,envMapIntensity:ei});
+  m.hull=new T.MeshStandardMaterial({map:dr3dBodyTex(),color:0xffffff,metalness:.6*mf,roughness:.5,envMap:env,envMapIntensity:ei});
+  m.recess=new T.MeshStandardMaterial({color:0x1b2229,metalness:.7*mf,roughness:.45,envMap:env,envMapIntensity:ei});
+  m.dark=new T.MeshStandardMaterial({color:0x2b333c,metalness:.8*mf,roughness:.42,side:DS,envMap:env,envMapIntensity:ei*1.2});
+  m.steel=new T.MeshStandardMaterial({color:0x44505c,metalness:.6*mf,roughness:.5,side:DS,envMap:env,envMapIntensity:ei});
+  m.cap=new T.MeshStandardMaterial({color:0x74818c,metalness:.7*mf,roughness:.35,envMap:env,envMapIntensity:ei});
   m.black=new T.MeshStandardMaterial({color:0x07090c,metalness:.2,roughness:.8,side:DS});
   m.acc=new T.MeshBasicMaterial({color:0x6ee5ff,toneMapped:false});          /* warna interlock (jari-jari muka) */
   m.cyan=new T.MeshBasicMaterial({color:0x35f3ff,toneMapped:false});
@@ -286,6 +289,9 @@ function* dr3dBuildG(){
    jadi blok sinkron ±1,5-2 dtk di itel (bench v142: go drone terbesar sebelum capsule) terpecah. Variabel lokal tetap satu scope (tanpa restruktur).
    ?ds=0 = jalan sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__dr3dT, dicatat bench (R.dr3dT, R.ds). */
 var DR3D_SLICE=(function(){var on=true;try{on=!/[?&]ds=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ds=on?1:0;}catch(e2){}return on;})();
+/* ?denv=1 = drone PAKAI env PMREM (perilaku v14); default tanpa env. ?dmf=N (0..1, default .45) = faktor metalness saat tanpa env. Terbaca di window.__denv / __dmf, dicatat bench (R.denv, R.dmf). */
+var DR3D_ENV=(function(){var on=false;try{on=/[?&]denv=1(?:&|#|$)/.test(location.search);}catch(e){}try{window.__denv=on?1:0;}catch(e2){}return on;})();
+var DR3D_MF=(function(){var f=.45;try{var m=/[?&]dmf=([0-9.]+)(?:&|#|$)/.exec(location.search);if(m)f=Math.max(0,Math.min(1,parseFloat(m[1])||0));}catch(e){}try{window.__dmf=f;}catch(e2){}return f;})();
 function dr3dDrive(it,tm){
   var t0=performance.now(),r=it.next();
   try{tm.push(Math.round(performance.now()-t0));window.__dr3dT=tm;}catch(e){}
