@@ -15,7 +15,7 @@
 var PT3D_CFG={
   /* DEFAULT angka di bawah = hasil COPY TUNE 2026-10-28 (komentar angka lama bisa kadaluarsa) */
   on:true,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   ovK:2,        /* cadangan: radius luar cincin overview = ovK x horizon BH (BH.Rr), dipakai kalau ptOvK() tidak bisa menghitung */
   ovMenu:.25,    /* ukuran portal overview = ovMenu x ukuran cincin di window menu sektor (16-sector-menu.js, smenuRingD). .5 = setengahnya */
   secK:0.50,       /* dasar ukuran R mulut wormhole keluar sektor (ptSecR) = secK x BH.R x .62 */
@@ -76,18 +76,7 @@ function pt3dLoad(){
   if(!PT3D_CFG.on){PT3D.state=3;PT3D.err='off';return;}
   PT3D.state=1;
   var go=function(){try{pt3dBuild();}catch(e){pt3dFail(e&&e.message||e);}};
-  if(typeof THREE!=='undefined'&&THREE.REVISION){go();return;}
-  var src=PT3D_CFG.lib,has=false,ss=document.getElementsByTagName('script'),i;
-  for(i=0;i<ss.length;i++){if((ss[i].getAttribute('src')||'')===src){has=true;break;}}
-  if(!has){
-    var s=document.createElement('script');
-    s.src=src;s.async=true;s.onerror=function(){pt3dFail('gagal muat '+src);};
-    document.head.appendChild(s);
-  }
-  var tries=0,iv=setInterval(function(){
-    if(typeof THREE!=='undefined'&&THREE.REVISION){clearInterval(iv);go();}
-    else if(++tries>80){clearInterval(iv);pt3dFail('timeout menunggu three.js');}
-  },150);
+  threeLoad(go,function(m){pt3dFail(m);});   /* pemuat bersama di 12-ast3d.js (import() dinamis, satu promise utk semua modul) */
 }
 
 /* sirkuit procedural (deterministik): garis siku + bantalan, putih di atas hitam -> dipakai sebagai emissiveMap */
@@ -124,7 +113,7 @@ function pt3dCircuitTex(T){
     /* garis tengah plat (poros simetri) */
     x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=3.2;stub(lanes[0],lanes[3],am);dot(lanes[1],am,4.5);
   }
-  var t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(.5,.5);t.offset.set(.5,.5);t.anisotropy=4;t.encoding=T.sRGBEncoding;
+  var t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(.5,.5);t.offset.set(.5,.5);t.anisotropy=4;t.colorSpace=T.SRGBColorSpace;
   return t;
 }
 function pt3dSeg(T,a0,a1,r0,r1){
@@ -150,7 +139,7 @@ function pt3dSeg(T,a0,a1,r0,r1){
 function pt3dBuild(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI;
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
-  r.setClearColor(0x000000,0);r.outputEncoding=T.sRGBEncoding;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
+  r.setClearColor(0x000000,0);r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();pt3dFail('webglcontextlost');},false);
   PT3D.r=r;
   var sc=new T.Scene(),H=PT3D_CFG.half,cam=new T.OrthographicCamera(-H,H,H,-H,-20,20);
@@ -170,10 +159,10 @@ function pt3dBuild(){
   var g1=new T.Mesh(new T.RingGeometry(IR-.026,IR-.004,160),gm1);g1.position.z=.11;grp.add(g1);
   var g2=new T.Mesh(new T.RingGeometry(1.0,1.02,160),gm2);g2.position.z=.0;grp.add(g2);
   PT3D.glow=[gm1,gm2];
-  var key=new T.DirectionalLight(0xffc88c,.7);key.position.set(.6,.9,1.4);sc.add(key);
-  var rim=new T.DirectionalLight(0xff4fd8,.85);rim.position.set(-1.2,-.7,.8);sc.add(rim);
-  sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.35));
-  var fill=new T.DirectionalLight(0x40e8ff,.5);fill.position.set(-.8,.5,1);sc.add(fill);
+  var key=new T.DirectionalLight(0xffc88c,.7*Math.PI);key.position.set(.6,.9,1.4);sc.add(key);
+  var rim=new T.DirectionalLight(0xff4fd8,.85*Math.PI);rim.position.set(-1.2,-.7,.8);sc.add(rim);
+  sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.35*Math.PI));
+  var fill=new T.DirectionalLight(0x40e8ff,.5*Math.PI);fill.position.set(-.8,.5,1);sc.add(fill);
   /* pra-ukur ke resolusi overview (setSize pertama = realokasi framebuffer MSAA yang mahal) */
   try{
     var res0=pt3dRes(Math.max(40,(typeof BH!=='undefined'?BH.R:26)*ptOvK()));

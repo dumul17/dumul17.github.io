@@ -14,7 +14,7 @@
    Matikan: ?scope3d=0 di URL atau localStorage dumul_scope3d=0. */
 var SCP3D_CFG={
   on:true,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   half:64,       /* kotak gambar -half..half (satuan lokal teleDrawBody) */
   resMin:128,resMax:256,
   /* Pose IDLE (di overview & di sektor): teleskop tidak datar — mengayun 3D pelan + condong ke arah gerakannya (bank/lean).
@@ -35,24 +35,12 @@ function scp3dLoad(){
   if(!SCP3D_CFG.on){SCP3D.state=3;SCP3D.err='off';return;}
   SCP3D.state=1;
   var go=function(){try{scp3dBuild();}catch(e){scp3dFail(e&&e.message||e);}};
-  if(typeof THREE!=='undefined'&&THREE.REVISION){go();return;}
-  /* three.min.js bisa lagi dimuat 12-ast3d.js: jangan dobel, cukup tunggu sampai THREE ada */
-  var src=SCP3D_CFG.lib,has=false,ss=document.getElementsByTagName('script'),i;
-  for(i=0;i<ss.length;i++){if((ss[i].getAttribute('src')||'')===src){has=true;break;}}
-  if(!has){
-    var s=document.createElement('script');
-    s.src=src;s.async=true;s.onerror=function(){scp3dFail('gagal muat '+src);};
-    document.head.appendChild(s);
-  }
-  var tries=0,iv=setInterval(function(){
-    if(typeof THREE!=='undefined'&&THREE.REVISION){clearInterval(iv);go();}
-    else if(++tries>80){clearInterval(iv);scp3dFail('timeout menunggu three.js');}
-  },150);
+  threeLoad(go,function(m){scp3dFail(m);});   /* pemuat bersama di 12-ast3d.js (import() dinamis, satu promise utk semua modul) */
 }
 
 /* ---------- tekstur kecil (canvas 2D) ---------- */
 function scp3dCanvas(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;return c;}
-function scp3dTex(c,srgb){var t=new THREE.CanvasTexture(c);if(srgb!==false)t.encoding=THREE.sRGBEncoding;t.anisotropy=2;return t;}
+function scp3dTex(c,srgb){var t=new THREE.CanvasTexture(c);if(srgb!==false)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=2;return t;}
 
 /* muka depan: peta warna (baja + panel + karat) + peta emisif (sirkuit neon). Canvas atas = hidung, kiri->kanan = sisi -y -> +y. */
 function scp3dFaceTex(){
@@ -178,7 +166,7 @@ function scp3dBuild(){
   var T=THREE,cv=document.createElement('canvas');
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
-  r.outputEncoding=T.sRGBEncoding;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;
+  r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();scp3dFail('webglcontextlost');},false);
   SCP3D.r=r;
   var sc=new T.Scene(),H=SCP3D_CFG.half;
@@ -286,10 +274,10 @@ function scp3dBuild(){
   });
 
   /* cahaya: kunci hangat dari arah BH (diset tiap frame), fill cyan, rim magenta, hemisphere ungu */
-  o.key=new T.DirectionalLight(0xffc88c,1.5);sc.add(o.key);
-  o.rim=new T.DirectionalLight(0xff4fd8,1.1);o.rim.position.set(-60,30,-40);sc.add(o.rim);
-  var fill=new T.DirectionalLight(0x40e8ff,.55);fill.position.set(-40,-30,60);sc.add(fill);
-  sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.4));
+  o.key=new T.DirectionalLight(0xffc88c,1.5*Math.PI);sc.add(o.key);
+  o.rim=new T.DirectionalLight(0xff4fd8,1.1*Math.PI);o.rim.position.set(-60,30,-40);sc.add(o.rim);
+  var fill=new T.DirectionalLight(0x40e8ff,.55*Math.PI);fill.position.set(-40,-30,60);sc.add(fill);
+  sc.add(new T.HemisphereLight(0x7a5cd8,0x0a0614,.4*Math.PI));
   SCP3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam,function(){   /* pra-ukur: skala teleskop konstan (DPR dibatasi 2) -> res selalu resMin; cocok dgn scp3dUpdate, jadi tanpa setSize di frame pertama */
     SCP3D.res=SCP3D_CFG.resMin;r.setPixelRatio(1);r.setSize(SCP3D.res,SCP3D.res,false);
@@ -311,7 +299,7 @@ function scp3dUpdate(now,mm){
     lx=(vx*c-vy*s)/d;ly=-(vx*s+vy*c)/d;
     fall=Math.max(.3,Math.min(1.25,1.25-d/(Math.max(W,H)*.9)));
   }catch(eL){}
-  o.key.position.set(lx*100,ly*100,65);o.key.intensity=1.5*fall;
+  o.key.position.set(lx*100,ly*100,65);o.key.intensity=1.5*Math.PI*fall;
 
   /* pose 3D idle: ayunan pelan (SPIN) + condong ke arah gerak (HOVER). Fase diakumulasi per detik, bukan now*rate, supaya geser slider SPIN tidak bikin pose meloncat. */
   var I=SCP3D_CFG.idle||{},cfg=(typeof TELE_CFG!=='undefined')?TELE_CFG:null,spinK=cfg&&isFinite(cfg.spin)?cfg.spin:1;

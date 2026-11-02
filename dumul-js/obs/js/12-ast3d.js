@@ -8,9 +8,7 @@
    Matikan: ?ast3d=0 di URL atau localStorage dumul_ast3d=0. */
 var AST3D_CFG={
   on:true,
-  lib:'dumul-js/obs/lib/three.min.js?v=1',
-  gltfLib:'dumul-js/obs/lib/GLTFLoader.js?v=1',
-  glb:[],        /* model NASA (opsional): ['dumul-js/obs/img/ast/bennu.glb', ...]; kosong = batu procedural saja */
+  lib:'dumul-js/obs/lib/three.module.r186.js?v=1',   /* ES module (r186); anak-nya three.core.r186.js diimpor otomatis. Path + ?v= harus sama dgn SHELL service-worker */
   dprMax:1.5,    /* resolusi render dibatasi: batu kecil + lembut, nggak perlu DPR penuh */
   procVariants:6,
   reuse:true,    /* cache hasil render per pass: kalau pan/zoom/posisi BH/layout nggak berubah, GL + astStep cuma jalan ~fps (bawah), frame lain tinggal blit cache. false = render tiap frame seperti dulu */
@@ -39,20 +37,43 @@ function threeWarmNext(){
   THREE_WARM.busy=true;
   var run=function(){
     try{if(it.pre)it.pre();}catch(e){}   /* pra-ukur kanvas (W/H sudah valid di layar boot) */
-    try{it.r.compile(it.sc,it.cam);it.r.render(it.sc,it.cam);}catch(e){}   /* compile + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
-    THREE_WARM.done++;
-    setTimeout(threeWarmNext,150);
+    var fin=function(){
+      try{it.r.compile(it.sc,it.cam);it.r.render(it.sc,it.cam);}catch(e){}   /* compile (sudah siap -> murah) + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
+      THREE_WARM.done++;
+      setTimeout(threeWarmNext,150);
+    };
+    /* r158+: compileAsync memakai KHR_parallel_shader_compile (link shader di luar main thread). Tanpa ekstensi itu three jatuh ke compile sinkron, jadi tidak lebih buruk.
+       Batas 4 dtk: kalau promise macet, lanjut sinkron supaya progres boot tidak tertahan. */
+    if(it.r.compileAsync){
+      var d=false,go=function(){if(d)return;d=true;fin();};
+      setTimeout(go,4000);
+      try{it.r.compileAsync(it.sc,it.cam).then(go,go);}catch(e){go();}
+    }else fin();
   };
   if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2000});else setTimeout(run,300);
 }
 
 function ast3dFail(why){AST3D.state=3;AST3D.err=String(why||'');try{console.warn('[ast3d] fallback ke sprite 2D:',AST3D.err);}catch(e){}}
 
-function ast3dScript(src,ok,bad){
-  var s=document.createElement('script');
-  s.src=src;s.async=true;
-  s.onload=ok;s.onerror=function(){bad('gagal muat '+src);};
-  document.head.appendChild(s);
+/* Pemuat three.js BERSAMA (12/13/14/15/17 semuanya memanggil ini). three r186 hanya ada sebagai ES module -> import() dinamis, hasilnya dipasang ke window.THREE
+   supaya semua kode lama (T=THREE; T.Mesh ...) tetap jalan. Satu promise (window.__threeP) dipakai bersama: modul kedua dst. tinggal menunggu, tidak muat dobel.
+   - window.THREE = SALINAN (Object.assign) agar bisa ditulisi (21-bench.js membungkus THREE.WebGLRenderer); namespace module asli read-only.
+   - ColorManagement dimatikan: warna hex dipakai apa adanya seperti r128 (tanpa konversi sRGB->linear), jadi tampilan tidak bergeser. Harus sebelum THREE.Color pertama dibuat.
+   Gagal (offline/blokir/browser tanpa import()) -> bad(pesan) -> tiap modul jatuh ke versi 2D seperti sebelumnya. */
+function threeLoad(ok,bad){
+  if(typeof THREE!=='undefined'&&THREE.REVISION){ok();return;}
+  var P=window.__threeP;
+  if(!P){
+    try{
+      var url=new URL((typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',document.baseURI).href;
+      P=window.__threeP=import(url).then(function(m){
+        try{m.ColorManagement.enabled=false;}catch(e){}
+        window.THREE=Object.assign({},m);
+        return window.THREE;
+      });
+    }catch(e){bad('import() tidak didukung: '+(e&&e.message||e));return;}
+  }
+  P.then(function(){ok();},function(e){window.__threeP=null;bad('gagal muat three.js: '+(e&&e.message||e));});
 }
 
 function ast3dLoad(){
@@ -63,7 +84,7 @@ function ast3dLoad(){
     try{ast3dBuild();}catch(e){ast3dFail(e&&e.message||e);}
   };
   if(typeof THREE!=='undefined'&&THREE.REVISION){go();return;}
-  ast3dScript(AST3D_CFG.lib,go,ast3dFail);
+  threeLoad(go,ast3dFail);
 }
 
 function ast3dMulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -162,34 +183,6 @@ function ast3dBuild(){
     for(i=0;i<AST3D_CFG.procVariants;i++)ast3dAddVariant(ast3dRockGeo(i+1,ti<LD.length?LD[ti][0]:3),ti);   /* seed sama per tier -> bentuk batu sama, cuma kerapatan mesh beda */
   AST3D.state=2;   /* siap dipakai segera dengan batu procedural */
   threeWarm(r,AST3D.sc,AST3D.cam,function(){ast3dResize();});   /* ukuran layar penuh dipasang di warm-up, bukan di frame batu pertama */
-  if(AST3D_CFG.glb&&AST3D_CFG.glb.length)ast3dLoadGlb();
-}
-
-/* Model NASA (.glb): ambil mesh pertama, pusatkan, skala ke radius ~.92, jadikan varian tambahan */
-function ast3dLoadGlb(){
-  var run=function(){
-    try{
-      var T=THREE,ld=new T.GLTFLoader();
-      AST3D_CFG.glb.forEach(function(url){
-        ld.load(url,function(gl){
-          try{
-            var m=null;gl.scene.traverse(function(o){if(!m&&o.isMesh)m=o;});
-            if(!m)return;
-            m.updateMatrixWorld(true);
-            var geo=m.geometry.clone();geo.applyMatrix4(m.matrixWorld);
-            geo.computeBoundingSphere();
-            var bs=geo.boundingSphere;
-            geo.translate(-bs.center.x,-bs.center.y,-bs.center.z);
-            geo.scale(.74/bs.radius,.74/bs.radius,.74/bs.radius);
-            if(!geo.attributes.normal)geo.computeVertexNormals();
-            ast3dAddVariant(geo);
-          }catch(e){try{console.warn('[ast3d] glb dilewati',url,e&&e.message);}catch(e2){}}
-        },undefined,function(){try{console.warn('[ast3d] glb gagal dimuat',url);}catch(e){}});
-      });
-    }catch(e){try{console.warn('[ast3d] GLTFLoader error',e&&e.message);}catch(e2){}}
-  };
-  if(typeof THREE!=='undefined'&&THREE.GLTFLoader)run();
-  else ast3dScript(AST3D_CFG.gltfLib,run,function(m){try{console.warn('[ast3d]',m);}catch(e){}});
 }
 
 /* pilih varian: tier menurut ukuran batu (_sz), lalu bentuk menurut sprite; tier kosong -> turun ke tier berikutnya yang ada */
@@ -328,9 +321,9 @@ function ast3dDraw(now,half){
       v.mesh.visible=v.n>0;
       if(!v.n)continue;
       v.geo.instanceCount=v.n;
-      v.A.updateRange.offset=0;v.A.updateRange.count=v.n*4;v.A.needsUpdate=true;
-      v.B.updateRange.offset=0;v.B.updateRange.count=v.n*4;v.B.needsUpdate=true;
-      v.Z.updateRange.offset=0;v.Z.updateRange.count=v.n;v.Z.needsUpdate=true;
+      v.A.clearUpdateRanges();v.A.addUpdateRange(0,v.n*4);v.A.needsUpdate=true;   /* r159+: updateRange{offset,count} diganti addUpdateRange(start,count) */
+      v.B.clearUpdateRanges();v.B.addUpdateRange(0,v.n*4);v.B.needsUpdate=true;
+      v.Z.clearUpdateRanges();v.Z.addUpdateRange(0,v.n);v.Z.needsUpdate=true;
     }
     AST3D.r.render(AST3D.sc,AST3D.cam);
     var cvA=AST3D.r.domElement,kx=cvA.width/W,ky=cvA.height/H,

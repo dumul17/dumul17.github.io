@@ -15,7 +15,7 @@
    Matikan: ?drone3d=0 di URL atau localStorage dumul_drone3d=0. Ukuran di layar: DR3D_CFG.size (px, sebelum skala sc dari TXFX). */
 var DR3D_CFG={
   on:true,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   size:20,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini. Kelipatan 5 supaya kena snap slider panel tuning (dulu 28) */
   half:50,        /* setengah lebar kamera ortho (satuan model) */
   resMin:128,resMax:196,
@@ -43,19 +43,7 @@ function dr3dLoad(){
   if(!DR3D_CFG.on){DR3D.state=3;DR3D.err='off';return;}
   DR3D.state=1;
   var go=function(){try{dr3dBuild();}catch(e){dr3dFail(e&&e.message||e);}};
-  if(typeof THREE!=='undefined'&&THREE.REVISION){go();return;}
-  /* three.min.js bisa lagi dimuat 12-ast3d.js / 13-scope3d.js: jangan dobel, cukup tunggu sampai THREE ada */
-  var src=DR3D_CFG.lib,has=false,ss=document.getElementsByTagName('script'),i;
-  for(i=0;i<ss.length;i++){if((ss[i].getAttribute('src')||'')===src){has=true;break;}}
-  if(!has){
-    var s=document.createElement('script');
-    s.src=src;s.async=true;s.onerror=function(){dr3dFail('gagal muat '+src);};
-    document.head.appendChild(s);
-  }
-  var tries=0,iv=setInterval(function(){
-    if(typeof THREE!=='undefined'&&THREE.REVISION){clearInterval(iv);go();}
-    else if(++tries>80){clearInterval(iv);dr3dFail('timeout menunggu three.js');}
-  },150);
+  threeLoad(go,function(m){dr3dFail(m);});   /* pemuat bersama di 12-ast3d.js (import() dinamis, satu promise utk semua modul) */
 }
 
 /* tekstur badan: baja berpanel (garis bujur/lintang) + baret + sedikit karat oranye, seperti badan teleskop */
@@ -69,7 +57,7 @@ function dr3dBodyTex(){
   for(i=1;i<8;i++){x.fillStyle='rgba(10,14,18,.55)';x.fillRect(0,i*16-1,256,2);x.fillStyle='rgba(190,205,215,.14)';x.fillRect(0,i*16+1,256,1);}
   for(i=0;i<34;i++){x.strokeStyle='rgba(205,215,225,'+(.06+rnd()*.12).toFixed(2)+')';x.lineWidth=1;x.beginPath();var sx=rnd()*256,sy=rnd()*128;x.moveTo(sx,sy);x.lineTo(sx+rnd()*18-9,sy+rnd()*8-4);x.stroke();}
   for(i=0;i<16;i++){x.fillStyle='rgba('+(150+(rnd()*50|0))+','+(70+(rnd()*40|0))+',30,'+(.2+rnd()*.3).toFixed(2)+')';x.fillRect(rnd()*256,rnd()*128,3+rnd()*9,2+rnd()*6);}
-  var t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=2;return t;
+  var t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=2;return t;
 }
 
 
@@ -121,7 +109,7 @@ function dr3dBuild(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI,DS=T.DoubleSide;
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
-  r.outputEncoding=T.sRGBEncoding;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
+  r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();dr3dFail('webglcontextlost');},false);
   DR3D.r=r;
   var sc=new T.Scene(),R=DR3D_CFG.half,cam=new T.OrthographicCamera(-R,R,R,-R,-200,200);
@@ -273,10 +261,10 @@ function dr3dBuild(){
     DR3D.stat={meshSebelum:c0,meshSesudah:c1};
   }catch(eM){try{console.warn('[drone3d] gabung mesh dilewati:',eM&&eM.message||eM);}catch(e){}}
   /* cahaya */
-  o.key=new T.DirectionalLight(0xffc88c,1.4);o.key.position.set(0,45,60);sc.add(o.key);
-  o.rim=new T.DirectionalLight(0xff4fd8,1.1);o.rim.position.set(-30,40,-55);sc.add(o.rim);
-  o.hemi=new T.HemisphereLight(0x7a5cd8,0x0a0614,.45);sc.add(o.hemi);
-  o.fill=new T.DirectionalLight(0x40e8ff,.55);o.fill.position.set(-40,-30,60);sc.add(o.fill);   /* fill cyan seperti teleskop */
+  o.key=new T.DirectionalLight(0xffc88c,1.4*Math.PI);o.key.position.set(0,45,60);sc.add(o.key);
+  o.rim=new T.DirectionalLight(0xff4fd8,1.1*Math.PI);o.rim.position.set(-30,40,-55);sc.add(o.rim);
+  o.hemi=new T.HemisphereLight(0x7a5cd8,0x0a0614,.45*Math.PI);sc.add(o.hemi);
+  o.fill=new T.DirectionalLight(0x40e8ff,.55*Math.PI);o.fill.position.set(-40,-30,60);sc.add(o.fill);   /* fill cyan seperti teleskop */
   /* pra-ukur kanvas ke resolusi yang akan dipakai drone pertama (skala sama dgn 08-tx-drone.js: W<420 ? 1 : 1.15): setSize pertama = realokasi framebuffer MSAA, terukur ~detik di headless -> hitch di drone pertama */
   try{
     var sc0=(typeof W!=='undefined'&&W<420)?1:1.15,res0=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*sc0*Math.min(2,DPR||1)*1.2/32)*32));
@@ -337,9 +325,9 @@ function dr3dUpdate(now,x,y,col){
   /* kunci hangat dari arah Gargantua */
   try{
     var bp=camBH(),dx=bp[0]-x,dy=bp[1]-y,d=Math.hypot(dx,dy)||1,fall=Math.max(.3,Math.min(1.25,1.25-d/(Math.max(W,H)*.9)));
-    o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*fall*DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;
+    o.key.position.set(dx/d*60,45,dy/d*60);o.key.intensity=1.4*Math.PI*fall*DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;
   }catch(eL){}
-  var lk=DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;o.rim.intensity=1.1*lk;o.hemi.intensity=.45*lk;o.fill.intensity=.55*lk;
+  var lk=DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;o.rim.intensity=1.1*Math.PI*lk;o.hemi.intensity=.45*Math.PI*lk;o.fill.intensity=.55*Math.PI*lk;
   /* render GPU dibatasi (minDt); hasil disalin ke kanvas 2D kecil supaya frame yang dilewati tinggal drawImage (isi buffer WebGL tidak dijamin utuh antar frame) */
   if(!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
     r.render(sc,DR3D.cam);

@@ -15,7 +15,7 @@ var PL3D_CFG={
   /* DEFAULT angka di bawah = hasil COPY TUNE 2026-10-29 (komentar angka lama bisa kadaluarsa) */
   on:true,
   force2d:false,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.min.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   /* GEOMETRI PER SEKTOR: hL/hR (garis horizon, x tinggi layar dari atas, di tepi kiri/kanan), rot (px/dtk, + = geser ke kanan, - = ke kiri) dan seed
      (pasangan integer, geser pola noise) ada di ov (overview) dan di SECTORS[].planet (sky-data.js). Landscape (PW>PH): hLLand/hRLand kalau diisi,
      kalau tidak diturunkan dari hL/hR (h+(1-h)*.4). Nilai hidup = blend ov + sektor menurut bobot SKYT (PL3D_CFG.live), sama seperti palette. */
@@ -255,19 +255,7 @@ function pl3dLoad(){
   if(!PL3D_CFG.on||PL3D_CFG.force2d||(typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce)){PL3D.state=3;PL3D.err=PL3D_CFG.on?(PL3D_CFG.force2d?'2d':'potato/reduce'):'off';return;}
   PL3D.state=1;
   var go=function(){try{pl3dBuild();}catch(e){pl3dFail(e&&e.message||e);}};
-  if(typeof THREE!=='undefined'&&THREE.REVISION){go();return;}
-  /* three.min.js bisa lagi dimuat 12-ast3d.js dkk: jangan dobel, cukup tunggu sampai THREE ada */
-  var src=PL3D_CFG.lib,has=false,ss=document.getElementsByTagName('script'),i;
-  for(i=0;i<ss.length;i++){if((ss[i].getAttribute('src')||'')===src){has=true;break;}}
-  if(!has){
-    var s=document.createElement('script');
-    s.src=src;s.async=true;s.onerror=function(){pl3dFail('gagal muat '+src);};
-    document.head.appendChild(s);
-  }
-  var tries=0,iv=setInterval(function(){
-    if(typeof THREE!=='undefined'&&THREE.REVISION){clearInterval(iv);go();}
-    else if(++tries>80){clearInterval(iv);pl3dFail('timeout menunggu three.js');}
-  },150);
+  threeLoad(go,function(m){pl3dFail(m);});   /* pemuat bersama di 12-ast3d.js (import() dinamis, satu promise utk semua modul) */
 }
 
 var PL3D_VS=[
@@ -714,11 +702,11 @@ function pl3dBuild(){
     uT:{value:0},uCDrift:{value:PL3D_CFG.cloudDrift},uCOff:{value:0},uWg:{value:0},uCSkip:{value:PL3D_CFG.cloudSkip},uGSkip:{value:PL3D_CFG.groundSkip},uShd:{value:PL3D_CFG.cloudShd},uRimLit:{value:PL3D_CFG.rimLit},uRimHalo:{value:PL3D_CFG.rimHalo},uCityA:{value:PL3D_CFG.cityA},uCityD:{value:PL3D_CFG.cityD},uCityTw:{value:PL3D_CFG.cityTw},uCrat:{value:PL3D_CFG.craterA},uCany:{value:PL3D_CFG.canyonA},uCratS:{value:PL3D_CFG.craterS},uCanyS:{value:PL3D_CFG.canyonS},uBio:{value:PL3D_CFG.bioA},uBioCol:{value:PL3D_CFG.bioCol},uBioSea:{value:PL3D_CFG.bioSea},uBioMtn:{value:PL3D_CFG.bioMtn},uBioFor:{value:PL3D_CFG.bioFor},uBioUrb:{value:PL3D_CFG.bioUrb},uEarth:{value:0},uCloudLit:{value:PL3D_CFG.cloudLit},uCloudDet:{value:PL3D_CFG.cloudDet},uCityGlow:{value:PL3D_CFG.cityGlow},uUrbS:{value:1e5},uUrbP:{value:PL3D_CFG.urbPatch},uUrbMin:{value:PL3D_CFG.urbMin},uUrbMax:{value:PL3D_CFG.urbMax},uBolt:{value:new T.Vector4(0,0,1,0)},uBoltAsp:{value:.4}
   };
   PL3D.mat=new T.ShaderMaterial({uniforms:PL3D.uni,vertexShader:PL3D_VS,fragmentShader:PL3D_FS,transparent:false,depthTest:false,depthWrite:false,blending:T.NoBlending});
-  var mesh=new T.Mesh(new T.PlaneBufferGeometry(2,2),PL3D.mat);
+  var mesh=new T.Mesh(new T.PlaneGeometry(2,2),PL3D.mat);
   mesh.frustumCulled=false;mesh.renderOrder=-10;PL3D.sc.add(mesh);
   pl3dResize();
   /* kompilasi shader sekarang (saat idle/boot), lalu cek hasilnya: shader error di three TIDAK melempar, jadi diperiksa lewat diagnostics program */
-  var warm=function(){
+  var warmSync=function(){
     if(PL3D.state!==1)return;
     try{
       pl3dUniforms(performance.now());
@@ -729,6 +717,15 @@ function pl3dBuild(){
       if(r.getContext&&r.getContext().isContextLost&&r.getContext().isContextLost()){pl3dFail('context lost');return;}
       PL3D.state=2;PL3D.dirty=true;PL3D.warm=true;
     }catch(e){pl3dFail(e&&e.message||e);}
+  };
+  /* r158+: kompilasi shader planet (fragment besar) dulu lewat compileAsync (paralel, main thread tidak tertahan), baru warmSync (compile murah + render pertama + cek diagnostics).
+     Batas 4 dtk / tanpa compileAsync -> langsung warmSync seperti sebelumnya. */
+  var warm=function(){
+    if(PL3D.state!==1)return;
+    if(!r.compileAsync){warmSync();return;}
+    var d=false,go=function(){if(d)return;d=true;warmSync();};
+    setTimeout(go,4000);
+    try{pl3dUniforms(performance.now());r.compileAsync(PL3D.sc,PL3D.cam).then(go,go);}catch(e){go();}
   };
   if(typeof requestIdleCallback==='function')requestIdleCallback(warm,{timeout:2500});else setTimeout(warm,400);
 }
