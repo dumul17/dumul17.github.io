@@ -319,7 +319,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=143"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=181"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=126"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=141"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=142"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -345,7 +345,7 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=17"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=18"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=12"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=12"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=28"></script>
@@ -408,7 +408,8 @@ if ('serviceWorker' in navigator) {
       }).catch(function () {});
     }
     window.addEventListener('load', function () {
-      if (navigator.serviceWorker.controller || window.__obsEntered) { reg(); return; }
+      /* v142: kunjungan terkontrol pun menunggu (cek update + install SW baru sesudah tiap deploy ikut fetch ±35 URL SHELL selagi boot). Fallback 25 dtk tetap. */
+      if (window.__obsEntered) { reg(); return; }
       window.addEventListener('obs-entered', function () { setTimeout(reg, 1500); }, { once: true });
       setTimeout(reg, 25000);
     });
