@@ -199,6 +199,12 @@ var DUMUL_CHARS=(function(){
   var WARM_CONC=4,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
   try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(8,+wcm[1]));}catch(eWc){}
   window.__warmConc=WARM_CONC;
+  /* v151: SFX warm TIDAK paralel dengan build 3D. Telemetri v149/v150 (8 run, itel): slot SFX yang mulai sebelum kapsul rata-rata ±7 dtk, yang mulai sesudah kapsul ±4 dtk
+     (main thread jenuh ±12 dtk long task selama build 3D -> loadedmetadata + warmPump ngantri). Sekarang antrean SFX baru jalan begitu SEMUA modul 3D settle + THREE_WARM kosong.
+     BGM (2 file kecil) tetap jalan dari awal. ?sfxpar=1 = perilaku lama (three2/allmods/bgm) untuk pembanding A/B. */
+  var SFX_PAR=false;
+  try{SFX_PAR=/[?&]sfxpar=1\b/.test(location.search);}catch(eSp){}
+  window.__sfxPar=SFX_PAR;
   function warmPump(){
     var gap=warmHold-performance.now();
     if(gap>0){setTimeout(warmPump,gap+20);return;}
@@ -299,6 +305,11 @@ var DUMUL_CHARS=(function(){
   /* Trigger opsi B (plan): THREE ada + >=2 modul settle, ATAU fallback: semua modul settle (three gagal/nonaktif) atau BGM sudah siap (jaringan nganggur). Idempotent via warmed. */
   function warmRestEarly(th,au){
     if(warmed)return;
+    if(!SFX_PAR){
+      /* v151: satu pemicu — semua modul settle + antrean shader warm kosong (th.warmOk). Cadangan kalau 3D macet: finish()/enterObservatory() tetap memanggil warmRest(). */
+      if(th&&th.mods>=th.total&&th.warmOk){warmTrig='after3d';warmRest();}
+      return;
+    }
     var three=(typeof THREE!=='undefined'&&THREE.REVISION);
     if(three&&th&&th.mods>=2){warmTrig='three2';warmRest();return;}
     if(th&&th.mods>=th.total){warmTrig='allmods';warmRest();return;}
@@ -591,7 +602,7 @@ var DUMUL_CHARS=(function(){
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
-    if(!sx.ok&&sx.total>0)wc+=crp('s'+sx.n,true,WT_SFX/sx.total,WT_SFX/sx.total,elapsed);
+    if(!sx.ok&&sx.total>0)wc+=crp('s'+sx.n,warmed,WT_SFX/sx.total,WT_SFX/sx.total,elapsed);   /* v151: rayapan hanya kalau antrean SFX sudah mulai */
     var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
