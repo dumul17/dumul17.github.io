@@ -203,9 +203,9 @@ var DUMUL_CHARS=(function(){
   window.__warmConc=WARM_CONC;
   /* v151: SFX warm TIDAK paralel dengan build 3D. Telemetri v149/v150 (8 run, itel): slot SFX yang mulai sebelum kapsul rata-rata ±7 dtk, yang mulai sesudah kapsul ±4 dtk
      (main thread jenuh ±12 dtk long task selama build 3D -> loadedmetadata + warmPump ngantri). Sekarang antrean SFX baru jalan begitu SEMUA modul 3D settle + THREE_WARM kosong.
-     BGM (2 file kecil) tetap jalan dari awal. ?sfxpar=1 = perilaku lama (three2/allmods/bgm) untuk pembanding A/B. */
-  var SFX_PAR=false;
-  try{SFX_PAR=/[?&]sfxpar=1\b/.test(location.search);}catch(eSp){}
+     BGM (2 file kecil) tetap jalan dari awal. v154: dikembalikan paralel by default (permintaan user); mode sequential ini tetap ada lewat ?sfxpar=0. */
+  var SFX_PAR=true;   /* v154: default KEMBALI paralel (pemicu three2/allmods/bgm seperti v150); ?sfxpar=0 = sequential v151 (SFX baru mulai sesudah 3D selesai) */
+  try{if(/[?&]sfxpar=0\b/.test(location.search))SFX_PAR=false;}catch(eSp){}
   window.__sfxPar=SFX_PAR;
   function warmPump(){
     var gap=warmHold-performance.now();
