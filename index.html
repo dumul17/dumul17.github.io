@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=85">
+<link rel="stylesheet" href="index.css?v=86">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
@@ -319,7 +319,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=143"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=181"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=126"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=137"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=138"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -555,7 +555,7 @@ if ('serviceWorker' in navigator) {
     if (styled) return; styled = true;
     var s2 = document.createElement('style');
     s2.textContent = [
-      '#ofl-card{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:45;width:min(92vw,340px);box-sizing:border-box;padding:12px 14px;border:1px solid rgba(110,229,255,.30);border-radius:5px;background:rgba(2,8,13,.9);box-shadow:0 0 22px rgba(110,229,255,.12),inset 0 0 18px rgba(110,229,255,.04);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#cfeffa;font:12px/1.55 "Courier New",monospace;opacity:0;pointer-events:none;transform:translate(-50%,12px);transition:opacity .35s ease,transform .35s ease}',
+      '#ofl-card{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:45;width:min(92vw,340px);box-sizing:border-box;padding:12px 14px;border:1px solid rgba(110,229,255,.30);border-radius:5px;background:rgba(2,8,13,.95);box-shadow:0 0 22px rgba(110,229,255,.12),inset 0 0 18px rgba(110,229,255,.04);color:#cfeffa;font:12px/1.55 "Courier New",monospace;opacity:0;pointer-events:none;transform:translate(-50%,12px);transition:opacity .35s ease,transform .35s ease}',
       '#ofl-card.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}',
       'body.sw #ofl-card{opacity:0!important;pointer-events:none!important}',
       '#ofl-card .ofl-t{color:#6ee5ff;font-weight:700;letter-spacing:.12em;font-size:12px;text-shadow:0 0 8px rgba(110,229,255,.55);padding-right:22px}',

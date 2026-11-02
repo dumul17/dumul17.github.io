@@ -141,7 +141,7 @@ body.sw :is(#title,#header .sub,footer nav a,footer .quote,.portal,.cap,#music-t
 
 /* ---------- v4 interaction layer ---------- | v25 mobile canvas compatibility */
 #header{visibility:hidden;pointer-events:none;opacity:0}
-#owl-source{position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;width:34px;height:34px;display:grid;place-items:center;color:rgba(184,198,214,.46);text-decoration:none;border:1px solid rgba(110,229,255,.12);border-radius:50%;background:rgba(6,11,17,.32);backdrop-filter:blur(4px);cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:color .2s,border-color .2s,transform .2s,box-shadow .2s}
+#owl-source{position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top,0px));z-index:6;width:34px;height:34px;display:grid;place-items:center;color:rgba(184,198,214,.46);text-decoration:none;border:1px solid rgba(110,229,255,.12);border-radius:50%;background:rgba(6,11,17,.5);cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:color .2s,border-color .2s,transform .2s,box-shadow .2s}
 #owl-source:hover,#owl-source:focus-visible,#owl-source[aria-expanded="true"]{color:#6ee5ff;border-color:rgba(110,229,255,.55);box-shadow:0 0 16px rgba(110,229,255,.16);transform:translateY(-1px)}
 #owl-source svg{width:19px;height:19px}
 /* Kilau sesekali di latar logo owl: cuma transform+opacity (compositor), di-trigger JS acak jarang-jarang, bukan loop terus-menerus */
