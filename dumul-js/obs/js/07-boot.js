@@ -453,15 +453,32 @@ var DUMUL_CHARS=(function(){
   }
   var pLast=0,postT=0;
   /* Satu sumber kebenaran untuk bar + panel (dipakai tick() sebelum capsule dan startPost() sesudahnya).
-     Progres jujur: bobot biaya unit selesai / total bobot (v128) + audio (v131). Tanpa komponen waktu, tanpa clamp +5%.
+     Progres jujur: bobot biaya unit selesai / total bobot (v128) + audio (v131) + rayapan terbatas di bawah bobot unit yang sedang jalan (v140, lihat crp()). Tanpa clamp +5%.
      Floor + cap 99: 100% hanya ditulis paintBar() saat SEMUA unit selesai. Monoton (tidak turun walau gambar lazy mulai di-fetch dan 'ready' berbalik false). */
+  /* v140: RAYAPAN per unit yang sedang jalan (supaya bar tidak diam lalu loncat per unit). Gerak halus, tapi TETAP jujur terhadap bobot:
+     unit yang belum selesai hanya boleh menyumbang W x CREEP_CAP x (1 - e^(-umur/EST)), kurva asimtotik di bawah CREEP_CAP (0,9) -> TIDAK PERNAH mencapai bobot penuh,
+     jadi tidak mungkin mengklaim unit selesai; begitu selesai, sumbangannya diganti bobot penuh (selalu lebih besar -> total tak pernah turun). Gate capsule / status / 100%
+     tetap dari keadaan nyata saja (wDone), rayapan cuma menambah angka bar. Waktu mulai tiap unit dikunci SEKALI saat pertama terlihat jalan (monoton). EST = WT_* (bench itel):
+     di HP kencang rayapan pelan lalu menyusul; di HP lemot rayapan mentok ±90% bobot unit. Biaya: beberapa exp() per frame, tanpa timer/rAF baru. */
+  var CREEP_CAP=.9,crpAt={};
+  function crp(key,running,w,est,elapsed){
+    if(!running||!(w>0)||!(est>0))return 0;
+    if(crpAt[key]===undefined)crpAt[key]=elapsed;
+    var age=elapsed-crpAt[key];
+    return age>0?w*CREEP_CAP*(1-Math.exp(-age/est)):0;
+  }
   function calc(elapsed){
     var ready=pageReady(),th=threeStatus(elapsed),au=audioStatus();
     var vis=ready&&th.mods>=th.total&&th.warmOk;
     var complete=vis&&(au.ok||elapsed>=AUDIO_CAP);   /* gate capsule */
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
-    var p=Math.min(99,Math.floor(wDone/WT_SUM*100));
+    var wc=0;
+    wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);   /* halaman */
+    for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);   /* modul 3D: hanya yang state 1 (memuat) */
+    if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,WT_WARM/th.exp,WT_WARM/th.exp,elapsed);   /* warm-up: di dalam item antrean yang sedang diproses (lebar 1 item) */
+    if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);   /* audio: di dalam file berikutnya */
+    var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
     return {ready:ready,th:th,au:au,complete:complete,all:vis&&au.ok,p:p};
