@@ -593,11 +593,42 @@ var DUMUL_CHARS=(function(){
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
      Animator rAF sendiri (bukan bergantung pada tick/startPost) supaya sapuan ke 100% tetap selesai walau interval startPost sudah berhenti. Berhenti kalau boot screen hilang. */
   var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
+  /* v149: glitch sesekali di #boot-bar + teks 0% selama idle. CSS class only; mati begitu persen > 0 / calm / potato. */
+  var barEl=document.getElementById('boot-bar'),barIdleT=0,barIdleOn=false,barIdleGen=0;
+  function barIdleStop(){
+    if(!barIdleOn)return;barIdleOn=false;
+    clearTimeout(barIdleT);barIdleGen++;
+    if(barEl)barEl.classList.remove('idle-gl');
+    if(pct)pct.classList.remove('idle-gl');
+  }
+  function barIdlePulse(){
+    if(!barIdleOn||chCalm||!bs||bs.classList.contains('off')||pV>0){barIdleStop();return;}
+    var gen=++barIdleGen;
+    if(barEl)barEl.classList.remove('idle-gl');
+    if(pct)pct.classList.remove('idle-gl');
+    requestAnimationFrame(function(){
+      if(gen!==barIdleGen)return;
+      if(barEl)barEl.classList.add('idle-gl');
+      if(pct)pct.classList.add('idle-gl');
+      setTimeout(function(){
+        if(gen!==barIdleGen)return;
+        if(barEl)barEl.classList.remove('idle-gl');
+        if(pct)pct.classList.remove('idle-gl');
+      },560);
+    });
+    barIdleT=setTimeout(barIdlePulse,1400+Math.random()*1200);
+  }
+  function barIdleStart(){
+    if(barIdleOn||chCalm||pV>0)return;
+    barIdleOn=true;
+    barIdleT=setTimeout(barIdlePulse,350+Math.random()*450);
+  }
   function barShow(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
     pV=v;fill.style.width=v+'%';pct.textContent=v+'%';
     chProg(v);
+    if(v>0)barIdleStop();
   }
   function barStep(now){
     pRaf=0;
@@ -610,6 +641,7 @@ var DUMUL_CHARS=(function(){
     var t=c.all?100:c.p;
     if(t>pTgt)pTgt=t;
     if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
+    if(pV<=0&&t<=0)barIdleStart();
   }
   function startPost(){
     if(postT)return;
