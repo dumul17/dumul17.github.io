@@ -107,6 +107,7 @@ function dr3dMerge(sc,root,skip){
 /* ---------- model ---------- */
 function* dr3dBuildG(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI,DS=T.DoubleSide;
+  try{window.__glLabel='DR3D';}catch(e){}
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
   r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;

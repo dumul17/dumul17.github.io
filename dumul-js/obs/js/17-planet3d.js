@@ -680,6 +680,7 @@ var PL3D_FS=[
 function pl3dBuild(){
   var T=THREE,tp0=performance.now(),tpa=0,tpb=0;   /* v39: waktu tahap (ms) -> window.__pl3dT (3 elemen: renderer+scene, noise+material+mesh, resize+jadwal warm); TANPA irisan, hanya ukur */
   var cv=document.createElement('canvas');
+  try{window.__glLabel='PL3D';}catch(e){}
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:false,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);r.setPixelRatio(1);
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();pl3dFail('webglcontextlost');},false);

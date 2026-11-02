@@ -173,6 +173,7 @@ function scp3dEnv(r){
 /* ---------- model pesawat ---------- */
 function* scp3dBuildG(){
   var T=THREE,cv=document.createElement('canvas');
+  try{window.__glLabel='SCP3D';}catch(e){}
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
   r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;

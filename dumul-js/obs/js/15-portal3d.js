@@ -138,6 +138,7 @@ function pt3dSeg(T,a0,a1,r0,r1){
 }
 function* pt3dBuildG(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI;
+  try{window.__glLabel='PT3D';}catch(e){}
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();pt3dFail('webglcontextlost');},false);

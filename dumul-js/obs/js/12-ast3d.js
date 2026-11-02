@@ -206,6 +206,7 @@ function ast3dAddVariant(geo,tier){
 function ast3dBuild(){
   var T=THREE;
   var cv=document.createElement('canvas');
+  try{window.__glLabel='AST3D';}catch(e){}
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
   cv.addEventListener('webglcontextlost',function(e){e.preventDefault();ast3dFail('webglcontextlost');},false);
