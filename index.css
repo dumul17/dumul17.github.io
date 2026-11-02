@@ -309,6 +309,15 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 @keyframes bootCur{50%{opacity:0}}
 #boot-bar{height:5px;margin-top:9px;border:1px solid rgba(110,229,255,.30);background:rgba(110,229,255,.035);overflow:hidden}
 #boot-fill{height:100%;width:0;background:linear-gradient(90deg,rgba(110,229,255,.28),#6ee5ff,rgba(110,229,255,.72));box-shadow:0 0 13px rgba(110,229,255,.45);transition:width .16s linear}
+/* Bar "hidup" saat main thread diblok (build 3D 0,7-2,2 dtk): sheen + denyut ujung memakai transform/opacity -> jalan di compositor, tetap bergerak walau JS/layout macet.
+   Persen TIDAK berubah (tetap jujur); ini hanya penanda "masih bekerja". Berhenti saat boot screen hilang dan di prefers-reduced-motion. */
+#boot-fill{position:relative;overflow:hidden}
+#boot-fill::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,rgba(200,248,255,0),rgba(200,248,255,.6),rgba(200,248,255,0));transform:translateX(-100%);will-change:transform;animation:bootSheen 1.25s linear infinite;pointer-events:none}
+#boot-fill::before{content:"";position:absolute;top:0;bottom:0;right:0;width:12px;background:radial-gradient(closest-side,rgba(220,252,255,.95),rgba(110,229,255,0));opacity:.35;will-change:opacity;animation:bootEdge .7s ease-in-out infinite alternate;pointer-events:none}
+@keyframes bootSheen{to{transform:translateX(250%)}}
+@keyframes bootEdge{to{opacity:1}}
+#boot-screen.off #boot-fill::after,#boot-screen.off #boot-fill::before{animation:none}
+@media (prefers-reduced-motion:reduce){#boot-fill::after,#boot-fill::before{animation:none}#boot-fill::before{opacity:.6}}
 #boot-pct{margin-top:5px;text-align:right;font-size:9px;letter-spacing:.16em;color:rgba(184,224,238,.75);text-shadow:0 0 4px #02070b}
 #boot-signal{margin-top:10px;font-size:10px;letter-spacing:.13em;color:#eafcff;opacity:0;transform:translateY(4px);transition:opacity .35s,transform .35s;text-shadow:0 0 8px rgba(110,229,255,.65)}
 #boot-signal.on{opacity:1;transform:none}
