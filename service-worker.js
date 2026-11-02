@@ -6,7 +6,7 @@
    - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
                           (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v311'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v312'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -43,15 +43,16 @@ const SHELL = [
   'dumul-js/obs/js/09-wormhole.js?v=44',
   'dumul-js/obs/js/10-ui-sound.js?v=8',
   'dumul-js/obs/js/11-live-count.js?v=5',
-  'dumul-js/obs/js/12-ast3d.js?v=13',
-  'dumul-js/obs/js/13-scope3d.js?v=11',
-  'dumul-js/obs/js/14-drone3d.js?v=11',
-  'dumul-js/obs/js/15-portal3d.js?v=27',
+  'dumul-js/obs/js/12-ast3d.js?v=14',
+  'dumul-js/obs/js/13-scope3d.js?v=12',
+  'dumul-js/obs/js/14-drone3d.js?v=12',
+  'dumul-js/obs/js/15-portal3d.js?v=28',
   'dumul-js/obs/js/16-sector-menu.js?v=6',
-  'dumul-js/obs/js/17-planet3d.js?v=36',
+  'dumul-js/obs/js/17-planet3d.js?v=37',
   'dumul-js/obs/js/18-tune3d.js?v=18',
-  /* Three.js dimuat lazy oleh 12-ast3d.js (AST3D_CFG.lib), 13-scope3d.js, 14-drone3d.js (lib yang sama): path + ?v= harus sama persis. GLTFLoader.js sengaja TIDAK di sini (hanya dipakai kalau AST3D_CFG.glb terisi; kalau nanti diisi, tambahkan juga). */
-  'dumul-js/obs/lib/three.min.js?v=1',
+  /* Three.js r186 (ES module) dimuat lazy lewat import() oleh threeLoad() di 12-ast3d.js (AST3D_CFG.lib), dipakai juga 13/14/15/17: path + ?v= harus sama persis dgn AST3D_CFG.lib dan dgn import di dalam three.module.r186.js (ke three.core.r186.js?v=1). Ganti versi three -> ganti NAMA file (r###) lalu ?v= tetap 1. */
+  'dumul-js/obs/lib/three.module.r186.js?v=1',
+  'dumul-js/obs/lib/three.core.r186.js?v=1',
   'dumul-js/obs/img/nebula.webp?v=1',
   'dumul-js/obs/img/milky-way.webp?v=3',
   'dumul.css?v=7',
