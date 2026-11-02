@@ -192,7 +192,7 @@ var DUMUL_CHARS=(function(){
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
   /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
-  var WARM_CONC=4,WARM_SLOT_MS=8000,warmed=false,warmQ=[],warmActive=0,warmHold=0;
+  var WARM_CONC=4,WARM_SLOT_MS=8000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
   try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(8,+wcm[1]));}catch(eWc){}
   window.__warmConc=WARM_CONC;
   function warmPump(){
@@ -234,25 +234,64 @@ var DUMUL_CHARS=(function(){
       a.preload='metadata';a.load();
     }catch(eL){rel('exc');}
   }
+  var warmTrig='',visAt=-1;   /* v147: warmTrig = three2|allmods|bgm|finish; visAt = elapsed saat vis pertama true */
+  function bootInfoSnap(extra){
+    try{
+      var x=extra||{};
+      window.__bootInfo={
+        warmAt:warmAt,warmTrig:warmTrig||null,visAt:visAt,
+        sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
+        bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
+        sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null
+      };
+    }catch(eBi){}
+  }
   function warmRest(){
     if(warmed)return;warmed=true;
+    if(!warmTrig)warmTrig='finish';   /* dipanggil dari finish tanpa early trigger */
+    warmAt=Math.round(performance.now()-t0);
     try{performance.mark('obs-warm');}catch(eM){}
     warmQ=warmQ.concat(stars);   /* v132: sisa antrean BGM (kalau ?wc=1) tetap di depan; AMB/MUSIC_COLLAP TIDAK di-load() ulang di sini (memutus request yang sedang jalan) */
     try{if(GARG)warmQ.push(GARG);}catch(e){}
     warmPump();
+    bootInfoSnap({});
   }
-  /* v132: audio di bar + gate = HANYA 2 BGM (constellation.opus = AMB, collapsars.opus = MUSIC_COLLAP); UI sound = synth Web Audio (10-ui-sound.js), tanpa file.
-     16 SFX stellar + GARG TIDAK ikut bar/gate: metadata-nya tetap dihangatkan di belakang setelah capsule tampil (warmRest), unduh offline lewat chip 'Simpan offline' di panel owl.
-     Satuan = elemen yang metadata-nya BENAR-BENAR ada (readyState>=1) atau gagal permanen (a.error), dibaca langsung dari elemen (bukan dari slot warm).
-     Warm BGM dimulai di awal boot (jaringan nganggur selama boot, lihat telemetri v126), cuma 2 request sehingga tidak berebut seperti 19 file.
-     Gate menunggu BGM paling lama AUDIO_CAP; lewat itu capsule tetap tampil dan bar tidak dipaksa 100% (lanjut naik lewat startPost). */
+  /* v145 Mode 2 strict: BGM (2) + SFX stellar (16) + GARG ikut bar + gate.
+     Kapsul hanya setelah vis + bgmOk + sfxOk (kerjaan nyata, tanpa minMs palsu).
+     warmRest (SFX+GARG) dimajukan ke gap (THREE ada + ≥2 modul settle), bukan nunggu kapsul.
+     AUDIO_CAP / SFX_CAP / cap3d = plafon darurat saja (media/modul macet), bukan jalur normal.
+     Satuan = readyState>=1 atau a.error (dari elemen). Warm BGM tetap dari awal boot. */
   var AUDIO_CAP=isRepeatVisit?6000:(IS_POTATO?8000:11000);
+  /* v146: SFX_CAP dihitung dari SAAT antrean SFX mulai (warmAt), bukan dari t0. Dari t0 (v145) plafon 22 dtk lebih pendek dari kapsul opsi B (+24-28 dtk) sehingga plafon
+     darurat jadi jalur normal. Wall SFX bench itel = ~16,9 dtk @conc4, jadi 22 dtk dari warmAt = margin ~5 dtk. warmRestEarly menjamin warmAt terisi sebelum gate. */
+  var SFX_CAP=isRepeatVisit?12000:(IS_POTATO?16000:22000);
   var audioEls=null;
   function audioList(){
     if(audioEls)return audioEls;
     var l=[];
     try{[AMB,MUSIC_COLLAP].forEach(function(a){if(a)l.push(a);});}catch(eA){}
     return (audioEls=l);
+  }
+  var sfxEls=null;
+  function sfxList(){
+    if(sfxEls)return sfxEls;
+    var l=stars.slice();
+    try{if(GARG)l.push(GARG);}catch(eG){}
+    return (sfxEls=l);
+  }
+  function sfxStatus(){
+    var l=sfxList(),n=0,i;
+    for(i=0;i<l.length;i++){try{if(l[i].readyState>=1||l[i].error)n++;}catch(eS){n++;}}
+    return {n:n,total:l.length,ok:l.length?n>=l.length:true};
+  }
+  /* Trigger opsi B (plan): THREE ada + >=2 modul settle, ATAU fallback: semua modul settle (three gagal/nonaktif) atau BGM sudah siap (jaringan nganggur). Idempotent via warmed. */
+  function warmRestEarly(th,au){
+    if(warmed)return;
+    var three=(typeof THREE!=='undefined'&&THREE.REVISION);
+    if(three&&th&&th.mods>=2){warmTrig='three2';warmRest();return;}
+    if(th&&th.mods>=th.total){warmTrig='allmods';warmRest();return;}
+    if(au&&au.ok){warmTrig='bgm';warmRest();}
   }
   /* v132/v133: simpan 2 BGM ke cache SW (sekali, berurutan) beberapa detik setelah Blue, saat BGM sudah main dan buffering awal aman. Tanpa menunggu aturan 50%.
      Dilewati kalau data saver / 2G / SW belum mengontrol halaman. SW melewati file yang sudah tersimpan. */
@@ -292,8 +331,8 @@ var DUMUL_CHARS=(function(){
   /* v128: bobot unit = BIAYA RELATIF pekerjaan (ms, dari bench itel A6610L: build 3D per modul + warm shader ±5,5 dtk), bukan jumlah unit.
      Tetap jujur: bar hanya naik saat pekerjaan nyata SELESAI, tanpa komponen waktu. Bedanya, unit yang makan 5 dtk (warm) kini mengisi ±48% bar,
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
-  var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000;   /* kalibrasi ulang (three r186 + antrean threeLoad, bench itel A6610L 4 run): build AST 0,7 / SCP 1,6 / DR 2,15 / PT 0,8 / PL 0,8 dtk, warm ±5 dtk */   /* v131: WT_AUDIO = porsi audio di bar (±27%): bar berhenti ±73% saat capsule tampil, sisanya naik saat audio benar-benar siap */
-  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_MODS.reduce(function(a,b){return a+b;},0);
+  var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=2800;   /* v145: WT_SFX kalibrasi plan (~16.9s wall SFX @conc4); bench ulang di itel */
+  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0);
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){
@@ -314,7 +353,7 @@ var DUMUL_CHARS=(function(){
   var R=[],doneQ=[],cur=-1,curDone=false,curAt=0,fadeEnd=0,nxt=-1,nxtDone=false,lastHtml='',stT=0;
   function rowHtml(i,done){
     if(i===-2)return '<span class="ok">\u2713 '+T('boot.allready')+'</span>';   /* baris penutup menetap */
-    var r=R[i],t=r.label+'  '+r.val;
+    var r=R[i],t=r.val?r.label+'  '+r.val:r.label;
     return done?'<span class="ok">\u2713 '+t+'</span>':'&gt; '+t;
   }
   function stApply(i,done){
@@ -340,36 +379,83 @@ var DUMUL_CHARS=(function(){
     else if(cur>=0&&!curDone&&!R[cur].q&&!(now-curAt>=700&&movedOn()))return;   /* masih jalan: tetap, kecuali baris lain baru bergerak (min 700 ms per baris) */
     else{
       /* pilih baris belum-selesai yang angkanya paling baru berubah (aktivitas terbaru), bukan urutan tetap */
-      for(j=0;j<R.length;j++){if(R[j]&&!R[j].q&&(best<0||R[j].at>R[best].at))best=j;}
+      for(j=0;j<R.length;j++){if(R[j]&&!R[j].q&&!R[j].hold&&(best<0||R[j].at>R[best].at))best=j;}
       want=best;
-      if(want<0){want=-2;wantDone=true;}   /* semua baris sudah selesai & ditampilkan -> baris penutup, tidak fade ke kosong */
+      if(want<0){
+        for(j=0;j<R.length;j++){if(R[j]&&R[j].hold)return;}   /* v146: masih ada baris tertahan (SFX belum mulai): jangan tutup dulu */
+        want=-2;wantDone=true;
+      }   /* semua baris sudah selesai & ditampilkan -> baris penutup, tidak fade ke kosong */
     }
     if(want===cur){stApply(want,wantDone);return;}   /* baris yang sama baru selesai: ganti di tempat, tanpa fade */
     if(cur<0){stApply(want,wantDone);return;}
     nxt=want;nxtDone=wantDone;
     statusEl.classList.add('out');fadeEnd=now+230;
   }
-  function paintPanel(ready,th,complete,au){
+  function paintPanel(ready,th,complete,au,sx){
     if(!statusEl)return;
-    var warmTxt=th.warmOk?T('boot.ready'):((!th.wDone&&!th.wTot)?T('boot.waiting'):(th.wDone+'/'+th.exp));
+    /* v145: satu kalimat karakter per baris (tanpa angka mentah di status atas). sx = sfxStatus. */
+    var modsOk=th.mods>=th.total,auOk=!!(au&&au.ok),sxOk=!!(sx&&sx.ok);
     var d=[
-      [T('boot.observer'),complete?T('boot.online'):T('boot.detected'),complete],
-      [T('boot.starmap'),ready?T('boot.locked'):T('boot.aligning'),ready],
-      [T('boot.mods'),th.mods+'/'+th.total,th.mods>=th.total],
-      [T('boot.warm'),warmTxt,th.warmOk],
-      [T('boot.audio')+' (BGM)',au?(au.ok?T('boot.ready'):(au.n+'/'+au.total)):T('boot.waiting'),!!(au&&au.ok)]
+      [ready?T('boot.observer.ok'):T('boot.observer.work'),'',ready],
+      [ready?T('boot.starmap.ok'):T('boot.starmap.work'),'',ready],
+      [modsOk?T('boot.mods.ok'):T('boot.mods.work'),'',modsOk],
+      [th.warmOk?T('boot.warm.ok'):T('boot.warm.work'),'',th.warmOk],
+      [auOk?T('boot.audio.ok'):T('boot.audio.work'),'',auOk],
+      [sxOk?T('boot.sfx.ok'):T('boot.sfx.work'),'',sxOk]
     ],i,r,now=performance.now();
     for(i=0;i<d.length;i++){
       r=R[i]||(R[i]={q:false,at:now,val:''});
       r.label=d[i][0];
       if(r.val!==d[i][1]){r.val=d[i][1];r.at=now;}
       r.ok=!!d[i][2];
-      if(r.ok&&!r.q){r.q=true;doneQ.push(i);}   /* antre sesuai urutan selesai */
+      r.hold=(i===5&&!warmed&&!r.ok);   /* v146: baris SFX belum boleh tampil sebelum antreannya benar-benar mulai */
+      if(r.ok&&!r.q){r.q=true;doneQ.push(i);}
     }
     stageStep();
   }
+  /* v143: LOG BOOT SATU BARIS (bahasa awam, tanpa angka ms), nempel di kiri persen (#boot-row).
+     Sumber = penanda tahap yang SUDAH ditulis tiap modul (window.__scp3dT / __dr3dT / __pt3dT / __pl3dT; panjang array = tahap selesai) + state modul. Tidak ada hook baru di modul 3D.
+     Yang tampil: tahap yang sedang dikerjakan ("> Drone · sayap"); kalau tidak ada, tahap terakhir yang selesai ("\u2713 Planet siap").
+     Tinggi baris = baris persen yang sudah ada, jadi panel tidak bergeser. Polling ikut interval 100 ms yang sudah ada; innerHTML hanya ditulis kalau isinya berubah. */
+  var logEl=document.getElementById('boot-log'),logLast='',logN={},logOut='';
+  var LOG_M=[   /* urutan = antrean threeLoad (AST, SCP, DR, PT, PL); [global, array tahap, kunci nama, kunci tahap]. Jumlah langkah = tahap bernama + 1 (langkah penutup = "siap") */
+    ['AST3D',null,'bl.rock',null],
+    ['SCP3D','__scp3dT','bl.scope',['canvas','light','paint','body','cockpit','engine','lamps']],
+    ['DR3D','__dr3dT','bl.drone',['canvas','light','paint','wings','engine','join','size']],
+    ['PT3D','__pt3dT','bl.portal',['canvas','circuit','plates','lamps','size']],
+    ['PL3D','__pl3dT','bl.planet',null]
+  ];
+  /* label tahap ke-n; null kalau n di luar daftar bernama (langkah penutup / modul tanpa tahap).
+     Dulu langkah penutup ikut membaca m[3][n] yang kosong -> kunci "bl.a.undefined" tampil di layar. */
+  function logStage(m,n){return m[3]&&n<m[3].length?T('bl.a.'+m[3][n]):null;}
+  function logPoll(){
+    if(!logEl)return;
+    var thr=(typeof THREE!=='undefined'&&THREE.REVISION),cur='',h='',i,m,o,nm,tot,n,k,st,sx;
+    if(thr&&!logN.thr){logN.thr=1;logLast=T('bl.engine')+' '+T('bl.ready');}
+    if(!thr)cur=T('bl.engine')+' \u00b7 '+T('bl.a.dl');
+    for(i=0;i<LOG_M.length;i++){
+      m=LOG_M[i];o=window[m[0]];
+      if(!o||o.state===3)continue;   /* belum ada / gagal (jatuh ke 2D): tidak ditampilkan */
+      nm=T(m[2]);tot=m[3]?m[3].length+1:1;n=logN[i]|0;
+      if(o.state===2)k=tot;
+      else if(m[3])k=window[m[1]]?window[m[1]].length:0;
+      else k=(m[1]&&window[m[1]]&&window[m[1]].length>=3)?1:0;
+      while(n<k&&n<tot){st=logStage(m,n);logLast=st?nm+' \u00b7 '+st:nm+' '+T('bl.ready');n++;}
+      logN[i]=n;
+      if(!cur&&thr&&n<tot)cur=nm+' \u00b7 '+(logStage(m,n)||T('bl.a.load'));
+    }
+    /* v145: setelah modul, bisikkan antrean SFX di log bawah (tanpa angka file) */
+    sx=sfxStatus();
+    if(!cur&&warmed&&sx.total&&!sx.ok)cur=T('bl.sfx')+' \u00b7 '+T('bl.a.sfx');
+    else if(sx.ok&&sx.total&&!logN.sfx){logN.sfx=1;logLast=T('bl.sfx')+' '+T('bl.ready');}
+    if(cur)h='<span class="pn">&gt; '+cur+'</span>';
+    else if(logLast)h='<span class="ok">\u2713 '+logLast+'</span>';
+    if(h!==logOut){logOut=h;logEl.innerHTML=h;}
+  }
+  logPoll();
   stT=setInterval(function(){
     if(bs.classList.contains('off')||!bs.parentNode){clearInterval(stT);stT=0;return;}
+    logPoll();
     stageStep();
   },100);
   function enterObservatory(){
@@ -396,8 +482,8 @@ var DUMUL_CHARS=(function(){
     window.__obsEntered=true;
     try{window.dispatchEvent(new Event('obs-entered'));}catch(eEv){}   /* PP-12: index.html mendaftarkan SW setelah ini */
     warmHold=performance.now()+1500;   /* tahan antrean audio selama frame pertama sektor */
-    warmRest();   /* no-op kalau sudah jalan sejak capsule tampil */
-    setTimeout(function(){try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(eW){}},2600);   /* pre-warm panel owl + music (06-interaction.js): buka pertama tidak hitch */
+    warmRest();   /* no-op kalau sudah jalan sejak gap/kapsul */
+    try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(eW){}   /* v145: fallback idempotent — biasanya sudah di finish() */
     setTimeout(function(){if(bs&&bs.parentNode)bs.remove();},850);
   }
   function finish(c){
@@ -407,17 +493,20 @@ var DUMUL_CHARS=(function(){
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
     /* Bar hanya 100% kalau SEMUA unit (termasuk audio, v131) benar-benar selesai. Kalau belum, bar tetap di angka asli; startPost() melanjutkannya sesudah capsule tampil. */
     paintBar(c);
+    /* v147: snapshot untuk 21-bench — warmAt/trig/visAt/sfxViaCap/bar saat kapsul */
+    bootInfoSnap({sfxViaCap:!!c.sfxCapHit,bgmViaCap:!!c.bgmCapHit,bar:typeof pV!=='undefined'?pV:c.p,sx:c.sx,vis:c.vis,complete:complete});
     sig.classList.add('on');
     chReadyOn();
     if(quoteEl)quoteEl.classList.add('on');
-    paintPanel(ready,th,complete,c.au);
+    paintPanel(ready,th,complete,c.au,c.sx);
     /* Capsule gate: wait for user choice. maxMs = timeout: tidak ada Red/Blue sampai habis -> masuk otomatis (tanpa haptic, jalur enterObservatory yang sama). */
     if(choicesEl){
       choicesEl.classList.add('on');
       choicesEl.setAttribute('aria-hidden','false');
     }
-    setTimeout(warmRest,400);   /* v127: mulai hangatkan audio sesudah capsule ter-paint */
-    startPost();   /* v131: bar + panel lanjut mengikuti audio sampai siap / boot screen hilang */
+    warmRest();   /* v145: no-op kalau sudah jalan di gap; fallback kalau modul macet / cap3d */
+    setTimeout(function(){try{if(typeof panelWarmOnce==='function')panelWarmOnce();}catch(ePw){}},500);   /* v145: warm panel owl+music saat kapsul */
+    startPost();   /* bar lanjut kalau plafon darurat kepakai */
     armCap();
   }
   function armCap(){   /* timeout capsule; di-arm ulang kalau pengunjung menyentuh karakter (aktif), supaya tap karakter tidak berbarengan dengan masuk otomatis */
@@ -474,20 +563,28 @@ var DUMUL_CHARS=(function(){
     return age>0?w*CREEP_CAP*(1-Math.exp(-age/est)):0;
   }
   function calc(elapsed){
-    var ready=pageReady(),th=threeStatus(elapsed),au=audioStatus();
+    var ready=pageReady(),th=threeStatus(elapsed),au=audioStatus(),sx=sfxStatus();
+    warmRestEarly(th,au);   /* v146: isi gap — SFX begitu ≥2 modul settle ATAU BGM siap / semua modul settle */
     var vis=ready&&th.mods>=th.total&&th.warmOk;
-    var complete=vis&&(au.ok||elapsed>=AUDIO_CAP);   /* gate capsule */
-    var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO,wi;
+    if(vis&&visAt<0)visAt=Math.round(elapsed);
+    /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap.
+       Plafon AUDIO_CAP (dari t0) / SFX_CAP (dari warmAt) hanya darurat (media macet) — happy path nunggu ok nyata. */
+    var bgmCapHit=!au.ok&&elapsed>=AUDIO_CAP;
+    var sfxCapHit=!sx.ok&&warmAt>=0&&elapsed-warmAt>=SFX_CAP;   /* v146/v147: plafon dari warmAt */
+    var bgmOk=au.ok||bgmCapHit,sfxOk=sx.ok||sfxCapHit;
+    var complete=vis&&bgmOk&&sfxOk;
+    var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
     var wc=0;
-    wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);   /* halaman */
-    for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);   /* modul 3D: hanya yang state 1 (memuat) */
-    if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);   /* warm-up: sisa item antrean yang sedang diproses (pecahan nyata th.part sudah dihitung di warmFrac, jadi rayapan cuma di sisanya) */
-    if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);   /* audio: di dalam file berikutnya */
+    wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);
+    for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);
+    if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
+    if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
+    if(!sx.ok&&sx.total>0)wc+=crp('s'+sx.n,true,WT_SFX/sx.total,WT_SFX/sx.total,elapsed);
     var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
-    return {ready:ready,th:th,au:au,complete:complete,all:vis&&au.ok,p:p};
+    return {ready:ready,th:th,au:au,sx:sx,vis:vis,complete:complete,all:vis&&au.ok&&sx.ok,p:p,sfxCapHit:sfxCapHit,bgmCapHit:bgmCapHit};
   }
   /* Haluskan angka: TARGET tetap jujur (calc/c.p, bobot unit selesai); yang ditampilkan MENGEJAR target secara eksponensial (BAR_TAU) dengan laju minimum (BAR_MIN %/dtk).
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
@@ -516,7 +613,7 @@ var DUMUL_CHARS=(function(){
     postT=setInterval(function(){
       if(bs.classList.contains('off')){clearInterval(postT);postT=0;return;}
       var c=calc(performance.now()-t0);
-      paintBar(c);paintPanel(c.ready,c.th,c.complete,c.au);
+      paintBar(c);paintPanel(c.ready,c.th,c.complete,c.au,c.sx);
       if(c.all){clearInterval(postT);postT=0;try{window.__bootAudioAll=Math.round(performance.now());}catch(eB){}}
     },250);
   }
@@ -524,12 +621,14 @@ var DUMUL_CHARS=(function(){
     var elapsed=performance.now()-t0,c=calc(elapsed);
     if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000))chSlowOn();   /* boot terasa lama: teleskop kalem, owl ngantuk */
     paintBar(c);
-    paintPanel(c.ready,c.th,false,c.au);
-    if(c.complete||elapsed>=cap3dNow(elapsed)){window.__bootFinish=c.complete?'gate':'cap3d';finish(c);}
+    paintPanel(c.ready,c.th,false,c.au,c.sx);
+    /* v145 strict: cap3d hanya paksa kalau 3D/page belum vis. Kalau vis sudah true, nunggu complete (BGM+SFX nyata / plafon audio). */
+    if(c.complete){window.__bootFinish='gate';finish(c);}
+    else if(elapsed>=cap3dNow(elapsed)&&!c.vis){window.__bootFinish='cap3d';finish(c);}
     else requestAnimationFrame(tick);
   }
   try{warmQ=[AMB,MUSIC_COLLAP].filter(Boolean);warmPump();}catch(eW){}   /* v132: warm 2 BGM sejak awal boot */
-  paintPanel(false,threeStatus(0),false,null);
+  paintPanel(false,threeStatus(0),false,null,null);
   requestAnimationFrame(tick);
 })();
 

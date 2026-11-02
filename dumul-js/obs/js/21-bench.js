@@ -122,6 +122,12 @@
     if (R.sfxAtBootStart) x.push('SFX @bootStart meta/play: ' + R.sfxAtBootStart.metadata + '/' + R.sfxAtBootStart.playable);
     if (R.sfxAtCapsule) x.push('SFX @capsule meta/play: ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.playable + ' dari ' + R.sfxAtCapsule.total);
     if (R.finishGuess) x.push('capsule krn: ' + R.finishGuess);
+    if (R.bootInfo) {
+      var bi = R.bootInfo;
+      x.push('warmAt/trig/visAt: ' + bi.warmAt + ' / ' + (bi.warmTrig || '-') + ' / ' + bi.visAt +
+        (bi.sfxViaCap ? '  sfxViaCap' : '') + (bi.bgmViaCap ? '  bgmViaCap' : '') +
+        (bi.bar != null ? '  bar@cap ' + bi.bar + '%' : ''));
+    }
     if (R.sfxAtBlue) x.push('SFX @blue meta/play: ' + R.sfxAtBlue.metadata + '/' + R.sfxAtBlue.playable);
     if (R.tapLog.length) { var f = R.tapLog[0]; x.push('tap#1: blue+' + f[1] + 'ms  SFX meta/play ' + f[2] + '/' + f[3]); }
     if (R.playLog.length) { var l = R.playLog[R.playLog.length - 1]; x.push('play terakhir: ' + l[0] + ' lat ' + l[3] + 'ms rs' + l[4]); }
@@ -139,6 +145,7 @@
     /* v130: LoAF sesudah capsule tampil (top 8 menurut durasi) + penanda timeout/auto-enter. R.loaf di atas = top 8 seluruh sesi, hampir semuanya pra-capsule. */
     try { var tc = R.t.capsule; R.loafCap = tc == null ? [] : LOAF.filter(function (x) { return x[0] >= tc; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8); } catch (e) { R.loafCap = []; }
     R.bootTimeout = !!window.__bootTimeout; R.bootFinish = window.__bootFinish || null; R.warmConc = window.__warmConc != null ? window.__warmConc : null; R.ca = window.__ca != null ? window.__ca : null;   /* pass 11: tercatat di JSON supaya run ?nolive=1 dan normal bisa dibedakan */
+    R.bootInfo = window.__bootInfo || R.bootInfo || null;   /* v147: warmAt, warmTrig, visAt, sfxViaCap, bar @capsule */
     try { R.nolive = /[?&]nolive=1(&|$)/.test(location.search); } catch (eNl) { R.nolive = null; }
     R.evt = EVT; /* [event, start, inputDelay, processing, total] untuk event >=100ms (klik Blue dll) */
     R.ltTop = LT.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10); /* [startTime, durasi] terpanjang; bandingkan dgn t.capsule/blue/frame1 dan marks */
@@ -180,8 +187,14 @@
       capDone = true; R.sfxAtCapsule = sfxStates(); mark('capsule'); hookSfx();
       if (R.t.bootStart != null) {
         R.bootToCapsule = R.t.capsule - R.t.bootStart;
-        /* bootStart ditandai agak telat (setelah seluruh 07-boot.js selesai), jadi jangan bandingkan ke angka persis. Logika pasti: readiness cuma bisa jadi sebab kalau 16/16 sudah metadata. */
-        R.finishGuess = window.__bootFinish || (R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total ? 'readiness 16/16' : 'maxMs (readiness belum ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.total + ')');
+        /* v147: bedakan gate nyata vs plafon SFX/BGM lewat __bootInfo */
+        R.bootInfo = window.__bootInfo || null;
+        var bi = R.bootInfo, fin = window.__bootFinish;
+        if (fin === 'cap3d') R.finishGuess = 'cap3d';
+        else if (bi && bi.sfxViaCap) R.finishGuess = 'gate+sfxCap meta ' + (R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.total);
+        else if (bi && bi.bgmViaCap) R.finishGuess = 'gate+bgmCap';
+        else if (R.sfxAtCapsule.metadata >= R.sfxAtCapsule.total) R.finishGuess = 'gate readiness 16/16';
+        else R.finishGuess = fin || ('gate? meta ' + R.sfxAtCapsule.metadata + '/' + R.sfxAtCapsule.total);
       }
       paint();
     }
