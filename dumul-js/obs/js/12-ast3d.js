@@ -60,8 +60,28 @@ function ast3dFail(why){AST3D.state=3;AST3D.err=String(why||'');try{console.warn
    - window.THREE = SALINAN (Object.assign) agar bisa ditulisi (21-bench.js membungkus THREE.WebGLRenderer); namespace module asli read-only.
    - ColorManagement dimatikan: warna hex dipakai apa adanya seperti r128 (tanpa konversi sRGB->linear), jadi tampilan tidak bergeser. Harus sebelum THREE.Color pertama dibuat.
    Gagal (offline/blokir/browser tanpa import()) -> bad(pesan) -> tiap modul jatuh ke versi 2D seperti sebelumnya. */
+/* ANTREAN build modul 3D: r186 memuat lewat import() -> SATU promise, jadi tanpa antrean kelima modul (12/13/14/15/17) build beruntun dalam satu rantai microtask
+   (bench itel A6610L: satu blok 6,9 dtk, bar boot beku lalu loncat). Antrean ini menjalankan SATU build per giliran, lalu menunggu satu frame ter-paint
+   (rAF -> setTimeout 0) supaya bar/panel boot sempat naik. Total CPU tetap; bedanya blok 6,9 dtk jadi ±5 blok terpisah (target: 0,7-2 dtk per blok, seperti di r128).
+   Tab tersembunyi tidak menembakkan rAF -> timer 250 ms sebagai cadangan agar antrean tidak macet. Urutan = urutan panggilan threeLoad. */
+var THREE_Q={q:[],run:false};
+function threeQNext(){
+  var f=THREE_Q.q.shift();
+  if(!f){THREE_Q.run=false;return;}
+  try{f();}catch(e){try{console.warn('[three] build modul gagal:',e&&e.message||e);}catch(e2){}}
+  threeQWait();
+}
+function threeQWait(){
+  var d=false,go=function(){if(d)return;d=true;threeQNext();};
+  try{requestAnimationFrame(function(){setTimeout(go,0);});}catch(e){}
+  setTimeout(go,250);
+}
+function threeRun(fn){
+  THREE_Q.q.push(fn);
+  if(!THREE_Q.run){THREE_Q.run=true;threeQWait();}
+}
 function threeLoad(ok,bad){
-  if(typeof THREE!=='undefined'&&THREE.REVISION){ok();return;}
+  if(typeof THREE!=='undefined'&&THREE.REVISION){threeRun(ok);return;}
   var P=window.__threeP;
   if(!P){
     try{
@@ -69,11 +89,12 @@ function threeLoad(ok,bad){
       P=window.__threeP=import(url).then(function(m){
         try{m.ColorManagement.enabled=false;}catch(e){}
         window.THREE=Object.assign({},m);
+        try{if(typeof window.__threeReady==='function')window.__threeReady(window.THREE);}catch(e){}   /* kait untuk 21-bench.js (?bench=1): pasang pembungkus WebGLRenderer SEBELUM build pertama */
         return window.THREE;
       });
     }catch(e){bad('import() tidak didukung: '+(e&&e.message||e));return;}
   }
-  P.then(function(){ok();},function(e){window.__threeP=null;bad('gagal muat three.js: '+(e&&e.message||e));});
+  P.then(function(){threeRun(ok);},function(e){window.__threeP=null;bad('gagal muat three.js: '+(e&&e.message||e));});
 }
 
 function ast3dLoad(){

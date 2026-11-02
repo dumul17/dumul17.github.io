@@ -13,26 +13,30 @@
   var LOAF = [], EVT = [], GLN = [], GLC = [];
   /* v8: ukur pembuatan WebGLRenderer (konteks + MSAA) dan compile/render pertama per renderer; dipasang begitu THREE termuat. Hanya di ?bench=1. */
   (function () {
+    function wrapThree() {
+      if (!(window.THREE && THREE.WebGLRenderer) || THREE.__benchWrapped) return false;
+      THREE.__benchWrapped = true;
+      var Orig = THREE.WebGLRenderer;
+      var W2 = function (o) {
+        var t0 = performance.now(), r = new Orig(o), d = performance.now() - t0;
+        if (GLN.length < 12) GLN.push([Math.round(t0), Math.round(d), o && o.antialias ? 1 : 0]);
+        var n = GLN.length - 1;
+        ['compile', 'render'].forEach(function (k) {
+          var f = r[k], c = 0;
+          r[k] = function () { var a = performance.now(), v = f.apply(this, arguments), e = performance.now() - a; if (c++ < 2 && e > 30 && GLC.length < 24) GLC.push([n, k, Math.round(a), Math.round(e)]); return v; };
+        });
+        return r;
+      };
+      W2.prototype = Orig.prototype;
+      try { Object.keys(Orig).forEach(function (k) { W2[k] = Orig[k]; }); } catch (e) {}
+      THREE.WebGLRenderer = W2;
+      return true;
+    }
+    /* r186: threeLoad() (12-ast3d.js) memanggil window.__threeReady begitu THREE terpasang, SEBELUM build modul pertama -> semua renderer terukur.
+       Polling lama dipertahankan sebagai cadangan (mis. THREE sudah ada lebih dulu). */
+    window.__threeReady = function () { try { wrapThree(); } catch (e) {} };
     var tries = 0, iv = setInterval(function () {
-      try {
-        if (window.THREE && THREE.WebGLRenderer && !THREE.__benchWrapped) {
-          clearInterval(iv); THREE.__benchWrapped = true;
-          var Orig = THREE.WebGLRenderer;
-          var W2 = function (o) {
-            var t0 = performance.now(), r = new Orig(o), d = performance.now() - t0;
-            if (GLN.length < 12) GLN.push([Math.round(t0), Math.round(d), o && o.antialias ? 1 : 0]);
-            var n = GLN.length - 1;
-            ['compile', 'render'].forEach(function (k) {
-              var f = r[k], c = 0;
-              r[k] = function () { var a = performance.now(), v = f.apply(this, arguments), e = performance.now() - a; if (c++ < 2 && e > 30 && GLC.length < 24) GLC.push([n, k, Math.round(a), Math.round(e)]); return v; };
-            });
-            return r;
-          };
-          W2.prototype = Orig.prototype;
-          try { Object.keys(Orig).forEach(function (k) { W2[k] = Orig[k]; }); } catch (e) {}
-          THREE.WebGLRenderer = W2;
-        } else if (++tries > 2000) clearInterval(iv);
-      } catch (e) { clearInterval(iv); }
+      try { if (wrapThree() || ++tries > 2000) clearInterval(iv); } catch (e) { clearInterval(iv); }
     }, 20);
   })();
   function fileOf(u) { try { return String(u || '').split('?')[0].split('/').pop(); } catch (e) { return ''; } }
