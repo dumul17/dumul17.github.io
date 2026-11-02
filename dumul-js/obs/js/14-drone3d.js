@@ -105,7 +105,7 @@ function dr3dMerge(sc,root,skip){
 }
 
 /* ---------- model ---------- */
-function dr3dBuild(){
+function* dr3dBuildG(){
   var T=THREE,cv=document.createElement('canvas'),PI=Math.PI,DS=T.DoubleSide;
   var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
   r.setClearColor(0x000000,0);
@@ -116,8 +116,10 @@ function dr3dBuild(){
   cam.position.set(0,70,52);cam.lookAt(0,0,0);   /* dari atas-depan (~53°), seperti gambar referensi */
   DR3D.sc=sc;DR3D.cam=cam;
   var m=DR3D.m,o=DR3D.o;
+  yield;   /* ---- tahap 0 selesai: renderer + scene ---- */
   var env=null;try{if(typeof scp3dEnv==='function')env=scp3dEnv(r);}catch(eE){env=null;}   /* env pantulan yang sama dgn teleskop (kalau 13-scope3d.js ada) */
   var ei=env?.8:0;
+  yield;   /* ---- tahap 1 selesai: env PMREM ---- */
   /* palet teleskop */
   m.hull=new T.MeshStandardMaterial({map:dr3dBodyTex(),color:0xffffff,metalness:.6,roughness:.5,envMap:env,envMapIntensity:ei});
   m.recess=new T.MeshStandardMaterial({color:0x1b2229,metalness:.7,roughness:.45,envMap:env,envMapIntensity:ei});
@@ -188,6 +190,7 @@ function dr3dBuild(){
   [[.9,.35,.25],[-.9,.35,.25],[.75,.2,.65],[-.75,.2,.65],[.35,.85,.4],[-.35,.85,.4],[0,.6,.8],[0,.95,.2],
    [.95,-.1,-.3],[-.95,-.1,-.3],[.55,-.5,.65],[-.55,-.5,.65],[0,-.2,.98]].forEach(function(d){place(mk(spkG,m.dark),V(d[0],d[1],d[2]),.35);});
 
+  yield;   /* ---- tahap 2 selesai: material + badan ---- */
   /* ===== as + sayap + sirip + pod roket (kiri & kanan) ===== */
   mdl.add(mk((function(){var g2=new T.CylinderGeometry(.26,.26,20.4,8);g2.rotateZ(PI/2);return g2;})(),m.dark,0,0,.9));
   var finS=new T.Shape();finS.moveTo(-1.3,0);finS.lineTo(1.5,0);finS.lineTo(.9,5);finS.lineTo(.1,5.5);finS.closePath();
@@ -234,6 +237,7 @@ function dr3dBuild(){
     });
   });
 
+  yield;   /* ---- tahap 3 selesai: as + sayap + sirip + pod ---- */
   /* ===== dua tabung thruster di bawah + strut + kabel selang ===== */
   var legG=new T.CylinderGeometry(.85,.85,5.2,14);legG.rotateX(PI/2);
   var legCone=new T.ConeGeometry(.85,1.2,14);legCone.rotateX(-PI/2);
@@ -253,6 +257,7 @@ function dr3dBuild(){
   });
   mdl.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([V(3.1,-5.4,2.7),V(2.3,-6.9,3.5),V(.9,-5.3,3.7),V(.5,-3.8,2.3)]),14,.13,5,false),m.black));
 
+  yield;   /* ---- tahap 4 selesai: thruster + strut + selang ---- */
   /* gabung mesh statis (lihat dr3dMerge). Gagal apa pun -> model tetap utuh seperti sebelumnya. Cek hasil: DR3D.stat / DR3D.r.info.render.calls di console */
   try{
     var c0=0;sc.traverse(function(n){if(n.isMesh)c0++;});
@@ -265,14 +270,30 @@ function dr3dBuild(){
   o.rim=new T.DirectionalLight(0xff4fd8,1.1*Math.PI);o.rim.position.set(-30,40,-55);sc.add(o.rim);
   o.hemi=new T.HemisphereLight(0x7a5cd8,0x0a0614,.45*Math.PI);sc.add(o.hemi);
   o.fill=new T.DirectionalLight(0x40e8ff,.55*Math.PI);o.fill.position.set(-40,-30,60);sc.add(o.fill);   /* fill cyan seperti teleskop */
+  yield;   /* ---- tahap 5 selesai: gabung mesh + cahaya ---- */
   /* pra-ukur kanvas ke resolusi yang akan dipakai drone pertama (skala sama dgn 08-tx-drone.js: W<420 ? 1 : 1.15): setSize pertama = realokasi framebuffer MSAA, terukur ~detik di headless -> hitch di drone pertama */
   try{
     var sc0=(typeof W!=='undefined'&&W<420)?1:1.15,res0=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*sc0*Math.min(2,DPR||1)*1.2/32)*32));
     DR3D.res=res0;r.setPixelRatio(1);r.setSize(res0,res0,false);
   }catch(eP){}
+  yield;   /* ---- tahap 6 selesai: pra-ukur kanvas (alokasi framebuffer MSAA) ---- */
   DR3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam);   /* kompilasi shader saat idle, bukan di render pertama (drone pertama muncul) */
 }
+
+/* Build dipecah jadi 8 tahap (generator, yield di batas tahap). Tiap tahap jalan satu giliran di antrean THREE_Q (12-ast3d.js) lalu menunggu satu frame ter-paint,
+   jadi blok sinkron ±1,5-2 dtk di itel (bench v142: go drone terbesar sebelum capsule) terpecah. Variabel lokal tetap satu scope (tanpa restruktur).
+   ?ds=0 = jalan sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__dr3dT, dicatat bench (R.dr3dT, R.ds). */
+var DR3D_SLICE=(function(){var on=true;try{on=!/[?&]ds=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ds=on?1:0;}catch(e2){}return on;})();
+function dr3dDrive(it,tm){
+  var t0=performance.now(),r=it.next();
+  try{tm.push(Math.round(performance.now()-t0));window.__dr3dT=tm;}catch(e){}
+  if(r.done)return;
+  if(DR3D_SLICE&&typeof THREE_Q!=='undefined'){
+    THREE_Q.q.unshift(function(){try{dr3dDrive(it,tm);}catch(e){dr3dFail(e&&e.message||e);}});   /* unshift: tahap berikut tetap di depan modul lain, urutan build tidak berubah */
+  }else dr3dDrive(it,tm);
+}
+function dr3dBuild(){dr3dDrive(dr3dBuildG(),[]);}
 
 /* ---------- per frame ---------- */
 function dr3dAngDiff(a,b){var d=(b-a)%6.283185;if(d>3.141593)d-=6.283185;if(d<-3.141593)d+=6.283185;return d;}
