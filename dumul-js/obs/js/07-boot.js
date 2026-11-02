@@ -72,7 +72,6 @@ var DUMUL_CHARS=(function(){
      progres cuma set satu CSS variable saat angka persen berubah. reduced-motion / IS_POTATO -> kelas .calm (tanpa gerak, state tetap tampil). */
   var chEl=document.getElementById('boot-chars'),chBub=null,chBubT=0,chTalkT=0,chBlTt=0,chBlTo=0,chTapN=0,chPct=-1,chSlow=false,chRdy=false,
       chCalm=!!(reduce||(typeof IS_POTATO!=='undefined'&&IS_POTATO));
-  if(chCalm&&bs)bs.classList.add('run');   /* v149: calm/potato -> tanpa glitch bar idle */
   function chAlive(){return !!(bs&&bs.parentNode&&!bs.classList.contains('off'));}
   function chAttr(k,v){if(chEl&&chEl.getAttribute(k)!==v)chEl.setAttribute(k,v);}
   function chHL(c,on){if(chEl)chEl.classList.toggle(c,on);}
@@ -196,8 +195,11 @@ var DUMUL_CHARS=(function(){
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
   /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
-  var WARM_CONC=4,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
-  try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(8,+wcm[1]));}catch(eWc){}
+  var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
+  try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(16,+wcm[1]));}catch(eWc){}
+  /* v152: WARM_CONC default 4 -> 8, batas override ?wc= 8 -> 16. Telemetri v151 (SFX baru mulai sesudah 3D): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB, unduh 0,06-0,2 dtk) tapi TTFB 1,6-3 dtk per request
+     -> latency-bound, bukan bandwidth-bound; konkurensi 4 terlalu sempit. 7 run ?wc=8 (wc=16 sempat terpotong ke 8): fase SFX 5-18 dtk di 5 run (16/16 saat kapsul), dulu ±27 dtk @conc4.
+     2 run buruk (TTFB 4,6 dan 12,7 dtk) = jaringan sedang ambruk, bukan perilaku kode. */
   window.__warmConc=WARM_CONC;
   /* v151: SFX warm TIDAK paralel dengan build 3D. Telemetri v149/v150 (8 run, itel): slot SFX yang mulai sebelum kapsul rata-rata ±7 dtk, yang mulai sesudah kapsul ±4 dtk
      (main thread jenuh ±12 dtk long task selama build 3D -> loadedmetadata + warmPump ngantri). Sekarang antrean SFX baru jalan begitu SEMUA modul 3D settle + THREE_WARM kosong.
@@ -612,13 +614,11 @@ var DUMUL_CHARS=(function(){
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
      Animator rAF sendiri (bukan bergantung pada tick/startPost) supaya sapuan ke 100% tetap selesai walau interval startPost sudah berhenti. Berhenti kalau boot screen hilang. */
   var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
-  /* v149: glitch bar 0% = CSS-only (index.css, jalan sejak first paint). Di sini cuma mematikannya lewat class .run di #boot-screen begitu persen > 0 (barShow) atau calm/potato. */
   function barShow(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
     pV=v;fill.style.width=v+'%';pct.textContent=v+'%';
     chProg(v);
-    if(v>0)bs.classList.add('run');
   }
   function barStep(now){
     pRaf=0;
