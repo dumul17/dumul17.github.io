@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v12 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.8 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
@@ -387,14 +387,15 @@
         lastRaf = t;
         /* coba baca pV dari DOM atau global */
         try {
-          var pct = document.querySelector('#boot-progress .pct, .boot-pct, [data-boot-pct]');
           var v = null;
-          if (typeof pV === 'number' && pV >= 0) v = pV;
-          else if (pct) {
-            var m = /(\d+)/.exec(pct.textContent || '');
+          /* pV di 07-boot local scope — baca DOM: #boot-pct / #boot-fill */
+          var pctEl = document.getElementById('boot-pct');
+          if (pctEl) {
+            var m = /(\d+)/.exec(pctEl.textContent || '');
             if (m) v = +m[1];
-          } else {
-            var fill = document.querySelector('#boot-progress .fill, .boot-fill, [data-boot-fill]');
+          }
+          if (v == null) {
+            var fill = document.getElementById('boot-fill');
             if (fill && fill.style && fill.style.width) {
               var w = parseFloat(fill.style.width);
               if (!isNaN(w)) v = Math.round(w);
@@ -445,7 +446,7 @@
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v11.7 ms (sejak navigasi)');
+    x.push('BENCH v11.8 ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -976,7 +977,34 @@
           still.push(nm);
         }
       });
-      MEDIA_AT_LOAD = { total: tot, networkState2: still.length, names: still };
+      /* SFX dibuat lewat new Audio() — tidak di DOM; sample objek global juga */
+      var sfxStill = [], sfxTot = 0;
+      try {
+        if (typeof SFX !== 'undefined' && SFX) {
+          Object.keys(SFX).forEach(function (k) {
+            sfxTot++;
+            var a = SFX[k];
+            if (a && a.networkState === 2) sfxStill.push(k);
+          });
+        }
+        ['AMB', 'MUSIC_COLLAP', 'GARG'].forEach(function (k) {
+          try {
+            var a = window[k];
+            if (a && typeof a.networkState === 'number') {
+              sfxTot++;
+              if (a.networkState === 2) sfxStill.push('bgm:' + k);
+            }
+          } catch (e2) {}
+        });
+      } catch (e3) {}
+      MEDIA_AT_LOAD = {
+        total: tot,
+        networkState2: still.length,
+        names: still,
+        sfxTotal: sfxTot,
+        sfxNetworkState2: sfxStill.length,
+        sfxNames: sfxStill
+      };
     } catch (e) { MEDIA_AT_LOAD = { error: String(e) }; }
     paint();
   });
