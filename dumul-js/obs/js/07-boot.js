@@ -436,9 +436,9 @@ var DUMUL_CHARS=(function(){
       try{chReact('o');}catch(eCh){}
       if(capTimer){clearTimeout(capTimer);capTimer=0;}   /* pengunjung aktif -> timeout dibatalkan */
       try{
-        window.open('https://github.com/dumul17/dumul17.github.io/blob/main/index.html','_blank','noopener');
+        window.open('https://github.com/dumul17/dumul17.github.io','_blank','noopener');
       }catch(e){
-        location.href='https://github.com/dumul17/dumul17.github.io/blob/main/index.html';
+        location.href='https://github.com/dumul17/dumul17.github.io';
       }
       /* Red already used — drop Red + or, leave Blue centered. */
       var redChoice=document.getElementById('boot-choice-red');
