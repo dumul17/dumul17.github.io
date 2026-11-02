@@ -24,7 +24,7 @@ const SHELL = [
   './',
   'index.html',
   'dumul.html',
-  'index.css?v=88',
+  'index.css?v=89',
   /* harus sama persis dengan <script src> di index.html */
   'dumul-js/obs/sky-data.js?v=31',
   'dumul-js/obs/texts.js?v=1',
@@ -38,7 +38,7 @@ const SHELL = [
   'dumul-js/obs/js/04-render.js?v=143',
   'dumul-js/obs/js/05-sector-ui.js?v=181',
   'dumul-js/obs/js/06-interaction.js?v=126',
-  'dumul-js/obs/js/07-boot.js?v=147',
+  'dumul-js/obs/js/07-boot.js?v=148',
   'dumul-js/obs/js/08-tx-drone.js?v=15',
   'dumul-js/obs/js/09-wormhole.js?v=44',
   'dumul-js/obs/js/10-ui-sound.js?v=8',

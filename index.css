@@ -309,6 +309,22 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 @keyframes bootCur{50%{opacity:0}}
 #boot-bar{height:5px;margin-top:9px;border:1px solid rgba(110,229,255,.30);background:rgba(110,229,255,.035);overflow:hidden}
 #boot-fill{height:100%;width:0;background:linear-gradient(90deg,rgba(110,229,255,.28),#6ee5ff,rgba(110,229,255,.72));box-shadow:0 0 13px rgba(110,229,255,.45);transition:width .16s linear}
+/* v149: glitch sesekali saat bar masih 0% (idle). CSS only + class toggle; mati begitu persen > 0 / reduced-motion / potato. */
+#boot-bar.idle-gl{animation:bootBarGl .55s steps(1,end)}
+#boot-pct.idle-gl{animation:bootPctGl .55s steps(1,end)}
+@keyframes bootBarGl{
+  0%,100%{transform:none;filter:none;border-color:rgba(110,229,255,.30)}
+  18%{transform:translateX(-3px);filter:hue-rotate(-50deg) saturate(1.9);border-color:rgba(255,120,200,.55)}
+  42%{transform:translateX(4px);filter:hue-rotate(140deg) saturate(2.1);border-color:rgba(120,255,220,.7)}
+  68%{transform:translateX(-1px);filter:hue-rotate(-25deg);border-color:rgba(110,229,255,.55)}
+}
+@keyframes bootPctGl{
+  0%,100%{transform:none;opacity:1;text-shadow:0 0 4px #02070b;color:rgba(184,224,238,.75)}
+  18%{transform:translateX(-2px);opacity:.85;text-shadow:0 0 6px rgba(255,120,200,.5);color:rgba(255,180,220,.9)}
+  42%{transform:translateX(3px);opacity:1;text-shadow:0 0 8px rgba(110,255,230,.55);color:rgba(180,255,240,.95)}
+  68%{transform:translateX(-1px);color:rgba(184,224,238,.9)}
+}
+@media (prefers-reduced-motion:reduce){#boot-bar.idle-gl,#boot-pct.idle-gl{animation:none!important}}
 /* Bar "hidup" saat main thread diblok (build 3D 0,7-2,2 dtk): sheen + denyut ujung memakai transform/opacity -> jalan di compositor, tetap bergerak walau JS/layout macet.
    Persen TIDAK berubah (tetap jujur); ini hanya penanda "masih bekerja". Berhenti saat boot screen hilang dan di prefers-reduced-motion. */
 #boot-fill{position:relative;overflow:hidden}
