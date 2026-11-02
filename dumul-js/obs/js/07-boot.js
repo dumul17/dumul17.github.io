@@ -300,7 +300,7 @@ var DUMUL_CHARS=(function(){
     var wq=window.THREE_WARM,wTot=wq?(wq.total||0):0,wDone=wq?(wq.done||0):0,exp=wTot+pend;
     var drained=!wq||(!wq.busy&&!wq.q.length);
     var warmOk=pend===0&&drained;
-    return {mods:settled,total:MODS.length,st:st,fins:fins,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,warmFrac:warmOk?1:(exp?Math.min(1,wDone/exp):0)};
+    return {mods:settled,total:MODS.length,st:st,fins:fins,pend:pend,wDone:wDone,wTot:wTot,exp:exp,warmOk:warmOk,part:(wq&&wq.part)||0,warmFrac:warmOk?1:(exp?Math.min(1,(wDone+((wq&&wq.part)||0))/exp):0)};
   }
   /* Status = SATU baris. Tiap baris muncul sebagai ">" (sedang jalan) dan jadi "✓" begitu selesai; baris yang selesai antre sesuai URUTAN SELESAI
      di perangkat itu (jadi urutan beda antar HP tidak masalah), tiap baris tampil minimal sebentar lalu fade ke baris berikutnya; semua selesai -> fade kosong.
@@ -476,7 +476,7 @@ var DUMUL_CHARS=(function(){
     var wc=0;
     wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);   /* halaman */
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);   /* modul 3D: hanya yang state 1 (memuat) */
-    if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,WT_WARM/th.exp,WT_WARM/th.exp,elapsed);   /* warm-up: di dalam item antrean yang sedang diproses (lebar 1 item) */
+    if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);   /* warm-up: sisa item antrean yang sedang diproses (pecahan nyata th.part sudah dihitung di warmFrac, jadi rayapan cuma di sisanya) */
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);   /* audio: di dalam file berikutnya */
     var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;

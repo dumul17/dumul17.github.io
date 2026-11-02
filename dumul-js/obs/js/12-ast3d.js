@@ -27,7 +27,10 @@ var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,nx:[-1e9,-1e9,-1e9],
    Dipakai juga oleh 13-scope3d.js dan 14-drone3d.js. */
 /* ?ca=0 mematikan compileAsync (12 + 17): A/B bench jalur compile sinkron vs async. Default NYALA. Tercatat di JSON bench (R.ca). */
 var THREE_CA=(function(){var on=true;try{on=!/[?&]ca=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ca=on?1:0;}catch(e){}return on;})();
-var THREE_WARM={q:[],busy:false,total:0,done:0};   /* total/done: dibaca 07-boot (progres warm-up di panel boot) */
+var THREE_WARM={q:[],busy:false,total:0,done:0,part:0};   /* total/done: dibaca 07-boot (progres warm-up di panel boot); part = pecahan (0..<1) item yang sedang diproses */
+/* ?ws=0 mematikan IRISAN warm-up per objek (A/B bench). Default NYALA. */
+var THREE_WS=(function(){var on=true;try{on=!/[?&]ws=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ws=on?1:0;}catch(e){}return on;})();
+function threeWarmObjs(sc){var o=[];try{sc.traverseVisible(function(x){if(x!==sc&&x.material&&(x.isMesh||x.isPoints||x.isLine||x.isSprite))o.push(x);});}catch(e){return null;}return o;}
 function threeWarm(r,sc,cam,pre){
   try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;}catch(e){}
   THREE_WARM.q.push({r:r,sc:sc,cam:cam,pre:pre});THREE_WARM.total++;
@@ -39,10 +42,31 @@ function threeWarmNext(){
   THREE_WARM.busy=true;
   var run=function(){
     try{if(it.pre)it.pre();}catch(e){}   /* pra-ukur kanvas (W/H sudah valid di layar boot) */
+    var warmDone=function(){THREE_WARM.part=0;THREE_WARM.done++;setTimeout(threeWarmNext,150);};
     var fin=function(){
-      try{it.r.compile(it.sc,it.cam);it.r.render(it.sc,it.cam);}catch(e){}   /* compile (sudah siap -> murah) + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
-      THREE_WARM.done++;
-      setTimeout(threeWarmNext,150);
+      var r=it.r,sc=it.sc,cam=it.cam,objs=THREE_WS?threeWarmObjs(sc):null;
+      if(!objs||objs.length<2){   /* scene 1 objek / ?ws=0: jalur lama (compile + satu render) */
+        try{r.compile(sc,cam);r.render(sc,cam);}catch(e){}   /* compile (sudah siap -> murah) + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
+        warmDone();return;
+      }
+      /* IRISAN: satu render per objek (objek lain disembunyikan sementara), maks ±10 ms per giliran lalu yield. Link shader + upload buffer/tekstur tiap material
+         jadi blok kecil terpisah (bukan satu blok 1-3 dtk), progres nyata (THREE_WARM.part) dibaca 07-boot. compile() sinkron SENGAJA dilewati di jalur ini:
+         tiap render() mengompilasi materialnya sendiri; kalau program sudah siap (compileAsync + KHR_parallel_shader_compile) render murah. Visibility dipulihkan di akhir. */
+      var i=0,k,vis=[];
+      for(k=0;k<objs.length;k++){vis.push(objs[k].visible);objs[k].visible=false;}
+      var step=function(){
+        var t=performance.now();
+        while(i<objs.length&&performance.now()-t<10){
+          objs[i].visible=true;
+          try{r.render(sc,cam);}catch(e){}
+          objs[i].visible=false;i++;
+          THREE_WARM.part=Math.min(.98,i/objs.length);
+        }
+        if(i<objs.length){setTimeout(step,0);return;}
+        for(k=0;k<objs.length;k++)objs[k].visible=vis[k];
+        warmDone();
+      };
+      step();
     };
     /* r158+: compileAsync memakai KHR_parallel_shader_compile (link shader di luar main thread). Tanpa ekstensi itu three jatuh ke compile sinkron, jadi tidak lebih buruk.
        Batas 4 dtk: kalau promise macet, lanjut sinkron supaya progres boot tidak tertahan. */
