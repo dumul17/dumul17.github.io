@@ -180,6 +180,12 @@ var DUMUL_CHARS=(function(){
   var maxMs=isRepeatVisit?10000:20000;
   var max3d=isRepeatVisit?12000:(IS_POTATO?9000:15000);
   var capTimer=0;
+  /* v142: batas tunggu pekerjaan boot TIDAK memakan jatah warm-up kalau yang lambat adalah jaringan. Selama three.js belum tiba (atau baru tiba lambat), batas diperpanjang
+     sebesar kelebihan waktunya di atas 3 dtk (maks +8 dtk). Plafon mutlak = max3d + 8 dtk, jadi offline/macet tetap tidak menahan capsule selamanya. */
+  function cap3dNow(elapsed){
+    var ta=window.__threeAt,wait=ta?Math.max(0,ta-t0):elapsed;
+    return max3d+Math.min(8000,Math.max(0,wait-3000));
+  }
   /* v127: metadata 16 SFX (lalu BGM/GARG, preload='none' di 01-core) dihangatkan mulai SAAT CAPSULE TAMPIL (finish()), bukan setelah Blue +4,2 dtk.
      Alasan (telemetri v126 itel A6610L): boot 12,2 dtk memblokir main thread 89%, jaringan nganggur, audio baru dimulai setelah Blue -> tap pertama cold. Saat capsule tampil
      main thread bebas (build + warm shader sudah selesai). Berbasis penyelesaian: maks WARM_CONC (2) elemen sekaligus, elemen berikutnya jalan setelah loadedmetadata/error
@@ -519,7 +525,7 @@ var DUMUL_CHARS=(function(){
     if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000))chSlowOn();   /* boot terasa lama: teleskop kalem, owl ngantuk */
     paintBar(c);
     paintPanel(c.ready,c.th,false,c.au);
-    if(c.complete||elapsed>=max3d){window.__bootFinish=c.complete?'gate':'cap3d';finish(c);}
+    if(c.complete||elapsed>=cap3dNow(elapsed)){window.__bootFinish=c.complete?'gate':'cap3d';finish(c);}
     else requestAnimationFrame(tick);
   }
   try{warmQ=[AMB,MUSIC_COLLAP].filter(Boolean);warmPump();}catch(eW){}   /* v132: warm 2 BGM sejak awal boot */

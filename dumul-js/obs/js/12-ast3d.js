@@ -43,6 +43,7 @@ function threeWarmNext(){
   var run=function(){
     try{if(it.pre)it.pre();}catch(e){}   /* pra-ukur kanvas (W/H sudah valid di layar boot) */
     var warmDone=function(){THREE_WARM.part=0;THREE_WARM.done++;setTimeout(threeWarmNext,150);};
+    var pBase=0;   /* dasar pecahan progres item: 0, atau 0,4 kalau fase compile teririsnya sudah jalan dulu */
     var fin=function(){
       var r=it.r,sc=it.sc,cam=it.cam,objs=THREE_WS?threeWarmObjs(sc):null;
       if(!objs||objs.length<2){   /* scene 1 objek / ?ws=0: jalur lama (compile + satu render) */
@@ -60,7 +61,7 @@ function threeWarmNext(){
           objs[i].visible=true;
           try{r.render(sc,cam);}catch(e){}
           objs[i].visible=false;i++;
-          THREE_WARM.part=Math.min(.98,i/objs.length);
+          THREE_WARM.part=Math.min(.98,pBase+(.98-pBase)*i/objs.length);
         }
         if(i<objs.length){setTimeout(step,0);return;}
         for(k=0;k<objs.length;k++)objs[k].visible=vis[k];
@@ -70,11 +71,32 @@ function threeWarmNext(){
     };
     /* r158+: compileAsync memakai KHR_parallel_shader_compile (link shader di luar main thread). Tanpa ekstensi itu three jatuh ke compile sinkron, jadi tidak lebih buruk.
        Batas 4 dtk: kalau promise macet, lanjut sinkron supaya progres boot tidak tertahan. */
-    if(THREE_CA&&it.r.compileAsync){
-      var d=false,go=function(){if(d)return;d=true;fin();};
-      setTimeout(go,4000);
-      try{it.r.compileAsync(it.sc,it.cam).then(go,go);}catch(e){go();}
-    }else fin();
+    var start=function(){
+      if(THREE_CA&&it.r.compileAsync){
+        var d=false,go=function(){if(d)return;d=true;fin();};
+        setTimeout(go,4000);
+        try{it.r.compileAsync(it.sc,it.cam).then(go,go);}catch(e){go();}
+      }else fin();
+    };
+    /* IRISAN FASE COMPILE: bagian sinkron compileAsync(scene) membangun SEMUA program sekaligus (bench itel: blok `run` 0,67-0,79 dtk). Di sini program dibangun
+       per objek (r.compile(objek, kamera, scene): lampu tetap dari scene), maks ±10 ms per giliran lalu yield; sesudah semua program ada, compileAsync(scene) di start()
+       tinggal cache-hit (murah) dan menunggu siap lewat polling-nya sendiri. Pecahan progres 0..0,4 untuk fase ini. ?ws=0 = jalur lama. */
+    var cobjs=(THREE_WS&&THREE_CA&&it.r.compileAsync)?threeWarmObjs(it.sc):null;
+    if(cobjs&&cobjs.length>=2){
+      var cj=0;
+      var cstep=function(){
+        var t=performance.now();
+        while(cj<cobjs.length&&performance.now()-t<10){
+          try{it.r.compile(cobjs[cj],it.cam,it.sc);}catch(e){}
+          cj++;
+          THREE_WARM.part=.4*cj/cobjs.length;
+        }
+        if(cj<cobjs.length){setTimeout(cstep,0);return;}
+        pBase=.4;
+        start();
+      };
+      cstep();
+    }else start();
   };
   if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2000});else setTimeout(run,300);
 }
@@ -115,6 +137,7 @@ function threeLoad(ok,bad){
       P=window.__threeP=import(url).then(function(m){
         try{m.ColorManagement.enabled=false;}catch(e){}
         window.THREE=Object.assign({},m);
+        try{window.__threeAt=performance.now();}catch(e){}   /* waktu three.js selesai di-import: 07-boot memakainya untuk batas tunggu (sinyal lambat) */
         try{if(typeof window.__threeReady==='function')window.__threeReady(window.THREE);}catch(e){}   /* kait untuk 21-bench.js (?bench=1): pasang pembungkus WebGLRenderer SEBELUM build pertama */
         return window.THREE;
       });
