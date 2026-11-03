@@ -197,6 +197,9 @@ var DUMUL_CHARS=(function(){
   /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
   var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
   var sfxLastName='';   /* [PATCH v157] nama file terakhir yang baru dapat loadedmetadata — buat log/status */
+  var sfxLastIsGlitch=false; /* [PATCH v159] meta terakhir = GARG/glitch */
+  var sfxGlitchWarm=false;   /* [PATCH v159] slot GARG sedang aktif (sebelum meta) */
+  var sfxCacheFlash=false;   /* [PATCH v159] offline: semua SFX sudah ready saat warmRest */
   try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(16,+wcm[1]));}catch(eWc){}
   /* v152: WARM_CONC default 4 -> 8, batas override ?wc= 8 -> 16. Telemetri v151 (SFX baru mulai sesudah 3D): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB, unduh 0,06-0,2 dtk) tapi TTFB 1,6-3 dtk per request
      -> latency-bound, bukan bandwidth-bound; konkurensi 4 terlalu sempit. 7 run ?wc=8 (wc=16 sempat terpotong ke 8): fase SFX 5-18 dtk di 5 run (16/16 saat kapsul), dulu ±27 dtk @conc4.
@@ -225,6 +228,8 @@ var DUMUL_CHARS=(function(){
   function warmName(a){try{return (a.currentSrc||a.src||'').replace(/^.*\//,'').replace(/\?.*$/,'');}catch(eN){return '?';}}
   function warmSlot(a){
     var fin=false,tm=0,t1=Math.round(performance.now()),nm=warmName(a);
+    var isGarg=false;try{isGarg=!!(typeof GARG!=='undefined'&&GARG&&a===GARG);}catch(eIg){}
+    if(isGarg)sfxGlitchWarm=true;   /* [PATCH v159] banner decoder saat GARG di-warm */
     function rel(why){
       if(fin)return;fin=true;
       clearTimeout(tm);
@@ -232,8 +237,10 @@ var DUMUL_CHARS=(function(){
       try{if(WLOG.length<40)WLOG.push([nm,t1,Math.round(performance.now()),why,a.readyState,a.networkState,warmActive,a.error?a.error.code:0,a._wab||0]);}catch(eG){}
       if(why==='meta'){
         try{sfxLastName=(nm||'').replace(/\.opus$/i,'');}catch(eNm){sfxLastName='';}   /* [PATCH v157] simpan nama bintang untuk log */
+        try{sfxLastIsGlitch=isGarg||/glitch/i.test(sfxLastName||'');}catch(eGl){sfxLastIsGlitch=isGarg;} /* [PATCH v159] */
         try{chTalk();}catch(eCh){}   /* [PATCH v157] mulut teleskop tiap metadata; paintPanel/log ganti teks di tick berikutnya */
       }
+      if(isGarg)sfxGlitchWarm=false;
       warmActive--;warmPump();
     }
     /* v130: 'abort' DIABAIKAN. Telemetri v129 (3 run, 19/19 slot): load() pada elemen preload='none' menembakkan 'abort' dalam 15-40 ms (readyState 0, networkState 3)
@@ -276,6 +283,13 @@ var DUMUL_CHARS=(function(){
     if(!warmTrig)warmTrig='finish';   /* dipanggil dari finish tanpa early trigger */
     warmAt=Math.round(performance.now()-t0);
     try{performance.mark('obs-warm');}catch(eM){}
+    /* [PATCH v159] offline/cache: kalau semua stellar+GARG sudah readyState>=1, banner flash "cache" biar tidak lompat bisu ke planet siap */
+    try{
+      var _ar=true,_i;
+      for(_i=0;_i<stars.length;_i++){if(!(stars[_i].readyState>=1||stars[_i].error)){_ar=false;break;}}
+      if(_ar&&typeof GARG!=='undefined'&&GARG&&!(GARG.readyState>=1||GARG.error))_ar=false;
+      if(_ar&&stars.length)sfxCacheFlash=true;
+    }catch(eCf){}
     warmQ=warmQ.concat(stars);   /* v132: sisa antrean BGM (kalau ?wc=1) tetap di depan; AMB/MUSIC_COLLAP TIDAK di-load() ulang di sini (memutus request yang sedang jalan) */
     try{if(GARG)warmQ.push(GARG);}catch(e){}
     warmPump();
@@ -461,15 +475,32 @@ var DUMUL_CHARS=(function(){
       if(!cur&&thr&&n<tot)cur=nm+' \u00b7 '+(logStage(m,n)||T('bl.a.load'));
     }
     /* v145: setelah modul, bisikkan antrean SFX di log bawah (tanpa angka file) */
+    /* [PATCH v159] A+C: counter 16 bintang murni; GARG = baris Glitch + decoder; offline cache flash */
     sx=sfxStatus();
+    var starN=0,starTot=stars.length,si;
+    try{for(si=0;si<starTot;si++){if(stars[si].readyState>=1||stars[si].error)starN++;}}catch(eSn){}
+    var showDec=false;
     if(!cur&&warmed&&sx.total&&!sx.ok){
-      /* [PATCH v158] nama + n/total hanya kalau sudah ada progress; hindari "0/17" di offline/awal warm */
-      if(sx.n>0||sfxLastName)cur=T('bl.sfx')+' \u00b7 '+(sfxLastName||T('bl.a.sfx'))+' \u00b7 '+sx.n+'/'+sx.total;
-      else cur=T('bl.sfx')+' \u00b7 '+T('bl.a.sfx');
+      if(sfxGlitchWarm||(sfxLastIsGlitch&&starN>=starTot)){
+        /* GARG / glitch-instrumental sedang di-warm → banner decoder */
+        cur='Glitch \u00b7 decoding\u2026';
+        showDec=true;
+      }else if(starN>0||(sfxLastName&&!sfxLastIsGlitch)){
+        cur=T('bl.sfx')+' \u00b7 '+(sfxLastName||T('bl.a.sfx'))+' \u00b7 '+starN+'/'+starTot;
+      }else{
+        cur=T('bl.sfx')+' \u00b7 '+T('bl.a.sfx');
+      }
     }
-    else if(sx.ok&&sx.total&&!logN.sfx){logN.sfx=1;logLast=T('bl.sfx')+' '+T('bl.ready');}
-    if(cur)h='<span class="pn">&gt; '+cur+'</span>';
+    else if(sx.ok&&sx.total&&!logN.sfx){
+      logN.sfx=1;
+      /* offline: semua sudah di cache saat warmRest → jangan lompat bisu */
+      logLast=sfxCacheFlash
+        ?(T('bl.sfx')+' \u00b7 cache \u00b7 '+T('bl.ready'))
+        :(T('bl.sfx')+' '+T('bl.ready'));
+    }
+    if(cur)h='<span class="pn'+(showDec?' dec':'')+'">&gt; '+cur+'</span>';
     else if(logLast)h='<span class="ok">\u2713 '+logLast+'</span>';
+    try{if(logEl)logEl.classList.toggle('dec',!!showDec);}catch(eDc){}
     if(h!==logOut){logOut=h;logEl.innerHTML=h;}
   }
   logPoll();
