@@ -183,12 +183,15 @@ function* scp3dBuildG(){
   var cam=new T.OrthographicCamera(-H,H,H,-H,-300,300);cam.position.set(0,0,100);cam.lookAt(0,0,0);
   SCP3D.sc=sc;SCP3D.cam=cam;
   yield;   /* ---- tahap 0 selesai: renderer + scene ---- */
-  var env=scp3dEnv(r),m=SCP3D.m,o=SCP3D.o,DS=T.DoubleSide,PI=Math.PI;
-  yield;   /* ---- tahap 1 selesai: env PMREM ---- */
+  /* FLAG ENV TELESKOP (v16): PMREM teleskop ±0,69-0,96 dtk di itel (bench 3 Nov), tidak bisa diiris. Default MASIH PAKAI env (tampilan lama); ?senv=0 = tanpa env (A/B + cek visual).
+     Tanpa env logam hanya memantulkan lampu, jadi metalness hull/face/dark dikali SCP3D_MF (?smf=N, default .45; pod kaca tidak diubah). Tahap 1 tetap ada (yield kosong) supaya scp3dT tetap 8 elemen. */
+  var env=null;if(SCP3D_ENV){env=scp3dEnv(r);}
+  var mf=env?1:SCP3D_MF,m=SCP3D.m,o=SCP3D.o,DS=T.DoubleSide,PI=Math.PI;
+  yield;   /* ---- tahap 1 selesai: env PMREM (atau dilewati) ---- */
   var face=scp3dFaceTex();
-  m.hull=new T.MeshStandardMaterial({color:0x44505c,metalness:.6,roughness:.5,flatShading:true,envMap:env,envMapIntensity:.8});
-  m.face=new T.MeshStandardMaterial({map:face.map,emissiveMap:face.emi,emissive:0xffffff,emissiveIntensity:1.45,metalness:.5,roughness:.55,envMap:env,envMapIntensity:.9,side:DS});
-  m.dark=new T.MeshStandardMaterial({color:0x2b333c,metalness:.8,roughness:.42,envMap:env,envMapIntensity:1.0,side:DS});
+  m.hull=new T.MeshStandardMaterial({color:0x44505c,metalness:.6*mf,roughness:.5,flatShading:true,envMap:env,envMapIntensity:.8});
+  m.face=new T.MeshStandardMaterial({map:face.map,emissiveMap:face.emi,emissive:0xffffff,emissiveIntensity:1.45,metalness:.5*mf,roughness:.55,envMap:env,envMapIntensity:.9,side:DS});
+  m.dark=new T.MeshStandardMaterial({color:0x2b333c,metalness:.8*mf,roughness:.42,envMap:env,envMapIntensity:1.0,side:DS});
   m.black=new T.MeshStandardMaterial({color:0x07090c,metalness:.2,roughness:.8,side:DS});
   m.pod=new T.MeshStandardMaterial({color:0x8fe9ff,metalness:.15,roughness:.12,transparent:true,opacity:.3,emissive:0x1aa6c8,emissiveIntensity:.7,envMap:env,envMapIntensity:1.4,depthWrite:false,side:DS});
   m.podcore=new T.MeshBasicMaterial({map:scp3dPodTex(),transparent:true,depthWrite:false,side:DS,toneMapped:false});
@@ -303,6 +306,9 @@ function* scp3dBuildG(){
 
 /* Build dipecah jadi 8 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG (14-drone3d.js). Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
    tahap berikut di-unshift sehingga urutan antar modul tidak berubah. ?ss=0 = sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__scp3dT, dicatat bench (R.scp3dT, R.ss). */
+/* ?senv=0 = teleskop TANPA env PMREM (default: pakai env). ?smf=N (0..1, default .45) = faktor metalness saat tanpa env. Terbaca di window.__senv / __smf, dicatat bench (R.senv, R.smf). */
+var SCP3D_ENV=(function(){var on=true;try{on=!/[?&]senv=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__senv=on?1:0;}catch(e2){}return on;})();
+var SCP3D_MF=(function(){var f=.45;try{var m=/[?&]smf=([0-9.]+)(?:&|#|$)/.exec(location.search);if(m)f=Math.max(0,Math.min(1,parseFloat(m[1])||0));}catch(e){}try{window.__smf=f;}catch(e2){}return f;})();
 var SCP3D_SLICE=(function(){var on=true;try{on=!/[?&]ss=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ss=on?1:0;}catch(e2){}return on;})();
 function scp3dDrive(it,tm){
   var t0=performance.now(),r=it.next();
