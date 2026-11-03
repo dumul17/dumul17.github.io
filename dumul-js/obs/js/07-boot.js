@@ -196,6 +196,7 @@ var DUMUL_CHARS=(function(){
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
   /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
   var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
+  var sfxLastName='';   /* [PATCH v157] nama file terakhir yang baru dapat loadedmetadata — buat log/status */
   try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(16,+wcm[1]));}catch(eWc){}
   /* v152: WARM_CONC default 4 -> 8, batas override ?wc= 8 -> 16. Telemetri v151 (SFX baru mulai sesudah 3D): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB, unduh 0,06-0,2 dtk) tapi TTFB 1,6-3 dtk per request
      -> latency-bound, bukan bandwidth-bound; konkurensi 4 terlalu sempit. 7 run ?wc=8 (wc=16 sempat terpotong ke 8): fase SFX 5-18 dtk di 5 run (16/16 saat kapsul), dulu ±27 dtk @conc4.
@@ -229,6 +230,10 @@ var DUMUL_CHARS=(function(){
       clearTimeout(tm);
       try{a.removeEventListener('loadedmetadata',onEv);a.removeEventListener('error',onEv);a.removeEventListener('abort',onEv);}catch(eR){}
       try{if(WLOG.length<40)WLOG.push([nm,t1,Math.round(performance.now()),why,a.readyState,a.networkState,warmActive,a.error?a.error.code:0,a._wab||0]);}catch(eG){}
+      if(why==='meta'){
+        try{sfxLastName=(nm||'').replace(/\.opus$/i,'');}catch(eNm){sfxLastName='';}   /* [PATCH v157] simpan nama bintang untuk log */
+        try{chTalk();}catch(eCh){}   /* [PATCH v157] mulut teleskop tiap metadata; paintPanel/log ganti teks di tick berikutnya */
+      }
       warmActive--;warmPump();
     }
     /* v130: 'abort' DIABAIKAN. Telemetri v129 (3 run, 19/19 slot): load() pada elemen preload='none' menembakkan 'abort' dalam 15-40 ms (readyState 0, networkState 3)
@@ -342,7 +347,7 @@ var DUMUL_CHARS=(function(){
   /* v128: bobot unit = BIAYA RELATIF pekerjaan (ms, dari bench itel A6610L: build 3D per modul + warm shader ±5,5 dtk), bukan jumlah unit.
      Tetap jujur: bar hanya naik saat pekerjaan nyata SELESAI, tanpa komponen waktu. Bedanya, unit yang makan 5 dtk (warm) kini mengisi ±48% bar,
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
-  var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=2800;   /* v145: WT_SFX kalibrasi plan (~16.9s wall SFX @conc4); bench ulang di itel */
+  var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
   var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0);
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
@@ -457,7 +462,10 @@ var DUMUL_CHARS=(function(){
     }
     /* v145: setelah modul, bisikkan antrean SFX di log bawah (tanpa angka file) */
     sx=sfxStatus();
-    if(!cur&&warmed&&sx.total&&!sx.ok)cur=T('bl.sfx')+' \u00b7 '+T('bl.a.sfx');
+    if(!cur&&warmed&&sx.total&&!sx.ok){
+      /* [PATCH v157] nama bintang + n/16 biar fase metadata terasa maju */
+      cur=T('bl.sfx')+' \u00b7 '+(sfxLastName||T('bl.a.sfx'))+' \u00b7 '+sx.n+'/'+sx.total;
+    }
     else if(sx.ok&&sx.total&&!logN.sfx){logN.sfx=1;logLast=T('bl.sfx')+' '+T('bl.ready');}
     if(cur)h='<span class="pn">&gt; '+cur+'</span>';
     else if(logLast)h='<span class="ok">\u2713 '+logLast+'</span>';
@@ -591,7 +599,12 @@ var DUMUL_CHARS=(function(){
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
-    if(!sx.ok&&sx.total>0)wc+=crp('s'+sx.n,warmed,WT_SFX/sx.total,WT_SFX/sx.total,elapsed);   /* v151: rayapan hanya kalau antrean SFX sudah mulai */
+    if(!sx.ok&&sx.total>0){
+      var per=WT_SFX/sx.total;
+      wc+=crp('s'+sx.n,warmed,per,per,elapsed);   /* v151: per langkah metadata selesai */
+      /* [PATCH v157] creep tipis selama ada slot aktif — bar tidak diam total di antara dua loadedmetadata; tetap di bawah CREEP_CAP */
+      if(warmed&&warmActive>0)wc+=crp('sAct',true,per*0.35,per*1.2,elapsed);
+    }
     var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
@@ -633,7 +646,14 @@ var DUMUL_CHARS=(function(){
   }
   function tick(){
     var elapsed=performance.now()-t0,c=calc(elapsed);
-    if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000))chSlowOn();   /* boot terasa lama: teleskop kalem, owl ngantuk */
+    /* [PATCH v157] jangan anggap "macet" kalau 3D+BGM sudah siap (atau BGM via cap) dan yang tersisa cuma metadata SFX */
+    if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000)){
+      var onlySfx=false;
+      try{
+        onlySfx=c.vis&&c.sx&&c.sx.total&&!c.sx.ok&&c.au&&(c.au.ok||c.bgmCapHit);
+      }catch(eOs){}
+      if(!onlySfx)chSlowOn();
+    }
     paintBar(c);
     paintPanel(c.ready,c.th,false,c.au,c.sx);
     /* v148 strict: 
