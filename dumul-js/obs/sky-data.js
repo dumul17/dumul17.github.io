@@ -21,7 +21,7 @@
      4. Jalankan  node check-sky.js  -> harus keluar "OK" (laporkan data yang kelupaan / salah).
 
    CARA TAMBAH BINTANG SFX (di rasi yang sudah ada)
-     1. Taruh file audio/<label huruf kecil>.opus   (contoh label 'Betelgeuse' -> audio/betelgeuse.opus)
+     1. Taruh file audio/obs-audio/<label huruf kecil>.opus   (contoh label 'Betelgeuse' -> audio/obs-audio/betelgeuse.opus)
      2. Tambah satu record di array SFX (urutan record = urutan di panel musik, dikelompokkan per sektor).
         Bintang HARUS ada di `lines` rasinya (alignment dihitung dari urutan garis, bintang SFX terakhir).
         fx:false -> tidak ada tombol #xxx-fx (bintang cuma bisa ditap lewat canvas, contoh Spica).
@@ -288,9 +288,11 @@ var SFX=[
 ];
 
 
-/* Audio non-SFX (tanpa .opus). BGM dipakai index.html, DUMUL_AUDIO dipakai dumul.html — dua-duanya ikut precache SW. */
-var BGM_AUDIO=['constellation','glitch-instrumental','collapsars'];
+/* Audio non-SFX (tanpa .opus). BGM = BGM Observatory saja; GARG (handoff) di GARG_PATH root audio/.
+   DUMUL_AUDIO = album Limerence di dumul.html. Precache per-halaman lewat audioFilesObs / audioFilesDumul. */
+var BGM_AUDIO=['constellation','collapsars'];
 var DUMUL_AUDIO=['limerence','glitch','nastenka','larung'];
+var GARG_PATH='audio/glitch-instrumental.opus';
 
 /* ---------- 4. GEOMETRI (titik + garis imajiner hasil trace) ---------- */
 var GEOMETRY=[
@@ -866,11 +868,23 @@ function panelGroups(){
   });
 }
 
-/* daftar file audio buat service worker (path relatif, urutan: BGM, SFX, DUMUL) */
+/* daftar file audio (path relatif). Opsi A: precache per-halaman.
+   Observatory: 18 obs-audio + GARG = 19. DUMUL: 4 lmr-audio + GARG = 5. Union unik = 23. */
+function audioFilesObs(){
+  return BGM_AUDIO.map(function(n){return 'audio/obs-audio/'+n+'.opus';})
+    .concat(SFX.map(function(s){return 'audio/obs-audio/'+s.audio;}))
+    .concat([GARG_PATH]);
+}
+function audioFilesDumul(){
+  return DUMUL_AUDIO.map(function(n){return 'audio/lmr-audio/'+n+'.opus';})
+    .concat([GARG_PATH]);
+}
 function audioFiles(){
-  return BGM_AUDIO.map(function(n){return 'audio/'+n+'.opus';})
-    .concat(SFX.map(function(s){return 'audio/'+s.audio;}))
-    .concat(DUMUL_AUDIO.map(function(n){return 'audio/'+n+'.opus';}));
+  var seen={},out=[];
+  audioFilesObs().concat(audioFilesDumul()).forEach(function(p){
+    if(!seen[p]){seen[p]=1;out.push(p);}
+  });
+  return out;
 }
 
 /* ---------- 5. FISIK BINTANG (dasar filter UV / IR; sumber: katalog_bintang_star_hopping_per_musim.docx Bagian 3) ----------
@@ -1214,7 +1228,7 @@ return {
   CONS_LABELS:D.CONS_LABELS,CONS_STARS:D.CONS_STARS,SIGNAL_FRAGMENTS:D.SIGNAL_FRAGMENTS,LAST_SIGNAL_DATA:D.LAST_SIGNAL_DATA,
   STAR_DATA:D.STAR_DATA,SIGNAL_NAMES:D.SIGNAL_NAMES,FOCUS_WHISPER:D.FOCUS_WHISPER,FOCUS_INFO:D.FOCUS_INFO,
   TERM_DIST:D.TERM_DIST,UNLOCK_CONS:D.UNLOCK_CONS,STAR_KEY:D.STAR_KEY,FX_KEYS:D.FX_KEYS,
-  focusOrder:focusOrder,panelGroups:panelGroups,audioFiles:audioFiles,check:check,
+  focusOrder:focusOrder,panelGroups:panelGroups,audioFiles:audioFiles,audioFilesObs:audioFilesObs,audioFilesDumul:audioFilesDumul,GARG_PATH:GARG_PATH,check:check,
   PHYS:PHYS,STAR_PHYS:STAR_PHYS,PL_PHYS:PL_PHYS,CONS_REF:CONS_REF,bandShift:bandShift,physOf:physOf,consPhys:consPhys,physNotes:physNotes
 };
 })();
