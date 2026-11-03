@@ -345,7 +345,7 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=20"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=21"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=16"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=15"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=30"></script>
@@ -656,7 +656,7 @@ if ('serviceWorker' in navigator) {
 <script>/* Bench (21-bench.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau URL punya ?bench=1. document.write supaya jalan SINKRON di titik ini
    (sebelum semua script defer) — wrapper rIC / WebGLRenderer / observer harus terpasang sebelum modul jalan, jadi TIDAK bisa pindah ke 19-auto-debug.js (dimuat setelah window load).
    Sengaja TIDAK di SHELL service-worker (sama seperti 19/20). Naikkan ?v= kalau isi 21-bench.js berubah. */
-(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.11"></scr'+'ipt>');}catch(e){}})();
+(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.12"></scr'+'ipt>');}catch(e){}})();
 </script>
 </body>
 </html>
