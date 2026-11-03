@@ -1297,7 +1297,7 @@ var SN_COOLDOWN={};
   }
   /* ---------- Media Session (notif + lock screen) ----------
      Semua track Observatory satu album: "Collapsars" -> art sendiri
-     (collapsars-cover.webp), beda dari Limerence di dumul.html. */
+     (audio/obs-audio/collapsars-cover.webp), beda dari Limerence di dumul.html. */
   var MS=('mediaSession' in navigator)&&typeof MediaMetadata!=='undefined'?navigator.mediaSession:null;
   var msKey='';
   function msTitle(n){return n?n.charAt(0).toUpperCase()+n.slice(1):'';}
@@ -1308,7 +1308,7 @@ var SN_COOLDOWN={};
         var name=trackNames[playingIdx];
         if(msKey!==name){
           msKey=name;
-          var base=new URL('collapsars-cover.webp',location.href).href;
+          var base=new URL('audio/obs-audio/collapsars-cover.webp',location.href).href;
           MS.metadata=new MediaMetadata({
             title:msTitle(name),artist:'DUMUL',album:'Collapsars',
             artwork:[{src:base,sizes:'1024x1024',type:'image/webp'}]
