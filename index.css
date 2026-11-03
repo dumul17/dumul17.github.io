@@ -312,6 +312,9 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 /* Bar "hidup" saat main thread diblok (build 3D 0,7-2,2 dtk): sheen + denyut ujung memakai transform/opacity -> jalan di compositor, tetap bergerak walau JS/layout macet.
    Persen TIDAK berubah (tetap jujur); ini hanya penanda "masih bekerja". Berhenti saat boot screen hilang dan di prefers-reduced-motion. */
 #boot-fill{position:relative;overflow:hidden}
+/* v155 (?bm=0 mematikan): fill selebar bar, digeser translateX -> animasi compositor, tidak ikut macet main thread. Transition lebih panjang menutup blok 0,5-0,7 dtk. */
+#boot-bar.bm #boot-fill{width:100%;transform:translateX(-100%);transition:transform .7s cubic-bezier(.2,.7,.3,1);will-change:transform}
+#boot-screen.off #boot-bar.bm #boot-fill{will-change:auto}
 #boot-fill::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;background:linear-gradient(90deg,rgba(200,248,255,0),rgba(200,248,255,.6),rgba(200,248,255,0));transform:translateX(-100%);will-change:transform;animation:bootSheen 1.25s linear infinite;pointer-events:none}
 #boot-fill::before{content:"";position:absolute;top:0;bottom:0;right:0;width:12px;background:radial-gradient(closest-side,rgba(220,252,255,.95),rgba(110,229,255,0));opacity:.35;will-change:opacity;animation:bootEdge .7s ease-in-out infinite alternate;pointer-events:none}
 @keyframes bootSheen{to{transform:translateX(250%)}}
