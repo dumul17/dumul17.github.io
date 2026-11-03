@@ -239,25 +239,19 @@ once its files (and, optionally, its music) have been cached.
         `Range` / `206` handling so seeking, `warmNext()` preloading and
         Web Audio analysers keep working. Anything not saved yet passes
         straight through to the network, exactly as before.
--   **When a track gets saved:**
-    1.  Automatically, once it has been played past 50% (the page
-        reports it to the service worker).
-    2.  In bulk, when the visitor taps the **offline button** in the
+-   **When a track gets saved:**   
+        In bulk, when the visitor taps the **offline button** in the
         Settings panel.
--   **Offline button** (opt-in, no popup): in the Observatory it lives in the
-    owl panel (Settings tab) as a chip that shows its own state:
-    `Save offline n/23` → `Saving n/23` (the chip fills as a progress bar)
-    → `Offline ready`. Tapping it downloads all tracks (23 files, ~75 MB).
-    -   `Offline…` while the service worker is still starting; `Offline N/A`
-        if it never becomes ready (e.g. Firefox private mode), tap to retry.
-    -   `Retry n/23` appears if the download stalls for 90 s or finishes
-        partially.
-    -   The choice is remembered (`ofl_choice`). If the download was
-        interrupted, it resumes silently on a later visit (skipped on Data
-        Saver, 2G and cellular).
-    -   The chip is removed if the browser has no service worker / Cache
-        Storage.
--   **Limits:** at most 24 audio files and 15 MB per file are kept
+-   **Offline button** (opt-in, no popup, **Opsi A** per-page):
+    -   Observatory chip (owl panel): `Save offline n/19` → downloads
+        19 paths (~52–55 MB): 18× `audio/obs-audio/` + shared GARG.
+    -   DUMUL banner: downloads 5 paths (~15 MB): 4× `audio/lmr-audio/` + GARG.
+    -   One shared `AUDIO_CACHE` (`dumul-audio-v3`); page sends `urls` on
+        `PRECACHE_AUDIO` / `AUDIO_STATUS` so totals are 19 vs 5, not 23.
+    -   `Offline…` while SW starts; `Offline N/A` if unavailable; `Retry n/t`
+        if the download stalls 90 s or finishes partially.
+    -   Choice remembered (`ofl_choice`). Chip removed without SW/Cache API.
+-   **Limits:** at most 24 audio files and 70 MB per file are kept
     (`MAX_AUDIO_FILES`, `MAX_AUDIO_BYTES`); oldest saved goes first.
 -   **`cache-status.html`:** a small diagnostic page (not linked from the
     site, `noindex`). Lists which tracks are saved and their sizes, shows
@@ -318,37 +312,28 @@ once its files (and, optionally, its music) have been cached.
 │
 ├── README.md
 │
-├── audio/                  # All .opus files live here (kept out of the root)
-│   ├── # Observatory stellar SFX (16)
-│   ├── betelgeuse.opus  rigel.opus  aldebaran.opus  pleione.opus
-│   ├── sirius.opus  capella.opus  pollux.opus  procyon.opus      # Winter
-│   ├── spica.opus  arcturus.opus  alioth.opus  regulus.opus      # Spring
-│   ├── vega.opus  deneb.opus  altair.opus                        # Summer
-│   ├── alpheratz.opus                                            # Autumn
-│   ├── # Observatory / transition audio
-│   ├── constellation.opus      # Observatory BGM
-│   ├── collapsars.opus         # Observatory BGM
-│   ├── glitch-instrumental.opus# Gargantua → DUMUL transition / album opening
-│   ├── # DUMUL album audio
-│   ├── limerence.opus
-│   ├── glitch.opus
-│   ├── nastenka.opus
-│   └── larung.opus
+├── audio/
+│   ├── glitch-instrumental.opus   # GARG handoff (shared root; Observatory + DUMUL)
+│   ├── obs-audio/                 # Observatory: 18 .opus + cover
+│   │   ├── constellation.opus     # BGM
+│   │   ├── collapsars.opus        # BGM
+│   │   ├── betelgeuse.opus … alpheratz.opus   # 16 SFX
+│   │   └── collapsars-cover.webp  # Media Session art (Observatory)
+│   └── lmr-audio/                 # DUMUL album: 4 .opus + hero
+│       ├── limerence.opus  glitch.opus  nastenka.opus  larung.opus
+│       └── og.webp                # Hero (index + dumul) + Media Session DUMUL
 │
-├── og.webp                 # Hero image used on both pages (art Limerence di dumul)
-├── collapsars-cover.webp   # Album art Collapsars (Media Session Observatory)
-├── og.jpg                  # DUMUL Open Graph image
+├── og.jpg                  # DUMUL Open Graph image (meta; separate from og.webp)
 └── og-constellation.jpg    # Observatory Open Graph image
 ```
 
-Audio paths are relative to the HTML pages (`audio/<name>.opus`) and are
-built in `dumul-js/obs/js/01-core.js` (`mkAudio`) and `dumul.js`
-(`srcOf`); the service worker gets its list from `SKY.audioFiles()`
-(`ALL_AUDIO`), which is generated from `sky-data.js`. Images stay beside the HTML files (the
-Open Graph images are referenced by absolute URL, so leave them at the
-site root). `service-worker.js` and
-`manifest.json` must also stay at the root so the service worker's scope
-covers both pages.
+Audio inventory: **23** files (18 obs + 4 lmr + 1 GARG). Offline Opsi A
+precaches **19** on Observatory and **5** on DUMUL (GARG shared, not copied).
+Paths are built in `sky-data.js` (`audioFilesObs` / `audioFilesDumul` /
+`GARG_PATH`), `01-core.js` (`mkAudio` full path), and `dumul.js` (`srcOf`).
+SW uses `d.urls` when the page sends them; fallback is `SKY.audioFiles()` (23).
+`og.jpg` / `og-constellation.jpg` stay at root for meta tags. `service-worker.js`
+and `manifest.json` stay at root for scope.
 
 ------------------------------------------------------------------------
 

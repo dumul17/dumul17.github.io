@@ -26,7 +26,7 @@
 <meta name="twitter:title" content="DUMUL — Indonesian Alternative Rock">
 <meta name="twitter:description" content="DUMUL is a three-person Indonesian alternative rock project recorded in Central Borneo bedrooms. Listen to Limerence, Glitch, Nastenka, and Larung.">
 <meta name="twitter:image" content="https://dumul17.github.io/og.jpg">
-<link rel="stylesheet" href="dumul.css?v=7">
+<link rel="stylesheet" href="dumul.css?v=8">
 
 <script>
   /* Sedini mungkin (sebelum paint pertama): tandai kalau ini kedatangan dari swallow. Nilainya dibaca (tidak dihapus) di sini. */
@@ -418,7 +418,7 @@ function dmNeuralDraw(g,W,H,net,t){
      4) Warna address bar browser ikut lagu (theme-color)
      5) Haptic bass (opt-in, Android) -->
 
-<script defer src="dumul.js?v=9"></script>
+<script defer src="dumul.js?v=10"></script>
 <script type="module" src="dumul-app.js?v=9"></script>
 <script>
 /* PWA: daftar service worker. Audio tidak disimpan otomatis (aturan >50% dihapus); hanya lewat unduh offline (PRECACHE_AUDIO). */
@@ -432,9 +432,17 @@ if ('serviceWorker' in navigator) {
 /* Offline archive — banner opt-in (gaya HUD observatory). Teks & angka bisa diubah di TXT / SIZE_MB. */
 (function () {
   if (!('serviceWorker' in navigator) || !('caches' in window)) return;
-  var SIZE_MB = 15;          /* perkiraan total ukuran semua lagu */
+  var SIZE_MB = 15;          /* Opsi A: 5 path DUMUL (~15 MB) */
   var ASK_AGAIN_DAYS = 14;   /* "NOT NOW" -> tanya lagi setelah sekian hari */
   var KEY = 'ofl_choice';
+  /* Hardcode (tanpa SKY): 4 lmr-audio + GARG root */
+  var OFFLINE_URLS = [
+    'audio/lmr-audio/limerence.opus',
+    'audio/lmr-audio/glitch.opus',
+    'audio/lmr-audio/nastenka.opus',
+    'audio/lmr-audio/larung.opus',
+    'audio/glitch-instrumental.opus'
+  ];
   var TXT = {
     title: '> OFFLINE ARCHIVE',
     ask: 'Save all {n} tracks (~{mb} MB) so the observatory keeps playing without signal?',
@@ -529,7 +537,7 @@ if ('serviceWorker' in navigator) {
 
   function sendPrecache() {
     navigator.serviceWorker.ready.then(function (reg) {
-      if (reg.active) reg.active.postMessage({ type: 'PRECACHE_AUDIO' });
+      if (reg.active) reg.active.postMessage({ type: 'PRECACHE_AUDIO', urls: OFFLINE_URLS });
     });
   }
   function arm() {
@@ -577,7 +585,7 @@ if ('serviceWorker' in navigator) {
 
   function askStatus() {
     navigator.serviceWorker.ready.then(function (reg) {
-      if (reg.active) reg.active.postMessage({ type: 'AUDIO_STATUS' });
+      if (reg.active) reg.active.postMessage({ type: 'AUDIO_STATUS', urls: OFFLINE_URLS });
     });
   }
   function begin() {

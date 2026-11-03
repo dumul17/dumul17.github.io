@@ -1,23 +1,24 @@
-/* Dumul's Observatory — service worker v2 (audio on-demand cache)
+/* Dumul's Observatory — service worker (audio on-demand cache, Opsi A per-halaman)
    - Halaman (navigate)      -> network-first, fallback cache kalau offline
    - CSS/JS/gambar/font      -> stale-while-revalidate
    - Audio (.opus dll)       -> kalau sudah tersimpan: dilayani dari cache lengkap dengan Range/206 (seek aman)
                                 kalau belum: diteruskan apa adanya ke network
-   - Lagu disimpan HANYA lewat PRECACHE_AUDIO (unduh offline, dipicu pengunjung). Tidak ada simpan otomatis: warm saat boot cukup metadata (hemat bandwidth).
-     Jalur CACHE_AUDIO / CACHE_AUDIO_LIST masih ada di SW tapi tidak dipanggil halaman; TEE_ON_MISS=false mematikan tee (kode tee dibiarkan sebagai opsi).
+   - Lagu disimpan HANYA lewat PRECACHE_AUDIO (unduh offline, dipicu pengunjung). Tidak ada simpan otomatis.
+   - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
+     Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v342'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
-const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
+const VERSION = 'v343'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const AUDIO_VERSION = 'v3';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
 const AUDIO_CACHE = `dumul-audio-${AUDIO_VERSION}`;
 
-const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, sekitar 67 MB) */
+const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, ~67 MB union) */
 const MAX_AUDIO_BYTES = 70 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
 const TEE_ON_MISS = false;                 /* true = file yang belum tersimpan diunduh SEKALI: satu cabang ke cache, satu cabang langsung ke pemutar. false = perilaku lama (teruskan ke network, simpan terpisah) */
 
-/* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
-importScripts('dumul-js/obs/sky-data.js?v=31');
+/* Daftar lagu dari sky-data.js. ALL_AUDIO = union 23 (fallback). Halaman kirim d.urls untuk total per-halaman. */
+importScripts('dumul-js/obs/sky-data.js?v=32');
 const ALL_AUDIO = SKY.audioFiles();
 
 /* Harus sama persis dengan yang dipanggil HTML (termasuk ?v=) */
@@ -25,19 +26,19 @@ const SHELL = [
   './',
   'index.html',
   'dumul.html',
-  'index.css?v=94',
+  'index.css?v=95',
   /* harus sama persis dengan <script src> di index.html */
-  'dumul-js/obs/sky-data.js?v=31',
+  'dumul-js/obs/sky-data.js?v=32',
   'dumul-js/obs/texts.js?v=1',
   'dumul-js/obs/i18n.js?v=38',
   'dumul-js/obs/i18n-sky.js?v=2',
   'dumul-js/obs/i18n-texts.js?v=1',
   'dumul-js/obs/js/00-rain.js?v=1',
-  'dumul-js/obs/js/01-core.js?v=143',
+  'dumul-js/obs/js/01-core.js?v=144',
   'dumul-js/obs/js/02-sky-logic.js?v=140',
   'dumul-js/obs/js/03-gargantua.js?v=111',
   'dumul-js/obs/js/04-render.js?v=143',
-  'dumul-js/obs/js/05-sector-ui.js?v=181',
+  'dumul-js/obs/js/05-sector-ui.js?v=182',
   'dumul-js/obs/js/06-interaction.js?v=126',
   'dumul-js/obs/js/07-boot.js?v=156',
   'dumul-js/obs/js/08-tx-drone.js?v=15',
@@ -56,11 +57,11 @@ const SHELL = [
   'dumul-js/obs/lib/three.core.r186.js?v=1',
   'dumul-js/obs/img/nebula.webp?v=1',
   'dumul-js/obs/img/milky-way.webp?v=3',
-  'dumul.css?v=7',
-  'dumul.js?v=9',
+  'dumul.css?v=8',
+  'dumul.js?v=10',
   'dumul-app.js?v=9',
-  'og.webp',
-  'collapsars-cover.webp',
+  'audio/lmr-audio/og.webp',
+  'audio/obs-audio/collapsars-cover.webp',
   'manifest.json',
   'icons/icon-192.png',
   'icons/icon-512.png'
@@ -113,9 +114,9 @@ self.addEventListener('message', (event) => {
     /* v132: beberapa file berurutan (bukan paralel) supaya tidak berebut bandwidth dengan lagu yang sedang diputar */
     event.waitUntil((async () => { for (const u of d.urls.slice(0, 4)) { if (typeof u === 'string') await cacheAudio(u); } })());
   } else if (d.type === 'PRECACHE_AUDIO') {
-    event.waitUntil(precacheAll());
+    event.waitUntil(precacheList(Array.isArray(d.urls) && d.urls.length ? d.urls : ALL_AUDIO));
   } else if (d.type === 'AUDIO_STATUS') {
-    event.waitUntil(replyStatus(event.source));
+    event.waitUntil(replyStatus(event.source, Array.isArray(d.urls) && d.urls.length ? d.urls : ALL_AUDIO));
   }
 });
 
@@ -195,36 +196,40 @@ async function trimAudio(cache) {
   for (let i = 0; i < keys.length - MAX_AUDIO_FILES; i++) await cache.delete(keys[i]);
 }
 
-async function countCached() {
+/* Hitung berapa path dari list yang sudah ada di AUDIO_CACHE (per-halaman lewat urls). */
+async function countCached(urls) {
+  const list = urls && urls.length ? urls : ALL_AUDIO;
   const cache = await caches.open(AUDIO_CACHE);
   let n = 0;
-  for (const f of ALL_AUDIO) {
+  for (const f of list) {
     if (await cache.match(audioKey(new URL(f, self.registration.scope).href))) n++;
   }
   return n;
 }
 
-async function replyStatus(client) {
+async function replyStatus(client, urls) {
   try {
-    if (client) client.postMessage({ type: 'AUDIO_STATUS', cached: await countCached(), total: ALL_AUDIO.length });
+    const list = urls && urls.length ? urls : ALL_AUDIO;
+    if (client) client.postMessage({ type: 'AUDIO_STATUS', cached: await countCached(list), total: list.length });
   } catch (e) {}
 }
 
-/* Unduh semua lagu satu per satu (tidak paralel, biar tidak menyaingi streaming yang sedang jalan) */
-async function precacheAll() {
+/* Unduh daftar urls satu per satu (Opsi A: 19 atau 5). Fallback ALL_AUDIO kalau urls kosong. */
+async function precacheList(urls) {
   if (precaching) return;
   precaching = true;
+  const list = urls && urls.length ? urls : ALL_AUDIO;
   let ok = 0;
   try {
-    for (let i = 0; i < ALL_AUDIO.length; i++) {
-      const good = await cacheAudio(new URL(ALL_AUDIO[i], self.registration.scope).href);
+    for (let i = 0; i < list.length; i++) {
+      const good = await cacheAudio(new URL(list[i], self.registration.scope).href);
       if (good) ok++;
-      await notify({ type: 'AUDIO_CACHED', file: ALL_AUDIO[i], done: ok, total: ALL_AUDIO.length });
+      await notify({ type: 'AUDIO_CACHED', file: list[i], done: ok, total: list.length });
     }
   } finally {
     precaching = false;
   }
-  await notify({ type: 'PRECACHE_DONE', ok: ok, total: ALL_AUDIO.length });
+  await notify({ type: 'PRECACHE_DONE', ok: ok, total: list.length });
 }
 
 async function notify(msg) {

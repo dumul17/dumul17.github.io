@@ -534,7 +534,7 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
   width: 100%;
   height: 282px;
   overflow: hidden;
-  background: #0a1218 url('./og.webp') center/cover no-repeat;
+  background: #0a1218 url('audio/lmr-audio/og.webp') center/cover no-repeat;
   z-index: 0;
 }
 .tesseract-og {
