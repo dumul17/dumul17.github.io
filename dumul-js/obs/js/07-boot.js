@@ -614,10 +614,13 @@ var DUMUL_CHARS=(function(){
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
      Animator rAF sendiri (bukan bergantung pada tick/startPost) supaya sapuan ke 100% tetap selesai walau interval startPost sudah berhenti. Berhenti kalau boot screen hilang. */
   var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
+  /* v155: ?bm=0 = bar lama (style.width). Default: fill selebar bar + translateX (compositor, tetap meluncur saat main thread macet; lihat index.css .bm). */
+  var BAR_BM=true;try{BAR_BM=!/[?&]bm=0(?:&|#|$)/.test(location.search);}catch(eB){}
+  try{if(BAR_BM)document.getElementById('boot-bar').classList.add('bm');window.__bm=BAR_BM?1:0;}catch(eB){}
   function barShow(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
-    pV=v;fill.style.width=v+'%';pct.textContent=v+'%';
+    pV=v;if(BAR_BM){fill.style.transform='translateX('+(v-100)+'%)';fill.setAttribute('data-v',v);}else fill.style.width=v+'%';pct.textContent=v+'%';
     chProg(v);
   }
   function barStep(now){
