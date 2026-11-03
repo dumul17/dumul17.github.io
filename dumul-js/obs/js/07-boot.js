@@ -196,10 +196,18 @@ var DUMUL_CHARS=(function(){
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
   /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
   var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
-  var sfxLastName='';   /* [PATCH v157] nama file terakhir yang baru dapat loadedmetadata — buat log/status */
-  var sfxLastIsGlitch=false; /* [PATCH v159] meta terakhir = GARG/glitch */
-  var sfxGlitchWarm=false;   /* [PATCH v159] slot GARG sedang aktif (sebelum meta) */
-  var sfxCacheFlash=false;   /* [PATCH v159] offline: semua SFX sudah ready saat warmRest */
+  /* [PATCH v160] Kejadian warm audio -> antrean untuk log boot (dikonsumsi logPoll). Menggantikan sfxLastName/sfxLastIsGlitch/sfxGlitchWarm/sfxCacheFlash (v157/v159).
+     Tiap file = 1 kejadian, termasuk yang sudah siap duluan (cache/offline), jadi log tetap bisa menghitung 2 BGM + 16 bintang + 1 GARG satu per satu, bukan loncat ke "siap".
+     k: 'b' BGM | 's' bintang | 'g' GARG; w: 's' mulai | 'e' selesai (meta / error). */
+  var warmEv=[];
+  function warmKind(a){
+    try{
+      if(typeof GARG!=='undefined'&&GARG&&a===GARG)return 'g';
+      if((typeof AMB!=='undefined'&&a===AMB)||(typeof MUSIC_COLLAP!=='undefined'&&a===MUSIC_COLLAP))return 'b';
+    }catch(eK){}
+    return 's';
+  }
+  function warmEvPush(k,w,nm){if(warmEv.length<80)warmEv.push({k:k,w:w,nm:nm||''});}
   try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(16,+wcm[1]));}catch(eWc){}
   /* v152: WARM_CONC default 4 -> 8, batas override ?wc= 8 -> 16. Telemetri v151 (SFX baru mulai sesudah 3D): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB, unduh 0,06-0,2 dtk) tapi TTFB 1,6-3 dtk per request
      -> latency-bound, bukan bandwidth-bound; konkurensi 4 terlalu sempit. 7 run ?wc=8 (wc=16 sempat terpotong ke 8): fase SFX 5-18 dtk di 5 run (16/16 saat kapsul), dulu ±27 dtk @conc4.
@@ -216,7 +224,15 @@ var DUMUL_CHARS=(function(){
     if(gap>0){setTimeout(warmPump,gap+20);return;}
     while(warmActive<WARM_CONC&&warmQ.length){
       var a=warmQ.shift();
-      try{if(!a||a.readyState>=1||!a.paused||a._retrying||a._want)continue;}catch(eE){continue;}
+      try{
+        if(a&&a.readyState>=1){   /* [PATCH v160] sudah siap duluan (cache/offline): tetap dicatat supaya log menghitungnya */
+          var kp=warmKind(a);
+          if(kp==='g'){warmEvPush('g','s');warmEvPush('g','e');}
+          else warmEvPush(kp,'e',warmName(a).replace(/\.opus$/i,''));
+          continue;
+        }
+        if(!a||!a.paused||a._retrying||a._want)continue;
+      }catch(eE){continue;}
       warmSlot(a);
     }
   }
@@ -229,18 +245,16 @@ var DUMUL_CHARS=(function(){
   function warmSlot(a){
     var fin=false,tm=0,t1=Math.round(performance.now()),nm=warmName(a);
     var isGarg=false;try{isGarg=!!(typeof GARG!=='undefined'&&GARG&&a===GARG);}catch(eIg){}
-    if(isGarg)sfxGlitchWarm=true;   /* [PATCH v159] banner decoder saat GARG di-warm */
+    if(isGarg)warmEvPush('g','s');   /* [PATCH v160] log: GARG mulai di-warm */
     function rel(why){
       if(fin)return;fin=true;
       clearTimeout(tm);
       try{a.removeEventListener('loadedmetadata',onEv);a.removeEventListener('error',onEv);a.removeEventListener('abort',onEv);}catch(eR){}
       try{if(WLOG.length<40)WLOG.push([nm,t1,Math.round(performance.now()),why,a.readyState,a.networkState,warmActive,a.error?a.error.code:0,a._wab||0]);}catch(eG){}
-      if(why==='meta'){
-        try{sfxLastName=(nm||'').replace(/\.opus$/i,'');}catch(eNm){sfxLastName='';}   /* [PATCH v157] simpan nama bintang untuk log */
-        try{sfxLastIsGlitch=isGarg||/glitch/i.test(sfxLastName||'');}catch(eGl){sfxLastIsGlitch=isGarg;} /* [PATCH v159] */
-        try{chTalk();}catch(eCh){}   /* [PATCH v157] mulut teleskop tiap metadata; paintPanel/log ganti teks di tick berikutnya */
-      }
-      if(isGarg)sfxGlitchWarm=false;
+      /* [PATCH v160] GARG selesai karena sebab apa pun (meta / error file glitch / timeout) -> log; BGM + bintang hanya dihitung kalau benar-benar meta/error (sama dengan sfxStatus/audioStatus) */
+      if(isGarg)warmEvPush('g','e');
+      else if(why==='meta'||why==='err')warmEvPush(warmKind(a),'e',(nm||'').replace(/\.opus$/i,''));
+      if(why==='meta'){try{chTalk();}catch(eCh){}}   /* [PATCH v157] mulut teleskop tiap metadata */
       warmActive--;warmPump();
     }
     /* v130: 'abort' DIABAIKAN. Telemetri v129 (3 run, 19/19 slot): load() pada elemen preload='none' menembakkan 'abort' dalam 15-40 ms (readyState 0, networkState 3)
@@ -283,13 +297,6 @@ var DUMUL_CHARS=(function(){
     if(!warmTrig)warmTrig='finish';   /* dipanggil dari finish tanpa early trigger */
     warmAt=Math.round(performance.now()-t0);
     try{performance.mark('obs-warm');}catch(eM){}
-    /* [PATCH v159] offline/cache: kalau semua stellar+GARG sudah readyState>=1, banner flash "cache" biar tidak lompat bisu ke planet siap */
-    try{
-      var _ar=true,_i;
-      for(_i=0;_i<stars.length;_i++){if(!(stars[_i].readyState>=1||stars[_i].error)){_ar=false;break;}}
-      if(_ar&&typeof GARG!=='undefined'&&GARG&&!(GARG.readyState>=1||GARG.error))_ar=false;
-      if(_ar&&stars.length)sfxCacheFlash=true;
-    }catch(eCf){}
     warmQ=warmQ.concat(stars);   /* v132: sisa antrean BGM (kalau ?wc=1) tetap di depan; AMB/MUSIC_COLLAP TIDAK di-load() ulang di sini (memutus request yang sedang jalan) */
     try{if(GARG)warmQ.push(GARG);}catch(e){}
     warmPump();
@@ -444,11 +451,15 @@ var DUMUL_CHARS=(function(){
     stageStep();
   }
   /* v143: LOG BOOT SATU BARIS (bahasa awam, tanpa angka ms), nempel di kiri persen (#boot-row).
-     Sumber = penanda tahap yang SUDAH ditulis tiap modul (window.__scp3dT / __dr3dT / __pt3dT / __pl3dT; panjang array = tahap selesai) + state modul. Tidak ada hook baru di modul 3D.
-     Yang tampil: tahap yang sedang dikerjakan ("> Drone · sayap"); kalau tidak ada, tahap terakhir yang selesai ("\u2713 Planet siap").
-     Tinggi baris = baris persen yang sudah ada, jadi panel tidak bergeser. Polling ikut interval 100 ms yang sudah ada; innerHTML hanya ditulis kalau isinya berubah. */
+     Sumber = penanda tahap yang SUDAH ditulis tiap modul (window.__scp3dT / __dr3dT / __pt3dT / __pl3dT; panjang array = tahap selesai) + state modul + kejadian warm audio (warmEv). Tidak ada hook baru di modul 3D.
+     Tinggi baris = baris persen yang sudah ada, jadi panel tidak bergeser. Polling ikut interval 100 ms yang sudah ada; innerHTML hanya ditulis kalau isinya berubah.
+     [PATCH v160] Dua jalur tampilan:
+       LIVE  = keadaan sekarang (">" tahap yang sedang jalan, atau "\u2713" kejadian terakhir). Jalur lama; dipakai saat jaringan lambat dan kejadian datang satu-satu.
+       ANTREAN = kalau satu poll membawa >=2 kejadian (cache / offline / HP kencang: semuanya selesai dalam beberapa ms), tiap kejadian ditampilkan berurutan dengan jeda singkat,
+                 jadi pengunjung offline tetap melihat 2 BGM -> 16 bintang -> GARG, tidak loncat ke baris terakhir ("Planet siap").
+       Antrean cuma kosmetik: tidak menahan bar, status atas, atau gerbang kapsul. Kalau menumpuk, jedanya mengecil (logDwell) dan tahap modul yang sama dilipat jadi satu. */
   var logEl=document.getElementById('boot-log'),logLast='',logN={},logOut='';
-  var LOG_M=[   /* urutan = antrean threeLoad (AST, SCP, DR, PT, PL); [global, array tahap, kunci nama, kunci tahap]. Jumlah langkah = tahap bernama + 1 (langkah penutup = "siap") */
+  var LOG_M=[   /* urutan = antrean threeLoad (AST, SCP, DR, PT, PL); [global, array tahap, kunci nama, kunci tahap]. Jumlah langkah = tahap bernama + 1 (langkah penutup = \"siap\") */
     ['AST3D',null,'bl.rock',null],
     ['SCP3D','__scp3dT','bl.scope',['canvas','light','paint','body','cockpit','engine','lamps']],
     ['DR3D','__dr3dT','bl.drone',['canvas','light','paint','wings','engine','join','size']],
@@ -456,12 +467,39 @@ var DUMUL_CHARS=(function(){
     ['PL3D','__pl3dT','bl.planet',null]
   ];
   /* label tahap ke-n; null kalau n di luar daftar bernama (langkah penutup / modul tanpa tahap).
-     Dulu langkah penutup ikut membaca m[3][n] yang kosong -> kunci "bl.a.undefined" tampil di layar. */
+     Dulu langkah penutup ikut membaca m[3][n] yang kosong -> kunci \"bl.a.undefined\" tampil di layar. */
   function logStage(m,n){return m[3]&&n<m[3].length?T('bl.a.'+m[3][n]):null;}
+
+  var logQ=[],logCur=null,logCurAt=0,logT=0,logFin=false,logLive={h:'',dec:false};
+  var bgmN=0,starN=0,gargOn=false,sfxNm='',bgmNm='',GL_MIN=700,GL_CH='01#?%/|_-\u2588\u2592';
+  function logEsc(s){return String(s).replace(/[&<>"]/g,'');}
+  /* Scramble gaya jam dilatasi di 06-interaction.js (clkScr), tapi tanpa < > & karena ditulis lewat innerHTML. Spasi dan titik tengah tidak ikut diacak (lebar baris stabil). */
+  function glScr(s,p){
+    var o='',i,c;
+    for(i=0;i<s.length;i++){c=s.charAt(i);o+=(c!==' '&&c!=='\u00b7'&&Math.random()<p)?GL_CH.charAt((Math.random()*GL_CH.length)|0):c;}
+    return o;
+  }
+  /* Baris GARG = decode yang SENGAJA error. res=null: error terus-menerus (digit ter-scramble, kadang ERR / CRC / ??, belah warna merah-cyan seperti jam).
+     res 0..1: fase penutup, error mereda (decode \"selesai\" sebentar) sebelum baris \u2713. Hanya warna, text-shadow, dan geser kiri 1-2 px (tidak mengubah lebar baris). */
+  function decHtml(res){
+    var base=T('bl.glitch')+' \u00b7 '+T('bl.a.decode'),tx,dx,k;
+    if(reduce)return '<span class=\"pn dec\">&gt; '+logEsc(base)+'</span>';   /* reduced-motion: statis, tetap kelihatan sebagai baris glitch */
+    if(res==null){
+      k=Math.random();
+      if(k<.22)tx=T('bl.glitch')+' \u00b7 '+(k<.07?'ERR:ERR:ERR':(k<.14?'??:??:??':'CRC 0x'+((Math.random()*65536)|0).toString(16).toUpperCase()));
+      else tx=glScr(base,.3+Math.random()*.4);
+      dx=(Math.random()*2-1)*2.2;
+    }else{
+      tx=glScr(base,.5*(1-res));
+      dx=(Math.random()*2-1)*2.2*(1-res);
+    }
+    return '<span class=\"pn dec\" style=\"left:'+dx.toFixed(1)+'px;text-shadow:'+dx.toFixed(1)+'px 0 rgba(255,70,100,.75),'+(-dx).toFixed(1)+'px 0 rgba(90,230,255,.7)\">&gt; '+logEsc(tx)+'</span>';
+  }
+
   function logPoll(){
     if(!logEl)return;
-    var thr=(typeof THREE!=='undefined'&&THREE.REVISION),cur='',h='',i,m,o,nm,tot,n,k,st,sx;
-    if(thr&&!logN.thr){logN.thr=1;logLast=T('bl.engine')+' '+T('bl.ready');}
+    var thr=(typeof THREE!=='undefined'&&THREE.REVISION),cur='',h='',i,m,o,nm,tot,n,k,st,sx,au,ev=[],e,live,starTot=stars.length,bgmTot=audioList().length,decLive=false;
+    if(thr&&!logN.thr){logN.thr=1;ev.push({k:'ok',s:T('bl.engine')+' '+T('bl.ready')});}
     if(!thr)cur=T('bl.engine')+' \u00b7 '+T('bl.a.dl');
     for(i=0;i<LOG_M.length;i++){
       m=LOG_M[i];o=window[m[0]];
@@ -470,38 +508,69 @@ var DUMUL_CHARS=(function(){
       if(o.state===2)k=tot;
       else if(m[3])k=window[m[1]]?window[m[1]].length:0;
       else k=(m[1]&&window[m[1]]&&window[m[1]].length>=3)?1:0;
-      while(n<k&&n<tot){st=logStage(m,n);logLast=st?nm+' \u00b7 '+st:nm+' '+T('bl.ready');n++;}
+      while(n<k&&n<tot){st=logStage(m,n);ev.push({k:'ok',g:'st',mod:i,s:st?nm+' \u00b7 '+st:nm+' '+T('bl.ready')});n++;}
       logN[i]=n;
       if(!cur&&thr&&n<tot)cur=nm+' \u00b7 '+(logStage(m,n)||T('bl.a.load'));
     }
-    /* v145: setelah modul, bisikkan antrean SFX di log bawah (tanpa angka file) */
-    /* [PATCH v159] A+C: counter 16 bintang murni; GARG = baris Glitch + decoder; offline cache flash */
-    sx=sfxStatus();
-    var starN=0,starTot=stars.length,si;
-    try{for(si=0;si<starTot;si++){if(stars[si].readyState>=1||stars[si].error)starN++;}}catch(eSn){}
-    var showDec=false;
+    /* [PATCH v160] kejadian warm audio -> baris log. BGM: x/2, bintang: x/16 (GARG TIDAK ikut hitungan bintang). GARG: mulai = live decode, selesai = fase penutup + \u2713. */
+    while(warmEv.length){
+      e=warmEv.shift();
+      if(e.k==='g'){
+        if(e.w==='s')gargOn=true;
+        else if(gargOn){gargOn=false;ev.push({k:'dec',min:GL_MIN});ev.push({k:'ok',s:T('bl.glitch')+' '+T('bl.ready')});}
+      }else if(e.k==='b'){bgmN++;bgmNm=e.nm;ev.push({k:'ok',s:T('bl.bgm')+' \u00b7 '+e.nm+' \u00b7 '+bgmN+'/'+bgmTot});}
+      else{starN++;sfxNm=e.nm;ev.push({k:'ok',g:'sfx',s:T('bl.sfx')+' \u00b7 '+e.nm+' \u00b7 '+starN+'/'+starTot});}
+    }
+    sx=sfxStatus();au=audioStatus();
+    if(sx.ok&&sx.total&&!logN.sfx){logN.sfx=1;ev.push({k:'ok',s:T('bl.sfx')+' '+T('bl.ready')});}
+    /* satu kejadian tunggal tanpa antrean = jalur LIVE lama (jaringan lambat); >=2 kejadian dalam satu poll, atau antrean masih jalan = masuk antrean */
+    if(ev.length>=2||logQ.length||logCur){for(i=0;i<ev.length;i++)logQ.push(ev[i]);}
+    else if(ev.length){e=ev[0];if(e.k==='ok')logLast=e.s;}
+    /* baris LIVE (dipakai saat antrean kosong): tahap modul > BGM > bintang; GARG menyela 1 dtk tiap 3 dtk selama masih di-warm (atau sendirian kalau bintang sudah selesai) */
+    if(!cur&&!au.ok&&bgmTot){cur=T('bl.bgm')+' \u00b7 '+(bgmNm||T('bl.a.bgm'))+' \u00b7 '+bgmN+'/'+bgmTot;}
     if(!cur&&warmed&&sx.total&&!sx.ok){
-      if(sfxGlitchWarm||(sfxLastIsGlitch&&starN>=starTot)){
-        /* GARG / glitch-instrumental sedang di-warm → banner decoder */
-        cur='Glitch \u00b7 decoding\u2026';
-        showDec=true;
-      }else if(starN>0||(sfxLastName&&!sfxLastIsGlitch)){
-        cur=T('bl.sfx')+' \u00b7 '+(sfxLastName||T('bl.a.sfx'))+' \u00b7 '+starN+'/'+starTot;
-      }else{
-        cur=T('bl.sfx')+' \u00b7 '+T('bl.a.sfx');
+      decLive=gargOn&&(starN>=starTot||(((performance.now()/1000)|0)%3===2));
+      if(!decLive)cur=T('bl.sfx')+' \u00b7 '+(sfxNm||T('bl.a.sfx'))+' \u00b7 '+starN+'/'+starTot;
+    }
+    if(decLive)live={h:'',dec:true};
+    else if(cur)live={h:'<span class=\"pn\">&gt; '+cur+'</span>',dec:false};
+    else if(logLast)live={h:'<span class=\"ok\">\u2713 '+logLast+'</span>',dec:false};
+    else live={h:'',dec:false};
+    logLive=live;
+    logShow();
+  }
+  /* Jeda tiap baris antrean: makin menumpuk makin pendek; sesudah kapsul tampil dibatasi 50 ms. Baris decode punya jeda sendiri (min). */
+  function logDwell(it){
+    if(it.k==='dec')return it.min;
+    var L=logQ.length,d=L>14?45:(L>8?60:(L>4?80:110));
+    return logFin?Math.min(d,50):d;
+  }
+  function logQNext(){
+    var it,j,dup;
+    while(logQ.length){
+      it=logQ.shift();
+      if(it.g==='st'&&logQ.length>5){   /* menumpuk: tahap modul yang sama cukup yang terakhir */
+        dup=false;for(j=0;j<logQ.length;j++){if(logQ[j].g==='st'&&logQ[j].mod===it.mod){dup=true;break;}}
+        if(dup)continue;
       }
+      return it;
     }
-    else if(sx.ok&&sx.total&&!logN.sfx){
-      logN.sfx=1;
-      /* offline: semua sudah di cache saat warmRest → jangan lompat bisu */
-      logLast=sfxCacheFlash
-        ?(T('bl.sfx')+' \u00b7 cache \u00b7 '+T('bl.ready'))
-        :(T('bl.sfx')+' '+T('bl.ready'));
-    }
-    if(cur)h='<span class="pn'+(showDec?' dec':'')+'">&gt; '+cur+'</span>';
-    else if(logLast)h='<span class="ok">\u2713 '+logLast+'</span>';
-    try{if(logEl)logEl.classList.toggle('dec',!!showDec);}catch(eDc){}
+    return null;
+  }
+  function logShow(){
+    if(!logEl||bs.classList.contains('off'))return;
+    var now=performance.now(),h,busy=false,decFrame=false;
+    if(logCur&&now-logCurAt>=logCur.dw)logCur=null;
+    if(!logCur&&logQ.length){logCur=logQNext();if(logCur){logCur.dw=logDwell(logCur);logCurAt=now;}}
+    if(logCur){
+      busy=true;
+      if(logCur.k==='dec'){h=decHtml(Math.min(1,(now-logCurAt)/logCur.dw));decFrame=true;}
+      else h='<span class=\"ok\">\u2713 '+logCur.s+'</span>';
+    }else if(logLive.dec){h=decHtml(null);decFrame=true;busy=true;}
+    else h=logLive.h;
     if(h!==logOut){logOut=h;logEl.innerHTML=h;}
+    /* selama ada yang beranimasi / antre: ketuk sendiri tiap 50 ms (decode: 66 ms, HP lemah 140 ms); selain itu interval 100 ms di bawah yang menyetir */
+    if(busy&&!logT)logT=setTimeout(function(){logT=0;logShow();},decFrame?(IS_POTATO?140:66):50);
   }
   logPoll();
   stT=setInterval(function(){
@@ -540,6 +609,7 @@ var DUMUL_CHARS=(function(){
   function finish(c){
     if(done)return;done=true;
     var th=c.th,ready=c.ready,complete=c.complete;
+    logFin=true;   /* [PATCH v160] kapsul tampil: sisa antrean log dipercepat */
     try{window.__boot3d={t:Math.round(performance.now()),done:th.mods+(th.warmOk?1:0),total:th.total+1,st:th.st,warm:th.warmOk,gate:true};}catch(e3){}
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
     /* Bar hanya 100% kalau SEMUA unit (termasuk audio, v131) benar-benar selesai. Kalau belum, bar tetap di angka asli; startPost() melanjutkannya sesudah capsule tampil. */
