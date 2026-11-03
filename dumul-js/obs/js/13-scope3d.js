@@ -251,7 +251,7 @@ function* scp3dBuildG(){
   wg.position.set(wx,0,zf(wx));wg.rotation.y=tilt;root.add(wg);
   var bz=new T.CylinderGeometry(5.5,5.5,1.2,8,1,false,PI/8);bz.rotateX(PI/2);
   var bezel=new T.Mesh(bz,m.dark);bezel.position.z=.3;wg.add(bezel);
-  var gl=new T.Mesh(new T.CircleGeometry(4.5,8,PI/8),m.room);gl.position.z=.95;wg.add(gl);
+  var glw=new T.Mesh(new T.CircleGeometry(4.5,8,PI/8),m.room);glw.position.z=.95;wg.add(glw);   /* v22 fix: dulu 'var gl' = menimpa handle renderer bersama (var di-hoist satu scope generator) -> threeGLSize/threeWarm kena Mesh, kanvas teleskop 0x0 -> fallback 2D */
   o.winGlow=sprite(0x35f3ff,22);o.winGlow.position.z=2.2;o.winGlow.material.opacity=.4;wg.add(o.winGlow);
 
   /* pod kaca di kiri-kanan badan */
