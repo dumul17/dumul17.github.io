@@ -425,7 +425,7 @@ if ('serviceWorker' in navigator) {
   if (!chip || !lab) return;
   if (!('serviceWorker' in navigator) || !('caches' in window)) { if (row && row.parentNode) row.parentNode.removeChild(row); return; }
   var SIZE_MB = 52;          /* perkiraan total ukuran semua lagu */
-  var KEY = 'ofl_choice';    /* 'yes' = pernah menekan tombol -> kunjungan berikutnya lanjut diam-diam (bukan data seluler / hemat data) */
+  var KEY = 'ofl_choice';    /* 'yes' = pernah setuju -> kartu Wi-Fi tidak muncul lagi. TIDAK memicu unduhan otomatis (v158) */
   var STR = {
     en: { idle: 'Save offline {d}/{t}', wait: 'Offline…', sync: 'Saving {d}/{t}', done: 'Offline ready', na: 'Offline N/A', part: 'Retry {d}/{t}',
           hint: 'Save all {t} tracks (~{mb} MB) so the observatory keeps playing without signal.',
@@ -479,9 +479,8 @@ if ('serviceWorker' in navigator) {
       if (busy) { paint(); return; }
       st = !total ? 'na' : (cached >= total ? 'done' : 'idle');
       paint();
-      var ch = load(), n = net();
-      if (st === 'idle' && ch && ch.v === 'yes' && !n.slow && !n.cell) begin();
-      else if (st === 'idle') offer(ch);
+      var ch = load();
+      if (st === 'idle') offer(ch);   /* v158: TIDAK ada unduh otomatis. Simpan lagu hanya setelah ketukan di chip / kartu pada kunjungan ini. */
       return;
     }
     if (d.type === 'AUDIO_CACHED') {

@@ -549,10 +549,7 @@ if ('serviceWorker' in navigator) {
     total = d.total; cachedNow = d.cached;
     if (d.cached >= d.total) return;                 /* sudah lengkap: tidak perlu tanya */
     var ch = load(), n = net();
-    if (ch && (ch.v === 'yes')) {                    /* pernah setuju: lanjutkan diam-diam */
-      if (!n.slow && !n.cell) sendPrecache();
-      return;
-    }
+    if (ch && (ch.v === 'yes')) return;              /* v158: pernah setuju, tapi TIDAK unduh otomatis; cuma tidak tanya lagi */
     if (ch && ch.v === 'later' && Date.now() - ch.t < ASK_AGAIN_DAYS * 864e5) return;
     if (n.slow) return;
     if (document.visibilityState !== 'visible' || document.body.classList.contains('sw')) return;

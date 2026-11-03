@@ -6,14 +6,14 @@
    - Lagu disimpan HANYA lewat PRECACHE_AUDIO (unduh offline, dipicu pengunjung). Tidak ada simpan otomatis: warm saat boot cukup metadata (hemat bandwidth).
      Jalur CACHE_AUDIO / CACHE_AUDIO_LIST masih ada di SW tapi tidak dipanggil halaman; TEE_ON_MISS=false mematikan tee (kode tee dibiarkan sebagai opsi).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v341'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v342'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
 const AUDIO_CACHE = `dumul-audio-${AUDIO_VERSION}`;
 
 const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, sekitar 67 MB) */
-const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
+const MAX_AUDIO_BYTES = 70 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
 const TEE_ON_MISS = false;                 /* true = file yang belum tersimpan diunduh SEKALI: satu cabang ke cache, satu cabang langsung ke pemutar. false = perilaku lama (teruskan ke network, simpan terpisah) */
 
 /* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
