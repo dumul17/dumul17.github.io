@@ -3,10 +3,10 @@
    - CSS/JS/gambar/font      -> stale-while-revalidate
    - Audio (.opus dll)       -> kalau sudah tersimpan: dilayani dari cache lengkap dengan Range/206 (seek aman)
                                 kalau belum: diteruskan apa adanya ke network
-   - Lagu disimpan kalau: (a) halaman melapor "sudah didengar >50%" (CACHE_AUDIO), atau
-                          (b) halaman minta unduh semua lagu (PRECACHE_AUDIO, dipicu pilihan pengunjung)
+   - Lagu disimpan HANYA lewat PRECACHE_AUDIO (unduh offline, dipicu pengunjung). Tidak ada simpan otomatis: warm saat boot cukup metadata (hemat bandwidth).
+     Jalur CACHE_AUDIO / CACHE_AUDIO_LIST masih ada di SW tapi tidak dipanggil halaman; TEE_ON_MISS=false mematikan tee (kode tee dibiarkan sebagai opsi).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v340'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v341'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v2';   /* v2: lagu pindah ke folder audio/ */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -14,7 +14,7 @@ const AUDIO_CACHE = `dumul-audio-${AUDIO_VERSION}`;
 
 const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, sekitar 40-70 MB) */
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
-const TEE_ON_MISS = true;                  /* true = file yang belum tersimpan diunduh SEKALI: satu cabang ke cache, satu cabang langsung ke pemutar. false = perilaku lama (teruskan ke network, simpan terpisah) */
+const TEE_ON_MISS = false;                 /* true = file yang belum tersimpan diunduh SEKALI: satu cabang ke cache, satu cabang langsung ke pemutar. false = perilaku lama (teruskan ke network, simpan terpisah) */
 
 /* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
 importScripts('dumul-js/obs/sky-data.js?v=31');
@@ -39,7 +39,7 @@ const SHELL = [
   'dumul-js/obs/js/04-render.js?v=143',
   'dumul-js/obs/js/05-sector-ui.js?v=181',
   'dumul-js/obs/js/06-interaction.js?v=126',
-  'dumul-js/obs/js/07-boot.js?v=155',
+  'dumul-js/obs/js/07-boot.js?v=156',
   'dumul-js/obs/js/08-tx-drone.js?v=15',
   'dumul-js/obs/js/09-wormhole.js?v=44',
   'dumul-js/obs/js/10-ui-sound.js?v=8',
