@@ -463,8 +463,9 @@ var DUMUL_CHARS=(function(){
     /* v145: setelah modul, bisikkan antrean SFX di log bawah (tanpa angka file) */
     sx=sfxStatus();
     if(!cur&&warmed&&sx.total&&!sx.ok){
-      /* [PATCH v157] nama bintang + n/16 biar fase metadata terasa maju */
-      cur=T('bl.sfx')+' \u00b7 '+(sfxLastName||T('bl.a.sfx'))+' \u00b7 '+sx.n+'/'+sx.total;
+      /* [PATCH v158] nama + n/total hanya kalau sudah ada progress; hindari "0/17" di offline/awal warm */
+      if(sx.n>0||sfxLastName)cur=T('bl.sfx')+' \u00b7 '+(sfxLastName||T('bl.a.sfx'))+' \u00b7 '+sx.n+'/'+sx.total;
+      else cur=T('bl.sfx')+' \u00b7 '+T('bl.a.sfx');
     }
     else if(sx.ok&&sx.total&&!logN.sfx){logN.sfx=1;logLast=T('bl.sfx')+' '+T('bl.ready');}
     if(cur)h='<span class="pn">&gt; '+cur+'</span>';
