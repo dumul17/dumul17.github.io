@@ -317,20 +317,7 @@ var DUMUL_CHARS=(function(){
     if(th&&th.mods>=th.total){warmTrig='allmods';warmRest();return;}
     if(au&&au.ok){warmTrig='bgm';warmRest();}
   }
-  /* v132/v133: simpan 2 BGM ke cache SW (sekali, berurutan) beberapa detik setelah Blue, saat BGM sudah main dan buffering awal aman. Tanpa menunggu aturan 50%.
-     Dilewati kalau data saver / 2G / SW belum mengontrol halaman. SW melewati file yang sudah tersimpan. */
-  function cacheBgm(){
-    try{
-      var c=navigator.connection;if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return;
-      if(!navigator.serviceWorker)return;
-      var urls=audioList().map(function(a){return a.currentSrc||a.src;}).filter(Boolean);
-      if(!urls.length)return;
-      /* v133: pakai serviceWorker.ready (bukan .controller). Telemetri v132: kunjungan pertama, controller baru ada di 39,9 dtk (install SW 15,8 dtk) -> postMessage 6 dtk
-         setelah Blue (25,4 dtk) kena controller=null dan diam-diam batal. SW menerima message dari registration.active tanpa harus mengontrol halaman. */
-      navigator.serviceWorker.ready.then(function(reg){try{if(reg.active)reg.active.postMessage({type:'CACHE_AUDIO_LIST',urls:urls});}catch(eP){}});
-    }catch(eC){}
-  }
-  window.addEventListener('obs-entered',function(){setTimeout(cacheBgm,6000);},{once:true});
+  /* v156: cacheBgm() dihapus. Audio tidak lagi disimpan otomatis (warm cukup metadata, hemat bandwidth); simpan hanya lewat unduh offline (PRECACHE_AUDIO). */
   function audioStatus(){
     var l=audioList(),n=0,i;
     for(i=0;i<l.length;i++){try{if(l[i].readyState>=1||l[i].error)n++;}catch(eS){n++;}}
