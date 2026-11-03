@@ -12,7 +12,7 @@ const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
 const AUDIO_CACHE = `dumul-audio-${AUDIO_VERSION}`;
 
-const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, sekitar 40-70 MB) */
+const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, sekitar 67 MB) */
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
 const TEE_ON_MISS = false;                 /* true = file yang belum tersimpan diunduh SEKALI: satu cabang ke cache, satu cabang langsung ke pemutar. false = perilaku lama (teruskan ke network, simpan terpisah) */
 
