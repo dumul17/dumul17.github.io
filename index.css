@@ -1303,6 +1303,8 @@ body.lis-burst #lis-fx{opacity:1;background:radial-gradient(ellipse at 50% 50%,r
 #lis-ask button:hover,#lis-ask button:focus-visible{background:rgba(110,229,255,.2);outline:none}
 #lis-ask button[data-a=leave]{border-color:rgba(255,154,217,.4);color:#ffb3e0;background:rgba(255,122,217,.07)}
 @media (prefers-reduced-motion:reduce){#lis-fx::before,#lis-fx::after,#lis-hud.red::before{animation:none}}
+/* selama wormhole/transisi sektor: grain tetap bergerak tapi tanpa blend screen (blend di atas kanvas yang bergerak = mahal tiap frame); noise putih, jadi normal ~ screen */
+html.wh-busy #lis-fx::before{mix-blend-mode:normal}
 
 /* ===== Panel pamitan (back terakhir sebelum keluar site): dialog teleskop gaya visual-novel, tema observatory =====
    Dibuat oleh JS (07-boot.js, EXITP). Karakter yang bicara nongol di sudut kiri-atas panel; kalau yang bicara si owl, potret ganti jadi owl. */
@@ -1580,4 +1582,4 @@ body.sect-in #mp-now-playing{--np-n:2}   /* v12: dulu di body -> style recalc se
 #owl-panel.owl-scrub .bp-page .t3-info{display:none!important}
 
 /* v23: html.wh-busy (diset 09-wormhole.js selama WORMHOLE/SECT busy): semua animasi HUD dijeda, layar tertutup terowongan jadi tak terlihat. Lanjut dari posisi terakhir setelah selesai. */
-html.wh-busy #terminal .cursor,html.wh-busy .tp-row.ld .tp-t,html.wh-busy #cat-lock::before,html.wh-busy #lis-fx::before,html.wh-busy #lis-fx::after,html.wh-busy #lis-hud.red::before,html.wh-busy #exit-panel .ex-next.on,html.wh-busy #exit-panel.talk .tl-m,html.wh-busy #exit-panel.talk .tl-glow,html.wh-busy #exit-panel.talk .ex-owl,html.wh-busy #exit-panel.talk .ow-beak,html.wh-busy .mp-track.playing .mp-state,html.wh-busy .mp-track.playing .mp-spec i,html.wh-busy #music-toggle.playing-closed .mp-spec-mini i{animation-play-state:paused!important}
+html.wh-busy #terminal .cursor,html.wh-busy .tp-row.ld .tp-t,html.wh-busy #cat-lock::before,html.wh-busy #exit-panel .ex-next.on,html.wh-busy #exit-panel.talk .tl-m,html.wh-busy #exit-panel.talk .tl-glow,html.wh-busy #exit-panel.talk .ex-owl,html.wh-busy #exit-panel.talk .ow-beak,html.wh-busy .mp-track.playing .mp-state,html.wh-busy .mp-track.playing .mp-spec i,html.wh-busy #music-toggle.playing-closed .mp-spec-mini i{animation-play-state:paused!important}

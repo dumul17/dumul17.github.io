@@ -14,6 +14,7 @@ const AUDIO_CACHE = `dumul-audio-${AUDIO_VERSION}`;
 
 const MAX_AUDIO_FILES = 24;                /* cukup buat semua lagu (23 file, sekitar 40-70 MB) */
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;  /* file lebih besar dari ini tidak disimpan */
+const TEE_ON_MISS = true;                  /* true = file yang belum tersimpan diunduh SEKALI: satu cabang ke cache, satu cabang langsung ke pemutar. false = perilaku lama (teruskan ke network, simpan terpisah) */
 
 /* Daftar lagu dari sky-data.js (SKY.audioFiles): BGM + semua SFX + lagu dumul.html. Nggak perlu edit di sini kalau tambah bintang. */
 importScripts('dumul-js/obs/sky-data.js?v=31');
@@ -24,7 +25,7 @@ const SHELL = [
   './',
   'index.html',
   'dumul.html',
-  'index.css?v=93',
+  'index.css?v=94',
   /* harus sama persis dengan <script src> di index.html */
   'dumul-js/obs/sky-data.js?v=31',
   'dumul-js/obs/texts.js?v=1',
@@ -125,7 +126,7 @@ self.addEventListener('fetch', (event) => {
 
   /* Audio */
   if (MEDIA_RE.test(url.pathname) || req.destination === 'audio' || req.destination === 'video') {
-    if (url.origin === self.location.origin) event.respondWith(serveAudio(req, url));
+    if (url.origin === self.location.origin) event.respondWith(serveAudio(req, url, event));
     return;
   }
 
@@ -183,11 +184,15 @@ async function storeAudio(key) {
     if (len > MAX_AUDIO_BYTES) return false;
 
     await cache.put(key, res);                   /* koneksi putus di tengah -> put gagal, tidak ada file setengah jadi */
-
-    const keys = await cache.keys();             /* urutan = paling lama disimpan dulu */
-    for (let i = 0; i < keys.length - MAX_AUDIO_FILES; i++) await cache.delete(keys[i]);
+    await trimAudio(cache);
     return true;
   } catch (err) { return false; }                /* diam: ini cuma optimasi */
+}
+
+/* Buang yang paling lama disimpan kalau jumlah file melebihi MAX_AUDIO_FILES */
+async function trimAudio(cache) {
+  const keys = await cache.keys();               /* urutan = paling lama disimpan dulu */
+  for (let i = 0; i < keys.length - MAX_AUDIO_FILES; i++) await cache.delete(keys[i]);
 }
 
 async function countCached() {
@@ -229,11 +234,64 @@ async function notify(msg) {
   } catch (e) {}
 }
 
-async function serveAudio(req, url) {
+/* Tee: hanya untuk request tanpa Range atau "bytes=0-" (yang dikirim elemen audio saat mulai), dan bukan mode Save-Data. */
+function teeAllowed(req) {
+  if (!TEE_ON_MISS) return false;
+  if ((req.headers.get('save-data') || '').toLowerCase() === 'on') return false;
+  const r = req.headers.get('range');
+  return !r || /^bytes=0-$/.test(r.trim());
+}
+
+/* File belum tersimpan: unduh utuh SEKALI (tanpa Range, 200). Satu cabang masuk cache (di latar, ditahan waitUntil),
+   cabang lain langsung dikirim ke pemutar sebagai 206 (atau 200 kalau requestnya tanpa Range).
+   Dicatat di `inflight` sejak awal supaya CACHE_AUDIO / precache / request kedua tidak mengunduh file yang sama lagi.
+   Mengembalikan null kalau tidak bisa di-tee (pemanggil jatuh ke fetch(req) biasa). */
+async function teeMiss(req, key, cache, event) {
+  let settle;
+  const gate = new Promise((r) => { settle = r; });
+  inflight.set(key, gate);
+  const release = (v) => { if (inflight.get(key) === gate) inflight.delete(key); settle(v); };
   try {
+    const res = await fetch(key);
+    if (res.status !== 200 || !res.body) { release(false); return res.ok ? null : res; }
+    const len = +res.headers.get('content-length') || 0;
+    if (!len || len > MAX_AUDIO_BYTES) {         /* ukuran tak diketahui / kebesaran: jangan disimpan */
+      try { res.body.cancel(); } catch (e) {}
+      release(false);
+      return null;
+    }
+    const store = cache.put(key, res.clone())    /* koneksi putus di tengah -> put gagal, tidak ada file setengah jadi */
+      .then(() => trimAudio(cache))
+      .then(() => true, () => false);
+    store.then(release);
+    if (event) event.waitUntil(store);
+
+    let type = res.headers.get('content-type') || '';
+    if (!type || /octet-stream/i.test(type)) type = 'audio/ogg';
+    const ranged = req.headers.has('range');
+    const h = { 'Content-Type': type, 'Content-Length': String(len), 'Accept-Ranges': 'bytes' };
+    if (ranged) h['Content-Range'] = `bytes 0-${len - 1}/${len}`;
+    return new Response(res.body, { status: ranged ? 206 : 200, headers: h });
+  } catch (err) { release(false); return null; }
+}
+
+async function serveAudio(req, url, event) {
+  try {
+    const key = audioKey(url.href);
     const cache = await caches.open(AUDIO_CACHE);
-    const cached = await cache.match(audioKey(url.href));
-    if (!cached) return fetch(req);              /* belum tersimpan -> network seperti biasa */
+    let cached = await cache.match(key);
+    if (!cached) {
+      if (teeAllowed(req)) {
+        if (inflight.has(key)) {                 /* file ini sedang diunduh utuh oleh jalur lain: tunggu, lalu layani dari cache (tanpa unduhan kedua) */
+          await inflight.get(key);
+          cached = await cache.match(key);
+        } else {
+          const live = await teeMiss(req, key, cache, event);
+          if (live) return live;
+        }
+      }
+      if (!cached) return fetch(req);            /* tidak bisa di-tee (Range tengah/ekor, Save-Data, gagal) -> network seperti biasa */
+    }
 
     const blob = await cached.blob();
     const size = blob.size;
