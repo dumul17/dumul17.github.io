@@ -40,14 +40,18 @@ function threeWarmNext(){
   var it=THREE_WARM.q.shift();
   if(!it){THREE_WARM.busy=false;return;}
   THREE_WARM.busy=true;
+  var W=threeWarmRec0();
   var run=function(){
-    try{if(it.pre)it.pre();}catch(e){}   /* pra-ukur kanvas (W/H sudah valid di layar boot) */
-    var warmDone=function(){THREE_WARM.part=0;THREE_WARM.done++;setTimeout(threeWarmNext,150);};
+    try{W.idle=performance.now()-W.t0;}catch(eW){}
+    try{var tp=performance.now();if(it.pre)it.pre();W.pre=performance.now()-tp;}catch(e){}   /* pra-ukur kanvas (W/H sudah valid di layar boot) */
+    var warmDone=function(){THREE_WARM.part=0;THREE_WARM.done++;threeWarmRec1(W);setTimeout(threeWarmNext,150);};
     var pBase=0;   /* dasar pecahan progres item: 0, atau 0,4 kalau fase compile teririsnya sudah jalan dulu */
     var fin=function(){
       var r=it.r,sc=it.sc,cam=it.cam,objs=THREE_WS?threeWarmObjs(sc):null;
       if(!objs||objs.length<2){   /* scene 1 objek / ?ws=0: jalur lama (compile + satu render) */
-        try{r.compile(sc,cam);r.render(sc,cam);}catch(e){}   /* compile (sudah siap -> murah) + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
+        var tq=performance.now();
+        try{r.compile(sc,cam);r.render(sc,cam);}catch(e){}
+        try{W.cpu+=performance.now()-tq;W.sl++;}catch(eW){}   /* compile (sudah siap -> murah) + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
         warmDone();return;
       }
       /* IRISAN: satu render per objek (objek lain disembunyikan sementara), maks ±10 ms per giliran lalu yield. Link shader + upload buffer/tekstur tiap material
@@ -63,6 +67,7 @@ function threeWarmNext(){
           objs[i].visible=false;i++;
           THREE_WARM.part=Math.min(.98,pBase+(.98-pBase)*i/objs.length);
         }
+        try{W.cpu+=performance.now()-t;W.sl++;}catch(eW){}
         if(i<objs.length){setTimeout(step,0);return;}
         for(k=0;k<objs.length;k++)objs[k].visible=vis[k];
         warmDone();
@@ -82,6 +87,7 @@ function threeWarmNext(){
        per objek (r.compile(objek, kamera, scene): lampu tetap dari scene), maks ±10 ms per giliran lalu yield; sesudah semua program ada, compileAsync(scene) di start()
        tinggal cache-hit (murah) dan menunggu siap lewat polling-nya sendiri. Pecahan progres 0..0,4 untuk fase ini. ?ws=0 = jalur lama. */
     var cobjs=(THREE_WS&&THREE_CA&&it.r.compileAsync)?threeWarmObjs(it.sc):null;
+    try{W.n=cobjs?cobjs.length:0;}catch(eW){}
     if(cobjs&&cobjs.length>=2){
       var cj=0;
       var cstep=function(){
@@ -91,6 +97,7 @@ function threeWarmNext(){
           cj++;
           THREE_WARM.part=.4*cj/cobjs.length;
         }
+        try{W.cpu+=performance.now()-t;W.sl++;}catch(eW){}
         if(cj<cobjs.length){setTimeout(cstep,0);return;}
         pBase=.4;
         start();
@@ -113,16 +120,41 @@ function ast3dFail(why){AST3D.state=3;AST3D.err=String(why||'');try{console.warn
    (rAF -> setTimeout 0) supaya bar/panel boot sempat naik. Total CPU tetap; bedanya blok 6,9 dtk jadi ±5 blok terpisah (target: 0,7-2 dtk per blok, seperti di r128).
    Tab tersembunyi tidak menembakkan rAF -> timer 250 ms sebagai cadangan agar antrean tidak macet. Urutan = urutan panggilan threeLoad. */
 var THREE_Q={q:[],run:false};
+/* PENCATAT GILIRAN (v20): HANYA mengukur, perilaku antrean tidak berubah. Terbaca di window.__threeQ, dicatat bench (R.threeQ).
+   Antrean ini dipakai SEMUA unit 3D (threeLoad -> threeRun di 12/13/14/15/17, plus kelanjutan tahap irisan 13/14/15 yang unshift ke sini), jadi satu pencatat cukup.
+   - turns: [label, runMs, waitMs, via] per giliran (maks 100). runMs = lama f(); waitMs = dari threeQWait dipanggil sampai giliran ini mulai (rAF + setTimeout 0, atau cadangan 250 ms);
+     via 'r' = lewat rAF, 't' = timer cadangan 250 ms. label ditebak dari array waktu modul yang bertambah selama giliran (SCP3D/DR3D/PT3D/PL3D);
+     giliran tanpa array yang bertambah = 'AST?' (AST3D tidak punya array waktu, atau giliran kosong).
+   - n/runMs/waitMs/waitMax/tmo: ringkasan semua giliran.
+   - warm: antrean THREE_WARM (semua unit): items [objN, idleMs, preMs, cpuMs, slices, totalMs] per renderer (maks 24); idleMs = tunggu requestIdleCallback, preMs = pra-ukur kanvas,
+     cpuMs = jumlah badan irisan (cstep/step) atau compile+render jalur lama, totalMs = dari threeWarmNext sampai selesai (sisanya = tunggu yield/compileAsync);
+     gapMs = jeda 150 ms antar-item dijumlah. objN = jumlah objek scene (ciri modul: ±7-8 AST3D, ±43 SCP3D, ±12 DR3D, ±14 PT3D, 1 PL3D). */
+var THREE_QS={n:0,runMs:0,waitMs:0,waitMax:0,tmo:0,lw:0,lv:'',turns:[],warm:{n:0,idleMs:0,cpuMs:0,sl:0,gapMs:0,last:0,items:[]}};
+try{window.__threeQ=THREE_QS;}catch(eQ){}
+var THREE_QN=['SCP3D','DR3D','PT3D','PL3D'];
+function threeQLens(){try{return [(window.__scp3dT||[]).length,(window.__dr3dT||[]).length,(window.__pt3dT||[]).length,(window.__pl3dT||[]).length];}catch(e){return [0,0,0,0];}}
+function threeQRec(a,l0,w,v){
+  var S=THREE_QS,run=performance.now()-a,l1=threeQLens(),lb='AST?',i;
+  for(i=0;i<4;i++){if(l1[i]>l0[i]){lb=THREE_QN[i];break;}}
+  S.n++;S.runMs+=run;S.waitMs+=w;if(w>S.waitMax)S.waitMax=w;if(v==='t')S.tmo++;
+  if(S.turns.length<100)S.turns.push([lb,Math.round(run),Math.round(w),v]);
+}
+function threeWarmRec0(){var W={t0:0,idle:0,pre:0,cpu:0,sl:0,n:0};try{W.t0=performance.now();var S=THREE_QS.warm;if(S.last>0)S.gapMs+=W.t0-S.last;}catch(e){}return W;}
+function threeWarmRec1(W){try{var S=THREE_QS.warm,t=performance.now();S.n++;S.idleMs+=W.idle;S.cpuMs+=W.cpu;S.sl+=W.sl;S.last=t;if(S.items.length<24)S.items.push([W.n,Math.round(W.idle),Math.round(W.pre),Math.round(W.cpu),W.sl,Math.round(t-W.t0)]);}catch(e){}}
 function threeQNext(){
   var f=THREE_Q.q.shift();
   if(!f){THREE_Q.run=false;return;}
+  var qa=0,ql=[0,0,0,0],qw=THREE_QS.lw,qv=THREE_QS.lv;
+  try{qa=performance.now();ql=threeQLens();}catch(eq){}
   try{f();}catch(e){try{console.warn('[three] build modul gagal:',e&&e.message||e);}catch(e2){}}
+  try{threeQRec(qa,ql,qw,qv);}catch(eq2){}
   threeQWait();
 }
 function threeQWait(){
-  var d=false,go=function(){if(d)return;d=true;threeQNext();};
-  try{requestAnimationFrame(function(){setTimeout(go,0);});}catch(e){}
-  setTimeout(go,250);
+  var d=false,t0=0;try{t0=performance.now();}catch(eq){}
+  var go=function(v){if(d)return;d=true;try{THREE_QS.lw=performance.now()-t0;THREE_QS.lv=v;}catch(eq2){}threeQNext();};
+  try{requestAnimationFrame(function(){setTimeout(function(){go('r');},0);});}catch(e){}
+  setTimeout(function(){go('t');},250);
 }
 function threeRun(fn){
   THREE_Q.q.push(fn);
