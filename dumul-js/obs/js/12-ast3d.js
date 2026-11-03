@@ -20,7 +20,7 @@ var AST3D_CFG={
 try{
   if(/[?&]ast3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_ast3d')==='0')AST3D_CFG.on=false;
 }catch(eA3){}
-var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,nx:[-1e9,-1e9,-1e9],ru:[-1,-1,-1],rd:[-1,-1,-1],sgT:-1,sgSame:false,hotF:false,sigA:[],sigB:[],reused:0,rendered:0,tiers:[],state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
+var AST3D={cache:[null,null,null],ver:0,rT:-1e9,reuseNow:-1,nx:[-1e9,-1e9,-1e9],ru:[-1,-1,-1],rd:[-1,-1,-1],sgT:-1,sgSame:false,hotF:false,sigA:[],sigB:[],reused:0,rendered:0,tiers:[],state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,gl:null,pw:0,ph:0,cam:null,sc:null,mat:null,uni:null,vars:[],cap:0,w:0,h:0,pr:0,drawn:0,passes:0,err:''};
 
 /* Warm-up shader: render pertama sebuah renderer Three.js mengompilasi program shader (ratusan ms di HP) -> hitch pas drone/batu/teleskop pertama muncul; setSize pertama (realokasi framebuffer MSAA) juga mahal, jadi ukuran kanvas diset di build.
    compile() cuma MEMINDAHKAN stall itu; jadi dipanggil saat idle (layar boot, user belum main), satu renderer per giliran supaya tidak numpuk.
@@ -33,9 +33,9 @@ var THREE_WS=(function(){var on=true;try{on=!/[?&]ws=0(?:&|#|$)/.test(location.s
 /* ?wi=0: warm-up mulai lewat setTimeout(run,0), bukan requestIdleCallback({timeout:2000}) (A/B bench; bagian 23-24 log: tunggu idle ±43-54% rantai warm). Default NYALA = perilaku lama. Tercatat di JSON bench (R.wi). */
 var THREE_WI=(function(){var on=true;try{on=!/[?&]wi=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__wi=on?1:0;}catch(e){}return on;})();
 function threeWarmObjs(sc){var o=[];try{sc.traverseVisible(function(x){if(x!==sc&&x.material&&(x.isMesh||x.isPoints||x.isLine||x.isSprite))o.push(x);});}catch(e){return null;}return o;}
-function threeWarm(r,sc,cam,pre){
+function threeWarm(r,sc,cam,pre,H){
   try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;}catch(e){}
-  THREE_WARM.q.push({r:r,sc:sc,cam:cam,pre:pre});THREE_WARM.total++;
+  THREE_WARM.q.push({r:r,sc:sc,cam:cam,pre:pre,H:H});THREE_WARM.total++;
   if(!THREE_WARM.busy)threeWarmNext();
 }
 function threeWarmNext(){
@@ -52,7 +52,7 @@ function threeWarmNext(){
       var r=it.r,sc=it.sc,cam=it.cam,objs=THREE_WS?threeWarmObjs(sc):null;
       if(!objs||objs.length<2){   /* scene 1 objek / ?ws=0: jalur lama (compile + satu render) */
         var tq=performance.now();
-        try{r.compile(sc,cam);r.render(sc,cam);}catch(e){}
+        try{r.compile(sc,cam);threeGLWarmBegin(r,it.H);r.render(sc,cam);}catch(e){}
         try{W.cpu+=performance.now()-tq;W.sl++;}catch(eW){}   /* compile (sudah siap -> murah) + satu render: upload tekstur/buffer pertama ikut dibayar di sini */
         warmDone();return;
       }
@@ -65,7 +65,7 @@ function threeWarmNext(){
         var t=performance.now();
         while(i<objs.length&&performance.now()-t<10){
           objs[i].visible=true;
-          try{r.render(sc,cam);}catch(e){}
+          try{threeGLWarmBegin(r,it.H);r.render(sc,cam);}catch(e){}
           objs[i].visible=false;i++;
           THREE_WARM.part=Math.min(.98,pBase+(.98-pBase)*i/objs.length);
         }
@@ -108,6 +108,93 @@ function threeWarmNext(){
     }else start();
   };
   if(!THREE_WI)setTimeout(run,0);else if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:2000});else setTimeout(run,300);
+}
+
+/* ===== RENDERER GL BERSAMA (v22) =====
+   Dulu tiap unit 3D (AST3D, SCP3D, DR3D, PT3D, PL3D) membuat WebGLRenderer + konteks WebGL sendiri: lima kali bayar init konteks, alokasi framebuffer, dan memori GPU lima buffer.
+   Sekarang dua grup, masing-masing SATU konteks:
+     'big'   = AST3D + PL3D (kanvas ukuran layar, antialias:false)
+     'small' = SCP3D + DR3D + PT3D (kanvas kecil <= 256 px, antialias:true, ACES + sRGB)
+   Semua kanvas GL ini offscreen (tidak masuk DOM) dan hasilnya selalu disalin lewat drawImage, jadi berbagi konteks aman asal tiap unit menyalin hasilnya SEGERA setelah render
+   (preserveDrawingBuffer:false) atau lewat salinan 2D miliknya sendiri (threeGLSnap).
+   Cara kerja:
+   - tiap unit meminta handle H = threeGLGet(...) dan melaporkan ukurannya lewat threeGLSize(H,w,h) (piksel perangkat, pixelRatio renderer selalu 1).
+     Ukuran kanvas grup = gabungan (maks lebar x maks tinggi) semua unit; grup 'small' cuma membesar, tidak pernah mengecil (tidak ada setSize bolak-balik antar unit).
+   - sebelum render, unit memanggil threeGLBegin(H): viewport + scissor = wilayah unit itu, DIRATAKAN KE ATAS-KIRI kanvas. Jadi koordinat sumber drawImage (0,0,w,h)
+     sama seperti kanvas milik sendiri dulu (tanpa balik sumbu y).
+   - scissor parsial (pita planet, kotak petir): threeGLRect(H,x,y,w,h) dalam koordinat atas-kiri wilayah unit; threeGLFull(H) = kembali ke seluruh wilayah unit.
+   - ?gs=0 = tiap unit kembali punya renderer sendiri seperti sebelum v22 (A/B + rollback). Tercatat di window.__gs dan JSON bench (R.gs, R.glG).
+   - webglcontextlost: semua unit di grup itu jatuh ke fallback 2D masing-masing (fail() per unit). */
+var THREE_GS=(function(){var on=true;try{on=!/[?&]gs=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__gs=on?1:0;}catch(e2){}return on;})();
+var THREE_GLG={big:null,small:null};
+try{window.__glG=function(){var o={},k,G,i;for(k in THREE_GLG){G=THREE_GLG[k];if(!G)continue;o[k]={w:G.w,h:G.h,aa:G.aa,units:G.us.map(function(h){return [h.u,h.w,h.h];})};}return o;};}catch(eG){}
+function threeGLMake(aa,tone,label){
+  var T=THREE,cv=document.createElement('canvas');
+  try{window.__glLabel=label;}catch(e){}   /* dibaca 21-bench.js saat konstruktor */
+  var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:aa,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
+  r.setClearColor(0x000000,0);r.setPixelRatio(1);
+  if(tone){r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;}
+  var G={r:r,cv:cv,w:0,h:0,aa:aa,us:[],grow:false,label:label};
+  r.__G=G;
+  cv.addEventListener('webglcontextlost',function(e){
+    e.preventDefault();
+    var u=G.us.slice(),i;
+    for(i=0;i<u.length;i++){try{u[i].fail('webglcontextlost');}catch(e2){}}
+  },false);
+  return G;
+}
+/* unit = nama unit (label bench di mode ?gs=0), grp = 'big'|'small', aa/tone = pengaturan renderer SENDIRI (dipakai hanya di ?gs=0), expo = toneMappingExposure unit (null = biarkan),
+   fail = fungsi gagal unit (dipanggil saat konteks hilang). */
+function threeGLGet(unit,grp,aa,tone,expo,fail){
+  var G;
+  if(THREE_GS){
+    G=THREE_GLG[grp];
+    if(!G){G=THREE_GLG[grp]=threeGLMake(grp==='small',grp==='small','GL'+grp.toUpperCase());G.grow=(grp==='small');}
+  }else G=threeGLMake(aa,tone,unit);
+  var H={u:unit,G:G,r:G.r,w:0,h:0,ex:(expo==null?null:expo),fail:fail,sn:null,sx:null};
+  G.us.push(H);
+  if(!THREE_GS&&expo!=null)G.r.toneMappingExposure=expo;
+  return H;
+}
+function threeGLSize(H,w,h){
+  w=Math.max(1,w|0);h=Math.max(1,h|0);
+  H.w=w;H.h=h;
+  var G=H.G,u=G.us,i,mw=0,mh=0;
+  for(i=0;i<u.length;i++){if(u[i].w>mw)mw=u[i].w;if(u[i].h>mh)mh=u[i].h;}
+  if(G.grow){if(G.w>mw)mw=G.w;if(G.h>mh)mh=G.h;}
+  if(mw!==G.w||mh!==G.h){G.w=mw;G.h=mh;G.r.setPixelRatio(1);G.r.setSize(mw,mh,false);}
+}
+/* sebelum SETIAP render unit (frame, warm-up, render pertama) */
+function threeGLBegin(H){
+  var G=H.G,r=G.r;
+  if(H.ex!=null)r.toneMappingExposure=H.ex;
+  if(G.us.length>1){var y=G.h-H.h;r.setViewport(0,y,H.w,H.h);r.setScissor(0,y,H.w,H.h);r.setScissorTest(true);}
+}
+/* scissor parsial; x,y,w,h = koordinat ATAS-KIRI di dalam wilayah unit (piksel perangkat) */
+function threeGLRect(H,x,y,w,h){var G=H.G,r=G.r;r.setScissorTest(true);r.setScissor(x,G.h-y-h,w,h);}
+function threeGLFull(H){
+  var G=H.G,r=G.r;
+  if(G.us.length>1){r.setScissor(0,G.h-H.h,H.w,H.h);r.setScissorTest(true);}
+  else r.setScissorTest(false);
+}
+/* y (koordinat GL, dari bawah) baris paling BAWAH wilayah unit; untuk readPixels */
+function threeGLOy(H){return H.G.h-H.h;}
+/* salinan 2D wilayah unit ke kanvas milik unit. Hanya perlu kalau renderer dibagi DAN hasilnya digambar lagi di frame yang sama tanpa render ulang
+   (ghost copy teleskop, cincin portal): unit lain bisa menimpa kanvas GL di antaranya. Tidak dibagi -> null, baca langsung. */
+function threeGLSnap(H){
+  if(H.G.us.length<2)return null;
+  var c=H.sn||(H.sn=document.createElement('canvas')),x;
+  if(c.width!==H.w||c.height!==H.h){c.width=H.w;c.height=H.h;H.sx=null;}
+  x=H.sx||(H.sx=c.getContext('2d'));
+  x.globalCompositeOperation='copy';x.drawImage(H.G.cv,0,0,H.w,H.h,0,0,H.w,H.h);x.globalCompositeOperation='source-over';
+  return c;
+}
+/* sumber gambar untuk drawImage 5/3-argumen (seluruh kanvas): salinan unit kalau dibagi, kanvas GL sendiri kalau tidak */
+function threeGLSrc(H){return (H.G.us.length>1&&H.sn)?H.sn:H.r.domElement;}
+/* warm-up: render dengan wilayah unit (kalau ada) atau seluruh kanvas grup */
+function threeGLWarmBegin(r,H){
+  if(H){threeGLBegin(H);threeGLFull(H);}
+  else if(r.__G){r.setViewport(0,0,r.__G.w,r.__G.h);r.setScissorTest(false);}
 }
 
 function ast3dFail(why){AST3D.state=3;AST3D.err=String(why||'');try{console.warn('[ast3d] fallback ke sprite 2D:',AST3D.err);}catch(e){}}
@@ -239,12 +326,8 @@ function ast3dAddVariant(geo,tier){
 
 function ast3dBuild(){
   var T=THREE;
-  var cv=document.createElement('canvas');
-  try{window.__glLabel='AST3D';}catch(e){}
-  var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
-  r.setClearColor(0x000000,0);
-  cv.addEventListener('webglcontextlost',function(e){e.preventDefault();ast3dFail('webglcontextlost');},false);
-  AST3D.r=r;
+  var gl=threeGLGet('AST3D','big',true,false,null,ast3dFail),r=gl.r;   /* v22: renderer grup 'big' (dibagi dgn PL3D, antialias:false); ?gs=0 = renderer sendiri antialias:true */
+  AST3D.gl=gl;AST3D.r=r;
   AST3D.sc=new T.Scene();
   AST3D.cam=new T.OrthographicCamera(0,W,H,0,-600,600);
   AST3D.uni={uBH:{value:new T.Vector2(W*.5,H*.5)},uBack:{value:0},uFall:{value:Math.max(W,H)*.9}};
@@ -287,7 +370,7 @@ function ast3dBuild(){
   for(ti=0;ti<=LD.length;ti++)
     for(i=0;i<AST3D_CFG.procVariants;i++)ast3dAddVariant(ast3dRockGeo(i+1,ti<LD.length?LD[ti][0]:3),ti);   /* seed sama per tier -> bentuk batu sama, cuma kerapatan mesh beda */
   AST3D.state=2;   /* siap dipakai segera dengan batu procedural */
-  threeWarm(r,AST3D.sc,AST3D.cam,function(){ast3dResize();});   /* ukuran layar penuh dipasang di warm-up, bukan di frame batu pertama */
+  threeWarm(r,AST3D.sc,AST3D.cam,function(){ast3dResize();},gl);   /* ukuran layar penuh dipasang di warm-up, bukan di frame batu pertama */
 }
 
 /* pilih varian: tier menurut ukuran batu (_sz), lalu bentuk menurut sprite; tier kosong -> turun ke tier berikutnya yang ada */
@@ -303,7 +386,8 @@ function ast3dResize(){
   var pr=Math.min(DPR||1,AST3D_CFG.dprMax);
   if(AST3D.w===W&&AST3D.h===H&&AST3D.pr===pr)return;
   AST3D.w=W;AST3D.h=H;AST3D.pr=pr;
-  AST3D.r.setPixelRatio(pr);AST3D.r.setSize(W,H,false);
+  AST3D.pw=Math.max(1,Math.floor(W*pr));AST3D.ph=Math.max(1,Math.floor(H*pr));   /* piksel perangkat (sama dgn kanvas lama: floor(W*pr)); pixelRatio renderer selalu 1 */
+  threeGLSize(AST3D.gl,AST3D.pw,AST3D.ph);
   var c=AST3D.cam;c.left=0;c.right=W;c.top=H;c.bottom=0;c.updateProjectionMatrix();
   AST3D.uni.uFall.value=Math.max(W,H)*.9;
 }
@@ -430,14 +514,15 @@ function ast3dDraw(now,half){
       v.B.clearUpdateRanges();v.B.addUpdateRange(0,v.n*4);v.B.needsUpdate=true;
       v.Z.clearUpdateRanges();v.Z.addUpdateRange(0,v.n);v.Z.needsUpdate=true;
     }
+    threeGLBegin(AST3D.gl);
     AST3D.r.render(AST3D.sc,AST3D.cam);
-    var cvA=AST3D.r.domElement,kx=cvA.width/W,ky=cvA.height/H,
+    var cvA=AST3D.r.domElement,kx=AST3D.pw/W,ky=AST3D.ph/H,
         rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),rx1=Math.min(W,Math.ceil(bx1)+2),ry1=Math.min(H,Math.ceil(by1)+2);
     if(rx1>rx0&&ry1>ry0){
       if(!AST3D_CFG.reuse)g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama persis dgn blit penuh: di luar bbox kanvas GL transparan */
       else{
         /* salin bbox (piksel perangkat, bulat, 1:1) ke kanvas cache pass ini, lalu blit dari cache -> hasil sama, dan frame berikut bisa pakai ulang */
-        var sx=Math.max(0,Math.floor(rx0*kx)),sy=Math.max(0,Math.floor(ry0*ky)),ex=Math.min(cvA.width,Math.ceil(rx1*kx)),ey=Math.min(cvA.height,Math.ceil(ry1*ky)),sw=ex-sx,sh=ey-sy;
+        var sx=Math.max(0,Math.floor(rx0*kx)),sy=Math.max(0,Math.floor(ry0*ky)),ex=Math.min(AST3D.pw,Math.ceil(rx1*kx)),ey=Math.min(AST3D.ph,Math.ceil(ry1*ky)),sw=ex-sx,sh=ey-sy;
         if(sw>0&&sh>0){
           var cc=ast3dStore(ci,sx,sy,sw,sh,sx/kx,sy/ky,sw/kx,sh/ky,total);
           if(cc.c.width<sw||cc.c.height<sh){cc.c.width=Math.max(cc.c.width,sw+32);cc.c.height=Math.max(cc.c.height,sh+32);}   /* cuma membesar (set width = kosongkan + realokasi) */

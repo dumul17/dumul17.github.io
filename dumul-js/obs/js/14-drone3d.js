@@ -106,13 +106,8 @@ function dr3dMerge(sc,root,skip){
 
 /* ---------- model ---------- */
 function* dr3dBuildG(){
-  var T=THREE,cv=document.createElement('canvas'),PI=Math.PI,DS=T.DoubleSide;
-  try{window.__glLabel='DR3D';}catch(e){}
-  var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
-  r.setClearColor(0x000000,0);
-  r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
-  cv.addEventListener('webglcontextlost',function(e){e.preventDefault();dr3dFail('webglcontextlost');},false);
-  DR3D.r=r;
+  var T=THREE,PI=Math.PI,DS=T.DoubleSide,gl=threeGLGet('DR3D','small',true,true,1.05,dr3dFail),r=gl.r;   /* v22: renderer grup 'small' (dibagi dgn SCP3D + PT3D) */
+  DR3D.gl=gl;DR3D.r=r;
   var sc=new T.Scene(),R=DR3D_CFG.half,cam=new T.OrthographicCamera(-R,R,R,-R,-200,200);
   cam.position.set(0,70,52);cam.lookAt(0,0,0);   /* dari atas-depan (~53°), seperti gambar referensi */
   DR3D.sc=sc;DR3D.cam=cam;
@@ -278,11 +273,11 @@ function* dr3dBuildG(){
   /* pra-ukur kanvas ke resolusi yang akan dipakai drone pertama (skala sama dgn 08-tx-drone.js: W<420 ? 1 : 1.15): setSize pertama = realokasi framebuffer MSAA, terukur ~detik di headless -> hitch di drone pertama */
   try{
     var sc0=(typeof W!=='undefined'&&W<420)?1:1.15,res0=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*sc0*Math.min(2,DPR||1)*1.2/32)*32));
-    DR3D.res=res0;r.setPixelRatio(1);r.setSize(res0,res0,false);
+    DR3D.res=res0;threeGLSize(gl,res0,res0);
   }catch(eP){}
   yield;   /* ---- tahap 6 selesai: pra-ukur kanvas (alokasi framebuffer MSAA) ---- */
   DR3D.state=2;
-  if(typeof threeWarm==='function')threeWarm(r,sc,cam);   /* kompilasi shader saat idle, bukan di render pertama (drone pertama muncul) */
+  if(typeof threeWarm==='function')threeWarm(r,sc,cam,null,gl);   /* kompilasi shader saat idle, bukan di render pertama (drone pertama muncul) */
 }
 
 /* Build dipecah jadi 8 tahap (generator, yield di batas tahap). Tiap tahap jalan satu giliran di antrean THREE_Q (12-ast3d.js) lalu menunggu satu frame ter-paint,
@@ -309,7 +304,7 @@ function dr3dUpdate(now,x,y,col){
   var T=THREE,r=DR3D.r,o=DR3D.o,m=DR3D.m,sc=DR3D.sc;
   /* resolusi render mengikuti ukuran di layar */
   var res=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*(DR3D.scale||1)*Math.min(2,DPR||1)*1.2/32)*32));
-  if(res!==DR3D.res){DR3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);DR3D.dirty=true;}
+  if(res!==DR3D.res){DR3D.res=res;threeGLSize(DR3D.gl,res,res);DR3D.dirty=true;}
 
   /* kecepatan (px/ms) dari posisi frame sebelumnya; loncatan/jeda panjang = reset */
   var dt=now-DR3D.pt,vx=0,vy=0,sp=0;
@@ -358,9 +353,10 @@ function dr3dUpdate(now,x,y,col){
   var lk=DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;o.rim.intensity=1.1*Math.PI*lk;o.hemi.intensity=.45*Math.PI*lk;o.fill.intensity=.55*Math.PI*lk;
   /* render GPU dibatasi (minDt); hasil disalin ke kanvas 2D kecil supaya frame yang dilewati tinggal drawImage (isi buffer WebGL tidak dijamin utuh antar frame) */
   if(!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
+    threeGLBegin(DR3D.gl);
     r.render(sc,DR3D.cam);
     if(!DR3D.c2||DR3D.c2.width!==res){DR3D.c2=document.createElement('canvas');DR3D.c2.width=DR3D.c2.height=res;DR3D.x2=DR3D.c2.getContext('2d');}
-    DR3D.x2.clearRect(0,0,res,res);DR3D.x2.drawImage(r.domElement,0,0);
+    DR3D.x2.clearRect(0,0,res,res);DR3D.x2.drawImage(r.domElement,0,0,res,res,0,0,res,res);   /* sumber (0,0,res,res): kanvas dibagi bisa lebih besar dari res */
     DR3D.lastR=now;DR3D.dirty=false;
   }
 }
@@ -382,7 +378,7 @@ function drone3dDraw(g,x,y,col,a,now,sc){
     g.fillStyle='rgba('+col+','+Math.min(1,.14*a*hk)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();}
     g.globalAlpha=a>1?1:(a<0?0:a);
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-    g.drawImage(DR3D.c2||DR3D.r.domElement,x-S/2,y-S/2,S,S);
+    if(DR3D.c2)g.drawImage(DR3D.c2,x-S/2,y-S/2,S,S);
     g.restore();
     return true;
   }catch(e){

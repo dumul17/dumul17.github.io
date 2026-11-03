@@ -679,13 +679,9 @@ var PL3D_FS=[
 
 function pl3dBuild(){
   var T=THREE,tp0=performance.now(),tpa=0,tpb=0;   /* v39: waktu tahap (ms) -> window.__pl3dT (3 elemen: renderer+scene, noise+material+mesh, resize+jadwal warm); TANPA irisan, hanya ukur */
-  var cv=document.createElement('canvas');
-  try{window.__glLabel='PL3D';}catch(e){}
-  var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:false,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
-  r.setClearColor(0x000000,0);r.setPixelRatio(1);
-  cv.addEventListener('webglcontextlost',function(e){e.preventDefault();pl3dFail('webglcontextlost');},false);
+  var gl=threeGLGet('PL3D','big',false,false,null,pl3dFail),r=gl.r;   /* v22: renderer grup 'big' (dibagi dgn AST3D, antialias:false) */
   var P=PL3D_CFG.pal,L=PL3D_CFG.lightCol;
-  PL3D.r=r;PL3D.sc=new T.Scene();PL3D.cam=new T.Camera();
+  PL3D.gl=gl;PL3D.r=r;PL3D.sc=new T.Scene();PL3D.cam=new T.Camera();
   tpa=performance.now();
   /* tekstur noise 256x256 (tileable, deterministik): R = acak(x,y), G = R digeser (+37,+17), B = acak kedua (ukuran batu) */
   var nz=new Uint8Array(256*256*4),nr=new Uint8Array(256*256),nb=new Uint8Array(256*256),ni,nx,ny,sd=1337;
@@ -713,8 +709,10 @@ function pl3dBuild(){
     if(PL3D.state!==1)return;
     try{
       pl3dUniforms(performance.now());
-      r.compile(PL3D.sc,PL3D.cam);r.render(PL3D.sc,PL3D.cam);
-      var ps=r.info.programs||[],i,bad='';
+      r.compile(PL3D.sc,PL3D.cam);threeGLBegin(gl);threeGLFull(gl);r.render(PL3D.sc,PL3D.cam);
+      var ps=r.info.programs||[],i,bad='',cp=null;
+      try{cp=r.properties.get(PL3D.mat).currentProgram;}catch(eCp){}
+      if(cp)ps=[cp];   /* v22: renderer dibagi -> periksa program planet saja, bukan program unit lain */
       for(i=0;i<ps.length;i++){var dg=ps[i].diagnostics;if(dg&&dg.runnable===false){bad=(dg.programLog||'')+' '+((dg.fragmentShader&&dg.fragmentShader.log)||'')+' '+((dg.vertexShader&&dg.vertexShader.log)||'');break;}}
       if(bad){pl3dFail('shader: '+bad.replace(/\s+/g,' ').slice(0,300));return;}
       if(r.getContext&&r.getContext().isContextLost&&r.getContext().isContextLost()){pl3dFail('context lost');return;}
@@ -752,7 +750,7 @@ function pl3dResize(){
   PL3D.cvM.width=rw;PL3D.cvM.height=rh;
   PL3D.cyc=null;PL3D.full=true;PL3D.bwR=null;   /* ukuran berubah: render penuh sekali jalan dulu */
   PL3D.fb=null;
-  if(PL3D.r){PL3D.r.setSize(rw,rh,false);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
+  if(PL3D.r){threeGLSize(PL3D.gl,rw,rh);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
 }
 
 /* titik lampu (ruang layar tegak): overview = portal yang sedang mengorbit (P4; kalau di balik limb, lampunya di balik planet jadi cuma pinggir limb yang menyala), sektor = BH mini */
@@ -807,7 +805,7 @@ function pl3dCycleStep(){
   var c=PL3D.cyc,r=PL3D.r,rw=PL3D.rw,rh=PL3D.rh,n=c.n,k=c.i,y0=Math.round(rh*k/n),y1=Math.round(rh*(k+1)/n),h=y1-y0,t;
   if(h>0){
     PL3D.uni.uBolt.value.w=0;   /* kilau petir TIDAK dibake ke dasar; petir punya jendela sendiri (pl3dBoltWin) */
-    r.setScissorTest(true);r.setScissor(0,rh-y1,rw,h);   /* y scissor dari BAWAH */
+    threeGLBegin(PL3D.gl);threeGLRect(PL3D.gl,0,y0,rw,h);   /* v22: scissor pita (koordinat atas-kiri wilayah planet; dulu y dari BAWAH = rh-y1) */
     r.render(PL3D.sc,PL3D.cam);pl3dMkGpu(r);
     r.setScissorTest(false);
     PL3D.c3.clearRect(0,y0,rw,h);
@@ -841,7 +839,7 @@ function pl3dBoltWin(){
   x0=Math.max(0,Math.floor(x0));y0=Math.max(0,Math.floor(y0));x1=Math.min(rw,Math.ceil(x1));y1=Math.min(rh,Math.ceil(y1));
   w=x1-x0;h=y1-y0;
   if(!(w>0&&h>0))return;
-  r.setScissorTest(true);r.setScissor(x0,y0,w,h);
+  threeGLBegin(PL3D.gl);threeGLRect(PL3D.gl,x0,rh-y1,w,h);   /* y0,y1 di sini dari BAWAH -> atas = rh-y1 */
   r.render(PL3D.sc,PL3D.cam);
   r.setScissorTest(false);
   PL3D.c2.clearRect(x0,rh-y1,w,h);
@@ -1250,18 +1248,18 @@ function planet3dDraw(now){
         if(nb<=1||PL3D.full||!PL3D.chk||!PL3D.cv3){   /* render penuh sekali jalan: pertama kali, ukuran berubah, atau bands=1 */
           var _pt0=performance.now();
           pl3dUniforms(now,true);
-          PL3D.r.setScissorTest(false);
+          threeGLBegin(PL3D.gl);threeGLFull(PL3D.gl);
           PL3D.r.render(PL3D.sc,PL3D.cam);
           if(window.__plSt){var _S=window.__plSt;_S.fl++;if(typeof WORMHOLE!=='undefined'&&WORMHOLE.dbgHas&&WORMHOLE.dbgHas('plfin')){try{PL3D.r.getContext().finish();}catch(eF){}}   /* ?whdbg=plfin: tunggu GPU selesai -> waktu render penuh yang SEBENARNYA (membekukan sebentar, hanya diagnosa) */
             var _d=Math.round(performance.now()-_pt0);if(_d>_S.mx)_S.mx=_d;}
           if(!PL3D.chk){   /* sekali: piksel dasar-tengah harus terisi (di dalam bola). Program yang tidak jalan tapi lolos diagnostics -> fallback 2D */
             PL3D.chk=1;
             var gl=PL3D.r.getContext(),px=new Uint8Array(4);
-            gl.readPixels(PL3D.rw>>1,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+            gl.readPixels(PL3D.rw>>1,threeGLOy(PL3D.gl),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);   /* baris paling bawah wilayah planet (kanvas dibagi: bukan y=0) */
             if(px[3]<200){pl3dFail('render kosong (alpha '+px[3]+')');return;}
           }
           PL3D.c2.clearRect(0,0,PL3D.rw,PL3D.rh);
-          PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh);
+          PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh,0,0,PL3D.rw,PL3D.rh);   /* v22: sumber (0,0,rw,rh) saja, kanvas dibagi bisa lebih besar */
           PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.fadeT=null;PL3D.renders++;pl3dRfMark();
         }else{pl3dCycleStart(now,lx,ly,nb,perOnly&&PL3D_CFG.fade>0);pl3dCycleStep();}
       }

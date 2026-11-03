@@ -137,12 +137,8 @@ function pt3dSeg(T,a0,a1,r0,r1){
   g.translate(0,0,-.08);return g;
 }
 function* pt3dBuildG(){
-  var T=THREE,cv=document.createElement('canvas'),PI=Math.PI;
-  try{window.__glLabel='PT3D';}catch(e){}
-  var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
-  r.setClearColor(0x000000,0);r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;
-  cv.addEventListener('webglcontextlost',function(e){e.preventDefault();pt3dFail('webglcontextlost');},false);
-  PT3D.r=r;
+  var T=THREE,PI=Math.PI,gl=threeGLGet('PT3D','small',true,true,1.05,pt3dFail),r=gl.r;   /* v22: renderer grup 'small' (dibagi dgn SCP3D + DR3D) */
+  PT3D.gl=gl;PT3D.r=r;
   var sc=new T.Scene(),H=PT3D_CFG.half,cam=new T.OrthographicCamera(-H,H,H,-H,-20,20);
   cam.position.set(0,0,10);cam.lookAt(0,0,0);PT3D.sc=sc;PT3D.cam=cam;
   yield;   /* ---- tahap 0 selesai: renderer + scene + kamera ---- */
@@ -171,11 +167,11 @@ function* pt3dBuildG(){
   /* pra-ukur ke resolusi overview (setSize pertama = realokasi framebuffer MSAA yang mahal) */
   try{
     var res0=pt3dRes(Math.max(40,(typeof BH!=='undefined'?BH.R:26)*ptOvK()));
-    PT3D.res=res0;r.setPixelRatio(1);r.setSize(res0,res0,false);
+    PT3D.res=res0;threeGLSize(gl,res0,res0);
   }catch(eP){}
   yield;   /* ---- tahap 4 selesai: setSize pra-ukur ---- */
   PT3D.state=2;
-  if(typeof threeWarm==='function')threeWarm(r,sc,cam);
+  if(typeof threeWarm==='function')threeWarm(r,sc,cam,null,gl);
 }
 /* Build dipecah jadi 6 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG / scp3dBuildG. Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
    tahap berikut di-unshift sehingga urutan antar modul tidak berubah. ?ps=0 = sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__pt3dT, dicatat bench (R.pt3dT, R.ps).
@@ -211,8 +207,8 @@ function pt3dWarmMax(){
     /* setSize cuma mengubah ukuran kanvas; realokasi framebuffer (MSAA) baru terbayar di render pertama -> render 1x SEKARANG, tapi hanya kalau res berubah.
        Kalau res sudah resMax (pernah charge / dive / warm), buffer sudah teralokasi -> no-op murni (aman dipanggil di frame berat). */
     if(PT3D.res!==res){
-      PT3D.res=res;PT3D.r.setPixelRatio(1);PT3D.r.setSize(res,res,false);
-      try{if(PT3D.sc&&PT3D.cam)PT3D.r.render(PT3D.sc,PT3D.cam);}catch(eR){}
+      PT3D.res=res;threeGLSize(PT3D.gl,res,res);
+      try{if(PT3D.sc&&PT3D.cam){threeGLBegin(PT3D.gl);PT3D.r.render(PT3D.sc,PT3D.cam);}}catch(eR){}
     }
     return true;
   }catch(e){return false;}
@@ -251,7 +247,7 @@ function ptTiltMat(an){
 function pt3dRender(now,Rp,playing,tk){
   var T=THREE,r=PT3D.r,res=pt3dRes(Rp);
   if(PT3D.big&&res<PT3D_CFG.resMax)res=PT3D_CFG.resMax;   /* sudah pernah charge / dive: tetap resolusi penuh (zoom-in nggak buram, nggak realokasi di tengah animasi) */
-  if(res!==PT3D.res){PT3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);}
+  if(res!==PT3D.res){PT3D.res=res;threeGLSize(PT3D.gl,res,res);}
   ptCol();
   var lv=ptLevels(now,playing),i,m,t=now*.001;
   for(i=0;i<12;i++){
@@ -266,7 +262,9 @@ function pt3dRender(now,Rp,playing,tk){
   if(PT3D.tilt){var an=ptTiltAng(now,tk);PT3D.tilt.rotation.set(an[0],an[1],an[2]);}
   PT3D.grp.rotation.x=(tk>0||still)?0:.06*Math.sin(t*.5);PT3D.grp.rotation.y=(tk>0||still)?0:.08*Math.sin(t*.37+1);   /* goyangan dikecilkan: cincin tampak bulat (kalau miring, goyangannya sudah ada di ptTiltAng) */
   PT3D.grp.rotation.z=PT3D.rz;
+  threeGLBegin(PT3D.gl);
   r.render(PT3D.sc,PT3D.cam);
+  threeGLSnap(PT3D.gl);   /* dibagi: salinan 2D milik cincin; frame yang sama bisa menggambar ulang tanpa render */
 }
 function pt3dUsable(){
   if(PT3D.state===0){pt3dLoad();return false;}
@@ -699,13 +697,13 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
         if(alt){
           var cc=PT3D.cc||(PT3D.cc=document.createElement('canvas')),rs=PT3D.res;
           if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}
-          var cx2=cc.getContext('2d');cx2.globalCompositeOperation='copy';cx2.drawImage(PT3D.r.domElement,0,0,rs,rs);cx2.globalCompositeOperation='source-over';
+          var cx2=cc.getContext('2d');cx2.globalCompositeOperation='copy';cx2.drawImage(threeGLSrc(PT3D.gl),0,0,rs,rs);cx2.globalCompositeOperation='source-over';
           PT3D.ccOK=1;PT3D.ccRes=rs;PT3D.ccT=now;
         }else PT3D.ccOK=0;
       }
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality=opts.lq?'low':'high';   /* v11: opts.lq (wormhole zoom): tekstur 256px di-upscale sampai layar penuh; filter 'high' mahal di GPU sesuai area -> 'low' */
-      g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:PT3D.r.domElement,-S/2,-S/2,S,S);
+      g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}

@@ -1,11 +1,12 @@
 'use strict';
-/* BENCH v11.11 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.14 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
    v11: post-enter rAF (p50/p95/p99 + dropped%); renderer.info per label; memory timeline (start/capsule/3d/30s);
    LCP/CLS/FCP; device info (cores/mem/dpr/viewport/GL_RENDERER); visibility flag; multi-run median/min/max;
-   microbench ulang di akhir (thermal/throttle delta). */
+   microbench ulang di akhir (thermal/throttle delta).
+   merge: v11.14 + data-v pV sampling + bm flag (?bm=0). */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
@@ -449,7 +450,7 @@
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v11.11 ms (sejak navigasi)');
+    x.push('BENCH v11.14+ ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -547,8 +548,8 @@
     } catch (e) {}
 
     R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
-    R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */
-  R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null;
+    R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null;
+    R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
 
     /* v10: network detail */

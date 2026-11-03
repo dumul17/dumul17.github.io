@@ -172,13 +172,8 @@ function scp3dEnv(r){
 
 /* ---------- model pesawat ---------- */
 function* scp3dBuildG(){
-  var T=THREE,cv=document.createElement('canvas');
-  try{window.__glLabel='SCP3D';}catch(e){}
-  var r=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'low-power',preserveDrawingBuffer:false});
-  r.setClearColor(0x000000,0);
-  r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;
-  cv.addEventListener('webglcontextlost',function(e){e.preventDefault();scp3dFail('webglcontextlost');},false);
-  SCP3D.r=r;
+  var T=THREE,gl=threeGLGet('SCP3D','small',true,true,1.0,scp3dFail),r=gl.r;   /* v22: renderer grup 'small' (dibagi dgn DR3D + PT3D); exposure per unit diset di threeGLBegin */
+  SCP3D.gl=gl;SCP3D.r=r;
   var sc=new T.Scene(),H=SCP3D_CFG.half;
   var cam=new T.OrthographicCamera(-H,H,H,-H,-300,300);cam.position.set(0,0,100);cam.lookAt(0,0,0);
   SCP3D.sc=sc;SCP3D.cam=cam;
@@ -300,8 +295,8 @@ function* scp3dBuildG(){
   yield;   /* ---- tahap 6 selesai: cahaya ---- */
   SCP3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam,function(){   /* pra-ukur: skala teleskop konstan (DPR dibatasi 2) -> res selalu resMin; cocok dgn scp3dUpdate, jadi tanpa setSize di frame pertama */
-    SCP3D.res=SCP3D_CFG.resMin;r.setPixelRatio(1);r.setSize(SCP3D.res,SCP3D.res,false);
-  });   /* kompilasi shader saat idle, bukan di render pertama */
+    SCP3D.res=SCP3D_CFG.resMin;threeGLSize(gl,SCP3D.res,SCP3D.res);
+  },gl);   /* kompilasi shader saat idle, bukan di render pertama */
 }
 
 /* Build dipecah jadi 8 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG (14-drone3d.js). Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
@@ -325,7 +320,7 @@ function scp3dUpdate(now,mm){
   var T=THREE,r=SCP3D.r,o=SCP3D.o,m=SCP3D.m,sc=Math.hypot(mm.a,mm.b),res=Math.max(SCP3D_CFG.resMin,Math.min(SCP3D_CFG.resMax,Math.ceil(SCP3D_CFG.half*2*sc*1.4/32)*32));
   /* selama transisi portal skala teleskop berubah .1->.95 -> res bergeser per 32px = setSize (realokasi buffer) berulang = stutter. Kunci res di nilai frame pertama transisi. */
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.busy){if(SCP3D.rl==null)SCP3D.rl=res;res=SCP3D.rl;}else SCP3D.rl=null;
-  if(res!==SCP3D.res){SCP3D.res=res;r.setPixelRatio(1);r.setSize(res,res,false);}
+  if(res!==SCP3D.res){SCP3D.res=res;threeGLSize(SCP3D.gl,res,res);}
   var TL=(typeof TELESCOPE!=='undefined')?TELESCOPE:null,mode=TL?TL.mode:'drift';
 
   /* arah cahaya: telescop -> Gargantua, diputar balik dari frame kanvas ke frame badan (canvas y ke bawah -> GL y ke atas) */
@@ -425,7 +420,9 @@ function scp3dUpdate(now,mm){
     if(role)o.winGlow.material.color.setRGB(cr,cg,cb);else o.winGlow.material.color.setRGB(.21,.95,1);
   }
   o.winGlow.material.opacity=.32+.1*Math.sin(now*.004);
+  threeGLBegin(SCP3D.gl);
   r.render(SCP3D.sc,SCP3D.cam);
+  threeGLSnap(SCP3D.gl);   /* dibagi: salin ke kanvas 2D milik teleskop, karena ghost copy di frame yang sama menggambar ulang tanpa render */
 }
 
 /* v15: ?whtele=1 menyalakan render GL teleskop selang-seling selama travel wormhole (whAlt dulu dimatikan permanen lewat '0&&'; umur cache 45ms terlalu pendek utk frame 66ms -> 150ms). */
@@ -447,12 +444,12 @@ function tele3dBody(g,now){
       if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)%SCP3D_WHALT!==0)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<130*SCP3D_WHALT)cache=SCP3D.cc;
       else{
         SCP3D.last=now;scp3dUpdate(now,mm);
-        if(wh||bf){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(SCP3D.r.domElement,0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;if(bf)SCP3D.bz=true;}
+        if(wh||bf){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;if(bf)SCP3D.bz=true;}
       }
     }
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
     var H=SCP3D_CFG.half;
-    g.drawImage(cache||SCP3D.r.domElement,-H,-H,H*2,H*2);
+    g.drawImage(cache||threeGLSrc(SCP3D.gl),-H,-H,H*2,H*2);
     return true;
   }catch(e){
     scp3dFail(e&&e.message||e);
