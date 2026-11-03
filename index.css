@@ -330,26 +330,12 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 #boot-log .ok{color:rgba(142,238,255,.8)}
 #boot-log .pn{color:rgba(184,224,238,.95)}
 #boot-log .pn::after{content:'\2588';margin-left:.35em;opacity:.7;animation:bootCur 1s steps(1,end) infinite}
-/* [PATCH v159] decoder flicker saat warm glitch-instrumental (GARG) — compositor only, hormati reduced-motion */
-#boot-log.dec .pn,
-#boot-log .pn.dec{
-  color:rgba(255,122,217,.95);
-  text-shadow:0 0 6px rgba(255,122,217,.45),0 0 2px #02070b;
-  animation:bootDecode 0.55s steps(2,end) infinite;
-}
-@keyframes bootDecode{
-  0%{opacity:1;letter-spacing:.05em;filter:none}
-  50%{opacity:.72;letter-spacing:.11em;filter:hue-rotate(-25deg)}
-  100%{opacity:1;letter-spacing:.05em;filter:none}
-}
-@media (prefers-reduced-motion:reduce){
-  #boot-log.dec .pn,
-  #boot-log .pn.dec{animation:none}
-}
-.potato #boot-log.dec .pn,
-.potato #boot-log .pn.dec,
-#boot-screen.calm #boot-log.dec .pn,
-#boot-screen.calm #boot-log .pn.dec{animation:none}
+/* [PATCH v160] baris GARG = decode yang sengaja error. Teks di-scramble dari JS (decHtml di 07-boot.js, sama gaya jam dilatasi di sektor/overview);
+   CSS cuma warna + glow. Geser kiri-kanan pakai left (relative, tidak mengubah lebar baris), belah warna merah-cyan lewat text-shadow inline.
+   Tidak ada animasi CSS lagi: bootDecode lama menganimasikan letter-spacing (reflow tiap frame) + filter hue-rotate, dan salah sasaran (seluruh baris berkedip, bukan karakternya).
+   reduced-motion ditangani JS (baris statis). Kursor blok tetap diam di baris ini supaya tidak ikut ngedip bareng glitch. */
+#boot-log .pn.dec{position:relative;color:rgba(255,122,217,.95);text-shadow:0 0 6px rgba(255,122,217,.45),0 0 2px #02070b}
+#boot-log .pn.dec::after{animation:none;opacity:.8}
 #boot-signal{margin-top:10px;font-size:10px;letter-spacing:.13em;color:#eafcff;opacity:0;transform:translateY(4px);transition:opacity .35s,transform .35s;text-shadow:0 0 8px rgba(110,229,255,.65)}
 #boot-signal.on{opacity:1;transform:none}
 #boot-quote{
