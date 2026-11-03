@@ -98,8 +98,10 @@
     'bl.engine':{en:'3D engine',id:'Mesin 3D'},'bl.scope':{en:'Telescope',id:'Teleskop'},'bl.drone':{en:'Drone',id:'Drone'},
     'bl.portal':{en:'Portal',id:'Portal'},'bl.planet':{en:'Planet',id:'Planet'},'bl.rock':{en:'Space rocks',id:'Batu angkasa'},
     'bl.sfx':{en:'Star voices',id:'Suara bintang'},
+    'bl.bgm':{en:'Music',id:'Musik'},'bl.glitch':{en:'Glitch signal',id:'Sinyal glitch'},   /* [v160] log boot: 2 BGM + GARG */
     'bl.ready':{en:'ready',id:'siap'},'bl.a.dl':{en:'downloading',id:'lagi unduh'},'bl.a.load':{en:'loading',id:'lagi muat'},
     'bl.a.sfx':{en:'waking up',id:'lagi bangun'},
+    'bl.a.bgm':{en:'tuning',id:'lagi disetel'},'bl.a.decode':{en:'decoding…',id:'lagi decode…'},
     /* nama tahap (kunci = isi LOG_M di 07-boot.js) */
     'bl.a.canvas':{en:'canvas',id:'kanvas'},'bl.a.light':{en:'light reflections',id:'pantulan cahaya'},'bl.a.paint':{en:'materials',id:'bahan'},
     'bl.a.body':{en:'body',id:'badan'},'bl.a.cockpit':{en:'cockpit',id:'kokpit'},'bl.a.engine':{en:'engines',id:'mesin'},'bl.a.lamps':{en:'lights',id:'lampu'},
