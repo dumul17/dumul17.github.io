@@ -53,6 +53,7 @@ var PL3D_CFG={
   zoomK:.2,       /* planet membesar cuma .1x dari skyZoom (diklem di zoom 4; di atas itu planet keluar layar) */
   sinkK:1,        /* pengali bhSink + teleSink (satu slider 'Sink' di panel tuning; 1 = apa adanya, 0 = tidak boleh menyentuh limb) */
   bhSink:.5,      /* BH mini boleh terbenam di balik limb sedalam sekian x radiusnya (0 = tidak boleh menyentuh limb) */
+  ptSink:1,       /* PORTAL overview (drag): tepi bawah boleh terbenam di balik limb sedalam sekian x radius cincin. 1 = pusat tepat di limb = 50% tenggelam (maks), 0 = tidak boleh menyentuh limb. Tidak ikut sinkK. Dipakai clamp drag (06-interaction.js) + trigger dilatasi jam */
   teleSink:.35,   /* teleskop: idem bhSink (planetObjClamp). Radius yang dipakai = .7 x radius hit teleskop (04-render.js). 0 = tidak boleh menyentuh limb */
   /* knob tuning tambahan (tab Planet di panel owl; angka ini = DEFAULT): */
   atmK:1.5,         /* pengali opasitas atmosfer/glow limb (palette tetap per sektor) */
@@ -1325,6 +1326,14 @@ function planetObjClamp(x,y,r,sink){
   if(q[1]<=m)return [x,y];
   q[1]=m;
   return pl3dStage(q[0],q[1]);
+}
+/* Seberapa dalam objek (pusat x,y STAGE, radius r px) terbenam di balik limb, dalam satuan r: 0 = tepi bawah baru menyentuh limb, 1 = pusat di limb (50% tenggelam), 2 = penuh. <0 = masih di atas limb.
+   live=true: limb ikut parallax/zoom yang tampil (overview, sama dgn planetObjClamp); live=false: limb statis tujuan (sektor, sama dgn clamp BH mini). null = planet tidak aktif / cam mode. Dipakai trigger dilatasi jam (06-interaction.js). */
+function planetSinkDepth(x,y,r,live){
+  if(!(PL3D_CFG.on&&PL3D.al>.5)||(typeof CAMERA_MODE!=='undefined'&&CAMERA_MODE)||!(r>0)||!isFinite(x)||!isFinite(y))return null;
+  pl3dSync();if(!PW||!PH)return null;
+  var q=pl3dScr(x,y),gm=pl3dGeom(!live,!live),dx=q[0]-gm.cx,limb=gm.cy-Math.sqrt(Math.max(0,gm.R*gm.R-dx*dx));
+  return (q[1]+r-limb)/r;
 }
 function planetBhOk(x,y,r){
   if(!pl3dBhOn())return true;

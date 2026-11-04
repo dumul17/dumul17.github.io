@@ -40,7 +40,7 @@ var T3D=(function(){
       {id:'cloud',mem:['cloud','cloudCov','cloudShd','cloudLit','cloudDet'],tog:1,raw:['cloudH']},
       {id:'atm',mem:['atmK','rimLit','rimHalo'],tog:1,raw:['fallK']},
       {id:'fx',fx:1,raw:['auroraOn','flareOn','debrisOn','boltOn','cityTw','evK']},
-      {id:'move',mem:['par','zoomK','rotK','sinkK','libr.k'],tog:1}
+      {id:'move',mem:['par','zoomK','rotK','sinkK','libr.k'],tog:1,raw:['ptSink']}
     ],
     secs:{adv:['ADVANCED','LANJUTAN'],shape:['SHAPE','BENTUK'],ground:['GROUND','TANAH'],bio:['BIOMES','BIOME'],haze:['HAZE','KABUT'],cloud:['CLOUDS','AWAN'],atm:['ATMOSPHERE & LIGHT','ATMOSFER & CAHAYA'],city:['CITY','KOTA'],fx:['EFFECTS','EFEK'],move:['MOTION','GERAK'],perf:['PERFORMANCE (ALL SLOTS)','PERFORMA (SEMUA SLOT)']},
     after:function(p){try{if(p==='auroraOn'||p==='flareOn'||p==='debrisOn'||p==='boltOn'||p==='evK'||p==='boltK')return;PL3D.dirty=true;if(p==='hzDy')PL3D.topC=null;}catch(e){}},   /* efek 2D digambar tiap frame: tidak perlu render ulang shader */
@@ -103,6 +103,7 @@ var T3D=(function(){
       ['zoomK','Zoom','Zoom',0,.4,100,0,'%','','move'],
       ['libr.k','Sway','Ayun',0,2,100,0,'%','','move'],                    /* gabungan Sway Y + Sway tilt (rasio tetap 1:3); tampil di overview + sektor */
       ['sinkK','Sink','Terbenam',0,2,100,0,'%','','move'],                 /* gabungan BH sink + Tele sink (rasio tetap .5 : .35) */
+      ['ptSink','Portal sink','Portal terbenam',0,2,50,0,'%','','move'],   /* batas drag portal overview di balik limb: 50% = pusat portal tepat di limb (maks default); 0% = tidak boleh menyentuh limb. Juga skala trigger dilatasi jam */
       ['rotK','Spin','Putar',0,3,100,0,'%','','move'],                     /* tampil + berefek di overview dan sektor (ov.rot .5) */
       ['cloudDrift','Drift','Hanyut awan',-20,20,10,1,'px/s','','move','cloud'],
       ['fps','Rate','Laju',1,15,1,0,'/s','','perf'],

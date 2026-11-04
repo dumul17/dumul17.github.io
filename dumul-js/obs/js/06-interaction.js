@@ -349,6 +349,7 @@ function beginBHDrag(e){
   if(ovR>0)grab=Math.max(grab,ovR*.95);
   if(d>grab*(skyZoom>1?Math.min(1.35,0.85+0.25*skyZoom):1))return false;
   drag.on=true;drag.moved=false;drag.pid=e.pointerId;drag.x0=e.clientX;drag.y0=e.clientY;drag.bx=BH.x;drag.by=BH.y;
+  drag.px0=bp[0];drag.py0=bp[1];drag.pr0=ovR;   /* posisi + radius portal overview saat mulai drag (orbit dibekukan selama drag): dasar clamp limb planet */
   drag.tapEligible=ovR>0?(d<=Math.max(ovR*.85,42)):(d<=Math.max(BH.R*BHSC*1.9*skyZoom,BHSC<.9?24:42));
   /* BH mini hanya drag. Overview: tap portal = buka menu sektor (endBHDrag). */
   try{cv.setPointerCapture(e.pointerId);}catch(err){}
@@ -369,6 +370,10 @@ function moveBHDrag(e){
     BH.x=Math.max(bm,Math.min(W-bm,BH.x));
     BH.y=Math.max(bm,Math.min(H-bm,BH.y));
     if(SECT.cur&&typeof planetBhClamp==='function'){var pcl=planetBhClamp(BH.x,BH.y,bm/1.15);BH.x=pcl[0];BH.y=pcl[1];}   /* planet: BH mini boleh terbenam sedikit di balik limb, tidak sampai hilang */
+    if(!SECT.cur&&drag.pr0>0&&typeof planetObjClamp==='function'){   /* overview: portal ikut jari tapi maksimal tenggelam PL3D_CFG.ptSink (1 = 50%, pusat di limb) di balik limb planet; geser BH sebesar koreksi supaya portal ikut tertahan */
+      var pcx=drag.px0+(BH.x-drag.bx),pcy=drag.py0+(BH.y-drag.by),pco=planetObjClamp(pcx,pcy,drag.pr0,PL3D_CFG.ptSink);
+      BH.x+=pco[0]-pcx;BH.y+=pco[1]-pcy;
+    }
     mouse.tx=Math.max(-1,Math.min(1,dx/(Math.min(W,H)*.24)));
     mouse.ty=Math.max(-1,Math.min(1,dy/(Math.min(W,H)*.24)));
   }
@@ -1200,8 +1205,8 @@ function tgTrigger(gap,fresh){
 })();
 
 
-/* ---------- CLOCK TIME DILATION (Gargantua di-drag ke dekat jam) ----------
-   Makin dekat Gargantua ke #bh-clock, makin parah jam kena dilatasi: digit ter-scramble, kadang
+/* ---------- CLOCK TIME DILATION (portal overview / BH mini sektor terbenam di limb planet) ----------
+   Makin dalam portal (overview) atau BH mini (sektor) terbenam di balik limb planet (0 -> batas clamp), makin parah jam kena dilatasi (cara lama: jarak Gargantua ke #bh-clock, jadi cadangan kalau planet mati): digit ter-scramble, kadang
    ERR / RATE x0.xx, warna bergeser, dan jam berjalan lebih lambat (lag menumpuk).
    Saat Gargantua balik ke home, level turun linear ~6.5 dtk dan jam "mengejar" waktu asli (decode pelan).
    Nonaktif di reduced-motion, swallow, observe-mode, tesseract. Tanpa tracking, semua lokal. */
@@ -1248,7 +1253,16 @@ function updateClockDilation(now){
     }else C.box=null;
   }
   var t=0;
-  if(C.box&&C.rinf>40&&!document.hidden&&BHSC>.05){
+  if(typeof planetSinkDepth==='function'&&PL3D_CFG.on&&PL3D.state!==3){
+    /* Trigger = seberapa dalam portal overview / BH mini sektor terbenam di balik limb planet: 0% (tepi bawah menyentuh limb) -> 0, batas clamp (overview ptSink = 50% tenggelam; sektor bhSink x sinkK) -> 1.
+       Posisi jam tidak dipakai lagi. Planet tidak tampil (cam mode, menu, belum siap) -> 0. */
+    var sd=null,smx=0;
+    if(!document.hidden&&BHSC>.05){
+      if(SECT.cur){smx=PL3D_CFG.bhSink*PL3D_CFG.sinkK;if(smx>0)sd=planetSinkDepth(BH.x,BH.y,BH.R*BHSC*Math.max(1,bhSizeMul()),false);}
+      else{var sr=ptOvR();smx=PL3D_CFG.ptSink;if(sr>0&&smx>0){var sp=ptOvPos();sd=planetSinkDepth(sp[0],sp[1],sr,true);}}
+    }
+    if(sd!=null&&smx>0){var su=Math.max(0,Math.min(1,sd/smx));t=su*su*(3-2*su);}
+  }else if(C.box&&C.rinf>40&&!document.hidden&&BHSC>.05){   /* cadangan (planet dimatikan): cara lama, jarak Gargantua ke jam */
     var bp=camBH(),d=clkDist(C.box,bp[0],bp[1])-BH.R*BHSC*skyZoom;
     var u=Math.max(0,Math.min(1,1-d/C.rinf));
     t=u*u*(3-2*u);
