@@ -720,9 +720,17 @@ var DUMUL_CHARS=(function(){
   /* v155: ?bm=0 = bar lama (style.width). Default: fill selebar bar + translateX (compositor, tetap meluncur saat main thread macet; lihat index.css .bm). */
   var BAR_BM=true;try{BAR_BM=!/[?&]bm=0(?:&|#|$)/.test(location.search);}catch(eB){}
   try{if(BAR_BM)document.getElementById('boot-bar').classList.add('bm');window.__bm=BAR_BM?1:0;}catch(eB){}
+  /* v158: ghost = segmen TARGET jujur (pTgt) di depan fill; stall = bar macet >1,5 dtk → napas pelan (class .stall, CSS opacity). */
+  var ghost=document.getElementById('boot-ghost'),bar=document.getElementById('boot-bar'),gV=-1,mvAt=performance.now(),bsT=0;
+  function stallTick(){
+    if(bs.classList.contains('off')||pV>=100){clearInterval(bsT);bsT=0;try{bar.classList.remove('stall');}catch(e){}return;}
+    try{bar.classList.toggle('stall',performance.now()-mvAt>1500);}catch(e){}
+  }
+  bsT=setInterval(stallTick,500);
   function barShow(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
+    mvAt=performance.now();if(bar.classList.contains('stall'))bar.classList.remove('stall');
     pV=v;if(BAR_BM){fill.style.transform='translateX('+(v-100)+'%)';fill.setAttribute('data-v',v);}else fill.style.width=v+'%';pct.textContent=v+'%';
     chProg(v);
     try{if(window.__rain)window.__rain.prog(v/100);}catch(eRp){}   /* hujan matrix ikut progres */
@@ -737,6 +745,7 @@ var DUMUL_CHARS=(function(){
   function paintBar(c){
     var t=c.all?100:c.p;
     if(t>pTgt)pTgt=t;
+    if(BAR_BM&&ghost){var gv=Math.min(100,Math.round(pTgt));if(gv!==gV){gV=gv;ghost.style.transform='translateX('+(gv-100)+'%)';}}
     if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
   }
   function startPost(){
