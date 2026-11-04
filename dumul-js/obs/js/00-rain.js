@@ -18,6 +18,8 @@
     var PAL=cfg.pal,G=Array.from(cfg.glyphs),NG=G.length,POT=cfg.potato,K=cfg.k,SOFT=cfg.soft;
     var cv=null,cx=null,cols=[],lfs=[],atlas=null,atlasKey='',cell=0,pad=0,dprM=1,vw=0,vh=0,baseFont=11;
     var alive=false,rafId=0,last=0,t0=0;
+    /* Reaktif boot: pT = progres target 0..1 (dari 07-boot), pS = nilai halus yang dipakai; bst = ledakan sesaat 1->0 saat kapsul tampil. */
+    var pT=0,pS=0,bst=0;
     /* Depth layers: far (slow + faint) → mid → near (fast + bright). */
     var LAYERS=[
       {depth:0.28,speedMul:0.32,alphaMul:0.28,fontScale:0.70,countMul:1.25},
@@ -97,13 +99,17 @@
       last=t;
       if(dt>50)dt=50;            /* habis stall: lanjut pelan, jangan teleport */
       var ds=dt/1000,h=vh,w=vw;
+      pS+=(pT-pS)*(1-Math.exp(-dt/320));
+      if(bst>0){bst-=dt/900;if(bst<0)bst=0;}
+      /* gm = pengali kecepatan jatuh (pelan di awal -> makin cepat mengikuti progres, + dorongan saat burst); ab = pengali terang. Mode low: tetap 1 (hemat). */
+      var gm=POT?1:(0.85+0.6*pS)*(1+1.6*bst*bst),ab=POT?1:1+0.7*bst;
       /* Jejak dihitung per waktu, bukan per frame → sama di 60/90/120Hz. */
       cx.globalAlpha=1;
       cx.fillStyle='rgba(2,6,14,'+(1-Math.pow(1-K.trail,dt/16.667)).toFixed(3)+')';
       cx.fillRect(0,0,cv.width,cv.height);
       for(var i=0;i<cols.length;i++){
         var c=cols[i],L=c.layer,fs=c.fs,len=c.len;
-        c.y+=c.speed*fs*18*ds;   /* 18 = 0.30 px/frame × 60 → kecepatan sama dgn versi lama di 60Hz */
+        c.y+=c.speed*fs*18*ds*gm;   /* 18 = 0.30 px/frame × 60 → kecepatan sama dgn versi lama di 60Hz */
         c.mt-=dt;
         if(c.mt<=0){c.mt+=K.mutMs;c.chars[(Math.random()*len)|0]=rg();}
         if(K.shiftMs>0){
@@ -129,7 +135,7 @@
           if(gy<-fs||gy>h)continue;
           var al=ALP[j];
           if(al<0.02)continue;
-          cx.globalAlpha=al;
+          cx.globalAlpha=ab>1?Math.min(1,al*ab):al;
           cx.drawImage(atlas,chars[(head+j)%len]*cell,j===0?rowHead:rowBody,cell,cell,dx,gy*dprM-pad,cell,cell);
         }
       }
@@ -142,6 +148,8 @@
         alive=true;t0=now();rafId=raf(frame);
       },
       resize:function(w,h,dpr){if(cv)resize(w,h,dpr);},
+      prog:function(v){pT=v<0?0:(v>1?1:v);},
+      burst:function(){bst=1;},
       stop:function(){alive=false;try{caf(rafId);}catch(e){}}
     };
   }
@@ -158,6 +166,8 @@
         eng.start(m.canvas,m.w,m.h,m.dpr);
         self.postMessage({t:'ok'});
       }else if(m.t==='size'&&eng){eng.resize(m.w,m.h,m.dpr);}
+      else if(m.t==='prog'&&eng){eng.prog(m.v);}
+      else if(m.t==='burst'&&eng){eng.burst();}
       else if(m.t==='stop'&&eng){eng.stop();}
     };
   }
@@ -228,5 +238,8 @@
     var w=innerWidth,h=innerHeight,d=window.devicePixelRatio||1;
     if(wk)wk.postMessage({t:'size',w:w,h:h,dpr:d});else if(mainEng)mainEng.resize(w,h,d);
   },150);});
-  window.__rain={kill:function(){alive=false;killWorker();if(mainEng){mainEng.stop();mainEng=null;}}};
+  window.__rain={kill:function(){alive=false;killWorker();if(mainEng){mainEng.stop();mainEng=null;}},
+    /* v2: hujan ikut progres boot (v 0..1) dan 'meledak' sesaat saat kapsul tampil. Aman dipanggil kapan saja (no-op kalau sudah di-kill). */
+    prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);},
+    burst:function(){if(!alive)return;if(wk)wk.postMessage({t:'burst'});else if(mainEng)mainEng.burst();}};
 })();
