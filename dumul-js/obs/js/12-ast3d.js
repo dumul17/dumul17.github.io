@@ -9,7 +9,7 @@
 var AST3D_CFG={
   on:true,
   lib:'dumul-js/obs/lib/three.module.r186.js?v=1',   /* ES module (r186); anak-nya three.core.r186.js diimpor otomatis. Path + ?v= harus sama dgn SHELL service-worker */
-  dprMax:1.5,    /* resolusi render dibatasi: batu kecil + lembut, nggak perlu DPR penuh */
+  dprMax:1,   /* resolusi render dibatasi: batu kecil (1-4 px) + lembut, nggak perlu DPR penuh. v23: dulu 1,5; kalau masih berat coba 1 */
   procVariants:6,
   reuse:true,    /* cache hasil render per pass: kalau pan/zoom/posisi BH/layout nggak berubah, GL + astStep cuma jalan ~fps (bawah), frame lain tinggal blit cache. false = render tiap frame seperti dulu */
   slowAlt:0,     /* HP lambat (FS.slow): 1 = pass belakang cuma di frame genap & depan cuma di ganjil (hemat GL, tapi tiap pass cuma ~fps/2 -> orbit patah-patah). 0 = kedua pass boleh render tiap frame (mulus) */
