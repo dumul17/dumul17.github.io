@@ -12,9 +12,9 @@ _nIdx=0,nR=function(){return _NOISE[_nIdx++&255]},
 /* Adaptive density from frame time (not quality cliff) */
 _perf=3,_fps=60,_stab=false,_ftEMA=16.6,_frameN=0,_slowN=0,_clean=0,_need=3,
 /* DNA helix: posisi sampel frame sebelumnya (buat titik lahir spark) + pool spark ikut beat */
-_dB=0,_dnaPh=0,_dnaN=0,_dnaC=0,_dnaX=new Float32Array(512),_dnaY1=new Float32Array(512),_dnaY2=new Float32Array(512),_dnaZ=new Float32Array(512),_dnaG=new Uint8Array(512),
+_dB=0,_dnaHs=6,_dnaPh=0,_dnaN=0,_dnaC=0,_dnaX=new Float32Array(512),_dnaY1=new Float32Array(512),_dnaY2=new Float32Array(512),_dnaZ=new Float32Array(512),_dnaG=new Uint8Array(512),
 _spkN=96,_spk=new Float32Array(96*7),_spkI=0,
-_spkEmit=function(cnt,pw){for(var q=0;q<cnt;q++){var ix=_dnaN>1?(nR()*_dnaN)|0:0,sI=nR()>.5?1:0,x=_dnaN>1?_dnaX[ix]:nR()*i,y=_dnaN>1?(sI?_dnaY2[ix]:_dnaY1[ix]):u*.5,b=_spkI*7;_spkI=(_spkI+1)%_spkN;var ang=(nR()-.5)*2.4+(y>_dnaC?1.5708:-1.5708),v2=(.9+nR()*2.2)*pw;_spk[b]=x;_spk[b+1]=y;_spk[b+2]=Math.cos(ang)*v2;_spk[b+3]=Math.sin(ang)*v2;_spk[b+4]=1;_spk[b+5]=1.4+nR()*1.8;_spk[b+6]=nR()<.25?2:sI}},
+_spkEmit=function(cnt,pw,x0){for(var q=0;q<cnt;q++){var ix=_dnaN>1?(x0==null?(nR()*_dnaN)|0:Math.max(0,Math.min(_dnaN-1,Math.round(x0/_dnaHs+(nR()-.5)*10)))):0,sI=nR()>.5?1:0,x=_dnaN>1?_dnaX[ix]:nR()*i,y=_dnaN>1?(sI?_dnaY2[ix]:_dnaY1[ix]):u*.5,b=_spkI*7;_spkI=(_spkI+1)%_spkN;var ang=(nR()-.5)*2.4+(y>_dnaC?1.5708:-1.5708),v2=(.9+nR()*2.2)*pw;_spk[b]=x;_spk[b+1]=y;_spk[b+2]=Math.cos(ang)*v2;_spk[b+3]=Math.sin(ang)*v2;_spk[b+4]=1;_spk[b+5]=1.4+nR()*1.8;_spk[b+6]=nR()<.25?2:sI}},
 /* glow node = sprite radial (di-cache per warna), bukan shadowBlur: tanpa blur pass per node per frame */
 _gl={},_glow=function(c){var s=_gl[c];if(s)return s;s=document.createElement("canvas");s.width=s.height=64;var x=s.getContext("2d"),r=parseInt(c.slice(1,3),16),g2=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16),gd=x.createRadialGradient(32,32,0,32,32,32);gd.addColorStop(0,"rgba("+r+","+g2+","+b+",.95)");gd.addColorStop(.22,"rgba("+r+","+g2+","+b+",.6)");gd.addColorStop(.5,"rgba("+r+","+g2+","+b+",.2)");gd.addColorStop(1,"rgba("+r+","+g2+","+b+",0)");x.fillStyle=gd;x.fillRect(0,0,64,64);return _gl[c]=s},
 k=(Q)=>{
@@ -176,13 +176,18 @@ if(_dB>0){g=gOrig*_dB;
   const gapHalf=frac*10*(1+sig.frac*0.15),gapC=fx*i;
   const yMin=u*0.22,yMax=u*0.78;
   const colA=waveLayers[0].color,colB=sig.cyanPink<0.5?"#8eeeff":"#ff7ad9",colC=waveLayers[2].color;
-  _dnaN=nS;_dnaC=cyA;
+  _dnaN=nS;_dnaC=cyA;_dnaHs=hs;
+  /* tap saat musik: burst spark di untai dekat titik tap + untai membengkak lokal (ring pulse & toast tetap seperti biasa) */
+  const tapB=__A.blips||[];
+  for(let bi=0;bi<tapB.length;bi++){const tb=tapB[bi];if(!tb.dna&&_dB>0.3){tb.dna=1;_spkEmit(14,1.4,tb.x)}}
   /* pass 1: posisi untai tiap sampel (spektrum dibaca sekali per sampel) */
   for(let n=0;n<nS;n++){
     const fe=n*hs;
     const sp=window.__dmSp?window.__dmSp(fe/i):0;
     const env=Math.min(1,sp*1.15+bass*0.3+__L*0.18);
-    let R=(R0+RM*env)*sig.amp*(1+kk*0.45);if(R>RC)R=RC;
+    let sw=0;
+    for(let bi=0;bi<tapB.length;bi++){const tb=tapB[bi],ag=(Q-tb.t)/650;if(ag<1&&ag>=0){const tx=(fe-tb.x)/80;sw+=(1-ag)*Math.exp(-tx*tx)*0.9}}
+    let R=(R0+RM*env)*sig.amp*(1+kk*0.45)*(1+sw);if(R>RC)R=RC;
     const ph=fe*tw+_dnaPh,sn=Math.sin(ph);
     const base=cyA-(fe/i-0.5)*u*0.05+Math.sin(fe*0.004+s*0.6)*u*0.012*sig.breath+sp*Math.sin(fe*0.13+s*35)*3*vAmp;
     let y1=base+R*sn,y2=base-R*sn,ox=0,gp=0;
@@ -262,7 +267,7 @@ for(let bi=blips.length-1;bi>=0;bi--){
 }
 /* Mesh nodes */
 let meshBoost=sig.mesh*(1+listen*0.1);
-p.forEach((h)=>{
+if(_dB<1)p.forEach((h)=>{
   h.x+=h.vx*c+Math.sin(s+h.phase)*0.2*meshBoost+(mid-0.2)*0.35*sig.mesh;
   h.y+=h.vy*c+Math.cos(s*0.7+h.phase)*0.18*meshBoost+(bass-0.2)*0.25*sig.mesh;
   for(let bi=0;bi<blips.length;bi++){
@@ -277,6 +282,7 @@ p.forEach((h)=>{
 });
 /* Snapshot for handoff continuity — rarer on low perf */
 if((++_meshSnap%(_pq>=3?20:32))===0)window.__dmMeshLive={w:i,h:u,nodes:p.map(h=>({x:h.x,y:h.y,ox:h.ox,oy:h.oy,vx:h.vx,vy:h.vy,r:h.r,color:h.color,glow:h.glow,phase:h.phase}))};
+if(_dB<1){const gM=g;g=gM*(1-_dB); /* mesh (garis penghubung + node) hanya tampil saat idle; memudar saat DNA */
 /* Links — full on 2/3, sparser distance on level 1 */
 l.lineWidth=0.6*(1+listen*0.3);
 let linkR=110*meshLinkMul*(1+listen*0.15*sig.mesh);
@@ -302,6 +308,7 @@ for(let ni=0;ni<p.length;ni++){
   l.beginPath();l.globalAlpha=na;l.fillStyle=h.color;l.arc(nx,h.y,nr,0,Math.PI*2);l.fill();
   l.beginPath();l.globalAlpha=g;l.fillStyle="#ffffff";l.arc(h.x,h.y,h.r*0.35,0,Math.PI*2);l.fill();
 }
+g=gM;}
 /* Beat smear bars */
 if(v>0&&nR()>0.5){let h=nR()*u,y=2+nR()*8;l.globalAlpha=g*0.35;l.fillStyle=nR()>0.5?"#6ee5ff":"#ff7ad9";l.fillRect(0,h,i,y)}
 if(window.__dmDbgOn&&window.__dmDbg){let dm=performance.now()-__ts;window.__dmDbg.draw=window.__dmDbg.draw?window.__dmDbg.draw*0.95+dm*0.05:dm;}
