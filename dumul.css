@@ -461,6 +461,18 @@ html.dm-lowfx #dm-log-toast{-webkit-backdrop-filter:none!important;backdrop-filt
   display:grid;place-items:center;padding:0;-webkit-tap-highlight-color:transparent;
 }
 #dm-log .dm-log-close:hover,#dm-log .dm-log-close:focus-visible{color:#6ee5ff;border-color:rgba(110,229,255,.5);outline:none}
+/* Live counter di bawah "DUMUL // SESSION LOG" (elemen diisi 11-live-count.js; hidden sampai ada data) */
+#dm-log #live-count{
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+  padding:6px 12px 7px;white-space:nowrap;
+  border-bottom:1px solid rgba(184,198,214,.08);
+  font:500 8.5px/1 'Space Grotesk',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;
+  color:rgba(196,226,240,.58);
+}
+#dm-log #live-count[hidden]{display:none}
+#dm-log #live-count i{flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:#6ee5ff;box-shadow:0 0 6px #6ee5ff}
+#dm-log #live-count b{flex:0 0 auto;font:600 10.5px/1 'Courier New',monospace;letter-spacing:.045em;color:#6ee5ff}
+#dm-log #live-count span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #dm-log .dm-log-list{padding:6px 12px 10px;overflow:auto;flex:1;min-height:0}
 #dm-log .l{white-space:pre;overflow:hidden;text-overflow:ellipsis;animation:dmLogIn .4s ease-out both}
 #dm-log .l:nth-last-child(n+5){opacity:.4}

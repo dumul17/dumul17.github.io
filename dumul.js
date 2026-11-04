@@ -1267,7 +1267,11 @@ try{
   closeBtn.setAttribute('aria-label','Close');closeBtn.textContent='\u00d7';
   head.appendChild(headLbl);head.appendChild(closeBtn);
   var list=document.createElement('div');list.className='dm-log-list';
-  box.appendChild(backLink);box.appendChild(head);box.appendChild(list);
+  /* Live counter ("1 observer" / "5 observers") — diisi oleh dumul-js/obs/js/11-live-count.js (dimuat dari dumul.html); tersembunyi sampai data presence masuk */
+  var live=document.createElement('div');
+  live.id='live-count';live.hidden=true;live.setAttribute('role','status');
+  live.innerHTML='<i></i><b>0</b><span>observer</span>';
+  box.appendChild(backLink);box.appendChild(head);box.appendChild(live);box.appendChild(list);
   bodyRoot.appendChild(box);
 
   /* ---- drag / parkir dock ---- */
