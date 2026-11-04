@@ -750,8 +750,11 @@ var DUMUL_CHARS=(function(){
     barShow();
     if(pShown<pTgt&&!bs.classList.contains('off'))pRaf=requestAnimationFrame(barStep);
   }
+  var rainRd=0;
   function paintBar(c){
     var t=c.all?100:c.p;
+    /* hujan: kata mulai dibaca hanya setelah semua modul 3D settle + warm selesai (c.vis); sebelum itu worker hujan cuma mengalir polos (hemat CPU di fase compile). Cadangan di 00-rain: K.wordGateMax. */
+    if(c.vis&&!rainRd){rainRd=1;try{if(window.__rain)window.__rain.read();}catch(eRr){}}
     if(t>pTgt)pTgt=t;
     if(BAR_BM&&ghost){var gv=Math.min(100,Math.round(pTgt));if(gv!==gV){gV=gv;ghost.style.transform='translateX('+(gv-100)+'%)';}}
     if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
