@@ -30,8 +30,8 @@ var THREE_CA=(function(){var on=true;try{on=!/[?&]ca=0(?:&|#|$)/.test(location.s
 var THREE_WARM={q:[],busy:false,total:0,done:0,part:0};   /* total/done: dibaca 07-boot (progres warm-up di panel boot); part = pecahan (0..<1) item yang sedang diproses */
 /* ?ws=0 mematikan IRISAN warm-up per objek (A/B bench). Default NYALA. */
 var THREE_WS=(function(){var on=true;try{on=!/[?&]ws=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ws=on?1:0;}catch(e){}return on;})();
-/* ?wi=0: warm-up mulai lewat setTimeout(run,0), bukan requestIdleCallback({timeout:2000}) (A/B bench; bagian 23-24 log: tunggu idle ±43-54% rantai warm). Default NYALA = perilaku lama. Tercatat di JSON bench (R.wi). */
-var THREE_WI=(function(){var on=true;try{on=!/[?&]wi=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__wi=on?1:0;}catch(e){}return on;})();
+/* Warm-up mulai lewat setTimeout(run,0), bukan requestIdleCallback({timeout:2000}) (bagian 23-25 + 32 log: tunggu idle ±43-54% rantai warm). Default sejak v27 = setTimeout (wi=0). ?wi=1 mengembalikan perilaku lama (rIC) untuk A/B / rollback. Tercatat di JSON bench (R.wi: 0 = setTimeout, 1 = rIC). */
+var THREE_WI=(function(){var on=false;try{on=/[?&]wi=1(?:&|#|$)/.test(location.search);}catch(e){}try{window.__wi=on?1:0;}catch(e){}return on;})();
 function threeWarmObjs(sc){var o=[];try{sc.traverseVisible(function(x){if(x!==sc&&x.material&&(x.isMesh||x.isPoints||x.isLine||x.isSprite))o.push(x);});}catch(e){return null;}return o;}
 function threeWarm(r,sc,cam,pre,H){
   try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;}catch(e){}
