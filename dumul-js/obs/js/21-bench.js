@@ -1,12 +1,13 @@
 'use strict';
-/* BENCH v11.14 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.15 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
    v11: post-enter rAF (p50/p95/p99 + dropped%); renderer.info per label; memory timeline (start/capsule/3d/30s);
    LCP/CLS/FCP; device info (cores/mem/dpr/viewport/GL_RENDERER); visibility flag; multi-run median/min/max;
    microbench ulang di akhir (thermal/throttle delta).
-   merge: v11.14 + data-v pV sampling + bm flag (?bm=0). */
+   merge: v11.14 + data-v pV sampling + bm flag (?bm=0).
+   v11.15: penghitung document.fonts 'loadingdone' (jumlah + waktu) dan layout() (jumlah, total ms, max, pre-capsule, yang dipicu loadingdone) -> R.loadingdone / R.layout. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
@@ -41,6 +42,45 @@
   var DEVICE = null;
   var MICRO_END = null;
   var GL_RENDERER = null;
+
+  /* v11.15: penghitung 'loadingdone' (document.fonts) + layout() (jumlah & ms).
+     Listener dipasang SEKARANG (bench jalan sinkron sebelum script defer) -> terhitung semua event, dan listener bench jalan lebih dulu dari 01-core/07-boot.
+     layout() adalah function declaration global di 02-sky-logic.js; dibungkus lewat event 'load' tag <script> 02 (jalan tepat setelah 02 dieksekusi, sebelum 07-boot).
+     Semua pemanggil memakai nama global layout (boot(), loadingdone, setTimeout(layout,120) di resize) jadi ikut terbungkus. Perilaku tidak berubah (return value + this diteruskan, error dilempar ulang). */
+  var LD = { n: 0, at: [] };                      /* at: waktu tiap loadingdone (maks 30 pertama) */
+  var LAY = { n: 0, ms: 0, max: 0, fromLD: 0, fromLDms: 0, calls: [], wrapped: false, at: null };  /* calls: [start, ms, dariLD] maks 60 pertama */
+  var _inLD = false;
+  try {
+    if (document.fonts && document.fonts.addEventListener) {
+      document.fonts.addEventListener('loadingdone', function () {
+        LD.n++; if (LD.at.length < 30) LD.at.push(Math.round(performance.now()));
+        _inLD = true; setTimeout(function () { _inLD = false; }, 0);   /* tandai layout() yang jalan di dispatch yang sama (handler 07-boot) */
+      });
+    }
+  } catch (eLD) {}
+  function wrapLayout() {
+    try {
+      if (LAY.wrapped || typeof window.layout !== 'function') return false;
+      var orig = window.layout;
+      window.layout = function () {
+        var t0 = performance.now(), ld = _inLD;
+        try { return orig.apply(this, arguments); }
+        finally {
+          var ms = performance.now() - t0;
+          LAY.n++; LAY.ms += ms; if (ms > LAY.max) LAY.max = ms;
+          if (ld) { LAY.fromLD++; LAY.fromLDms += ms; }
+          if (LAY.calls.length < 60) LAY.calls.push([Math.round(t0), Math.round(ms * 10) / 10, ld ? 1 : 0]);
+        }
+      };
+      LAY.wrapped = true; LAY.at = Math.round(performance.now());
+      return true;
+    } catch (eW) { return false; }
+  }
+  try {
+    var _s02 = document.querySelector('script[src*="02-sky-logic"]');
+    if (_s02) _s02.addEventListener('load', wrapLayout, { once: true });
+    document.addEventListener('DOMContentLoaded', wrapLayout, { once: true });   /* cadangan (tag 02 tidak ketemu); dibungkus sekali saja */
+  } catch (eL2) {}
 
   function runMicro() {
     try {
@@ -450,7 +490,7 @@
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v11.14+ ms (sejak navigasi)');
+    x.push('BENCH v11.15+ ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -474,6 +514,8 @@
     if (R.tapLog.length) { var f = R.tapLog[0]; x.push('tap#1: blue+' + f[1] + 'ms  SFX meta/play ' + f[2] + '/' + f[3]); }
     if (R.playLog.length) { var l = R.playLog[R.playLog.length - 1]; x.push('play terakhir: ' + l[0] + ' lat ' + l[3] + 'ms rs' + l[4]); }
     x.push('longtask sblm capsule: ' + ltN + 'x / ' + Math.round(lt) + 'ms');
+    x.push('loadingdone: ' + LD.n + 'x' + (LD.at.length ? ' (pertama @' + LD.at[0] + ', terakhir @' + LD.at[LD.at.length - 1] + ')' : ''));
+    x.push('layout(): ' + LAY.n + 'x / ' + Math.round(LAY.ms) + 'ms  max ' + Math.round(LAY.max) + 'ms  dr loadingdone ' + LAY.fromLD + 'x' + (LAY.wrapped ? '' : '  (BELUM terbungkus)'));
     if (IS_REPEAT != null) x.push('repeatVisit: ' + IS_REPEAT);
     if (MICRO) x.push('microbench: ' + MICRO.iters + ' iters / ' + MICRO.ms + 'ms');
     if (RAF_POST_STATS) {
@@ -529,6 +571,19 @@
     try { var m0 = performance.getEntriesByName('obs-t0')[0], mw = performance.getEntriesByName('obs-warm')[0]; R.t0Start = m0 ? Math.round(m0.startTime) : null; R.warmStart = mw ? Math.round(mw.startTime) : null; R.t0mode = /[?&]legacy=1/.test(location.search) ? 'legacy' : (/[?&]t0=capsule/.test(location.search) ? 'capsule' : 'dcl'); } catch (e) {}
     R.longtaskBeforeCapsule = { n: ltN, ms: Math.round(lt) };
     R.longtaskTotal = { n: ltAllN, ms: Math.round(ltAll) };
+    /* v11.15: loadingdone + layout() */
+    try {
+      var tcL = R.t.capsule, pre = { n: 0, ms: 0 }, preLD = 0;
+      LAY.calls.forEach(function (c) { if (tcL == null || c[0] < tcL) { pre.n++; pre.ms += c[1]; } });
+      LD.at.forEach(function (t) { if (tcL == null || t < tcL) preLD++; });
+      R.loadingdone = { n: LD.n, preCapsule: preLD, at: LD.at };
+      R.layout = {
+        wrapped: LAY.wrapped, wrapAt: LAY.at, n: LAY.n, ms: Math.round(LAY.ms * 10) / 10, max: Math.round(LAY.max * 10) / 10,
+        fromLoadingdone: { n: LAY.fromLD, ms: Math.round(LAY.fromLDms * 10) / 10 },
+        preCapsule: { n: pre.n, ms: Math.round(pre.ms * 10) / 10, note: LAY.calls.length >= 60 ? 'dari 60 panggilan pertama' : 'lengkap' },
+        calls: LAY.calls   /* [start, ms, 1=dipicu loadingdone] */
+      };
+    } catch (eLY) { R.loadingdone = null; R.layout = null; }
 
     /* v10: ver semua file + hash konten 07-boot & index.css */
     try {
@@ -1063,6 +1118,8 @@
           bootToCapsule: o.bootToCapsule,
           load: o.t && o.t.load,
           longtaskPre: o.longtaskBeforeCapsule,
+          loadingdone: o.loadingdone && o.loadingdone.n,
+          layout: o.layout && { n: o.layout.n, ms: o.layout.ms, max: o.layout.max, fromLD: o.layout.fromLoadingdone && o.layout.fromLoadingdone.n },
           net: o.net,
           isRepeat: o.isRepeatVisit,
           finishGuess: o.finishGuess,
