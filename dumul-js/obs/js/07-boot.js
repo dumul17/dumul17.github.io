@@ -618,7 +618,6 @@ var DUMUL_CHARS=(function(){
     bootInfoSnap({sfxViaCap:!!c.sfxCapHit,bgmViaCap:!!c.bgmCapHit,bar:typeof pV!=='undefined'?pV:c.p,sx:c.sx,vis:c.vis,complete:complete});
     sig.classList.add('on');
     chReadyOn();
-    try{if(window.__rain)window.__rain.burst();}catch(eRb){}   /* kapsul tampil: hujan menyala sesaat */
     if(quoteEl)quoteEl.classList.add('on');
     paintPanel(ready,th,complete,c.au,c.sx);
     /* Capsule gate: wait for user choice. maxMs = timeout: tidak ada Red/Blue sampai habis -> masuk otomatis (tanpa haptic, jalur enterObservatory yang sama). */

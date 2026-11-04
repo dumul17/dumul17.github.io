@@ -18,10 +18,27 @@
     var PAL=cfg.pal,G=Array.from(cfg.glyphs),NG=G.length,POT=cfg.potato,K=cfg.k,SOFT=cfg.soft;
     var cv=null,cx=null,cols=[],lfs=[],atlas=null,atlasKey='',cell=0,pad=0,dprM=1,vw=0,vh=0,baseFont=11;
     var alive=false,rafId=0,last=0,t0=0;
-    /* Reaktif boot: pT = progres target 0..1 (dari 07-boot), pS = nilai halus yang dipakai; bst = ledakan sesaat 1->0 saat kapsul tampil. */
-    var pT=0,pS=0,bst=0;
+    /* Reaktif boot: pT = progres target 0..1 (dari 07-boot), pS = nilai halus yang dipakai. */
+    var pT=0,pS=0;
     /* Sentuhan: pts = sampai 3 pointer {id,x,y,s(kekuatan 0..1),on}. RAD = jangkauan sedot, RADK = jangkauan sentakan tap. */
     var pts=[],RAD=90,RADK=130;
+    /* Kolom yang kebaca: sesekali SATU kolom near berhenti, glyph-nya "mengkristal" jadi kata (vertikal, atas→bawah), tahan sebentar, lalu larut & lanjut jatuh.
+       Huruf kata di luar set glyph hujan ditaruh di sel ekstra atlas (indeks >= NG) → rg() tetap hanya memilih glyph hujan biasa. Mode low: mati (WORDS kosong). */
+    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=2200+Math.random()*2000;
+    (function(){
+      for(var wi=0;wi<WORDS.length;wi++){
+        var ws=String(WORDS[wi]).toUpperCase(),arr=[];
+        for(var k=0;k<ws.length;k++){
+          var ch=ws.charAt(k);
+          if(!/[A-Z0-9]/.test(ch))continue;
+          var gi=G.indexOf(ch);
+          if(gi<0){if(XI[ch]===undefined){XI[ch]=NG+XCH.length;XCH.push(ch);}gi=XI[ch];}
+          arr.push(gi);
+        }
+        if(arr.length>=3&&arr.length<=14)WD.push(arr);
+      }
+    })();
+    var NT=NG+XCH.length;
     /* Depth layers: far (slow + faint) → mid → near (fast + bright). */
     var LAYERS=[
       {depth:0.28,speedMul:0.32,alphaMul:0.28,fontScale:0.70,countMul:1.25},
@@ -49,7 +66,7 @@
       atlasKey=key;
       var fsMax=Math.max.apply(null,lfs);
       cell=Math.ceil(fsMax*dprM*1.35)+2;pad=Math.ceil(cell*0.1);
-      atlas=mk();atlas.width=NG*cell;atlas.height=LAYERS.length*8*cell;
+      atlas=mk();atlas.width=NT*cell;atlas.height=LAYERS.length*8*cell;
       var a=atlas.getContext('2d');
       a.textAlign='center';a.textBaseline='top';
       for(var li=0;li<LAYERS.length;li++){
@@ -58,7 +75,7 @@
           if(ci===7&&LAYERS[li].depth<0.7)continue;
           a.fillStyle=ci===7?'#ffffff':'rgb('+PAL[ci].r+','+PAL[ci].g+','+PAL[ci].b+')';
           var y=(li*8+ci)*cell+pad;
-          for(var g=0;g<NG;g++)a.fillText(G[g],g*cell+cell/2,y);
+          for(var g=0;g<NT;g++)a.fillText(g<NG?G[g]:XCH[g-NG],g*cell+cell/2,y);
         }
       }
     }
@@ -81,7 +98,7 @@
       baseFont=POT?12:Math.max(11,Math.min(16,Math.floor(w/52)));
       for(var q=0;q<LAYERS.length;q++)lfs[q]=Math.max(8,Math.round(baseFont*LAYERS[q].fontScale));
       buildAtlas();
-      cols.length=0;
+      cols.length=0;rdCol=null;
       for(var li=0;li<LAYERS.length;li++){
         var L=LAYERS[li];
         var n=Math.max(6,Math.floor((w/(baseFont*L.fontScale))*L.countMul*(POT?0.7:1)));
@@ -91,6 +108,23 @@
       /* Sort far → near so near streams paint last (on top). */
       cols.sort(function(a,b){return a.layer.depth-b.layer.depth;});
       cx.fillStyle='#02060e';cx.fillRect(0,0,cv.width,cv.height);
+    }
+    /* Pilih satu kolom near yang seluruh katanya muat di layar, lalu mulai "baca". Belum ada kandidat → coba lagi 0,4 dtk kemudian. */
+    function rdTry(){
+      var wd=WD[(Math.random()*WD.length)|0],n=wd.length,best=null,i,c;
+      for(i=0;i<cols.length;i++){
+        c=cols[i];
+        if(c.li!==2||c.rd||c.fl>0||c.kick>0||c.x!==c.hx)continue;
+        if(c.y>vh*0.88||c.y-(n-1)*c.fs<vh*0.12)continue;
+        if(c.x<vw*0.06||c.x>vw*0.94)continue;
+        if(!best||Math.random()<0.3)best=c;
+      }
+      if(!best){rdNext=400;return;}
+      var len=best.len<n+5?n+5:best.len,ch=new Uint8Array(len);
+      for(i=0;i<len;i++)ch[i]=rg();
+      best.len=len;best.chars=ch;best.head=0;
+      best.rd={wd:wd,n:n,t:0,hold:1700+Math.random()*700,dc:0};
+      rdCol=best;
     }
     /* jarak titik (x,y) ke segmen vertikal kolom c (kepala di c.y, ekor ke atas sepanjang len*fs) */
     function colDist(c,x,y){
@@ -125,9 +159,9 @@
       if(dt>50)dt=50;            /* habis stall: lanjut pelan, jangan teleport */
       var ds=dt/1000,h=vh,w=vw;
       pS+=(pT-pS)*(1-Math.exp(-dt/320));
-      if(bst>0){bst-=dt/900;if(bst<0)bst=0;}
-      /* gm = pengali kecepatan jatuh (pelan di awal -> makin cepat mengikuti progres, + dorongan saat burst); ab = pengali terang. Mode low: tetap 1 (hemat). */
-      var gm=POT?1:(0.85+0.6*pS)*(1+1.6*bst*bst),ab=POT?1:1+0.7*bst;
+      if(WD.length&&!rdCol){rdNext-=dt;if(rdNext<=0)rdTry();}
+      /* gm = pengali kecepatan jatuh (pelan di awal -> makin cepat mengikuti progres). Mode low: tetap 1 (hemat). */
+      var gm=POT?1:(0.85+0.6*pS);
       var np=pts.length,kIn=1-Math.exp(-dt/110),kOut=1-Math.exp(-dt/450),q;
       for(q=np-1;q>=0;q--){
         var pp=pts[q];pp.s+=((pp.on?1:0)-pp.s)*(1-Math.exp(-dt/(pp.on?90:420)));
@@ -150,15 +184,36 @@
         else if(c.x!==c.hx){c.x+=(c.hx-c.x)*kOut;if(Math.abs(c.hx-c.x)<0.05)c.x=c.hx;}
         if(c.fl>0)c.fl-=dt;
         if(c.kick>0){c.kick-=dt/650;if(c.kick<0)c.kick=0;}
-        c.y+=c.speed*fs*18*ds*gm*(1+1.4*c.kick);   /* 18 = 0.30 px/frame × 60 → kecepatan sama dgn versi lama di 60Hz */
+        /* sf = pengali kecepatan (melambat → diam → melaju lagi), rdA = terang huruf kata. Tap dekat kolom (kick) memutus baca lebih awal. */
+        var rd=c.rd,sf=1,rdA=0;
+        if(rd){
+          rd.t+=dt;
+          if(c.kick>0.3&&rd.t<rd.hold)rd.t=rd.hold;
+          var rT=rd.t,rH=rd.hold;
+          if(rT>=rH+450){c.rd=rd=null;rdCol=null;rdNext=5000+Math.random()*4000;}
+          else{
+            sf=rT<250?1-rT/250:(rT<rH?0:(rT-rH)/450);
+            rdA=rT<rH?1:1-(rT-rH)/450;
+            if(rT<rH){
+              rd.dc-=dt;
+              if(rd.dc<=0){   /* decode: huruf yang belum "terkunci" diacak, terkunci satu per satu dari atas */
+                rd.dc=60;
+                for(var wk2=0;wk2<rd.n;wk2++)c.chars[(c.head+rd.n-1-wk2)%len]=rT>wk2*55+200?rd.wd[wk2]:rg();
+              }
+            }
+          }
+        }
+        c.y+=c.speed*fs*18*ds*gm*(1+1.4*c.kick)*sf;   /* 18 = 0.30 px/frame × 60 → kecepatan sama dgn versi lama di 60Hz */
         c.mt-=dt;
-        for(var mm=0;c.mt<=0&&mm<4;mm++){c.mt+=K.mutMs;c.chars[(Math.random()*len)|0]=rg();}
-        if(K.shiftMs>0){
+        if(rd&&rd.t<rd.hold)c.mt=K.mutMs;   /* selama kata ditahan, huruf tidak dimutasi; sesudahnya larut lewat mutasi biasa */
+        else for(var mm=0;c.mt<=0&&mm<4;mm++){c.mt+=K.mutMs;c.chars[(Math.random()*len)|0]=rg();}
+        if(K.shiftMs>0&&!rd){
           c.sh-=dt;
           if(c.sh<=0){c.sh+=K.shiftMs;c.head=(c.head-1+len)%len;c.chars[c.head]=rg();}
         }
         if(c.y-len*fs>h){
           /* Recycle from above the top (normal continuous rain). */
+          if(c.rd){c.rd=null;rdCol=null;rdNext=4000;}
           c.y=Math.random()*-h*0.4;
           c.x=c.hx=Math.random()*w;c.fl=0;c.kick=0;
           c.speed=pickSpeed(L);
@@ -169,15 +224,16 @@
           c.head=0;
         }
         var ALP=ALPHA[c.li],head=c.head,chars=c.chars;
-        var rowBody=(c.li*8+(c.fl>0?1:c.ci))*cell,rowHead=L.depth>=0.7?(c.li*8+7)*cell:rowBody;
+        var rowBody=(c.li*8+(c.fl>0?1:c.ci))*cell,rowHead=L.depth>=0.7?(c.li*8+7)*cell:rowBody,rowWd=(c.li*8+(c.fl>0?1:0))*cell,rdN=rd?rd.n:0;
         var dx=Math.round(c.x*dprM-cell/2);
         for(var j=0;j<len;j++){
           var gy=c.y-j*fs;
           if(gy<-fs||gy>h)continue;
-          var al=ALP[j];
+          var al=ALP[j],inW=j<rdN;
+          if(inW&&0.92*rdA>al)al=0.92*rdA;
           if(al<0.02)continue;
-          cx.globalAlpha=ab>1?Math.min(1,al*ab):al;
-          cx.drawImage(atlas,chars[(head+j)%len]*cell,j===0?rowHead:rowBody,cell,cell,dx,gy*dprM-pad,cell,cell);
+          cx.globalAlpha=al;
+          cx.drawImage(atlas,chars[(head+j)%len]*cell,inW?rowWd:(j===0?rowHead:rowBody),cell,cell,dx,gy*dprM-pad,cell,cell);
         }
       }
       cx.globalAlpha=1;
@@ -191,7 +247,6 @@
       resize:function(w,h,dpr){if(cv)resize(w,h,dpr);},
       prog:function(v){pT=v<0?0:(v>1?1:v);},
       pt:ptSet,
-      burst:function(){bst=1;},
       stop:function(){alive=false;try{caf(rafId);}catch(e){}}
     };
   }
@@ -209,7 +264,6 @@
         self.postMessage({t:'ok'});
       }else if(m.t==='size'&&eng){eng.resize(m.w,m.h,m.dpr);}
       else if(m.t==='prog'&&eng){eng.prog(m.v);}
-      else if(m.t==='burst'&&eng){eng.burst();}
       else if(m.t==='pt'&&eng){eng.pt(m.id,m.x,m.y,m.a);}
       else if(m.t==='stop'&&eng){eng.stop();}
     };
@@ -227,6 +281,8 @@
     mutMs:50,     /* ganti 1 glyph acak per kolom tiap N ms */
     trail:0.16    /* kekuatan jejak per 1/60 dtk (makin kecil = jejak makin panjang) */
   };
+  /* Kata untuk "kolom yang kebaca" (nama situs + judul lagu album). Mode low: kosong. */
+  var WORDS=IS_POTATO?[]:['DUMUL','OBSERVATORY','LIMERENCE','GLITCH','NASTENKA','LARUNG'];
   var alive=true,wk=null,wkUrl=null,mainEng=null;
   function newCanvas(){
     var c=document.createElement('canvas');
@@ -244,7 +300,7 @@
       function(f){return requestAnimationFrame(f);},
       function(i){cancelAnimationFrame(i);},
       function(){return performance.now();},
-      {pal:CYBER_PAL,glyphs:glyphs,potato:IS_POTATO,k:MX,soft:true}
+      {pal:CYBER_PAL,glyphs:glyphs,potato:IS_POTATO,k:MX,soft:true,words:WORDS}
     );
     mainEng.start(newCanvas(),innerWidth,innerHeight,window.devicePixelRatio||1);
   }
@@ -267,7 +323,7 @@
         if(alive)startMain();
       };
       wk.postMessage({t:'init',canvas:off,w:innerWidth,h:innerHeight,dpr:window.devicePixelRatio||1,
-        cfg:{pal:CYBER_PAL,glyphs:glyphs,potato:IS_POTATO,k:MX,soft:false}},[off]);
+        cfg:{pal:CYBER_PAL,glyphs:glyphs,potato:IS_POTATO,k:MX,soft:false,words:WORDS}},[off]);
     }catch(eW){
       killWorker();
       try{mx.removeChild(c);}catch(e3){}
@@ -295,7 +351,6 @@
     ptOn('pointerleave',ptUp,document.documentElement);
   }
   window.__rain={kill:function(){alive=false;killWorker();if(mainEng){mainEng.stop();mainEng=null;}for(var i=0;i<ptOff.length;i++)ptOff[i]();ptOff=[];},
-    /* prog/burst: hujan ikut progres boot (v 0..1) + menyala sesaat saat kapsul tampil. Aman dipanggil kapan saja (no-op kalau sudah di-kill). */
-    prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);},
-    burst:function(){if(!alive)return;if(wk)wk.postMessage({t:'burst'});else if(mainEng)mainEng.burst();}};
+    /* prog: hujan ikut progres boot (v 0..1). Aman dipanggil kapan saja (no-op kalau sudah di-kill). */
+    prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);}};
 })();
