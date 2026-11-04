@@ -15,7 +15,7 @@
    Matikan: ?drone3d=0 di URL atau localStorage dumul_drone3d=0. Ukuran di layar: DR3D_CFG.size (px, sebelum skala sc dari TXFX). */
 var DR3D_CFG={
   on:true,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.module.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r159.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   size:20,        /* sisi kotak gambar di layar (px) untuk sc=1; drone ~ memenuhi kotak ini. Kelipatan 5 supaya kena snap slider panel tuning (dulu 28) */
   half:50,        /* setengah lebar kamera ortho (satuan model) */
   resMin:128,resMax:196,
