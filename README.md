@@ -11,8 +11,8 @@ Live: [dumul17.github.io](https://dumul17.github.io/)
 
 | Page | HTML | Styles | Scripts | Description |
 |---|---|---|---|---|
-| **Observatory** | `index.html` | `index.css` | `dumul-js/obs/js/01-core.js` … `11-live-count.js`, plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
-| **DUMUL** | `dumul.html` | `dumul.css` | `dumul.js`, `dumul-app.js` | DUMUL album page with five selectable transmissions, synced lyrics, track notes, spectrum/seek UI, and seamless Gargantua handoff |
+| **Observatory** | `index.html` | `dumul-css/index.css` | `dumul-js/obs/js/00-rain.js` … `18-tune3d.js` (`01`–`18` are the app, `19`–`21` are lazy dev tools), plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
+| **DUMUL** | `dumul.html` | `dumul-css/dumul.css` | `dumul-js/lmr/dumul.js`, `dumul-js/lmr/dumul-app.js` | DUMUL album page with five selectable transmissions, synced lyrics, track notes, spectrum/seek UI, and seamless Gargantua handoff |
 | **PWA / offline** | `manifest.json`, `icons/` | -- | `service-worker.js` | Installable app, offline shell, and opt-in offline audio archive |
 
 The Observatory is the entry point. The **DUMUL** portal sits around
@@ -139,7 +139,7 @@ Orion's belt, and the transition into DUMUL runs through that belt
 -   **Quality chip** (`Perf · HIGH / LOW`): no device auto-detect, the
     default is HIGH. The visitor's choice is saved (`dumul_quality`); append
     `?perf=low` or `?perf=high` to the URL to test a tier without saving.
--   A nebula backdrop image (`img/nebula.webp`, one image cover-fitted for both portrait and landscape)
+-   Backdrop images in `img/` at the site root: `nebula.webp` (one image cover-fitted for both portrait and landscape, used inside a sector) and `milky-way.webp` (tiling Milky Way strip, overview only)
 -   **Live observer counter:** loaded after the page has finished loading (on idle), so Firebase never competes with boot and audio for bandwidth. A small `N observers` readout showing how many
     unique devices have the Observatory open right now (Firebase Realtime
     Database presence, one entry per device, removed when the last tab
@@ -265,52 +265,30 @@ once its files (and, optionally, its music) have been cached.
 ``` text
 .
 ├── index.html              # Observatory (entry)
-├── index.css               # Observatory styles
-│
-├── dumul-js/
-│   └── obs/                # Observatory scripts + data (everything the sky runs on)
-│       ├── sky-data.js     # ONE source of truth: sectors, constellations, stars, SFX, panel groups, audio list
-│       ├── texts.js        # All site text (telescope messages, terminal log, greetings) — pure data (English)
-│       ├── i18n.js         # EN/ID layer: UI dictionary, T('key'), language chip (dumul_lang)
-│       ├── i18n-sky.js     # ID translation of sky-data.js (whispers, camera info cards, signal fragments)
-│       ├── i18n-texts.js   # ID translation of texts.js (telescope messages, terminal log)
-│       ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
-│       ├── img/
-│       │   ├── nebula.webp             # Nebula backdrop (single image, used for portrait AND landscape)
-│       └── js/             # Observatory logic, split from the old index.js (load order matters!)
-│           ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
-│           ├── 02-sky-logic.js     # data wiring, Pleiades, memory, unlock, observation mode, alignment, time dilation, layout, plate
-│           ├── 03-gargantua.js     # black hole, shared neural network, transition spectrum
-│           ├── 04-render.js        # overlays, telescope, SFX, target reticle, constellation drawing, observatory FX
-│           ├── 05-sector-ui.js     # sector overview (positions only), mini Gargantua parking, sector jump (sectJumpTo), telescope carry (LIS), tune panel, music player
-│           ├── 06-interaction.js   # interaction, easter eggs, terminal, greeting, clock dilation
-│           ├── 07-boot.js          # boot, layout editor, render loop
-│           ├── 08-tx-drone.js      # drone TX/RX animation + hold ring (TXFX)
-│           ├── 09-wormhole.js      # wormhole transition for sector jumps / leaving a sector (WORMHOLE)
-│           ├── 10-ui-sound.js      # synthesized UI sound effects (UIS)
-│           ├── 11-live-count.js    # live observer counter (ES module, loaded lazily via import(); Firebase presence)
-│           ├── 12-ast3d.js … 14-drone3d.js  # hybrid 3D layers (asteroids, telescope, TX drone; Three.js self-hosted in lib/)
-│           ├── 15-portal3d.js      # 3D portal ring (overview only) and its shared WebGL renderer (PT3D)
-│           ├── 16-sector-menu.js   # sector menu window (#sect-menu): holo star map, swipe, telescope toggle
-│           ├── 17-planet3d.js      # planet surface at the bottom of the screen (PL3D)
-│           └── 18-tune3d.js        # tune-panel tabs Planet / Drone / Portal / Milky Way (T3D); loads last
-│
 ├── dumul.html              # DUMUL / album page
-├── dumul.css               # DUMUL styles
-├── dumul.js                # Player, lyrics, track notes, handoff, visitor log, effects
-├── dumul-app.js            # Bundled React hero (minified, not meant to be edited by hand)
-│
 ├── service-worker.js       # PWA: caching, offline, audio Range handling (keep at root)
-├── manifest.json           # PWA manifest
+├── manifest.json           # PWA manifest (keep at root)
+├── google6909df6bd589a0af.html   # Google Search Console verification (keep at root, do not rename)
+├── cache-status.html       # Optional diagnostic page for the audio cache
+├── README.md
+│
+├── dumul-css/              # All stylesheets
+│   ├── index.css           # Observatory styles
+│   └── dumul.css           # DUMUL styles
+│                           # (url() paths inside are relative to this folder: ../audio/...)
+│
+├── img/                    # Shared images (referenced from the page, not from the CSS)
+│   ├── nebula.webp         # Nebula backdrop (NEB.src in 02-sky-logic.js)
+│   ├── milky-way.webp      # Milky Way strip, overview only (MW.src in 02-sky-logic.js)
+│   ├── og-constellation.jpg   # Observatory Open Graph image (index.html meta)
+│   └── og.jpg                 # DUMUL Open Graph image (dumul.html meta; separate from audio/lmr-audio/og.webp)
+│
 ├── icons/
 │   ├── icon-192.png
 │   ├── icon-512.png
 │   └── icon-maskable-512.png
-├── cache-status.html       # Optional diagnostic page for the audio cache
-├── licenses/
+├── licences/               # NOTE: folder is spelled "licences" (c) in the repo
 │   └── gargantua-css-LICENSE.txt   # MIT license of the Gargantua CSS source (Josetxu)
-│
-├── README.md
 │
 ├── audio/
 │   ├── glitch-instrumental.opus   # GARG handoff (shared root; Observatory + DUMUL)
@@ -323,16 +301,51 @@ once its files (and, optionally, its music) have been cached.
 │       ├── limerence.opus  glitch.opus  nastenka.opus  larung.opus
 │       └── og.webp                # Hero (index + dumul) + Media Session DUMUL
 │
-├── og.jpg                  # DUMUL Open Graph image (meta; separate from og.webp)
-└── og-constellation.jpg    # Observatory Open Graph image
+└── dumul-js/
+    ├── lmr/                # DUMUL page scripts
+    │   ├── dumul.js        # Player, lyrics, track notes, handoff, visitor log, effects
+    │   └── dumul-app.js    # Bundled React hero (ES module, minified, not meant to be edited by hand)
+    │
+    └── obs/                # Observatory scripts + data (everything the sky runs on)
+        ├── sky-data.js     # ONE source of truth: sectors, constellations, stars, SFX, panel groups, audio list
+        ├── texts.js        # All site text (telescope messages, terminal log, greetings) — pure data (English)
+        ├── i18n.js         # EN/ID layer: UI dictionary, T('key'), language chip (dumul_lang)
+        ├── i18n-sky.js     # ID translation of sky-data.js (whispers, camera info cards, signal fragments)
+        ├── i18n-texts.js   # ID translation of texts.js (telescope messages, terminal log)
+        ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
+        ├── lib/
+        │   └── three.custom.r159.js   # Three.js r159, self-hosted custom bundle (ES module, tree-shaken to the classes in use)
+        └── js/             # Observatory logic (load order matters!)
+            ├── 00-rain.js          # rain overlay (loaded first, before the data files)
+            ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
+            ├── 02-sky-logic.js     # data wiring, Pleiades, memory, unlock, observation mode, alignment, time dilation, layout, plate, nebula / Milky Way image paths
+            ├── 03-gargantua.js     # black hole, shared neural network, transition spectrum
+            ├── 04-render.js        # overlays, telescope, SFX, target reticle, constellation drawing, observatory FX
+            ├── 05-sector-ui.js     # sector overview (positions only), mini Gargantua parking, sector jump (sectJumpTo), telescope carry (LIS), tune panel, music player
+            ├── 06-interaction.js   # interaction, easter eggs, terminal, greeting, clock dilation
+            ├── 07-boot.js          # boot, render loop
+            ├── 08-tx-drone.js      # drone TX/RX animation + hold ring (TXFX)
+            ├── 09-wormhole.js      # wormhole transition for sector jumps / leaving a sector (WORMHOLE)
+            ├── 10-ui-sound.js      # synthesized UI sound effects (UIS)
+            ├── 11-live-count.js    # live observer counter (ES module, loaded lazily via import(); Firebase presence)
+            ├── 12-ast3d.js … 14-drone3d.js  # hybrid 3D layers (asteroids, telescope, TX drone; Three.js from lib/)
+            ├── 15-portal3d.js      # 3D portal ring (overview only) and its shared WebGL renderer (PT3D)
+            ├── 16-sector-menu.js   # sector menu window (#sect-menu): holo star map, swipe, telescope toggle
+            ├── 17-planet3d.js      # planet surface at the bottom of the screen (PL3D)
+            ├── 18-tune3d.js        # tune-panel tabs Planet / Drone / Portal / Milky Way (T3D); loads last of the app files
+            │
+            │   # Lazy dev tools: never in the service worker's SHELL, zero cost for normal visitors
+            ├── 19-auto-debug.js    # debug panel, only fetched when the URL has ?debug=1
+            ├── 20-layout-editor.js # layout editor (constellations / portal), only when ?layout=1 or localStorage.obs_layout_on=1
+            └── 21-bench.js         # read-only benchmark, only when the URL has ?bench=1
 ```
 
 Audio inventory: **23** files (18 obs + 4 lmr + 1 GARG). Offline Opsi A
 precaches **19** on Observatory and **5** on DUMUL (GARG shared, not copied).
 Paths are built in `sky-data.js` (`audioFilesObs` / `audioFilesDumul` /
-`GARG_PATH`), `01-core.js` (`mkAudio` full path), and `dumul.js` (`srcOf`).
+`GARG_PATH`), `01-core.js` (`mkAudio` full path), and `dumul-js/lmr/dumul.js` (`srcOf`).
 SW uses `d.urls` when the page sends them; fallback is `SKY.audioFiles()` (23).
-`og.jpg` / `og-constellation.jpg` stay at root for meta tags. `service-worker.js`
+`img/og.jpg` and `img/og-constellation.jpg` are the Open Graph images (absolute URLs in the meta tags, never cached by the service worker). `service-worker.js`
 and `manifest.json` stay at root for scope.
 
 ------------------------------------------------------------------------
@@ -342,35 +355,37 @@ and `manifest.json` stay at root for scope.
 | To change... | Edit |
 |---|---|
 | Text, structure, meta/SEO tags, links | `index.html` / `dumul.html` |
-| Look and layout | `index.css` / `dumul.css` |
+| Look and layout | `dumul-css/index.css` / `dumul-css/dumul.css` (a `url()` inside needs `../` to reach `audio/`) |
 | Add / move a constellation, star, SFX, sector, panel group | `dumul-js/obs/sky-data.js` (then `node dumul-js/obs/check-sky.js`) |
 | Any sentence the Observatory says (telescope, terminal, greeting) | `dumul-js/obs/texts.js` (English) + `i18n-texts.js` (Indonesian) |
 | UI labels / button text / toasts, either language | `dumul-js/obs/i18n.js` (dictionary) and `data-i18n="key"` in `index.html` |
 | Constellation whispers, camera info cards, signal fragments | `dumul-js/obs/sky-data.js` (English) + `i18n-sky.js` (Indonesian) |
-| Observatory behavior, features, bug fixes, animation, audio | `dumul-js/obs/js/01…10-*.js` (see the layout above for which file) |
+| Observatory behavior, features, bug fixes, animation, audio | `dumul-js/obs/js/00…18-*.js` (see the layout above for which file) |
 | Drone relay animation / wormhole transition / UI sounds | `08-tx-drone.js` / `09-wormhole.js` / `10-ui-sound.js` |
 | Live observer counter | `11-live-count.js` |
-| DUMUL page behavior | `dumul.js` |
+| DUMUL page behavior | `dumul-js/lmr/dumul.js` |
 | Offline behavior, cache rules, track list for "Save all" | `service-worker.js` |
 | Install name, colors, icons, shortcuts | `manifest.json` |
+| Nebula / Milky Way image paths | `NEB.src` / `MW.src` in `dumul-js/obs/js/02-sky-logic.js` (and the same two paths in `SHELL`) |
+| Open Graph preview images | `og:image` / `twitter:image` meta in `index.html` (`img/og-constellation.jpg`) and `dumul.html` (`img/og.jpg`) |
 | Offline button text, size estimate | the second PWA `<script>` near the end of `index.html` (`STR`, `SIZE_MB`) |
 
 Notes:
 
--   `dumul-app.js` is generated bundle output --- avoid editing it.
+-   `dumul-js/lmr/dumul-app.js` is generated bundle output --- avoid editing it.
 -   The deterministic neural-network layout exists in two places
     (`dumul-js/obs/js/03-gargantua.js` and the inline script at the top
     of `dumul.html`). Keep
     them identical, or the Gargantua → DUMUL transition will no longer
     line up.
 -   After changing a CSS/JS file, bump its version query in the HTML
-    (for example `dumul.js?v=1` → `dumul.js?v=2`) so returning visitors
+    (for example `dumul-js/lmr/dumul.js?v=1` → `dumul-js/lmr/dumul.js?v=2`) so returning visitors
     don't get a stale cached copy. GitHub Pages caches files for about
     10 minutes. **Also update the same entry in the `SHELL` list of
     `service-worker.js`** and bump its `VERSION` so the old precached copy
     is dropped. `node dumul-js/obs/check-sky.js` verifies the `?v=` values
     match.
--   **The files in `dumul-js/obs/js/` (`01` … `10`) are one
+-   **The files in `dumul-js/obs/js/` (`01` … `10`, and the 3D files `12` … `18`) are one
     program, not modules.** They are plain classic scripts loaded in order
     with `defer` and share one global scope; there is no IIFE anymore, so
     each file starts with `'use strict'`. Don't reorder the `<script>`
@@ -379,7 +394,7 @@ Notes:
     `TXFX`, `WORMHOLE` and `UIS` are already taken).
     Anything that runs at load time (not inside a function) may only use
     functions from the same or an earlier file. Bump `?v=` on **every**
-    tag (data files, i18n files, all js files, `index.css`) + the `SHELL`
+    tag (data files, i18n files, all js files, `dumul-css/index.css`) + the `SHELL`
     list together on each deploy.
 -   **`11-live-count.js` is the exception:** it is an ES module (Firebase is
     imported from `gstatic.com`), so it has its own scope and needs a
@@ -396,6 +411,8 @@ Notes:
     (`{en, id}`), then use `data-i18n="key"` / `data-i18n-aria="key"` in the
     HTML or `T('key')` in JS. New telescope / terminal lines go in
     `texts.js` and get a counterpart in `i18n-texts.js`.
+-   **Three.js (r159):** the library is the self-hosted custom bundle `dumul-js/obs/lib/three.custom.r159.js`, an ES module loaded lazily by `12-ast3d.js`. Its path + `?v=` must be identical in `AST3D_CFG.lib` (`12-ast3d.js`), `SHELL` in `service-worker.js`, the `modulepreload` link in `index.html` and the `import` inside the bundle itself; change one and you change all. (The header comment of `12-ast3d.js` still says r128; it is stale, the bundle is r159.)
+-   **Moving files:** CSS `url()` is relative to the CSS file, JS image paths (`NEB.src`, `MW.src`) are relative to the page, and `check-sky.js` has the CSS path (`dumul-css/index.css`) written out in full. If you move `index.css` or an image again, update all of these together with `SHELL`.
 -   **Adding, renaming or removing a track:** put the file in `audio/`
     and register it in `sky-data.js` (the service worker's `ALL_AUDIO`
     is generated from it), then update `SIZE_MB` in the offline
@@ -435,7 +452,7 @@ node dumul-js/obs/check-sky.js /path/to/site
 ```
 
 It validates `sky-data.js` (`SKY.check()`), that every audio file exists,
-that the `?v=` of `index.css`, `sky-data.js`, `texts.js`, the three `i18n*.js`
+that the `?v=` of `dumul-css/index.css`, `sky-data.js`, `texts.js`, the three `i18n*.js`
 files and every `js/*.js` in `index.html` matches `SHELL` in
 `service-worker.js` (and the script tags are in folder order), that each `js/` file starts with
 `'use strict'`, and that no old hard-coded text/button patterns are left.
@@ -457,11 +474,11 @@ The site is configured for the user site **`dumul17.github.io`**.
 3.  The HTML already contains canonical URLs for
     `https://dumul17.github.io/` and
     `https://dumul17.github.io/dumul.html`.
-4.  Upload the HTML and CSS files, the whole `dumul-js/obs/` folder
-    (`sky-data.js`, `texts.js`, `i18n*.js`, `img/`, `js/01…16`) and the `dumul.*` files
-    together, and keep the referenced audio and image assets beside them
-    on the same origin. Upload `dumul-js/obs/` **before** the new
-    `index.html` / `service-worker.js` so the page never points at scripts
+4.  Upload the HTML files, `dumul-css/`, `img/`, the whole `dumul-js/` folder
+    (`obs/`: `sky-data.js`, `texts.js`, `i18n*.js`, `lib/`, `js/00…18`; `lmr/`: `dumul.js`, `dumul-app.js`)
+    and keep the referenced audio assets beside them
+    on the same origin. Upload `dumul-css/`, `img/` and `dumul-js/` **before** the new
+    `index.html` / `dumul.html` / `service-worker.js` so the page never points at files
     that aren't there yet.
 5.  Also upload `service-worker.js`, `manifest.json` and `icons/` to the
     repo root (and optionally `cache-status.html`). Open the live site
@@ -500,8 +517,8 @@ The site is configured for the user site **`dumul17.github.io`**.
     the boot screen's audio bandwidth on later visits.
 -   **Split assets:** CSS and JavaScript live in external files so
     browsers can cache them separately from the HTML (the Observatory
-    script is split into 10 ordered files plus the data and language files, with
-    the live counter as a separate lazily loaded module); a few tiny
+    script is split into ordered files `00`–`18` plus the data and language files, with
+    the live counter as a separate lazily loaded module and `19`–`21` as dev-only lazy tools); a few tiny
     scripts that must run before first paint stay inline in
     `dumul.html`.
 -   **Browser storage:** the Observatory/DUMUL transition uses
@@ -556,7 +573,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     Pure CSS"* by Josetxu
     ([codepen.io/josetxu/pen/rNWgNeq](https://codepen.io/josetxu/pen/rNWgNeq)),
     MIT License. Adapted into a canvas sprite. See
-    `licenses/gargantua-css-LICENSE.txt`.
+    `licences/gargantua-css-LICENSE.txt`.
 
 ------------------------------------------------------------------------
 
