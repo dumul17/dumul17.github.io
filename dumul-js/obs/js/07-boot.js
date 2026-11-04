@@ -101,10 +101,11 @@ var DUMUL_CHARS=(function(){
     if(!chEl||chRdy||v===chPct)return;
     chPct=v;chEl.style.setProperty('--bp',(v/100).toFixed(2));
   }
-  function chSlowOn(){chSlow=true;chAttr('data-tm','soft');chAttr('data-om','sleepy');}
+  function chSlowOn(){chSlow=true;chAttr('data-tm','soft');chAttr('data-om','sleepy');try{if(window.__rain)window.__rain.mood(0.65);}catch(eMd){}}
   function chReadyOn(){
     if(chRdy||!chEl)return;
     chRdy=true;chSlow=false;chAttr('data-tm','smile');chAttr('data-om','awake');
+    try{if(window.__rain)window.__rain.mood(0);}catch(eMd){}
     chEl.style.setProperty('--bp','1');chEl.classList.add('pick');
     chHop('t');
   }

@@ -20,6 +20,9 @@
     var alive=false,rafId=0,last=0,t0=0;
     /* Reaktif boot: pT = progres target 0..1 (dari 07-boot), pS = nilai halus yang dipakai. */
     var pT=0,pS=0;
+    /* Mood palet: mT 0..1 = peluang kolom baru/recolor memilih warna hangat (magenta/pink/ungu) vs dingin (cyan/biru/hijau). Atlas sudah memuat semua warna → ganti c.ci saja, tanpa render ulang. Kuning (3) dipakai khusus kedip sentuh → hijau matrix. */
+    var mT=0,COOL=[0,4,6],WARM=[1,5,2];
+    function pickCi(){var a=Math.random()<mT?WARM:COOL;return a[(Math.random()*3)|0];}
     /* Sentuhan: pts = sampai 3 pointer {id,x,y,s(kekuatan 0..1),on}. RAD = jangkauan sedot, RADK = jangkauan sentakan tap. */
     var pts=[],RAD=90,RADK=130;
     /* Kolom yang kebaca: sesekali SATU kolom near berhenti, glyph-nya "mengkristal" jadi kata (vertikal, atas→bawah), tahan sebentar, lalu larut & lanjut jatuh.
@@ -86,8 +89,8 @@
         y:midway?(Math.random()*h*1.15-h*0.15):(Math.random()*-h*1.2),
         speed:pickSpeed(L),len:len,chars:chars,head:0,
         mt:Math.random()*K.mutMs,sh:Math.random()*(K.shiftMs||1),
-        ci:(Math.random()*PAL.length)|0,li:li,layer:L,fs:lfs[li],x:x,
-        hx:x,fl:0,kick:0   /* hx = x asal (kolom kembali ke sini), fl = sisa ms kedip magenta, kick = sentakan tap 1->0 */
+        ci:pickCi(),rc:0,li:li,layer:L,fs:lfs[li],x:x,
+        hx:x,fl:0,kick:0   /* hx = x asal (kolom kembali ke sini), fl = sisa ms kedip hijau matrix, kick = sentakan tap 1->0 */
       };
     }
     function resize(w,h,dpr){
@@ -185,6 +188,7 @@
         if(w2>0.02){c.fl=380;c.mt-=dt*6*w2;c.x+=(c.hx+(px-c.hx)*0.85*w2-c.x)*kIn;}   /* tersedot ke jari + glyph teracak lebih cepat */
         else if(c.x!==c.hx){c.x+=(c.hx-c.x)*kOut;if(Math.abs(c.hx-c.x)<0.05)c.x=c.hx;}
         if(c.fl>0)c.fl-=dt;
+        if(c.rc>0){c.rc-=dt;if(c.rc<=0)c.ci=pickCi();}   /* recolor mood, bertahap per kolom */
         if(c.kick>0){c.kick-=dt/650;if(c.kick<0)c.kick=0;}
         /* sf = pengali kecepatan (melambat → diam → melaju lagi), rdA = terang huruf kata. Tap dekat kolom (kick) memutus baca lebih awal. */
         var rd=c.rd,sf=1,rdA=0;
@@ -220,13 +224,13 @@
           c.x=c.hx=Math.random()*w;c.fl=0;c.kick=0;
           c.speed=pickSpeed(L);
           len=c.len=pickLen();
-          c.ci=(Math.random()*PAL.length)|0;
+          c.ci=pickCi();
           c.chars=new Uint8Array(len);
           for(var r=0;r<len;r++)c.chars[r]=rg();
           c.head=0;
         }
         var ALP=ALPHA[c.li],head=c.head,chars=c.chars;
-        var rowBody=(c.li*8+(c.fl>0?1:c.ci))*cell,rowHead=L.depth>=0.7?(c.li*8+7)*cell:rowBody,rowWd=(c.li*8+(c.fl>0?1:0))*cell,rdN=rd?rd.n:0;
+        var rowBody=(c.li*8+(c.fl>0?3:c.ci))*cell,rowHead=L.depth>=0.7?(c.li*8+7)*cell:rowBody,rowWd=(c.li*8+(c.fl>0?3:0))*cell,rdN=rd?rd.n:0;
         var dx=Math.round(c.x*dprM-cell/2);
         for(var j=0;j<len;j++){
           var gy=c.y-j*fs;
@@ -250,6 +254,7 @@
       prog:function(v){pT=v<0?0:(v>1?1:v);},
       pt:ptSet,
       avoid:function(r){AV=r;},
+      mood:function(v){mT=POT?0:(v<0?0:(v>1?1:v));for(var i=0;i<cols.length;i++)cols[i].rc=200+Math.random()*1800;},
       stop:function(){alive=false;try{caf(rafId);}catch(e){}}
     };
   }
@@ -268,6 +273,7 @@
       }else if(m.t==='size'&&eng){eng.resize(m.w,m.h,m.dpr);}
       else if(m.t==='prog'&&eng){eng.prog(m.v);}
       else if(m.t==='avoid'&&eng){eng.avoid(m.r);}
+      else if(m.t==='mood'&&eng){eng.mood(m.v);}
       else if(m.t==='pt'&&eng){eng.pt(m.id,m.x,m.y,m.a);}
       else if(m.t==='stop'&&eng){eng.stop();}
     };
@@ -275,7 +281,7 @@
 
   var glyphs='ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789ABCDEF✦★*+<>|/\\□■◆◇○●▲△▼▽';
   var CYBER_PAL=[
-    {r:34,g:230,b:255},{r:255,g:43,b:214},{r:180,g:74,b:255},{r:255,g:220,b:50},
+    {r:34,g:230,b:255},{r:255,g:43,b:214},{r:180,g:74,b:255},{r:0,g:255,b:65},
     {r:80,g:160,b:255},{r:255,g:80,b:140},{r:80,g:255,b:180}
   ];
   /* ---- Knob hujan matrix ---- */
@@ -353,7 +359,7 @@
     var w=innerWidth,h=innerHeight,d=window.devicePixelRatio||1;
     if(wk)wk.postMessage({t:'size',w:w,h:h,dpr:d});else if(mainEng)mainEng.resize(w,h,d);
   },150);});
-  /* ---- Sentuh = gangguan: jari/kursor "menyedot" kolom di sekitarnya + kolom itu berkedip magenta & glyph-nya teracak sebentar; tap = sentakan lebih besar. Mode low: mati. ---- */
+  /* ---- Sentuh = gangguan: jari/kursor "menyedot" kolom di sekitarnya + kolom itu berkedip hijau matrix & glyph-nya teracak sebentar; tap = sentakan lebih besar. Mode low: mati. ---- */
   var ptOff=[];
   function ptSend(id,x,y,a){if(!alive)return;if(wk)wk.postMessage({t:'pt',id:id,x:x,y:y,a:a});else if(mainEng)mainEng.pt(id,x,y,a);}
   if(!IS_POTATO){
@@ -368,5 +374,7 @@
   }
   window.__rain={kill:function(){alive=false;clearInterval(avT);killWorker();if(mainEng){mainEng.stop();mainEng=null;}for(var i=0;i<ptOff.length;i++)ptOff[i]();ptOff=[];},
     /* prog: hujan ikut progres boot (v 0..1). Aman dipanggil kapan saja (no-op kalau sudah di-kill). */
-    prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);}};
+    prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);},
+    /* mood: 0 = dingin (cyan/biru/hijau), 1 = hangat (magenta/pink/ungu). Mode low: no-op. */
+    mood:function(v){if(!alive)return;if(wk)wk.postMessage({t:'mood',v:v});else if(mainEng)mainEng.mood(v);}};
 })();
