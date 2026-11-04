@@ -1048,7 +1048,7 @@ function startRenderLoop(){
 setInterval(function(){
   if(pageHidden||!bootDone)return;
   if(performance.now()-lastFrameOK>1500){
-    try{buildSprite();}catch(e){}
+    try{buildSprite(true);}catch(e){}   /* force: watchdog memang mau bangun ulang sprite dari nol */
     if(renderRAF){cancelAnimationFrame(renderRAF);renderRAF=0;}
     renderGeneration++;
     startRenderLoop();

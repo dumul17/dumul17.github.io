@@ -91,8 +91,12 @@ function bhCssApply(R,S,d){
   img.onerror=function(){}; /* tetap pakai sprite lama */
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
-function buildSprite(){                   /* layered gravitational lens: luminous, deep, photorealistic feel + Doppler / photon ring / secondary lens */
-  var R=BH.R,S=Math.ceil(R*13),d=DPR,c=document.createElement('canvas');
+function buildSprite(force){                   /* layered gravitational lens: luminous, deep, photorealistic feel + Doppler / photon ring / secondary lens */
+  var R=BH.R,S=Math.ceil(R*13),d=DPR,c;
+  /* Sprite kanvas ini cuma placeholder: bhCssApply() di ujung selalu menggantinya dengan sprite CSS. Kalau sprite CSS sudah pernah jadi (ukuran apa pun), lewati gambar kanvas mahal ini:
+     bhCssApply sendiri yang pakai ulang (key sama) atau menskala sprite lama sambil bake ukuran baru. Kanvas tetap dibangun kalau: pertama kali (belum ada sprite CSS), ?bh=old, gambar CSS gagal, atau force (watchdog). */
+  if(!force&&BH_CSS.on&&typeof Image!=='undefined'&&BH_CSS.spr&&R>0){bhCssApply(R,S,d);return;}
+  c=document.createElement('canvas');
   c.width=c.height=Math.ceil(S*d);
   var s=c.getContext('2d');s.scale(d,d);
   var cx=S/2,cy=S/2;

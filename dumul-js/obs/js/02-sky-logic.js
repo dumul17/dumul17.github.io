@@ -1315,14 +1315,15 @@ function txLongPressDrone(){
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
    Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'img/nebula.webp?v=1',img:null,base:null,key:'',tint:{}};
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'img/nebula.webp?v=1',img:null,base:null,key:'',tint:{},LITE_MS:2500,liteT:0,noLite:false};   /* LITE_MS: batas tunggu nebula sebelum bake prosedural penuh jadi cadangan (jaringan lelet); liteT = id timer; noLite = cadangan sudah jalan, jangan lite lagi */
+function nebLiteFallback(){NEB.liteT=0;if(NEB.on&&!(NEB.img&&NEB.img._ok)){NEB.noLite=true;try{bakeAstroPlates(true);}catch(e){}}}
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
   var im=NEB.img;   /* satu gambar untuk portrait & landscape (cover-fit di bawah); yang berubah cuma staging-nya */
   if(!im){
     im=NEB.img=new Image();
-    im.onload=function(){im._ok=1;try{bakeAstroPlates();}catch(e){}};
-    im.onerror=function(){NEB.on=false;NEB.base=null;NEB.tint={};};
+    im.onload=function(){im._ok=1;if(NEB.liteT){clearTimeout(NEB.liteT);NEB.liteT=0;}try{bakeAstroPlates();}catch(e){}};
+    im.onerror=function(){NEB.on=false;NEB.base=null;NEB.tint={};if(NEB.liteT){clearTimeout(NEB.liteT);NEB.liteT=0;}try{bakeAstroPlates();}catch(e){}};   /* bake pertama sekarang LITE (nebula belum siap), jadi gagal-muat wajib bake prosedural di sini */
     im.src=NEB.src;return null;
   }
   if(!im._ok){NEB.base=null;return null;}
@@ -1539,12 +1540,28 @@ function nebTintSync(s){
    L1 mid  : crisp stars (+ faint band field, diffraction spikes), RA/Dec grid, HUD reticles
    Both carry a safe margin so parallax never exposes an edge. */
 function plateRng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-function bakeAstroPlates(){
+function bakeHudGeom(){
+  var m=Math.max(10,Math.min(18,W*.035)),len=Math.min(22,Math.max(16,Math.min(W,H)*.055));
+  HUD={m:m,len:len,top:Math.max(44,Math.min(88,H*.105)),bot:Math.max(42,Math.min(82,H*.105))};
+}
+function bakeAstroPlates(full){
   var M=plateM=Math.round(Math.max(24,Math.min(48,Math.min(W,H)*.07)));
   var EW=W+2*M,EH=H+2*M,rnd=plateRng(0x5EED17),cx0=W*.5,cy0=H*.5,BA=-.5+upAng(),bt=Math.min(W,H)*.32; /* + upAng(): sabuk Milky Way tegak di layar landscape (ROT), sama seperti di portrait; portrait/desktop upAng()=0 */
   plateDPR=DPR;plateRot=STG.rot;
   /* ===== L0 deep plate (opaque, reduced resolution: it is soft by design) ===== */
   var ds=Math.min(DPR,IS_POTATO?.5:PLATE_DS_DEEP);
+  /* LITE: nebula gambar masih di-fetch (nebBase null tapi NEB.on) -> bake prosedural penuh PASTI dibuang begitu im.onload memanggil bakeAstroPlates() lagi
+     (versi nebula melewati bintang/kabut prosedural). Jadi bake pertama cukup plate 1x1 gelap + bgCanvas 1x1 kosong (bgEmpty) + HUD; yang sebenarnya jalan di onload.
+     Cadangan: onerror (bake prosedural) atau NEB.LITE_MS lewat (nebLiteFallback -> bake penuh seperti dulu); resize saat lite = lite lagi. */
+  if(!full&&!NEB.noLite&&NEB.on&&!nebBase(EW,EH,ds)){
+    plateDeep=document.createElement('canvas');plateDeep.width=plateDeep.height=1;
+    var lc=plateDeep.getContext('2d',{alpha:false});lc.fillStyle='#050b12';lc.fillRect(0,0,1,1);
+    bgCanvas=document.createElement('canvas');bgCanvas.width=bgCanvas.height=1;bgCtx=null;
+    bgEmpty=true;plateDust=[];gridCanvas=null;
+    bakeHudGeom();
+    if(!NEB.liteT)NEB.liteT=setTimeout(nebLiteFallback,NEB.LITE_MS);
+    return;
+  }
   plateDeep=document.createElement('canvas');
   plateDeep.width=Math.max(1,Math.round(EW*ds));plateDeep.height=Math.max(1,Math.round(EH*ds));
   var dc=plateDeep.getContext('2d',{alpha:false});
@@ -1668,10 +1685,7 @@ function bakeAstroPlates(){
   }
     /* Observatory HUD corner reticles: sengaja TIDAK di-bake ke bgCanvas (itu ikut parallax/pan/zoom).
        Cuma hitung geometri di sini; digambar fixed di layar lewat drawHud() tiap frame. */
-    (function(){
-      var m=Math.max(10,Math.min(18,W*.035)),len=Math.min(22,Math.max(16,Math.min(W,H)*.055));
-      HUD={m:m,len:len,top:Math.max(44,Math.min(88,H*.105)),bot:Math.max(42,Math.min(82,H*.105))};
-    })();
+    bakeHudGeom();
 
     /* Grid RA/Dec equatorial: dipindah ke gridCanvas (bakeCamGrid), di-bake lazy saat cam ON.
        Plate di-bake ulang => grid lama invalid. */
@@ -1727,7 +1741,11 @@ function layout(){
   W=stageCalc();H=STG.vh;
   try{document.body.classList.toggle('cam-compact',!!STG.rot||(H<=560&&W>=H*1.3));_cb.h=0;document.body.classList.toggle('touch-short',H<=560&&!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches));}catch(e){}
   DPR=(IS_POTATO?1:Math.min(window.devicePixelRatio||1,2))*(STG.on?STG.k:1)*(window.__dprMul||1);
-  G_DEPTH=0;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);g.setTransform(DPR,0,0,DPR,0,0);
+  /* Set cv.width/height SELALU mengalokasi ulang backing store + mereset state, walau ukurannya sama (layout() jalan lagi tiap resize/rotasi/URL bar/font). Cuma set kalau ukuran benar-benar berubah; kalau sama, state dibersihkan lewat resetCanvasState() (restore save bocor via G_DEPTH + transform/alpha/dash). */
+  var lyCw=Math.round(W*DPR),lyCh=Math.round(H*DPR);
+  if(cv.width!==lyCw||cv.height!==lyCh){G_DEPTH=0;cv.width=lyCw;cv.height=lyCh;}
+  else{try{resetCanvasState();}catch(eRc){}}
+  g.setTransform(DPR,0,0,DPR,0,0);
   fitTitle();
   var hb=vrect($('#header')).bottom,ft=vrect($('#footer')).top;
   var top=hb+10,bot=ft-8,ah=Math.max(120,bot-top),portrait=W<H*1.05;
