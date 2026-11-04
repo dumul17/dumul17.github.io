@@ -114,6 +114,7 @@ try{
   /* Mini spectrum di atas bar: muncul kalau spektrum hero sudah keluar layar (mis. lagu di urutan bawah, lagi baca lirik) */
   var miniEl=document.createElement('canvas');miniEl.id='dm-mini';miniEl.setAttribute('aria-hidden','true');bar.appendChild(miniEl);
   var mctx=miniEl.getContext('2d'),miniW=0,miniH=0,miniDpr=0,miniLast=0,miniOn=false;
+  var miniPh=0,miniSeen=0,miniI=0,MN=700,MS=24,mX=new Float32Array(700),mY1=new Float32Array(700),mY2=new Float32Array(700),mZ=new Float32Array(700),mSp=new Float32Array(24*5);
   function drawMini(now,playing){
     var want=!!playing&&window.__dmHeroVis===false&&!document.hidden;
     if(want!==miniOn){miniOn=want;miniEl.classList.toggle('dm-on',want);}
@@ -128,23 +129,44 @@ try{
       mctx.setTransform(dpr,0,0,dpr,0,0);
     }
     mctx.clearRect(0,0,w,h);
-    var y=h/2,t=now/1000,sp=window.__dmSp,amp=h*.42,beat=(now-(A.beatAt||0))<140;
+    /* Mini DNA helix: versi kecil dari hero (untai cyan + pink, anak tangga, spark ikut beat). Hemat daya / auto-lighten -> tanpa glow, sampel lebih jarang, tanpa spark. */
+    var lite=window.__dmLowFx===true||window.__dmLite===true;
+    var y=h/2,sp=window.__dmSp,st=lite?6:3,tw=6.2832/Math.max(70,Math.min(130,w*.2)),kk=A.kick||0;
+    miniPh+=.05+kk*.3+(A.mid||0)*.04;
+    var hold=0,n=0,i;
+    for(var x=0;x<=w&&n<MN-1;x+=st,n++){
+      var v=sp?sp(x/w):0,env=Math.min(1,v*1.15+(A.bass||0)*.3+(A.level||0)*.15);
+      var R=(h*.1+h*.3*env)*(1+kk*.5);if(R>h*.46)R=h*.46;
+      var ph=x*tw+miniPh,sn=Math.sin(ph);
+      mX[n]=x;mY1[n]=y+R*sn;mY2[n]=y-R*sn;mZ[n]=Math.cos(ph)*.5+.5;
+    }
     mctx.lineCap='round';mctx.lineJoin='round';
-    mctx.beginPath();mctx.moveTo(0,y);mctx.lineTo(w,y);
-    mctx.strokeStyle='rgba(184,198,214,.1)';mctx.lineWidth=1;mctx.stroke();
+    if(!lite){mctx.beginPath();for(i=1;i<n;i+=3){if(Math.abs(mY1[i]-mY2[i])<3)continue;mctx.moveTo(mX[i],mY1[i]);mctx.lineTo(mX[i],mY2[i]);}
+      mctx.strokeStyle='rgba(110,229,255,'+(.16+kk*.3).toFixed(2)+')';mctx.lineWidth=1;mctx.stroke();}
     for(var pass=0;pass<2;pass++){
-      var ox=pass?(beat?(Math.random()-.5)*7:1.4):0;
+      var Y=pass?mY2:mY1;
       mctx.beginPath();
-      for(var x=0;x<=w;x+=3){
-        var v=sp?sp(x/w):0;
-        var yy=y+Math.sin(x*.02+t*2+pass)*1.1+v*Math.sin(x*.13+t*35+pass*1.3)*amp*(pass?.75:1);
-        if(x===0)mctx.moveTo(x+ox,yy);else mctx.lineTo(x+ox,yy);
-      }
-      if(pass){mctx.strokeStyle='rgba(255,122,217,.55)';mctx.lineWidth=1;mctx.shadowBlur=0;}
-      else{mctx.strokeStyle='#6ee5ff';mctx.lineWidth=1.5;mctx.shadowColor='rgba(110,229,255,.6)';mctx.shadowBlur=6;}
+      for(i=0;i<n;i++){if(i===0)mctx.moveTo(mX[i],Y[i]);else mctx.lineTo(mX[i],Y[i]);}
+      if(pass){mctx.strokeStyle='rgba(255,122,217,.6)';mctx.lineWidth=1;mctx.shadowBlur=0;}
+      else{mctx.strokeStyle='#6ee5ff';mctx.lineWidth=1.5;if(!lite){mctx.shadowColor='rgba(110,229,255,.6)';mctx.shadowBlur=6;}}
       mctx.stroke();
     }
     mctx.shadowBlur=0;
+    /* titik putih di bagian untai yang menghadap depan */
+    mctx.fillStyle='rgba(230,249,255,.8)';
+    for(i=0;i<n;i+=2){if(mZ[i]>.9)mctx.fillRect(mX[i]-.8,mY1[i]-.8,1.6,1.6);}
+    /* spark ikut beat */
+    if(!lite){
+      if(A.beatAt&&A.beatAt!==miniSeen){miniSeen=A.beatAt;
+        var cnt=4+Math.round((A.beatStr||.4)*8);
+        for(i=0;i<cnt;i++){var q=miniI*5,k=(Math.random()*n)|0;miniI=(miniI+1)%MS;
+          mSp[q]=mX[k];mSp[q+1]=Math.random()>.5?mY2[k]:mY1[k];mSp[q+2]=(Math.random()-.5)*1.2;mSp[q+3]=(mSp[q+1]>y?1:-1)*(.4+Math.random()*1.2);mSp[q+4]=1;}
+      }
+      for(i=0;i<MS;i++){var o=i*5,lf=mSp[o+4];if(lf<=0)continue;
+        mSp[o]+=mSp[o+2];mSp[o+1]+=mSp[o+3];mSp[o+4]=lf-.08;
+        mctx.fillStyle=(i&1)?'rgba(255,122,217,'+lf.toFixed(2)+')':'rgba(110,229,255,'+lf.toFixed(2)+')';
+        mctx.fillRect(mSp[o]-1,mSp[o+1]-1,2,2);}
+    }
   }
   function uiStep(){
     if(!current)return;
@@ -2230,6 +2252,7 @@ try{
   function applyFx(){
     var low=isLow();
     root.classList.toggle('dm-lowfx',low);
+    window.__dmLowFx=low; /* dibaca hero canvas + mini DNA: kepadatan partikel turun */
     root.classList.toggle('dm-fx',!low&&!reduce);
     sync();
   }

@@ -12,7 +12,7 @@ _nIdx=0,nR=function(){return _NOISE[_nIdx++&255]},
 /* Adaptive density from frame time (not quality cliff) */
 _perf=3,_fps=60,_stab=false,_ftEMA=16.6,_frameN=0,_slowN=0,_clean=0,_need=3,
 /* DNA helix: posisi sampel frame sebelumnya (buat titik lahir spark) + pool spark ikut beat */
-_dB=0,_dnaHs=6,_dnaPh=0,_dnaN=0,_dnaC=0,_dnaX=new Float32Array(512),_dnaY1=new Float32Array(512),_dnaY2=new Float32Array(512),_dnaZ=new Float32Array(512),_dnaG=new Uint8Array(512),
+_liteUntil=0,_dB=0,_dnaHs=6,_dnaPh=0,_dnaN=0,_dnaC=0,_dnaX=new Float32Array(512),_dnaY1=new Float32Array(512),_dnaY2=new Float32Array(512),_dnaZ=new Float32Array(512),_dnaG=new Uint8Array(512),
 _spkN=96,_spk=new Float32Array(96*7),_spkI=0,
 _spkEmit=function(cnt,pw,x0){for(var q=0;q<cnt;q++){var ix=_dnaN>1?(x0==null?(nR()*_dnaN)|0:Math.max(0,Math.min(_dnaN-1,Math.round(x0/_dnaHs+(nR()-.5)*10)))):0,sI=nR()>.5?1:0,x=_dnaN>1?_dnaX[ix]:nR()*i,y=_dnaN>1?(sI?_dnaY2[ix]:_dnaY1[ix]):u*.5,b=_spkI*7;_spkI=(_spkI+1)%_spkN;var ang=(nR()-.5)*2.4+(y>_dnaC?1.5708:-1.5708),v2=(.9+nR()*2.2)*pw;_spk[b]=x;_spk[b+1]=y;_spk[b+2]=Math.cos(ang)*v2;_spk[b+3]=Math.sin(ang)*v2;_spk[b+4]=1;_spk[b+5]=1.4+nR()*1.8;_spk[b+6]=nR()<.25?2:sI}},
 /* glow node = sprite radial (di-cache per warna), bukan shadowBlur: tanpa blur pass per node per frame */
@@ -23,6 +23,9 @@ let c=Math.min(32,rawDt)/16.666;
 if(rawDt>0&&rawDt<250)_fps+=(1000/rawDt-_fps)*0.02;
 if(_fps<40)_stab=true;else if(_fps>=45)_stab=false;
 let stab=_stab&&window.__dmAutoGov===true;
+/* lite = chip Low-power visuals ATAU Auto-lighten (fps<40, ditahan 6 dtk biar tidak bolak-balik) -> kualitas gambar level 1 (DNA & mode idle) */
+if(stab)_liteUntil=Q+6000;
+let lite=window.__dmLowFx===true||(window.__dmAutoGov===true&&Q<_liteUntil);window.__dmLite=lite;
 /* EMA frame time → performanceLevel 1|2|3 */
 /* frame lambat (>25 ms) per jendela 60 frame: >=6 -> turun 1 level; 0 selama _need jendela berturut -> naik 1 level (makin lama kalau sering turun lagi) */
 if(rawDt>25&&rawDt<250)_slowN++;
@@ -36,7 +39,7 @@ if(window.__dmDbgOn===undefined)window.__dmDbgOn=/[?&]perfdbg=1/.test(location.s
 if(window.__dmDbgOn){if(window.__dmLock===undefined){var __m=/[?&]lock=([123])/.exec(location.search);window.__dmLock=__m?+__m[1]:0;}if(window.__dmLock)_perf=window.__dmLock;}
 /* kualitas gambar: dikunci level 3 (L3). Governor _perf tetap dihitung/ditampilkan, tapi hanya dipakai kalau ?adapt=1 */
 if(window.__dmAdaptOn===undefined)window.__dmAdaptOn=/[?&]adapt=1/.test(location.search);
-let _pq=window.__dmAdaptOn?_perf:3;
+let _pq=window.__dmAdaptOn?_perf:(lite?1:3);
 let __A=window.__dmA||{level:0,beatAt:0,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:.5,listen:0,sig:"default",blips:[]};
 let __L=Math.max(__A.level||0,__A.memory||0);
 let s=__A.phase>0?__A.phase:Q*0.001;
