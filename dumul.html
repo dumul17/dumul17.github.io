@@ -452,13 +452,10 @@ if ('serviceWorker' in navigator) {
     part: '> SYNC INTERRUPTED', partNote: '{d}/{t} saved. Resumes on your next visit.'
   };
   var total = 0, cachedNow = 0, card = null, mode = '', watchdog = 0, hideT = 0, styled = false;
+  var want = false, askTries = 0, retryT = 0, gotStatus = false, readyAsked = false, swReg = null, statTries = 0, statT = 0;   /* v159: lihat tryAsk()/askStatus() */
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function save(v) { try { localStorage.setItem(KEY, JSON.stringify({ v: v, t: Date.now() })); } catch (e) {} }
-  function net() {
-    var c = navigator.connection || {};
-    return { slow: !!(c.saveData || /(^|-)2g$/.test(c.effectiveType || '')), cell: c.type === 'cellular' };
-  }
   function fmt(s, d) {
     return s.replace('{n}', total).replace('{mb}', SIZE_MB).replace('{d}', d || 0).replace('{t}', total);
   }
@@ -553,15 +550,28 @@ if ('serviceWorker' in navigator) {
     sendPrecache();
   }
 
+  /* v159: kartu TIDAK lagi di-skip selamanya. Dulu onStatus cuma cek SEKALI lalu return kalau jaringan lelet (saveData / 2g), tab sedang di latar, atau body.sw,
+     dan tidak pernah dicoba lagi (first visit + jaringan lelet: SW baru aktif belakangan, status datang telat, kebetulan salah satu kondisi itu -> kartu hilang untuk sesi itu).
+     Sekarang: jaringan lelet TIDAK memblokir (kartu cuma opt-in; unduhan baru jalan kalau SAVE ALL ditekan). Tab di latar / body.sw cuma MENUNDA:
+     tampil begitu tab kembali terlihat (visibilitychange) atau body.sw lepas (poll 1,5 dtk, maks ±5 menit). */
+  function tryAsk() {
+    clearTimeout(retryT); retryT = 0;
+    if (!want || visible()) return;
+    if (document.visibilityState !== 'visible') return;                    /* ditunda: visibilitychange memanggil tryAsk lagi */
+    if (document.body.classList.contains('sw')) { if (++askTries < 200) retryT = setTimeout(tryAsk, 1500); return; }
+    want = false;
+    render('ask');
+  }
+  document.addEventListener('visibilitychange', function () { if (want) tryAsk(); });
+
   function onStatus(d) {
+    gotStatus = true; clearTimeout(statT);
     total = d.total; cachedNow = d.cached;
     if (d.cached >= d.total) return;                 /* sudah lengkap: tidak perlu tanya */
-    var ch = load(), n = net();
+    var ch = load();
     if (ch && (ch.v === 'yes')) return;              /* v158: pernah setuju, tapi TIDAK unduh otomatis; cuma tidak tanya lagi */
     if (ch && ch.v === 'later' && Date.now() - ch.t < ASK_AGAIN_DAYS * 864e5) return;
-    if (n.slow) return;
-    if (document.visibilityState !== 'visible' || document.body.classList.contains('sw')) return;
-    render('ask');
+    want = true; tryAsk();
   }
 
   navigator.serviceWorker.addEventListener('message', function (e) {
@@ -583,10 +593,18 @@ if ('serviceWorker' in navigator) {
     }
   });
 
+  /* v159: tunggu SW aktif SEKALI (ready), lalu kirim AUDIO_STATUS; kalau belum ada balasan (SW baru di first visit + jaringan lelet bisa telat / tertidur)
+     ulangi tiap 10 dtk, maks 6x. Balasan ganda aman: onStatus idempoten (kartu yang sudah tampil / sudah dipilih tidak muncul lagi). */
   function askStatus() {
-    navigator.serviceWorker.ready.then(function (reg) {
-      if (reg.active) reg.active.postMessage({ type: 'AUDIO_STATUS', urls: OFFLINE_URLS });
-    });
+    if (gotStatus) return;
+    if (!readyAsked) {
+      readyAsked = true;
+      navigator.serviceWorker.ready.then(function (reg) { swReg = reg; askStatus(); });
+      return;
+    }
+    if (swReg && swReg.active) swReg.active.postMessage({ type: 'AUDIO_STATUS', urls: OFFLINE_URLS });
+    clearTimeout(statT);
+    if (++statTries < 6) statT = setTimeout(askStatus, 10000);
   }
   function begin() {
     var hasBoot = !!document.getElementById('boot-screen'), tries = 0;
