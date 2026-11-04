@@ -14,7 +14,7 @@
    Matikan: ?scope3d=0 di URL atau localStorage dumul_scope3d=0. */
 var SCP3D_CFG={
   on:true,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r159.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
   half:64,       /* kotak gambar -half..half (satuan lokal teleDrawBody) */
   envSize:256,   /* ukuran cube PMREM env pantulan (teleskop + drone). Default 256 = tampilan lama. Turunkan (128/64) buat hemat CPU saat boot; A/B lewat ?envsz=N (dibatasi 32..256, dibulatkan ke pangkat 2) */
   resMin:128,resMax:256,

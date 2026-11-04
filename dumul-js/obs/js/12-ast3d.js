@@ -8,7 +8,7 @@
    Matikan: ?ast3d=0 di URL atau localStorage dumul_ast3d=0. */
 var AST3D_CFG={
   on:true,
-  lib:'dumul-js/obs/lib/three.custom.r159.js?v=1',   /* ES module (r159, bundle tree-shaken: cuma class yang dipakai). Path + ?v= harus sama dgn SHELL service-worker */
+  lib:'dumul-js/obs/lib/three.custom.r186.js?v=1',   /* ES module (r186, bundle tree-shaken: cuma class yang dipakai). Path + ?v= harus sama dgn SHELL service-worker */
   dprMax:1.25,   /* resolusi render dibatasi: batu kecil (1-4 px) + lembut, nggak perlu DPR penuh. v23: dulu 1,5; kalau masih berat coba 1 */
   procVariants:6,
   reuse:true,    /* cache hasil render per pass: kalau pan/zoom/posisi BH/layout nggak berubah, GL + astStep cuma jalan ~fps (bawah), frame lain tinggal blit cache. false = render tiap frame seperti dulu */
@@ -254,7 +254,7 @@ function threeLoad(ok,bad){
   var P=window.__threeP;
   if(!P){
     try{
-      var url=new URL((typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r159.js?v=1',document.baseURI).href;
+      var url=new URL((typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r186.js?v=1',document.baseURI).href;
       P=window.__threeP=import(url).then(function(m){
         try{m.ColorManagement.enabled=false;}catch(e){}
         window.THREE=Object.assign({},m);
@@ -510,7 +510,7 @@ function ast3dDraw(now,half){
       v.mesh.visible=v.n>0;
       if(!v.n)continue;
       v.geo.instanceCount=v.n;
-      v.A.clearUpdateRanges();v.A.addUpdateRange(0,v.n*4);v.A.needsUpdate=true;   /* r159+: updateRange{offset,count} diganti addUpdateRange(start,count) */
+      v.A.clearUpdateRanges();v.A.addUpdateRange(0,v.n*4);v.A.needsUpdate=true;   /* r159+ (masih valid di r186): updateRange{offset,count} diganti addUpdateRange(start,count) */
       v.B.clearUpdateRanges();v.B.addUpdateRange(0,v.n*4);v.B.needsUpdate=true;
       v.Z.clearUpdateRanges();v.Z.addUpdateRange(0,v.n);v.Z.needsUpdate=true;
     }
