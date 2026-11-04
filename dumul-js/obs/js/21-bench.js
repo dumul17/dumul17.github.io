@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.17 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.18 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
@@ -9,7 +9,8 @@
    merge: v11.14 + data-v pV sampling + bm flag (?bm=0).
    v11.15: penghitung document.fonts 'loadingdone' (jumlah + waktu) dan layout() (jumlah, total ms, max, pre-capsule, yang dipicu loadingdone) -> R.loadingdone / R.layout.
    v11.16: atribusi fromLoadingdone dibetulkan (v11.15 salah-tandai boot() yang kebetulan jalan di tick yang sama): flag dibersihkan tepat setelah listener 07-boot selesai, bukan via setTimeout(0).
-   v11.17: resource audio/three + proto (nextHopProtocol), q (antre+connect sebelum request terkirim), w (tunggu server murni), conn (ms connect, 0 = koneksi dipakai ulang), sw (lewat service worker); R.protoAll (hitung per protokol, semua resource) dan R.audPeak (puncak request audio yang tumpang tindih di network). Untuk membedakan batas 6 koneksi HTTP/1.1 vs server/VPN lambat. */
+   v11.17: resource audio/three + proto (nextHopProtocol), q (antre+connect sebelum request terkirim), w (tunggu server murni), conn (ms connect, 0 = koneksi dipakai ulang), sw (lewat service worker); R.protoAll (hitung per protokol, semua resource) dan R.audPeak (puncak request audio yang tumpang tindih di network). Untuk membedakan batas 6 koneksi HTTP/1.1 vs server/VPN lambat.
+   v11.18: R.three = THREE.REVISION (r159/r186 kelihatan di dump); regex resource three juga cocok dgn three.custom.rNNN.js (sebelumnya threeRes selalu null utk bundle custom). */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
@@ -614,7 +615,7 @@
       R.loadAfterCapsule = R.t.load != null && R.t.capsule != null ? R.t.load - R.t.capsule : null;
     } catch (e) {}
 
-    R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
+    R.three = (window.THREE && window.THREE.REVISION) || null; R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
     R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null;
     R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
@@ -637,7 +638,7 @@
     R.isRepeatVisit = IS_REPEAT;
     R.bootRepeatFlag = IS_REPEAT; /* kompat */
 
-    /* v10: resource timing detail — three.module + audio (named objects) */
+    /* v10: resource timing detail — three (module/core/custom) + audio (named objects) */
     try {
       var rs = performance.getEntriesByType('resource');
       R.res = rs.length;
@@ -667,7 +668,7 @@
         if (/\.opus|\.mp3|\.ogg|\.wav|audio\//i.test(e.name) || /sfx|bgm|amb|garg|collap/i.test(name)) {
           R.aud.push(obj);
         }
-        if (/three\.(module|core)/i.test(name) || /three\.module\.r\d+/i.test(e.name)) {
+        if (/three\.(module|core|custom)/i.test(name)) {
           if (!R.threeRes) R.threeRes = obj;
           else if (!Array.isArray(R.threeRes)) R.threeRes = [R.threeRes, obj];
           else R.threeRes.push(obj);
