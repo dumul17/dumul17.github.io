@@ -7,7 +7,7 @@
    - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
      Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v372'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v373'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v3';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -33,14 +33,14 @@ const SHELL = [
   'dumul-js/obs/i18n.js?v=39',
   'dumul-js/obs/i18n-sky.js?v=2',
   'dumul-js/obs/i18n-texts.js?v=1',
-  'dumul-js/obs/js/00-rain.js?v=7',
+  'dumul-js/obs/js/00-rain.js?v=8',
   'dumul-js/obs/js/01-core.js?v=144',
   'dumul-js/obs/js/02-sky-logic.js?v=142',
   'dumul-js/obs/js/03-gargantua.js?v=112',
   'dumul-js/obs/js/04-render.js?v=144',
   'dumul-js/obs/js/05-sector-ui.js?v=183',
   'dumul-js/obs/js/06-interaction.js?v=128',
-  'dumul-js/obs/js/07-boot.js?v=164',
+  'dumul-js/obs/js/07-boot.js?v=165',
   'dumul-js/obs/js/08-tx-drone.js?v=15',
   'dumul-js/obs/js/09-wormhole.js?v=44',
   'dumul-js/obs/js/10-ui-sound.js?v=8',

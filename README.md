@@ -316,7 +316,7 @@ once its files (and, optionally, its music) have been cached.
         ├── i18n-texts.js   # ID translation of texts.js (telescope messages, terminal log)
         ├── check-sky.js    # Pre-deploy check:  node dumul-js/obs/check-sky.js
         ├── lib/
-        │   └── three.custom.r159.js   # Three.js r159, self-hosted custom bundle (ES module, tree-shaken to the classes in use)
+        │   └── three.custom.r186.js   # Three.js r186, self-hosted custom bundle (ES module, tree-shaken to the classes in use)
         └── js/             # Observatory logic (load order matters!)
             ├── 00-rain.js          # rain overlay (loaded first, before the data files)
             ├── 01-core.js          # setup, stage, Sector Scan HUD, camera, audio, spatial muffle, visualizers
@@ -413,7 +413,7 @@ Notes:
     (`{en, id}`), then use `data-i18n="key"` / `data-i18n-aria="key"` in the
     HTML or `T('key')` in JS. New telescope / terminal lines go in
     `texts.js` and get a counterpart in `i18n-texts.js`.
--   **Three.js (r159):** the library is the self-hosted custom bundle `dumul-js/obs/lib/three.custom.r159.js`, an ES module loaded lazily by `12-ast3d.js`. Its path + `?v=` must be identical in `AST3D_CFG.lib` (`12-ast3d.js`), `SHELL` in `service-worker.js`, the `modulepreload` link in `index.html` and the `import` inside the bundle itself; change one and you change all. (The header comment of `12-ast3d.js` still says r128; it is stale, the bundle is r159.)
+-   **Three.js (r186):** the library is the self-hosted custom bundle `dumul-js/obs/lib/three.custom.r186.js`, an ES module loaded lazily by `12-ast3d.js`. Its path + `?v=` must be identical in `AST3D_CFG.lib` (`12-ast3d.js`), `SHELL` in `service-worker.js`, the `modulepreload` link in `index.html` and the `import` inside the bundle itself; change one and you change all. (The header comment of `12-ast3d.js` still says r128; it is stale, the bundle is r159.)
 -   **Moving files:** CSS `url()` is relative to the CSS file, JS image paths (`NEB.src`, `MW.src`) are relative to the page, and `check-sky.js` has the CSS path (`dumul-css/index.css`) written out in full. If you move `index.css` or an image again, update all of these together with `SHELL`.
 -   **Adding, renaming or removing a track:** put the file in `audio/`
     and register it in `sky-data.js` (the service worker's `ALL_AUDIO`
