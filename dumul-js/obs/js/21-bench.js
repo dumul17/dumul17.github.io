@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.15 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.16 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
@@ -7,7 +7,8 @@
    LCP/CLS/FCP; device info (cores/mem/dpr/viewport/GL_RENDERER); visibility flag; multi-run median/min/max;
    microbench ulang di akhir (thermal/throttle delta).
    merge: v11.14 + data-v pV sampling + bm flag (?bm=0).
-   v11.15: penghitung document.fonts 'loadingdone' (jumlah + waktu) dan layout() (jumlah, total ms, max, pre-capsule, yang dipicu loadingdone) -> R.loadingdone / R.layout. */
+   v11.15: penghitung document.fonts 'loadingdone' (jumlah + waktu) dan layout() (jumlah, total ms, max, pre-capsule, yang dipicu loadingdone) -> R.loadingdone / R.layout.
+   v11.16: atribusi fromLoadingdone dibetulkan (v11.15 salah-tandai boot() yang kebetulan jalan di tick yang sama): flag dibersihkan tepat setelah listener 07-boot selesai, bukan via setTimeout(0). */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
@@ -49,12 +50,13 @@
      Semua pemanggil memakai nama global layout (boot(), loadingdone, setTimeout(layout,120) di resize) jadi ikut terbungkus. Perilaku tidak berubah (return value + this diteruskan, error dilempar ulang). */
   var LD = { n: 0, at: [] };                      /* at: waktu tiap loadingdone (maks 30 pertama) */
   var LAY = { n: 0, ms: 0, max: 0, fromLD: 0, fromLDms: 0, calls: [], wrapped: false, at: null };  /* calls: [start, ms, dariLD] maks 60 pertama */
-  var _inLD = false;
+  var _inLD = false, _clrReady = false;
   try {
     if (document.fonts && document.fonts.addEventListener) {
       document.fonts.addEventListener('loadingdone', function () {
         LD.n++; if (LD.at.length < 30) LD.at.push(Math.round(performance.now()));
-        _inLD = true; setTimeout(function () { _inLD = false; }, 0);   /* tandai layout() yang jalan di dispatch yang sama (handler 07-boot) */
+        _inLD = true;
+        if (!_clrReady) setTimeout(function () { _inLD = false; }, 0);   /* cadangan: listener pembersih belum terpasang (loadingdone datang sebelum 07-boot dieksekusi) */
       });
     }
   } catch (eLD) {}
@@ -80,6 +82,15 @@
     var _s02 = document.querySelector('script[src*="02-sky-logic"]');
     if (_s02) _s02.addEventListener('load', wrapLayout, { once: true });
     document.addEventListener('DOMContentLoaded', wrapLayout, { once: true });   /* cadangan (tag 02 tidak ketemu); dibungkus sekali saja */
+    /* Pembersih flag _inLD: dipasang lewat event 'load' tag 07-boot (jalan tepat setelah 07 dieksekusi) -> urutan listener: bench, 01-core, 07-boot, PEMBERSIH.
+       Jadi layout() yang dipanggil handler 07-boot ikut ditandai, tapi boot() yang jalan di tick yang sama sesudahnya tidak. */
+    var _armClr = function () {
+      if (_clrReady) return; _clrReady = true;
+      try { if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', function () { _inLD = false; }); } catch (eC) {}
+    };
+    var _s07 = document.querySelector('script[src*="07-boot"]');
+    if (_s07) _s07.addEventListener('load', _armClr, { once: true });
+    document.addEventListener('DOMContentLoaded', _armClr, { once: true });   /* cadangan: DCL jalan setelah semua script defer */
   } catch (eL2) {}
 
   function runMicro() {
@@ -490,7 +501,7 @@
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v11.15+ ms (sejak navigasi)');
+    x.push('BENCH v11.16+ ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
