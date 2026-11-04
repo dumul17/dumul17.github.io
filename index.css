@@ -286,6 +286,8 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 #boot-screen.off{opacity:0;visibility:hidden;pointer-events:none}
 #boot-matrix{position:absolute;inset:0;opacity:.72;overflow:hidden;pointer-events:none}
 #boot-matrix canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* vignette layar penuh di dalam #boot-matrix (panel boot tetap di atasnya); CSS statis, gratis buat Worker */
+#boot-matrix::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(2,7,11,.55) 100%)}
 #boot-core{position:relative;isolation:isolate;width:min(80vw,320px);padding:14px 14px 12px}
 /* Tanpa kotak: latar gelap lembut yang memudar ke pinggir (biar teks tetap kebaca di atas hujan matrix) + dua garis tipis atas/bawah */
 #boot-core::before{content:'';position:absolute;inset:-30px -36px;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at center,rgba(2,7,11,.86) 0,rgba(2,7,11,.66) 52%,rgba(2,7,11,0) 100%)}
@@ -434,7 +436,7 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
     transparent 0,transparent 2px,
     rgba(0,0,0,.11) 2px,rgba(0,0,0,.11) 3px
   );
-  opacity:.35;mix-blend-mode:multiply;
+  opacity:.35;
 }
 @media(prefers-reduced-motion:reduce){
   #boot-quote,#boot-choices,#boot-status{transition-duration:.01s}
