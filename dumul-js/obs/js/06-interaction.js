@@ -603,6 +603,13 @@ SKY.FX_KEYS.forEach(function(key){
    Tidak ada render loop baru: komet = entri SS (comet:true), digambar oleh drawShooting.
    Ekor + aurora di-bake sekali ke canvas kecil. Aurora digambar sebagai irisan yang bergelombang. */
 var KCOMET={on:false},COMET_SPR=null;
+/* Putar hue rgb 0..1 (matriks YIQ). SALINAN pl3dHue (17-planet3d.js) supaya komet tidak bergantung ke file planet. */
+function cometHue(c,deg){
+  var a=deg*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a),r=c[0],g=c[1],b=c[2];
+  return [r*(.299+.701*cs+.168*sn)+g*(.587-.587*cs+.330*sn)+b*(.114-.114*cs-.497*sn),
+          r*(.299-.299*cs-.328*sn)+g*(.587+.413*cs+.035*sn)+b*(.114-.114*cs+.292*sn),
+          r*(.299-.300*cs+1.250*sn)+g*(.587-.588*cs-1.050*sn)+b*(.114+.886*cs-.203*sn)];
+}
 function bakeCometSprites(){
   var Wd=512,Hd=64,AH=96;
   function wedge(layers){
@@ -619,35 +626,34 @@ function bakeCometSprites(){
     });
     return c;
   }
-  function aurora(bands,seed){
-    var c=document.createElement('canvas');c.width=Wd;c.height=AH;
+  /* Aurora ala planet3d: gradien menurut palet (tengah = warna dasar, tepi = hue -32 lebih gelap, inti = hue +38 dicampur putih 25%),
+     lalu sinar "melubangi" pita. Kanvas 2x lebar dan pola sinar TILEABLE (periode 512) -> drawAurora cukup menggeser x sumber untuk
+     menggerakkan sinar sepanjang ekor (nol biaya tambahan). Pemudaran ke ujung ekor dipindah ke alpha per irisan di drawAurora. */
+  function aurora(atm,seed){
+    var c=document.createElement('canvas');c.width=Wd*2;c.height=AH;
     var x=c.getContext('2d'),r=seed,i;
     function rnd(){r=(r*1664525+1013904223)>>>0;return r/4294967296;}
+    function q(col,m){return Math.max(0,Math.min(255,Math.round(col[0]*255*m)))+','+Math.max(0,Math.min(255,Math.round(col[1]*255*m)))+','+Math.max(0,Math.min(255,Math.round(col[2]*255*m)));}
+    var cB=cometHue(atm,38),cT=cometHue(atm,-32);
+    cB=[cB[0]*.75+.25,cB[1]*.75+.25,cB[2]*.75+.25];
+    var gr=x.createLinearGradient(0,0,0,AH),D=[[0,cT,0,.85],[.2,cT,.2,.85],[.4,atm,.5,1],[.5,cB,.9,1],[.6,atm,.5,1],[.8,cT,.2,.85],[1,cT,0,.85]];
+    D.forEach(function(st){gr.addColorStop(st[0],'rgba('+q(st[1],st[3])+','+st[2]+')');});
     x.globalCompositeOperation='lighter';
-    bands.forEach(function(B){
-      var cy=AH*B[0],hh=AH*B[1]/2,gr=x.createLinearGradient(0,cy-hh,0,cy+hh);
-      gr.addColorStop(0,'rgba('+B[2]+',0)');
-      gr.addColorStop(.5,'rgba('+B[2]+','+B[3]+')');
-      gr.addColorStop(1,'rgba('+B[2]+',0)');
-      x.fillStyle=gr;x.fillRect(0,cy-hh,Wd,hh*2);
-    });
-    /* garis-garis sinar vertikal khas aurora: "melubangi" pita */
+    x.fillStyle=gr;x.fillRect(0,0,Wd*2,AH);
+    /* garis sinar vertikal khas aurora, ditulis di x dan x+512 supaya pola menyambung saat digeser */
     x.globalCompositeOperation='destination-out';
-    for(i=0;i<70;i++){x.fillStyle='rgba(0,0,0,'+(.08+rnd()*.38).toFixed(2)+')';x.fillRect(rnd()*Wd,0,1+rnd()*3,AH);}
-    /* memudar ke ujung ekor */
-    x.globalCompositeOperation='destination-in';
-    var m=x.createLinearGradient(0,0,Wd,0);
-    m.addColorStop(0,'rgba(0,0,0,0)');m.addColorStop(.35,'rgba(0,0,0,.35)');
-    m.addColorStop(.8,'rgba(0,0,0,.85)');m.addColorStop(1,'rgba(0,0,0,1)');
-    x.fillStyle=m;x.fillRect(0,0,Wd,AH);
+    for(i=0;i<70;i++){
+      var rx=rnd()*Wd,rw=1+rnd()*3,ra=(.08+rnd()*.38).toFixed(2);
+      x.fillStyle='rgba(0,0,0,'+ra+')';x.fillRect(rx,0,rw,AH);x.fillRect(rx+Wd,0,rw,AH);
+    }
     return c;
   }
   COMET_SPR={
     cyan:wedge([[1,.20,'110,229,255'],[.6,.38,'140,238,255'],[.28,.85,'235,252,255']]),
     red:wedge([[1,.20,'255,60,70'],[.6,.36,'255,120,100'],[.28,.85,'255,228,220']]),
     pink:wedge([[1,.17,'255,64,110'],[.6,.30,'255,110,150']]),
-    aurB:aurora([[.32,.55,'80,200,255',.32],[.50,.45,'120,255,215',.28],[.68,.50,'150,130,255',.28]],11),
-    aurR:aurora([[.32,.55,'255,90,110',.32],[.50,.45,'255,160,90',.28],[.68,.50,'255,70,190',.28]],23)
+    aurB:aurora([.31,.78,1],11),
+    aurR:aurora([1,.42,.45],23)
   };
 }
 /* Komet pecah jadi DUA: induk jadi yang biru (lurus), serpihan jadi yang merah (menyimpang). */
@@ -656,6 +662,7 @@ function cometSplit(s,now,x,y){
   var base=Math.atan2(s.vy,s.vx),sp0=Math.hypot(s.vx,s.vy),rem=Math.max(900,s.life-(now-s.t)),a=base+.2,sp=sp0*.9;
   SS.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:now,life:rem*1.08,
     comet:true,frag:true,pal:'red',grow:900,hr:s.hr*.92,L:s.L*.92,bend:-.1,seed:s.seed+.37});
+  cometDebris(s,now,x,y,base,sp0);
   glitchUntil=now+520;
   haptic(16);
   try{
@@ -668,16 +675,33 @@ function cometSplit(s,now,x,y){
     }
   }catch(e){}
 }
-/* Pita aurora: 14 irisan sprite, tiap irisan bergeser naik-turun mengikuti gelombang. */
+/* Pita aurora: 14 irisan sprite, tiap irisan bergeser naik-turun mengikuti gelombang. Sinar mengalir ke arah ekor (x sumber digeser per waktu),
+   dan ujung ekor memudar lewat alpha per irisan (dulu di-bake ke sprite). */
 function drawAurora(spr,L,hr,x,y,ang,a,now,seed){
-  var NS=14,sw=512/NS,dw=L/NS,dh=hr*9,j,p;
+  var NS=14,sw=512/NS,dw=L/NS,dh=hr*9,j,p,f,sc=(now*.045+seed*211)%512;
   g.save();g.translate(x,y);g.rotate(ang);
   for(j=0;j<NS;j++){
-    p=j/NS;
-    g.globalAlpha=a*(.78+.22*Math.sin(now*.0031+j*.8+seed*7));
-    g.drawImage(spr,j*sw,0,sw+1,96,-L+j*dw,-dh/2+Math.sin(now*.0019+p*6+seed*6)*hr*1.7*(1-p*.55),dw+1,dh);
+    p=j/NS;f=Math.min(1,p/.8);f=f*f*(3-2*f);
+    g.globalAlpha=a*f*(.78+.22*Math.sin(now*.0031+j*.8+seed*7));
+    g.drawImage(spr,(j*sw+sc)%512,0,sw+1,96,-L+j*dw,-dh/2+Math.sin(now*.0019+p*6+seed*6)*hr*1.7*(1-p*.55),dw+1,dh);
   }
   g.restore();
+}
+/* Kepala komet = batu 3D berapi (ast3dHeads di 12-ast3d.js, renderer GL 'big' yang sama dengan batu asteroid). drawComet mengisi COMET_HEADS,
+   drawShooting memanggil cometHeadsFlush sekali per frame setelah semua komet. 3D tidak tersedia (potato/reduce/gagal/belum siap) -> bulatan putih seperti dulu. */
+var COMET_HEADS=[];
+function cometHeadsFlush(now){
+  var L=COMET_HEADS,i,h,ok=false;
+  if(!L.length)return;
+  try{if(typeof ast3dHeads==='function')ok=ast3dHeads(L,now);}catch(e){ok=false;}
+  if(!ok){
+    for(i=0;i<L.length;i++){
+      h=L[i];
+      g.fillStyle='rgba('+(h.red?'255,238,232':'255,255,255')+','+(.95*h.a)+')';
+      g.beginPath();g.arc(h.x,h.y,Math.max(1,h.r*.7),0,6.283);g.fill();
+    }
+  }
+  L.length=0;
 }
 function drawComet(s,now,u,x,y){
   if(!COMET_SPR)bakeCometSprites();
@@ -710,14 +734,13 @@ function drawComet(s,now,u,x,y){
     g.fillStyle='rgba('+(k&1?c2:c1)+','+(a*(1-p)*.75).toFixed(3)+')';
     g.beginPath();g.arc(x+ux*d+nx*lat,y+uy*d+ny*lat,Math.max(.5,hr*.22*(1-p*.6)),0,6.283);g.fill();
   }
-  /* kepala */
+  /* kepala: glow 2D di sini, batu 3D digambar belakangan oleh cometHeadsFlush (di atas semua ekor) */
   var pulse=.88+.12*Math.sin(now*.011+s.seed*9);
-  drawStarGlow(x,y,hr*1.9,red?'255,60,60':'255,70,120',a*.5*pulse);
-  drawStarGlow(x,y,hr*1.3,red?'255,170,150':'150,240,255',a*.95);
-  g.fillStyle='rgba('+(red?'255,238,232':'255,255,255')+','+(.95*a)+')';
-  g.beginPath();g.arc(x,y,Math.max(1,hr*.7),0,6.283);g.fill();
+  drawStarGlow(x,y,hr*1.5,red?'255,60,60':'255,70,120',a*.5*pulse);
+  drawStarGlow(x,y,hr*1.05,red?'255,170,150':'150,240,255',a*.95);
   g.strokeStyle='rgba('+(red?'255,215,205':'225,250,255')+','+(.55*a)+')';g.lineWidth=.9;
-  g.beginPath();g.moveTo(x-hr*3.6,y);g.lineTo(x+hr*3.6,y);g.moveTo(x,y-hr*3.6);g.lineTo(x,y+hr*3.6);g.stroke();
+  g.beginPath();g.moveTo(x-hr*2.8,y);g.lineTo(x+hr*2.8,y);g.moveTo(x,y-hr*2.8);g.lineTo(x,y+hr*2.8);g.stroke();
+  COMET_HEADS.push({x:x,y:y,vx:s.vx,vy:s.vy,r:hr,a:a,red:red,k:red?1:0,seed:s.seed,pulse:pulse});
   /* cincin kejut saat pecah */
   if(s.split){
     var q=(now-s.splitT)/650;
@@ -736,36 +759,55 @@ function drawComet(s,now,u,x,y){
 function konamiComet(){
   if(reduce||IS_POTATO||SW||KCOMET.on)return;
   KCOMET.on=true;
-  var DELAY=2600,DUR=5200;
+  var DELAY=2600,DUR=8800;   /* DUR: lama melintas (dtk x1000); makin besar = komet makin pelan */
   setTimeout(function(){
     if(SW||pageHidden){KCOMET.on=false;return;}
-    var hbEl=document.getElementById('header'),hb=hbEl?vrect(hbEl).bottom:0;
-    var top=Math.max(hb+14,H*.12),bot=H-Math.min(H*.2,90),avail=Math.max(120,bot-top);
-    var x0=-W*.12,y0=top+avail*.08,x1=W*1.12,y1=top+avail*.58,sec=DUR/1000;
+    /* Landscape ROT (STG.rot): kanvas/stage portrait diputar 90 derajat, planet ada di dasar layar NYATA. Jalur komet dihitung di ruang layar nyata (tegak, kiri -> kanan di atas planet)
+       lalu dikonversi ke ruang stage (c2v), bukan x 0..W di stage (itu jadi vertikal di layar dan menembus planet). Portrait/desktop: ruang stage seperti semula. */
+    var hbEl=document.getElementById('header'),rot=(typeof STG!=='undefined'&&STG.rot)?STG.rot:0,UW=rot?STG.iw:W,UH=rot?STG.ih:H,hb=0,hr0;
+    if(hbEl){
+      if(rot){hr0=hbEl.getBoundingClientRect();hb=(hr0.height<UH*.5)?hr0.bottom:0;}
+      else hb=vrect(hbEl).bottom;
+    }
+    var top=Math.max(hb+14,UH*.12),bot=UH-Math.min(UH*.2,90),avail=Math.max(120,bot-top);
+    var x0=-UW*.12,y0=top+avail*.08,x1=UW*1.12,y1=top+avail*.58,sec=DUR/1000,q0,q1;
+    if(rot){q0=c2v(x0,y0);q1=c2v(x1,y1);x0=q0[0];y0=q0[1];x1=q1[0];y1=q1[1];}
     SS.push({x:x0,y:y0,vx:(x1-x0)/sec,vy:(y1-y0)/sec,t:performance.now(),life:DUR,
       comet:true,pal:'mix',splitU:.38,hr:Math.max(3.4,Math.min(7,Math.min(W,H)*.013)),
       L:Math.max(300,Math.min(760,Math.hypot(W,H)*.5)),bend:.12,seed:Math.random()});
   },DELAY);
   setTimeout(function(){KCOMET.on=false;},DELAY+DUR+400);
 }
-/* Konami: meteor shower reusing the SS shooting-star pool (drawShooting renders it). */
-function konamiMeteors(){
+/* Puing pecahan komet: muncul SETELAH komet pecah, bertahap ~2,3 dtk. Lahir di sekitar EKOR aurora (di belakang kepala, sebar selebar pita), kecil dan pelan,
+   lalu hanyut jatuh ke arah PLANET (pusat planet di ruang stage; planet digambar di atas langit jadi puing yang sampai tertutup = masuk atmosfer).
+   Separuh biru (ekor induk), separuh merah (ekor serpihan). Tetap entri SS biasa (sprite goresan di drawShooting).
+   Planet tidak ada / gagal dihitung -> target = tengah bawah layar. */
+var DEBRIS_PAL=[['234,246,255','110,229,255'],['255,214,170','255,80,70']];
+function cometPlanetTarget(){
+  try{
+    if(typeof pl3dSync==='function'&&typeof pl3dGeom==='function'&&typeof ptUp2Stage==='function'){
+      pl3dSync();var gm=pl3dGeom();
+      if(gm&&gm.R>0)return ptUp2Stage(gm.cx,gm.cy);
+    }
+  }catch(e){}
+  return [W*.5,H*1.1];
+}
+function cometDebris(s,now,x,y,base,sp0){
   if(reduce||IS_POTATO||SW)return;
-  markActivity(); /* keyboard input doesn't count as activity; drawShooting bails out in idleMode */
-  for(var i=0;i<18;i++){
+  var N=18,i;
+  for(i=0;i<N;i++){
     (function(i){
+      var d=i*120+Math.random()*80,k=i&1,ang0=k?base+.2:base,sk=k?sp0*.9:sp0,
+          ux=Math.cos(ang0),uy=Math.sin(ang0),back=s.L*(.08+Math.random()*.7),lat=(Math.random()-.5)*s.hr*8,
+          ox=x+ux*sk*d/1000-ux*back-uy*lat,oy=y+uy*sk*d/1000-uy*back+ux*lat,   /* posisi kepala saat itu, mundur ke ekor, geser menyamping */
+          sp=95+Math.random()*95,jit=(Math.random()-.5)*.5;
       setTimeout(function(){
-        if(SW)return;
-        var now=performance.now(),
-            ang=(.16+Math.random()*.16)*Math.PI,
-            sp=700+Math.random()*500;
-        SS.push({
-          x:Math.random()*W*1.1-W*.1,y:-20+Math.random()*H*.25,
-          vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,
-          t:now,life:900+Math.random()*500,
-          tl:.12,lw:2,c0:'255,122,217',c1:'34,230,255'
-        });
-      },i*110+Math.random()*90);
+        if(SW||pageHidden)return;
+        markActivity();
+        var T=cometPlanetTarget(),ang=Math.atan2(T[1]-oy,T[0]-ox)+jit;
+        SS.push({x:ox,y:oy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,t:performance.now(),life:1500+Math.random()*1100,
+          tl:.16,lw:1.1,c0:DEBRIS_PAL[k][0],c1:DEBRIS_PAL[k][1]});
+      },d);
     })(i);
   }
 }
@@ -773,8 +815,9 @@ function triggerKonami(){
   document.body.classList.add('konami');
   haptic(18);
   showSecret(T('toast.override'),1800);
-  konamiMeteors();
+  markActivity();   /* input keyboard tidak dihitung aktivitas; drawShooting berhenti di idleMode */
   konamiComet();
+  try{if(typeof ast3dHeadsPrep==='function')ast3dHeadsPrep();}catch(eHp){}   /* compile shader kepala komet sekarang (komet baru muncul ~2,6 dtk lagi) */
   /* Cheat: selesaikan semua alignment (achievement ALIGNED). markObserved sengaja TIDAK disentuh, biar Constellation Log tetap jujur. */
   alignAll();
   showModeToast(T('toast.alignall'),null,2400);

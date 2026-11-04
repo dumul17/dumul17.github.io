@@ -924,6 +924,7 @@ function drawShooting(now){
     gr.addColorStop(0,'rgba('+(s.c0||'234,246,255')+','+(1-u)+')');gr.addColorStop(1,'rgba('+(s.c1||'110,229,255')+',0)');
     g.strokeStyle=gr;g.lineWidth=s.lw||1.4;g.beginPath();g.moveTo(x,y);g.lineTo(x-s.vx*tl,y-s.vy*tl);g.stroke();
   }
+  if(typeof cometHeadsFlush==='function')cometHeadsFlush(now);
 }
 /* Pusat orbit = anchor home BH (BH.hx/hy), diproyeksikan lewat skyXF (pan/rotate/zoom). BHK ikut seperti camBH() supaya mode kamera
    tetap sinkron; di luar mode kamera BHK=0 jadi anchor diam di tengah langit, nggak ikut BH mini yang di-drag / di-summon. */

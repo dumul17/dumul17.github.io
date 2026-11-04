@@ -538,4 +538,106 @@ function ast3dDraw(now,half){
     return false;
   }
 }
+/* ---- Kepala komet Konami (dipanggil cometHeadsFlush di 06-interaction.js) ----
+   Dua batu 3D berapi (bentuk dari ast3dRockGeo, seed lain dari batu sabuk), satu mesh per kepala (k=0 biru/induk, k=1 merah/serpihan).
+   Memakai renderer GL 'big' + kamera ortho AST3D, scene SENDIRI (AST3D.sc tidak tersentuh, cache batu sabuk aman). Bagian depan (arah gerak) + tepi menyala
+   warna kepala, sisi belakang tetap batu gelap berkawah. Dirender langsung (tanpa cache) karena cuma 2 objek + hanya ~5 dtk setelah Konami.
+   Gagal / belum siap -> return false: pemanggil menggambar bulatan putih 2D seperti dulu. Satu kali gagal = berhenti mencoba (D.bad). */
+var AST3D_HD={built:false,bad:false,sc:null,mat:null,m:[]};
+function ast3dHeadsBuild(){
+  var D=AST3D_HD,T,i,geo,ig,v;
+  if(D.built)return true;
+  if(D.bad||AST3D.state!==2||typeof THREE==='undefined')return false;
+  T=THREE;
+  D.sc=new T.Scene();
+  D.mat=new T.ShaderMaterial({
+    transparent:true,depthTest:true,depthWrite:true,
+    blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor,
+    vertexShader:[
+      'attribute vec4 iA;attribute vec4 iB;attribute vec4 iC;attribute vec2 iD;',   /* iA x,y,ukuran,alpha | iB sumbu putar xyz,sudut | iC warna panas rgb,denyut | iD arah gerak (y ke atas) */
+      'varying vec3 vN;varying vec3 vHot;varying vec2 vD;varying float vA;varying float vP;',
+      'vec3 rot(vec3 v,vec3 k,float a){float c=cos(a),s=sin(a);return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c);}',
+      'void main(){',
+      '  vec3 p=rot(position,iB.xyz,iB.w);',
+      '  vN=rot(normal,iB.xyz,iB.w);',
+      '  vHot=iC.rgb;vP=iC.w;vD=iD;vA=iA.w;',
+      '  gl_Position=projectionMatrix*vec4(vec3(iA.xy,0.)+p*iA.z,1.);',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'varying vec3 vN;varying vec3 vHot;varying vec2 vD;varying float vA;varying float vP;',
+      'void main(){',
+      '  vec3 n=normalize(vN);',
+      '  float fr=max(dot(n,normalize(vec3(vD,.45))),0.);',   /* menghadap arah gerak = paling panas (gesekan) */
+      '  float rim=pow(1.-max(n.z,0.),2.2);',
+      '  float back=max(dot(n,normalize(vec3(-vD,.7))),0.);',
+      '  vec3 col=vec3(.17,.135,.12)*(.3+.7*back);',   /* badan batu gelap, sedikit terang dari ekor */
+      '  col+=vHot*(pow(fr,1.3)*1.5+rim*.9)*vP;',
+      '  col=mix(col,vec3(1.,.95,.88),pow(fr,5.)*.55*vP);',   /* inti depan memutih */
+      '  gl_FragColor=vec4(col*vA,vA);',
+      '}'
+    ].join('\n')
+  });
+  for(i=0;i<2;i++){
+    geo=ast3dRockGeo(41+i*13,3);
+    ig=new T.InstancedBufferGeometry();
+    ig.index=geo.index;
+    ig.setAttribute('position',geo.attributes.position);
+    ig.setAttribute('normal',geo.attributes.normal);
+    v={A:new T.InstancedBufferAttribute(new Float32Array(4),4).setUsage(T.DynamicDrawUsage),
+       B:new T.InstancedBufferAttribute(new Float32Array(4),4).setUsage(T.DynamicDrawUsage),
+       C:new T.InstancedBufferAttribute(new Float32Array(4),4).setUsage(T.DynamicDrawUsage),
+       D:new T.InstancedBufferAttribute(new Float32Array(2),2).setUsage(T.DynamicDrawUsage)};
+    ig.setAttribute('iA',v.A);ig.setAttribute('iB',v.B);ig.setAttribute('iC',v.C);ig.setAttribute('iD',v.D);
+    ig.instanceCount=0;
+    v.geo=ig;v.mesh=new T.Mesh(ig,D.mat);v.mesh.frustumCulled=false;v.mesh.visible=false;
+    D.sc.add(v.mesh);D.m.push(v);
+  }
+  D.built=true;return true;
+}
+/* Dipanggil triggerKonami: bangun scene + compile shader sekarang (komet baru muncul ~2,6 dtk kemudian), supaya tidak ada hitch di frame kepala pertama. */
+function ast3dHeadsPrep(){
+  if(!AST3D_CFG.on||AST3D.state!==2||AST3D_HD.bad)return;
+  if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return;
+  setTimeout(function(){
+    try{
+      if(!ast3dHeadsBuild())return;
+      var r=AST3D.r,D=AST3D_HD;
+      if(r.compileAsync)r.compileAsync(D.sc,AST3D.cam).catch(function(){});else r.compile(D.sc,AST3D.cam);
+    }catch(e){AST3D_HD.bad=true;}
+  },250);
+}
+var AST3D_HCOL=[[.45,.9,1],[1,.42,.25]];   /* warna panas: biru-cyan (induk) / oranye-merah (serpihan) */
+function ast3dHeads(list,now){
+  var D=AST3D_HD,i,h,v,n=0,bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9,hf,sz,th,cz,sz2,sp,A,B,C,Dd,col;
+  if(D.bad||!AST3D_CFG.on||AST3D.state!==2)return false;
+  if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
+  try{
+    if(!ast3dHeadsBuild())return false;
+    ast3dResize();
+    for(i=0;i<D.m.length;i++){D.m[i].mesh.visible=false;D.m[i].geo.instanceCount=0;}
+    for(i=0;i<list.length;i++){
+      h=list[i];v=D.m[h.k];if(!v)continue;
+      sz=h.r*1.65;hf=sz*1.3;
+      if(h.x+hf<0||h.x-hf>W||h.y+hf<0||h.y-hf>H)continue;
+      th=h.seed*6.283185+h.k*2.1;cz=Math.cos(th*1.7);sz2=Math.sqrt(Math.max(0,1-cz*cz));
+      sp=Math.hypot(h.vx,h.vy)||1;col=AST3D_HCOL[h.k]||AST3D_HCOL[0];
+      A=v.A.array;B=v.B.array;C=v.C.array;Dd=v.D.array;
+      A[0]=h.x;A[1]=H-h.y;A[2]=sz;A[3]=h.a>1?1:(h.a<0?0:h.a);
+      B[0]=sz2*Math.cos(th);B[1]=sz2*Math.sin(th);B[2]=cz;B[3]=now*.0042*(h.k?-1:1)+th;
+      C[0]=col[0];C[1]=col[1];C[2]=col[2];C[3]=h.pulse;
+      Dd[0]=h.vx/sp;Dd[1]=-h.vy/sp;
+      v.A.needsUpdate=true;v.B.needsUpdate=true;v.C.needsUpdate=true;v.D.needsUpdate=true;
+      v.geo.instanceCount=1;v.mesh.visible=true;n++;
+      if(h.x-hf<bx0)bx0=h.x-hf;if(h.x+hf>bx1)bx1=h.x+hf;if(h.y-hf<by0)by0=h.y-hf;if(h.y+hf>by1)by1=h.y+hf;
+    }
+    if(!n)return true;   /* kepala di luar layar: tidak ada yang digambar, tapi 3D "siap" (bukan fallback) */
+    threeGLBegin(AST3D.gl);
+    AST3D.r.render(D.sc,AST3D.cam);
+    var cvA=AST3D.r.domElement,kx=AST3D.pw/W,ky=AST3D.ph/H,
+        rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),rx1=Math.min(W,Math.ceil(bx1)+2),ry1=Math.min(H,Math.ceil(by1)+2);
+    if(rx1>rx0&&ry1>ry0)g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama dgn blit non-cache ast3dDraw */
+    return true;
+  }catch(e){D.bad=true;try{console.warn('[ast3d] kepala komet gagal, pakai bulatan 2D:',e&&e.message||e);}catch(e2){}return false;}
+}
 try{ast3dLoad();}catch(eA3L){}   /* mulai muat + warm-up lebih awal (layar boot), bukan menunggu batu pertama digambar */
