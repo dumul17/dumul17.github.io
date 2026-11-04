@@ -1315,7 +1315,7 @@ function txLongPressDrone(){
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
    Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'dumul-js/obs/img/nebula.webp?v=1',img:null,base:null,key:'',tint:{}};
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'img/nebula.webp?v=1',img:null,base:null,key:'',tint:{}};
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
   var im=NEB.img;   /* satu gambar untuk portrait & landscape (cover-fit di bawah); yang berubah cuma staging-nya */
@@ -1348,7 +1348,7 @@ function nebBase(EW,EH,ds){
    transisi overview <-> sektor mulus (bobot disusul .06/frame, sama dengan SKYT). Gagal dimuat / IS_POTATO -> overview lama persis.
    Tuning: scale = tinggi gambar x tinggi layar tegak (>= 1 supaya tepi atas/bawah tak kelihatan; ganti gambar yang lebih lebar = otomatis lebih panjang gulungannya), vx = px/dtk (+ ke kanan di landscape / ke atas di portrait, 0 = diam), mirror = tile bergantian dicerminkan (sambungan mulus walau gambar tidak seamless),
    A = kuat gambar, zf/pf = zoom/parallax (sama dgn plateDeep: .55 / .14). Matikan: ?mw=0 atau localStorage dumul_mw=0. ?v= di src HARUS sama dengan SHELL service-worker. */
-var MW={on:!IS_POTATO,src:'dumul-js/obs/img/milky-way.webp?v=3',A:.2,scale:1,vx:2.5,mirror:false,zf:.55,pf:.15,img:null,off:0,t:0,w:-1,f:0};
+var MW={on:!IS_POTATO,src:'img/milky-way.webp?v=3',A:.2,scale:1,vx:2.5,mirror:false,zf:.55,pf:.15,img:null,off:0,t:0,w:-1,f:0};
 try{var _mq=(location.search.match(/[?&]mw=(\w+)/)||[])[1]||localStorage.getItem('dumul_mw')||'';if(_mq==='0')MW.on=false;}catch(eMW){}
 /* Tuning Milky Way overview (tab Sky di panel owl): angka di literal MW di atas = DEFAULT (MW_DEF); hasil Save masuk localStorage.dumul_mw_cfg dan dimuat di sini. */
 var MW_DEF={A:MW.A,scale:MW.scale,vx:MW.vx,zf:MW.zf,pf:MW.pf,mirror:MW.mirror?1:0};
