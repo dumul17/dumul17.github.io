@@ -46,7 +46,7 @@
   width: 100%;
   height: 282px;
   overflow: hidden;
-  background: #0a1218 url('audio/lmr-audio/og.webp') center/cover no-repeat;
+  background: #0a1218 url('../audio/lmr-audio/og.webp') center/cover no-repeat;
 }
 .tesseract-shade { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .tesseract-shade.s1 { background: rgba(10, 18, 24, 0.6); }
