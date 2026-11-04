@@ -7,7 +7,7 @@
    - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
      Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v363'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v364'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v3';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -52,9 +52,7 @@ const SHELL = [
   'dumul-js/obs/js/16-sector-menu.js?v=6',
   'dumul-js/obs/js/17-planet3d.js?v=43',
   'dumul-js/obs/js/18-tune3d.js?v=19',
-  /* Three.js r186 (ES module) dimuat lazy lewat import() oleh threeLoad() di 12-ast3d.js (AST3D_CFG.lib), dipakai juga 13/14/15/17: path + ?v= harus sama persis dgn AST3D_CFG.lib dan dgn import di dalam three.module.r186.js (ke three.core.r186.js?v=1). Ganti versi three -> ganti NAMA file (r###) lalu ?v= tetap 1. */
-  'dumul-js/obs/lib/three.module.r186.js?v=1',
-  'dumul-js/obs/lib/three.core.r186.js?v=1',
+  'dumul-js/obs/lib/three.custom.r159.js?v=1',
   'dumul-js/obs/img/nebula.webp?v=1',
   'dumul-js/obs/img/milky-way.webp?v=3',
   'dumul.css?v=9',
