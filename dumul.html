@@ -26,7 +26,7 @@
 <meta name="twitter:title" content="DUMUL — Indonesian Alternative Rock">
 <meta name="twitter:description" content="DUMUL is a three-person Indonesian alternative rock project recorded in Central Borneo bedrooms. Listen to Limerence, Glitch, Nastenka, and Larung.">
 <meta name="twitter:image" content="https://dumul17.github.io/og.jpg">
-<link rel="stylesheet" href="dumul.css?v=8">
+<link rel="stylesheet" href="dumul.css?v=9">
 
 <script>
   /* Sedini mungkin (sebelum paint pertama): tandai kalau ini kedatangan dari swallow. Nilainya dibaca (tidak dihapus) di sini. */
@@ -41,6 +41,13 @@
     var from=false;
     try{from=sessionStorage.getItem('dm_collapsars_from')==='swallow'||document.documentElement.classList.contains('dm-from-swallow');}catch(e){}
     var root=document.documentElement;
+    /* Reload / Back-Forward: browser (Brave/Chromium mobile) restore posisi scroll lama setelah layout cukup tinggi,
+       sering SETELAH pin 500ms habis -> keliatan di tengah dulu. Perlakukan sama seperti handoff: lock + pin lebih lama. */
+    var restored=false;
+    try{var nv=performance.getEntriesByType('navigation')[0];restored=!!nv&&(nv.type==='reload'||nv.type==='back_forward');}catch(e){}
+    if(restored&&!from){try{root.classList.add('dm-pin-lock');}catch(e){}}
+    from=from||restored;
+    try{root.style.overflowAnchor='none';}catch(e){}
     var unlocked=false;
     /* Pin window: longer on handoff so React root + player bar + lyrics can settle. */
     var until=performance.now()+(from?2800:500);
@@ -68,6 +75,7 @@
       });
       try{window.removeEventListener('scroll',pin);}catch(e){}
     }
+    window.addEventListener('pageshow',function(ev){if(ev.persisted){forceTop();setTimeout(forceTop,60);setTimeout(forceTop,200);}});
     window.addEventListener('scroll',pin,{passive:true});
     /* Always pin on load path; unlock after window settles. */
     window.addEventListener('load',function(){

@@ -13,7 +13,9 @@
   /* Prevent mid-page flash on handoff: hard-lock scroll until layout settles at top.
      Unlocked by JS adding .dm-scroll-ready (does not touch audio/mesh continuity). */
   html.dm-from-swallow:not(.dm-scroll-ready),
-  html.dm-from-swallow:not(.dm-scroll-ready) body {
+  html.dm-from-swallow:not(.dm-scroll-ready) body,
+  html.dm-pin-lock:not(.dm-scroll-ready),
+  html.dm-pin-lock:not(.dm-scroll-ready) body {
     overflow: hidden !important;
     overscroll-behavior: none !important;
     height: 100% !important;
@@ -303,7 +305,7 @@ h1.display{
   box-sizing:border-box;
 }
 html{scroll-behavior:smooth}
-html.dm-from-swallow{scroll-behavior:auto!important}
+html.dm-from-swallow,html.dm-pin-lock{scroll-behavior:auto!important}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
 }
