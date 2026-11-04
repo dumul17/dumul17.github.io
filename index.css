@@ -4,7 +4,7 @@ html,body{height:100%;margin:0}
 body{background:radial-gradient(120% 80% at 50% 28%,#10222f 0%,#08121b 55%,#04080d 100%);color:#dbe7f3;font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 #sky{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .scan{position:fixed;inset:0;pointer-events:none;z-index:2;background:none}
-/* scanline default dimatikan (bikin langit kusam). Mau balik: background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px). Versi pink body.konami .scan di bawah tetap jalan. */
+/* scanline default dimatikan (bikin langit kusam). Mau balik: background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px). */
 header{position:fixed;top:0;left:0;right:0;z-index:3;text-align:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px 0;pointer-events:none}
 h1{position:relative;margin:0;display:inline-block;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 h1::before{content:'';position:absolute;top:50%;left:50%;width:140%;height:2px;transform:translate(-50%,-50%) scaleX(0);background:linear-gradient(90deg,transparent,#6ee5ff,#ffffff,#6ee5ff,transparent);box-shadow:0 0 12px #6ee5ff,0 0 24px rgba(110,229,255,.8);opacity:0;pointer-events:none;transition:transform .3s ease,opacity .3s ease;z-index:-1}
@@ -242,7 +242,6 @@ body.owl-open #owl-panel,body.owl-open #owl-backdrop,body.owl-open #owl-source{p
 .supernova-flash.on{animation:snflash .85s ease-out forwards}
 @keyframes snflash{0%{opacity:0}12%{opacity:1}30%{opacity:.78}100%{opacity:0}}
 body.konami #sky{filter:none}
-body.konami .scan{background:repeating-linear-gradient(0deg,rgba(255,43,214,.08) 0 1px,transparent 1px 3px)}
 body.konami #title .big,body.konami #title .kicker{color:#ff7ad9;text-shadow:0 0 18px rgba(255,43,214,.7),0 0 10px rgba(34,230,255,.45)}
 body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
 @keyframes cyberGlitch{0%,100%{transform:none;filter:none}20%{transform:translateX(-3px);filter:hue-rotate(-40deg) saturate(1.8)}45%{transform:translateX(4px);filter:hue-rotate(160deg) saturate(2.2)}70%{transform:translateX(-1px);filter:hue-rotate(-20deg) saturate(1.6)}}
