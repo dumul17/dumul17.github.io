@@ -11,6 +11,10 @@ _NOISE=(function(){var a=new Float32Array(256),i;for(i=0;i<256;i++)a[i]=Math.ran
 _nIdx=0,nR=function(){return _NOISE[_nIdx++&255]},
 /* Adaptive density from frame time (not quality cliff) */
 _perf=3,_fps=60,_stab=false,_ftEMA=16.6,_frameN=0,_slowN=0,_clean=0,_need=3,
+/* DNA helix: posisi sampel frame sebelumnya (buat titik lahir spark) + pool spark ikut beat */
+_dB=0,_dnaPh=0,_dnaN=0,_dnaC=0,_dnaX=new Float32Array(512),_dnaY1=new Float32Array(512),_dnaY2=new Float32Array(512),_dnaZ=new Float32Array(512),_dnaG=new Uint8Array(512),
+_spkN=96,_spk=new Float32Array(96*7),_spkI=0,
+_spkEmit=function(cnt,pw){for(var q=0;q<cnt;q++){var ix=_dnaN>1?(nR()*_dnaN)|0:0,sI=nR()>.5?1:0,x=_dnaN>1?_dnaX[ix]:nR()*i,y=_dnaN>1?(sI?_dnaY2[ix]:_dnaY1[ix]):u*.5,b=_spkI*7;_spkI=(_spkI+1)%_spkN;var ang=(nR()-.5)*2.4+(y>_dnaC?1.5708:-1.5708),v2=(.9+nR()*2.2)*pw;_spk[b]=x;_spk[b+1]=y;_spk[b+2]=Math.cos(ang)*v2;_spk[b+3]=Math.sin(ang)*v2;_spk[b+4]=1;_spk[b+5]=1.4+nR()*1.8;_spk[b+6]=nR()<.25?2:sI}},
 /* glow node = sprite radial (di-cache per warna), bukan shadowBlur: tanpa blur pass per node per frame */
 _gl={},_glow=function(c){var s=_gl[c];if(s)return s;s=document.createElement("canvas");s.width=s.height=64;var x=s.getContext("2d"),r=parseInt(c.slice(1,3),16),g2=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16),gd=x.createRadialGradient(32,32,0,32,32,32);gd.addColorStop(0,"rgba("+r+","+g2+","+b+",.95)");gd.addColorStop(.22,"rgba("+r+","+g2+","+b+",.6)");gd.addColorStop(.5,"rgba("+r+","+g2+","+b+",.2)");gd.addColorStop(1,"rgba("+r+","+g2+","+b+",0)");x.fillStyle=gd;x.fillRect(0,0,64,64);return _gl[c]=s},
 k=(Q)=>{
@@ -41,7 +45,7 @@ let bass=__A.bass||0,mid=__A.mid||0,treble=__A.treble||0,frac=__A.fracture||0,fx
 let breath=0.7+0.3*Math.sin(s*(1.1/sig.breath))+0.15*Math.sin(s*(3.2/sig.breath)+1.2);
 /* cheap pseudo-noise for alpha jitter instead of Math.random */
 let g=Math.max(0.35,Math.min(1.15,(breath+(nR()-0.5)*0.14)*(0.55+0.45*Math.max(__L,0.2))*(1+listen*0.35)));
-if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=1.15+__L*2.8*sig.frac*(__A.beatKind==='snare'?0.75:1);S=4}
+if(__A.beatAt&&__A.beatAt!==window.__dmSeen){window.__dmSeen=__A.beatAt;v=1.15+__L*2.8*sig.frac*(__A.beatKind==='snare'?0.75:1);S=4;if(_dB>0.3)_spkEmit(Math.round((_pq>=3?10:6)+(__A.beatStr||0.4)*(_pq>=3?22:10)*(__A.beatKind==='snare'?0.7:1)),1+(__A.beatStr||0)*1.2)}
 l.clearRect(0,0,i,u);
 if(S-=c,S<=0){if(nR()>0.72)v=1.2+nR()*3.5;S=28+nR()*120}
 let K=v>0?(nR()-0.5)*9*(0.28+mid*0.55):0;
@@ -86,6 +90,10 @@ let meshLinkMul=_pq>=2?1:0.72;
 let doGlitchBars=_pq>=2;
 let doSparks=_pq>=2&&treble>0.12;
 l.save();l.globalAlpha=g;
+/* Idle (belum ada musik) = 3 garis gelombang lama; pas ada musik = DNA double helix. Crossfade lewat _dB (±0,5 dtk), histeresis biar tidak bolak-balik. */
+_dB+=(((_dB>0.5?(__L>0.015):(__L>0.04))?1:0)-_dB)*0.05*c;if(_dB<0.004)_dB=0;else if(_dB>0.996)_dB=1;
+const gOrig=g;
+if(_dB<1){g=gOrig*(1-_dB);
 /* ── wave layers (always full visual presence; step only thins sampling) ── */
 for(let y=0;y<waveLayers.length;y++){
   let h=waveLayers[y];
@@ -155,6 +163,87 @@ if(doSparks){
     l.stroke();l.shadowBlur=0;
   }
 }
+}
+if(_dB>0){g=gOrig*_dB;
+/* ── DNA helix: 2 untai (cyan + pink) + anak tangga (cyan) + titik inti putih.
+   Bentuk (radius helix) dari spektrum cermin kiri-kanan; spark lahir dari untai tiap beat ── */
+{
+  const hs=_pq>=3?6:(_pq===2?8:11);
+  const nS=Math.min(511,Math.ceil(i/hs)+1);
+  const tw=6.2832/Math.max(170,Math.min(380,u*1.6));
+  _dnaPh+=c*(0.016+mid*0.035+__L*0.02+kk*0.2);
+  const cyA=sinkY,R0=u*0.05,RM=u*0.17,RC=u*0.24;
+  const gapHalf=frac*10*(1+sig.frac*0.15),gapC=fx*i;
+  const yMin=u*0.22,yMax=u*0.78;
+  const colA=waveLayers[0].color,colB=sig.cyanPink<0.5?"#8eeeff":"#ff7ad9",colC=waveLayers[2].color;
+  _dnaN=nS;_dnaC=cyA;
+  /* pass 1: posisi untai tiap sampel (spektrum dibaca sekali per sampel) */
+  for(let n=0;n<nS;n++){
+    const fe=n*hs;
+    const sp=window.__dmSp?window.__dmSp(fe/i):0;
+    const env=Math.min(1,sp*1.15+bass*0.3+__L*0.18);
+    let R=(R0+RM*env)*sig.amp*(1+kk*0.45);if(R>RC)R=RC;
+    const ph=fe*tw+_dnaPh,sn=Math.sin(ph);
+    const base=cyA-(fe/i-0.5)*u*0.05+Math.sin(fe*0.004+s*0.6)*u*0.012*sig.breath+sp*Math.sin(fe*0.13+s*35)*3*vAmp;
+    let y1=base+R*sn,y2=base-R*sn,ox=0,gp=0;
+    const dx=fe-gapC;
+    if(frac>0.02&&Math.abs(dx)<gapHalf){
+      const uG=1-Math.abs(dx)/gapHalf,sg=dx<0?-1:1;
+      y1+=sg*frac*4*uG;y2+=sg*frac*4*uG;ox=sg*frac*3*uG;
+      if(Math.abs(dx)<gapHalf*0.35)gp=1;
+    }
+    if(y1<yMin)y1=yMin;else if(y1>yMax)y1=yMax;
+    if(y2<yMin)y2=yMin;else if(y2>yMax)y2=yMax;
+    _dnaX[n]=fe+ox+K*0.3;_dnaY1[n]=y1;_dnaY2[n]=y2;_dnaZ[n]=Math.cos(ph)*0.5+0.5;_dnaG[n]=gp;
+  }
+  /* untai: garis tipis (+ glow kalau hot, cuma untai utama) */
+  l.lineJoin="round";l.lineCap="round";
+  for(let sI=0;sI<2;sI++){
+    const Y=sI?_dnaY2:_dnaY1;
+    l.beginPath();let mv=false;
+    for(let n=0;n<nS;n++){if(_dnaG[n])continue;if(!mv){l.moveTo(_dnaX[n],Y[n]);mv=true}else l.lineTo(_dnaX[n],Y[n])}
+    l.strokeStyle=sI?colB:colA;
+    const lw0=(sI?0.55:1.05)*thin,ga0=g*waveLayers[sI].alpha*(0.8+nR()*0.4)*(1+listen*0.2);
+    if(!sI&&hot){const gk=1+listen*0.25+__L*0.15;l.lineWidth=lw0*7*gk;l.globalAlpha=ga0*0.09;l.stroke();l.lineWidth=lw0*3.2*gk;l.globalAlpha=ga0*0.18;l.stroke();}
+    l.lineWidth=lw0;l.globalAlpha=Math.min(1,ga0);l.stroke();
+  }
+  l.lineJoin="miter";l.lineCap="butt";
+  /* anak tangga */
+  const rs=_pq>=2?2:4;
+  l.beginPath();
+  for(let n=1;n<nS;n+=rs){if(_dnaG[n])continue;if(Math.abs(_dnaY1[n]-_dnaY2[n])<5)continue;l.moveTo(_dnaX[n],_dnaY1[n]);l.lineTo(_dnaX[n],_dnaY2[n])}
+  l.strokeStyle=colC;l.lineWidth=0.6*thin;l.globalAlpha=Math.min(1,g*(0.28+kk*0.35+__L*0.15)*(1+listen*0.2));l.stroke();
+  /* partikel debu di untai + anak tangga; depan lebih besar/terang, belakang lebih kecil/redup */
+  const sA=_glow(colA),sB=_glow(colB),sC=_glow(colC),sW=_glow("#e6f9ff"),dust=_pq>=2,kb=1+kk*0.35;
+  for(let n=0;n<nS;n++){
+    if(_dnaG[n])continue;
+    const x=_dnaX[n],zf=_dnaZ[n];
+    for(let sI=0;sI<2;sI++){
+      if(!stab&&nR()<0.08)continue;
+      const f=sI?1-zf:zf,Y=sI?_dnaY2[n]:_dnaY1[n],rr=(1.1+1.9*f)*kb,gr=rr*4,spr=sI?sB:sA;
+      l.globalAlpha=Math.min(1,g*(0.3+0.7*f)*(1+listen*0.15));
+      l.drawImage(spr,x-gr,Y-gr,gr*2,gr*2);
+      if(f>0.8){const wr=rr*1.1;l.globalAlpha=Math.min(1,g*(f-0.8)*3.5);l.drawImage(sW,x-wr,Y-wr,wr*2,wr*2)}
+      for(let dq=0;dust&&dq<2;dq++){if(nR()<0.3)continue;const dr=(0.6+nR()*1.1)*3,jx=(nR()-0.5)*14,jy=(nR()-0.5)*(8+14*(1-f));l.globalAlpha=Math.min(1,g*0.55*(0.35+f));l.drawImage(spr,x+jx-dr,Y+jy-dr,dr*2,dr*2)}
+    }
+    if(dust&&n%rs===1&&Math.abs(_dnaY1[n]-_dnaY2[n])>5){
+      for(let q=0;q<3;q++){const tt=0.15+nR()*0.7,yy=_dnaY1[n]+(_dnaY2[n]-_dnaY1[n])*tt,dr=(0.7+nR()*0.9)*3;l.globalAlpha=Math.min(1,g*0.5);l.drawImage(sC,x-dr,yy-dr,dr*2,dr*2)}
+    }
+  }
+  /* spark ikut beat (lahir dari untai di _spkEmit) + rintik tipis dari treble */
+  if(doSparks&&nR()<treble*0.6)_spkEmit(1,0.6);
+  const spS=[sA,sB,sW];
+  for(let q=0;q<_spkN;q++){
+    const b=q*7,lf=_spk[b+4];if(lf<=0)continue;
+    _spk[b]+=_spk[b+2]*c;_spk[b+1]+=_spk[b+3]*c;_spk[b+2]*=0.97;_spk[b+3]*=0.97;_spk[b+4]=lf-0.035*c;
+    const sz=_spk[b+5]*(0.5+lf*0.8),gr=sz*3.6;
+    l.globalAlpha=Math.min(1,lf*lf*1.1*g);
+    l.drawImage(spS[_spk[b+6]|0],_spk[b]-gr,_spk[b+1]-gr,gr*2,gr*2);
+    if(lf>0.5){const wr=sz*1.2;l.globalAlpha=Math.min(1,(lf-0.5)*2*g);l.drawImage(sW,_spk[b]-wr,_spk[b+1]-wr,wr*2,wr*2)}
+  }
+}
+}else _spk.fill(0);
+g=gOrig;
 /* Horizontal glitch bars — secondary detail; thinner on low perf */
 if(doGlitchBars){
   l.globalAlpha=g*0.18;
