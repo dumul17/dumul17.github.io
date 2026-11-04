@@ -677,7 +677,12 @@ var DUMUL_CHARS=(function(){
      jadi tidak mungkin mengklaim unit selesai; begitu selesai, sumbangannya diganti bobot penuh (selalu lebih besar -> total tak pernah turun). Gate capsule / status / 100%
      tetap dari keadaan nyata saja (wDone), rayapan cuma menambah angka bar. Waktu mulai tiap unit dikunci SEKALI saat pertama terlihat jalan (monoton). EST = WT_* (bench itel):
      di HP kencang rayapan pelan lalu menyusul; di HP lemot rayapan mentok ±90% bobot unit. Biaya: beberapa exp() per frame, tanpa timer/rAF baru. */
-  var CREEP_CAP=.9,crpAt={};
+  var CREEP_CAP=.9,crpAt={},uLast=0,flB=0;
+  /* v158: kilat singkat tiap UNIT nyata selesai (halaman, tiap modul 3D, warm, BGM, SFX) — bukan tiap langkah kecil; ±9 kali per boot. */
+  function barFlash(){
+    if(!bar||bs.classList.contains('off'))return;
+    flB^=1;bar.classList.remove(flB?'fb':'fa');bar.classList.add(flB?'fa':'fb');
+  }
   function crp(key,running,w,est,elapsed){
     if(!running||!(w>0)||!(est>0))return 0;
     if(crpAt[key]===undefined)crpAt[key]=elapsed;
@@ -697,6 +702,9 @@ var DUMUL_CHARS=(function(){
     var complete=vis&&bgmOk&&sfxOk;
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
+    var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
+    for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])uD++;
+    if(uD>uLast){uLast=uD;barFlash();}
     var wc=0;
     wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);
