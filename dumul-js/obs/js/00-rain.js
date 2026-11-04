@@ -24,7 +24,7 @@
     var pts=[],RAD=90,RADK=130;
     /* Kolom yang kebaca: sesekali SATU kolom near berhenti, glyph-nya "mengkristal" jadi kata (vertikal, atas→bawah), tahan sebentar, lalu larut & lanjut jatuh.
        Huruf kata di luar set glyph hujan ditaruh di sel ekstra atlas (indeks >= NG) → rg() tetap hanya memilih glyph hujan biasa. Mode low: mati (WORDS kosong). */
-    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=2200+Math.random()*2000;
+    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=1000+Math.random()*1000,AV=null;   /* AV = [l,t,r,b] area panel boot (CSS px) yang harus dihindari; null = belum diterima → belum mulai baca */
     (function(){
       for(var wi=0;wi<WORDS.length;wi++){
         var ws=String(WORDS[wi]).toUpperCase(),arr=[];
@@ -111,19 +111,21 @@
     }
     /* Pilih satu kolom near yang seluruh katanya muat di layar, lalu mulai "baca". Belum ada kandidat → coba lagi 0,4 dtk kemudian. */
     function rdTry(){
+      if(!AV){rdNext=300;return;}
       var wd=WD[(Math.random()*WD.length)|0],n=wd.length,best=null,i,c;
       for(i=0;i<cols.length;i++){
         c=cols[i];
         if(c.li!==2||c.rd||c.fl>0||c.kick>0||c.x!==c.hx)continue;
-        if(c.y>vh*0.88||c.y-(n-1)*c.fs<vh*0.12)continue;
-        if(c.x<vw*0.06||c.x>vw*0.94)continue;
+        var yT=c.y-(n-1)*c.fs-c.fs*0.5,yB=c.y+c.fs*0.5;
+        if(yT<vh*0.04||yB>vh*0.97||c.x<vw*0.03||c.x>vw*0.97)continue;
+        if(AV[2]>AV[0]&&c.x>AV[0]&&c.x<AV[2]&&yB>AV[1]&&yT<AV[3])continue;   /* jangan berhenti di belakang panel boot */
         if(!best||Math.random()<0.3)best=c;
       }
       if(!best){rdNext=400;return;}
       var len=best.len<n+5?n+5:best.len,ch=new Uint8Array(len);
       for(i=0;i<len;i++)ch[i]=rg();
       best.len=len;best.chars=ch;best.head=0;
-      best.rd={wd:wd,n:n,t:0,hold:1700+Math.random()*700,dc:0};
+      best.rd={wd:wd,n:n,t:0,hold:2200+Math.random()*800,dc:0};
       rdCol=best;
     }
     /* jarak titik (x,y) ke segmen vertikal kolom c (kepala di c.y, ekor ke atas sepanjang len*fs) */
@@ -190,7 +192,7 @@
           rd.t+=dt;
           if(c.kick>0.3&&rd.t<rd.hold)rd.t=rd.hold;
           var rT=rd.t,rH=rd.hold;
-          if(rT>=rH+450){c.rd=rd=null;rdCol=null;rdNext=5000+Math.random()*4000;}
+          if(rT>=rH+450){c.rd=rd=null;rdCol=null;rdNext=2200+Math.random()*2400;}
           else{
             sf=rT<250?1-rT/250:(rT<rH?0:(rT-rH)/450);
             rdA=rT<rH?1:1-(rT-rH)/450;
@@ -247,6 +249,7 @@
       resize:function(w,h,dpr){if(cv)resize(w,h,dpr);},
       prog:function(v){pT=v<0?0:(v>1?1:v);},
       pt:ptSet,
+      avoid:function(r){AV=r;},
       stop:function(){alive=false;try{caf(rafId);}catch(e){}}
     };
   }
@@ -264,6 +267,7 @@
         self.postMessage({t:'ok'});
       }else if(m.t==='size'&&eng){eng.resize(m.w,m.h,m.dpr);}
       else if(m.t==='prog'&&eng){eng.prog(m.v);}
+      else if(m.t==='avoid'&&eng){eng.avoid(m.r);}
       else if(m.t==='pt'&&eng){eng.pt(m.id,m.x,m.y,m.a);}
       else if(m.t==='stop'&&eng){eng.stop();}
     };
@@ -332,8 +336,20 @@
     return true;
   }
   if(!startWorker())startMain();
+  /* Rect panel boot (#boot-core + bayangan gelapnya) dikirim ke engine supaya kata "kolom yang kebaca" tidak berhenti di belakang panel. #boot-core baru ada setelah HTML diparse → kirim saat DOM siap, saat resize, dan berkala (tinggi panel berubah saat kapsul tampil). */
+  var avT=0;
+  function avSend(){
+    if(!alive||IS_POTATO)return;
+    var e=document.getElementById('boot-core'),r=[0,0,0,0];
+    if(e){var b=e.getBoundingClientRect();if(b.width>0)r=[b.left-40,b.top-34,b.right+40,b.bottom+34];}
+    if(wk)wk.postMessage({t:'avoid',r:r});else if(mainEng)mainEng.avoid(r);
+  }
+  if(!IS_POTATO){
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',avSend);else avSend();
+    avT=setInterval(avSend,1500);
+  }
   var rtM;window.addEventListener('resize',function(){clearTimeout(rtM);rtM=setTimeout(function(){
-    if(!alive)return;
+    if(!alive)return;avSend();
     var w=innerWidth,h=innerHeight,d=window.devicePixelRatio||1;
     if(wk)wk.postMessage({t:'size',w:w,h:h,dpr:d});else if(mainEng)mainEng.resize(w,h,d);
   },150);});
@@ -350,7 +366,7 @@
     ptOn('pointerup',ptUp);ptOn('pointercancel',ptUp);
     ptOn('pointerleave',ptUp,document.documentElement);
   }
-  window.__rain={kill:function(){alive=false;killWorker();if(mainEng){mainEng.stop();mainEng=null;}for(var i=0;i<ptOff.length;i++)ptOff[i]();ptOff=[];},
+  window.__rain={kill:function(){alive=false;clearInterval(avT);killWorker();if(mainEng){mainEng.stop();mainEng=null;}for(var i=0;i<ptOff.length;i++)ptOff[i]();ptOff=[];},
     /* prog: hujan ikut progres boot (v 0..1). Aman dipanggil kapan saja (no-op kalau sudah di-kill). */
     prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);}};
 })();
