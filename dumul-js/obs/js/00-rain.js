@@ -27,7 +27,7 @@
     var pts=[],RAD=90,RADK=130;
     /* Kolom yang kebaca: sesekali SATU kolom near berhenti, glyph-nya "mengkristal" jadi kata (vertikal, atas→bawah), tahan sebentar, lalu larut & lanjut jatuh.
        Huruf kata di luar set glyph hujan ditaruh di sel ekstra atlas (indeks >= NG) → rg() tetap hanya memilih glyph hujan biasa. Mode low: mati (WORDS kosong). */
-    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=1000+Math.random()*1000,AV=null;   /* AV = [l,t,r,b] area panel boot (CSS px) yang harus dihindari; null = belum diterima → belum mulai baca */
+    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=K.wordFirst[0]+Math.random()*(K.wordFirst[1]-K.wordFirst[0]),AV=null;   /* AV = [l,t,r,b] area panel boot (CSS px) yang harus dihindari; null = belum diterima → belum mulai baca */
     (function(){
       for(var wi=0;wi<WORDS.length;wi++){
         var ws=String(WORDS[wi]).toUpperCase(),arr=[];
@@ -114,7 +114,7 @@
     }
     /* Pilih satu kolom near yang seluruh katanya muat di layar, lalu mulai "baca". Belum ada kandidat → coba lagi 0,4 dtk kemudian. */
     function rdTry(){
-      if(!AV){rdNext=300;return;}
+      if(!AV){rdNext=K.wordRetry;return;}
       var wd=WD[(Math.random()*WD.length)|0],n=wd.length,best=null,i,c;
       for(i=0;i<cols.length;i++){
         c=cols[i];
@@ -124,13 +124,14 @@
         if(AV[2]>AV[0]&&c.x>AV[0]&&c.x<AV[2]&&yB>AV[1]&&yT<AV[3])continue;   /* jangan berhenti di belakang panel boot */
         if(!best||Math.random()<0.3)best=c;
       }
-      if(!best){rdNext=400;return;}
+      if(!best){rdNext=K.wordRetry;return;}
       var len=best.len<n+5?n+5:best.len,ch=new Uint8Array(len);
       for(i=0;i<len;i++)ch[i]=rg();
       best.len=len;best.chars=ch;best.head=0;
       best.rd={wd:wd,n:n,t:0,hold:2200+Math.random()*800,dc:0};
       rdCol=best;
     }
+    function gapNext(){return K.wordGap[0]+Math.random()*(K.wordGap[1]-K.wordGap[0]);}
     /* jarak titik (x,y) ke segmen vertikal kolom c (kepala di c.y, ekor ke atas sepanjang len*fs) */
     function colDist(c,x,y){
       var yT=c.y-c.len*c.fs,dx=c.hx-x,dy=y<yT?yT-y:(y>c.y?y-c.y:0);
@@ -196,7 +197,8 @@
           rd.t+=dt;
           if(c.kick>0.3&&rd.t<rd.hold)rd.t=rd.hold;
           var rT=rd.t,rH=rd.hold;
-          if(rT>=rH+450){c.rd=rd=null;rdCol=null;rdNext=2200+Math.random()*2400;}
+          if(rT>=rH&&!rd.nx){rd.nx=1;if(rdCol===c){rdCol=null;rdNext=gapNext();}}   /* kata berikut boleh mulai begitu kata ini mulai larut → tanpa jeda */
+          if(rT>=rH+450){c.rd=rd=null;if(rdCol===c){rdCol=null;rdNext=gapNext();}}
           else{
             sf=rT<250?1-rT/250:(rT<rH?0:(rT-rH)/450);
             rdA=rT<rH?1:1-(rT-rH)/450;
@@ -219,7 +221,7 @@
         }
         if(c.y-len*fs>h){
           /* Recycle from above the top (normal continuous rain). */
-          if(c.rd){c.rd=null;rdCol=null;rdNext=4000;}
+          if(c.rd){if(rdCol===c){rdCol=null;rdNext=gapNext();}c.rd=null;}
           c.y=Math.random()*-h*0.4;
           c.x=c.hx=Math.random()*w;c.fl=0;c.kick=0;
           c.speed=pickSpeed(L);
@@ -289,7 +291,10 @@
     fpsCap:60,    /* batas fps; 0 = ikut refresh layar */
     shiftMs:0,    /* >0 = isi glyph kolom bergeser tiap N ms (look lama ≈33, tapi bikin kedip); 0 = glyph diam, kolom meluncur mulus */
     mutMs:50,     /* ganti 1 glyph acak per kolom tiap N ms */
-    trail:0.16    /* kekuatan jejak per 1/60 dtk (makin kecil = jejak makin panjang) */
+    trail:0.16,   /* kekuatan jejak per 1/60 dtk (makin kecil = jejak makin panjang) */
+    wordFirst:[250,600],  /* [min,max] ms sebelum kata pertama mulai dibaca */
+    wordGap:[0,250],      /* [min,max] ms jeda antar kata, dihitung sejak kata sebelumnya MULAI larut (0 = langsung nyambung) */
+    wordRetry:120         /* ms coba lagi kalau belum ada kolom yang cocok */
   };
   /* Kata untuk "kolom yang kebaca" (nama situs + judul lagu album). Mode low: kosong. */
   var WORDS=IS_POTATO?[]:['DUMUL','OBSERVATORY','LIMERENCE','GLITCH','NASTENKA','LARUNG'];
