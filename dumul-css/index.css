@@ -322,6 +322,18 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 @keyframes bootEdge{to{opacity:1}}
 #boot-screen.off #boot-fill::after,#boot-screen.off #boot-fill::before{animation:none}
 @media (prefers-reduced-motion:reduce){#boot-fill::after,#boot-fill::before{animation:none}#boot-fill::before{opacity:.6}}
+
+/* v158 bar: (1) tick instrumen statis tiap 10% (tanpa animasi), (2) segmen ghost = TARGET jujur di depan fill yang mengejar halus (transform saja), (3) napas pelan saat macet (.stall dipasang JS, opacity saja), (4) persen tabular-nums. Semua compositor-only; ?bm=0 mematikan ghost. */
+#boot-bar::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),rgba(2,7,11,.62) calc(10% - 1px),rgba(2,7,11,.62) 10%)}
+#boot-ghost{position:absolute;top:0;bottom:0;left:0;width:100%;transform:translateX(-100%);background:linear-gradient(90deg,rgba(110,229,255,.05),rgba(110,229,255,.20));border-right:1px solid rgba(110,229,255,.30);transition:transform .35s cubic-bezier(.2,.7,.3,1);will-change:transform;pointer-events:none}
+#boot-bar:not(.bm) #boot-ghost{display:none}
+#boot-screen.off #boot-ghost{will-change:auto}
+@keyframes bootBreath{0%,100%{opacity:1}50%{opacity:.62}}
+#boot-bar.stall #boot-fill{animation:bootBreath 1.7s ease-in-out infinite}
+#boot-bar.stall #boot-fill::after{animation-duration:.85s}
+#boot-screen.off #boot-bar.stall #boot-fill{animation:none}
+@media (prefers-reduced-motion:reduce){#boot-bar.stall #boot-fill{animation:none}}
+#boot-pct{font-variant-numeric:tabular-nums}
 #boot-pct{margin-top:5px;text-align:right;font-size:9px;letter-spacing:.16em;color:rgba(184,224,238,.75);text-shadow:0 0 4px #02070b}
 /* Log boot SATU baris: sebaris dengan persen (kiri = log, kanan = persen). Baris ini memang sudah ada (cuma berisi "0%" di kanan), jadi tinggi panel sama persis dengan sebelum ada log.
    Font log = font persen (9px / 8px landscape) dan line-height:1 (glif \u2713 dari font cadangan tidak menaikkan tinggi baris). */
