@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.18 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.19 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
@@ -10,7 +10,8 @@
    v11.15: penghitung document.fonts 'loadingdone' (jumlah + waktu) dan layout() (jumlah, total ms, max, pre-capsule, yang dipicu loadingdone) -> R.loadingdone / R.layout.
    v11.16: atribusi fromLoadingdone dibetulkan (v11.15 salah-tandai boot() yang kebetulan jalan di tick yang sama): flag dibersihkan tepat setelah listener 07-boot selesai, bukan via setTimeout(0).
    v11.17: resource audio/three + proto (nextHopProtocol), q (antre+connect sebelum request terkirim), w (tunggu server murni), conn (ms connect, 0 = koneksi dipakai ulang), sw (lewat service worker); R.protoAll (hitung per protokol, semua resource) dan R.audPeak (puncak request audio yang tumpang tindih di network). Untuk membedakan batas 6 koneksi HTTP/1.1 vs server/VPN lambat.
-   v11.18: R.three = THREE.REVISION (r159/r186 kelihatan di dump); regex resource three juga cocok dgn three.custom.rNNN.js (sebelumnya threeRes selalu null utk bundle custom). */
+   v11.18: R.three = THREE.REVISION (r159/r186 kelihatan di dump); regex resource three juga cocok dgn three.custom.rNNN.js (sebelumnya threeRes selalu null utk bundle custom).
+   v11.19: pencatat warm/bake PASCA-BOOT dgn dump terpisah (POST COPY/JSON/TXT, window.__benchPost()): fungsi bake/warm global, rIC (asal file:baris), longtask/LoAF, rAF per detik, memori, warmLog audio, THREE_WARM. ?pbms=N = panjang jendela setelah entered (default 60000). */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
@@ -858,6 +859,181 @@
     }
   }).observe(ch, { attributes: true, attributeFilter: ['class'] });
 
+  /* ===== v11.19: PENCATAT WARM/BAKE PASCA-BOOT (dump TERPISAH: tombol POST JSON / POST TXT / POST COPY; snapshot() utama tidak berubah) =====
+     Jendela rekam: mulai saat kapsul muncul (atau obs-entered kalau lebih dulu) sampai entered + PB_MS (default 60 dtk, ?pbms=N). Hanya MENGUKUR, tidak mengubah urutan kerja:
+     (1) fungsi global bake/warm dibungkus (waktu mulai + durasi sinkron + argumen ringkas). Dipasang di DOMContentLoaded (semua script defer sudah jalan). Fungsi per-frame berbasis cache
+         (snBake, bhCssApply, ensureAsteroidSprites ...) tetap dihitung di agregat, tapi baris event cuma dicatat kalau >= 1 ms.
+     (2) requestIdleCallback dibungkus: asal (file:baris dari stack saat dijadwalkan), jeda jadwal->jalan, durasi, timeRemaining awal, didTimeout. Hanya yang JALAN sesudah kapsul.
+     (3) longtask + LoAF (>=50 ms, atribusi skrip), rAF per detik (n, max, >33 ms, >50 ms) selama jendela, memori tiap 10 dtk, warmLog audio, THREE_WARM + __threeQ.warm.
+     Hasil: ringkasan per nama + timeline gabungan (relatif kapsul) + detail. window.__benchPost() = snapshot string (console). */
+  var PB_MS = (function () { var m = /[?&]pbms=(\d+)/.exec(location.search); return m ? Math.max(5000, +m[1]) : 60000; })();
+  var PB = { ev: [], agg: {}, ric: [], ricN: 0, ricMs: 0, loaf: [], lt: [], fr: {}, mem: [], t0: null, tEnd: null, wrapped: [], missing: [], sampler: false };
+  var PB_FN = ['bakeAstroPlates', 'bakeDustLayers', 'bakeHudGeom', 'bakeCamGrid', 'ensureCamGrid', 'nebTint', 'nebTintStep', 'nebTintSync', 'nebLiteFallback',
+    'bhBandBake', 'bhCssApply', 'bhBloomSprite', 'bhFiberSprite', 'buildSprite', 'ensureAsteroidSprites', 'ofxMakeTint', 'ringWarmStep', 'getRingSprite', 'getStarSprite',
+    'skyWarmStep', 'snBake', 'bakeCometSprites', 'panelWarmOnce', 'whPrewarm', 'buildSprites', 'threeWarm', 'threeWarmNext', 'threeGLWarmBegin',
+    'pl3dBake2D', 'pl3dAurBake', 'pl3dAurBakeMk', 'pt3dWarmMax', 'warmRest', 'warmPump'];
+  function pbArg(a) {
+    try {
+      if (!a || !a.length) return '';
+      var v = a[0], t = typeof v;
+      if (v == null) return '';
+      if (t === 'number' || t === 'boolean') return String(v);
+      if (t === 'string') return v.slice(0, 24);
+      if (Array.isArray(v)) return '[' + v.slice(0, 3).join(',') + ']';
+      if (t === 'object') return String(v.id || v.name || v.key || v.k || '{}').slice(0, 24);
+    } catch (e) {}
+    return '';
+  }
+  function pbRec(name, t, d, a) {
+    var g = PB.agg[name] || (PB.agg[name] = { n: 0, ms: 0, max: 0, nPost: 0, msPost: 0, maxPost: 0, first: null, last: null });
+    g.n++; g.ms += d; if (d > g.max) g.max = d;
+    var tc = R.t.capsule;
+    if (tc != null && t >= tc && (PB.tEnd == null || t <= PB.tEnd)) {
+      g.nPost++; g.msPost += d; if (d > g.maxPost) g.maxPost = d;
+      if (g.first == null) g.first = Math.round(t);
+      g.last = Math.round(t);
+      if (d >= 1 && PB.ev.length < 500) PB.ev.push([name, Math.round(t), Math.round(d * 10) / 10, pbArg(a)]);
+    }
+  }
+  function pbWrap(name) {
+    try {
+      var f = window[name];
+      if (typeof f !== 'function') { PB.missing.push(name); return; }
+      if (f.__pb) return;
+      var w = function () {
+        var t = performance.now();
+        try { return f.apply(this, arguments); }
+        finally { try { pbRec(name, t, performance.now() - t, arguments); } catch (e) {} }
+      };
+      w.__pb = 1; w.prototype = f.prototype;
+      window[name] = w; PB.wrapped.push(name);
+    } catch (e) { PB.missing.push(name + '!'); }
+  }
+  /* rIC: dibungkus SEKARANG (sebelum script defer menjadwalkan); callback asli tetap dipanggil dgn deadline yang sama */
+  try {
+    if (window.requestIdleCallback) {
+      var _ric2 = window.requestIdleCallback.bind(window);
+      window.requestIdleCallback = function (fn, o) {
+        var org = '', sched = performance.now();
+        try {
+          var st = (new Error().stack || '').split('\n');
+          for (var i = 1; i < st.length; i++) { if (st[i].indexOf('21-bench') < 0) { var m = /([^\/\s(]+\.js)[^:]*:(\d+)/.exec(st[i]); org = m ? m[1] + ':' + m[2] : st[i].trim().slice(0, 40); break; } }
+        } catch (e) {}
+        return _ric2(function (dl) {
+          var t = performance.now(), tc = R.t.capsule;
+          try { return fn.call(this, dl); }
+          finally {
+            try {
+              var d = performance.now() - t;
+              if (tc != null && t >= tc) {
+                PB.ricN++; PB.ricMs += d;
+                if (PB.ric.length < 300) { var tr = -1; try { tr = Math.round(dl.timeRemaining()); } catch (e1) {} PB.ric.push([org, Math.round(sched), Math.round(t), Math.round(d * 10) / 10, o && o.timeout || 0, dl && dl.didTimeout ? 1 : 0, tr]); }
+              }
+            } catch (e) {}
+          }
+        }, o);
+      };
+    }
+  } catch (e) {}
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (e) {
+        if (e.duration < 50 || PB.loaf.length >= 150) return;
+        var sc = (e.scripts || []).slice().sort(function (a, b) { return b.duration - a.duration; }).slice(0, 3).map(function (x) {
+          return [fileOf(x.sourceURL), x.sourceFunctionName || '', Math.round(x.duration)];
+        });
+        PB.loaf.push([Math.round(e.startTime), Math.round(e.duration), Math.round(e.blockingDuration || 0), Math.round(e.renderStart ? e.renderStart - e.startTime : 0), sc]);
+      });
+    }).observe({ type: 'long-animation-frame', buffered: true });
+  } catch (e) {}
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (e) { if (PB.lt.length < 300) PB.lt.push([Math.round(e.startTime), Math.round(e.duration)]); });
+    }).observe({ type: 'longtask', buffered: true });
+  } catch (e) {}
+  function pbStartSampler() {
+    if (PB.sampler) return; PB.sampler = true;
+    PB.t0 = performance.now(); var last = null, lastMem = PB.t0;
+    function tick(ts) {
+      var tE = R.t.entered, stop = (tE != null ? tE + PB_MS : PB.t0 + PB_MS + 120000);
+      if (ts > stop) { PB.tEnd = Math.round(ts); return; }
+      if (last != null) {
+        var d = ts - last, k = Math.floor((ts - PB.t0) / 1000), b = PB.fr[k] || (PB.fr[k] = [0, 0, 0, 0]);
+        b[0]++; if (d > b[1]) b[1] = Math.round(d * 10) / 10; if (d > 33.5) b[2]++; if (d > 50) b[3]++;
+      }
+      last = ts;
+      if (ts - lastMem >= 10000) { lastMem = ts; try { PB.mem.push(Object.assign({ t: Math.round(ts) }, snapMem() || {})); } catch (e) {} }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  (function () {
+    var iv = setInterval(function () {
+      if (R.t.capsule != null || R.t.entered != null) { clearInterval(iv); pbStartSampler(); }
+    }, 250);
+    setTimeout(function () { clearInterval(iv); }, 120000);
+  })();
+  document.addEventListener('DOMContentLoaded', function () { PB_FN.forEach(pbWrap); });
+  function pbSnapshot() {
+    var tc = R.t.capsule, te = R.t.entered, tb = tc != null ? tc : (te != null ? te : 0), end = PB.tEnd != null ? PB.tEnd : Infinity;
+    var inW = function (t) { return t >= tb && t <= end; };
+    var rel = function (t) { return '+' + (Math.round(t - tb)); };
+    var agg = Object.keys(PB.agg).filter(function (k) { return PB.agg[k].nPost; }).map(function (k) {
+      var g = PB.agg[k]; return [k, g.nPost, Math.round(g.msPost), Math.round(g.maxPost * 10) / 10, g.first, g.last];
+    }).sort(function (a, b) { return b[2] - a[2]; });
+    var ricBy = {};
+    PB.ric.forEach(function (r) { var g = ricBy[r[0]] || (ricBy[r[0]] = [0, 0, 0, 0]); g[0]++; g[1] += r[3]; if (r[3] > g[2]) g[2] = r[3]; if (r[5]) g[3]++; });
+    var ricAgg = Object.keys(ricBy).map(function (k) { var g = ricBy[k]; return [k, g[0], Math.round(g[1]), Math.round(g[2] * 10) / 10, g[3]]; }).sort(function (a, b) { return b[2] - a[2]; });
+    var lt = PB.lt.filter(function (x) { return inW(x[0]); }), loaf = PB.loaf.filter(function (x) { return inW(x[0]); });
+    var wl = (window.__warmLog || []).filter(function (r) { return r[2] >= tb - 0; });
+    var frames = Object.keys(PB.fr).map(function (k) { var b = PB.fr[k]; return [+k, b[0], b[1], b[2], b[3]]; });
+    /* timeline gabungan (relatif kapsul) */
+    var tl = [];
+    PB.ev.forEach(function (e) { tl.push([e[1], 'fn   ' + e[0] + (e[3] ? '(' + e[3] + ')' : '') + ' ' + e[2] + 'ms']); });
+    PB.ric.forEach(function (r) { if (r[3] >= 1) tl.push([r[2], 'rIC  ' + r[0] + ' ' + r[3] + 'ms' + (r[5] ? ' TMO' : '') + ' (tunggu ' + (r[2] - r[1]) + ', sisa ' + r[6] + ')']); });
+    lt.forEach(function (x) { tl.push([x[0], 'LT   ' + x[1] + 'ms']); });
+    loaf.forEach(function (x) { tl.push([x[0], 'LoAF ' + x[1] + 'ms blk ' + x[2] + ' | ' + x[4].map(function (s) { return s[0] + ':' + (s[1] || '-') + ' ' + s[2]; }).join(' ; ')]); });
+    wl.forEach(function (r) { tl.push([r[2], 'warm ' + r[0] + ' selesai (' + r[3] + ') ' + (r[2] - r[1]) + 'ms']); });
+    if (te != null) tl.push([te, '---- obs-entered ----']);
+    tl.sort(function (a, b) { return a[0] - b[0]; });
+    var tlTxt = tl.slice(0, 400).map(function (x) { return rel(x[0]) + '  ' + x[1]; });
+    var tw = window.THREE_WARM, tq = window.__threeQ;
+    var o = {
+      kind: 'post-boot', url: location.href, qs: location.search, three: (window.THREE && window.THREE.REVISION) || null, at: new Date().toISOString(), nowMs: now(),
+      t: { capsule: tc, blue: R.t.blue, entered: te, frame1: R.t.frame1, winStart: PB.t0 != null ? Math.round(PB.t0) : null, winEnd: PB.tEnd, pbMs: PB_MS, closed: PB.tEnd != null },
+      bootInfo: window.__bootInfo || null,
+      wrapped: PB.wrapped, missing: PB.missing,
+      byFn: agg, '_byFn_cols': 'nama, jumlah, totalMs, maxMs, pertama, terakhir (abs ms)',
+      ricSummary: { n: PB.ricN, totalMs: Math.round(PB.ricMs), cap: PB.ric.length >= 300 }, ricByOrigin: ricAgg, '_ricByOrigin_cols': 'file:baris, jumlah, totalMs, maxMs, timeout',
+      longtasks: lt, loaf: loaf, '_loaf_cols': 'start, dur, blocking, renderDelay, [file, fn, ms] x3',
+      framesPerSec: frames, '_framesPerSec_cols': 'detik sejak winStart, jumlah frame, max delta, >33.5ms, >50ms',
+      mem: PB.mem, warmLog: wl,
+      threeWarm: tw ? { total: tw.total, done: tw.done, busy: tw.busy, qlen: tw.q ? tw.q.length : null } : null,
+      threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
+      timeline: tlTxt,
+      events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
+      ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
+    };
+    return JSON.stringify(o);
+  }
+  window.__benchPost = pbSnapshot;
+  function pbTxt(s) {
+    var o = JSON.parse(s), out = ['BENCH POST-BOOT DUMP', 'url: ' + o.url, 'waktu: ' + o.at, 'three: ' + o.three, 't: ' + JSON.stringify(o.t), '', '== RINGKASAN fn (totalMs desc) =='];
+    o.byFn.forEach(function (r) { out.push('  ' + r.join('  ')); });
+    out.push('', '== RINGKASAN rIC per asal =='); o.ricByOrigin.forEach(function (r) { out.push('  ' + r.join('  ')); });
+    out.push('', 'rIC total: ' + JSON.stringify(o.ricSummary), 'THREE_WARM: ' + JSON.stringify(o.threeWarm), '', '== TIMELINE (relatif kapsul, ms) ==');
+    o.timeline.forEach(function (l) { out.push(l); });
+    out.push('', '== DETAIL ==');
+    Object.keys(o).forEach(function (k) {
+      if (k === 'timeline' || k === 'byFn' || k === 'ricByOrigin') return;
+      var v = o[k];
+      if (Array.isArray(v)) { out.push(k + ' (' + v.length + '):'); v.forEach(function (r) { out.push('  ' + JSON.stringify(r)); }); }
+      else if (v && typeof v === 'object') out.push(k + ': ' + JSON.stringify(v));
+      else out.push(k + ': ' + v);
+    });
+    return out.join('\n');
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     box = document.createElement('div');
     box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#7fffb0;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #2a6;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;pointer-events:none;';
@@ -1035,6 +1211,28 @@
       }
     };
     btnRow.appendChild(mm);
+
+    /* v11.19: dump TERPISAH pasca-boot (warm/bake) */
+    [['POST COPY', null], ['POST JSON', 'json'], ['POST TXT', 'txt']].forEach(function (c) {
+      var x = document.createElement('button');
+      x.textContent = c[0];
+      x.style.cssText = btnStyle();
+      x.onclick = function (ev) {
+        ev.stopPropagation();
+        var s = pbSnapshot();
+        console.log('[bench-post]', s);
+        if (c[1] == null) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(s).then(function () { x.textContent = 'COPIED'; setTimeout(function () { x.textContent = c[0]; }, 1500); }, function () { showCopyFallback(c[0], s); });
+          } else showCopyFallback(c[0], s);
+          return;
+        }
+        var t = c[1] === 'json' ? JSON.stringify(JSON.parse(s), null, 2) : pbTxt(s), name = 'bench-post-' + stamp() + '.' + c[1];
+        if (saveFile(name, t, c[1] === 'json' ? 'application/json' : 'text/plain')) { x.textContent = 'SAVED'; setTimeout(function () { x.textContent = c[0]; }, 1500); }
+        else showCopyFallback(c[0], t);
+      };
+      btnRow.appendChild(x);
+    });
 
     document.body.appendChild(box);
     mark('dcl');
