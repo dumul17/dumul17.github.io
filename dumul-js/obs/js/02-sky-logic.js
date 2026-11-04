@@ -1315,8 +1315,28 @@ function txLongPressDrone(){
    Semua di-bake SEKALI ke canvas (ukuran plate); per frame cuma drawImage. Gambar dimuat lazy, selesai dimuat -> bake ulang plate otomatis.
    Gagal dimuat / IS_POTATO -> plate prosedural lama. ?v= di src HARUS sama persis dengan SHELL service-worker.
    Tuning: kabut lama saat nebula gambar aktif (0 = hilang total, 1 = seperti dulu): HAZE = awan debu + glow ungu-merah di plate, BAND = sabuk Milky Way putih kebiruan, DRIFT = 2 layer debu pastel yang melayang pelan (paling bikin kedalaman), A_OV = kuat nebula di overview, A_SEC = kuat nebula bertint di sektor, SPREAD = seberapa lebar variasi hue asli gambar dipertahankan di sektor (0 = satu hue datar, 1 = variasi penuh asli), SATMIX = seberapa saturasi sektor ikut menggeser saturasi blob (0..1), HC = hue pusat gambar asli (ungu ~270), TINT = (cuma fallback tanpa topeng) kuat warna sektor 0..1, SDIM = gelapkan plate di sektor sebelum nebula bertopeng (0..1), MASK = [batas bawah, atas] terang piksel untuk topeng latar transparan (null = matikan), ZF = seberapa ikut membesar saat zoom sektor (0 = tetap, .55 = sama dgn plate), VIG = kuat vignette tepi (0 = mati, 1 = default, >1 lebih gelap). */
-var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'img/nebula.webp?v=1',img:null,base:null,key:'',tint:{},LITE_MS:2500,liteT:0,noLite:false};   /* LITE_MS: batas tunggu nebula sebelum bake prosedural penuh jadi cadangan (jaringan lelet); liteT = id timer; noLite = cadangan sudah jalan, jangan lite lagi */
-function nebLiteFallback(){NEB.liteT=0;if(NEB.on&&!(NEB.img&&NEB.img._ok)){NEB.noLite=true;try{bakeAstroPlates(true);}catch(e){}}}
+var NEB={on:!IS_POTATO,A_OV:1,A_SEC:.9,TINT:.65,SDIM:.7,MASK:[10,80],THICK:.5,HAZE:0,BAND:0,DRIFT:0,SPREAD:.45,SATMIX:.5,HC:270,ZF:.25,VIG:1,src:'img/nebula.webp?v=1',img:null,base:null,key:'',tint:{},LITE_MS:2500,liteT:0,noLite:false,fbP:false};   /* LITE_MS: batas tunggu nebula sebelum bake prosedural penuh jadi cadangan (jaringan lelet); liteT = id timer; noLite = cadangan sudah jalan, jangan lite lagi */
+/* Cadangan LITE (jaringan lelet), v17: TIDAK lagi bake sinkron di timer 2,5 dtk (310 ms nyangkut di boot, first visit). Sekarang:
+   (1) tunggu boot tenang = kapsul tampil (__boot3d.gate, diset finish() di 07-boot.js) atau bootDone; langit memang belum dirender sebelum enterObservatory;
+   (2) bake lewat idle (timeout 600 ms) supaya tidak menabrak frame/interaksi;
+   (3) kalau nebula tiba selagi menunggu (onload -> _ok), tidak ada bake prosedural sama sekali = double-bake hilang di kasus 'telat sedikit'.
+   fbP = sedang menunggu (dedupe: resize saat LITE memasang timer LITE_MS lagi). */
+function nebLiteFallback(){
+  NEB.liteT=0;
+  if(NEB.fbP)return;
+  NEB.fbP=true;
+  (function go(){
+    if(!NEB.on||(NEB.img&&NEB.img._ok)){NEB.fbP=false;return;}   /* nebula tiba / dimatikan (onerror sudah bake sendiri): nol kerja */
+    var calm=(typeof bootDone!=='undefined'&&bootDone)||(window.__boot3d&&window.__boot3d.gate);
+    if(!calm){setTimeout(go,250);return;}
+    var run=function(){
+      NEB.fbP=false;
+      if(!NEB.on||(NEB.img&&NEB.img._ok)||NEB.noLite)return;
+      NEB.noLite=true;try{bakeAstroPlates(true);}catch(e){}
+    };
+    if(window.requestIdleCallback)requestIdleCallback(run,{timeout:600});else setTimeout(run,50);
+  })();
+}
 function nebBase(EW,EH,ds){
   if(!NEB.on)return null;
   var im=NEB.img;   /* satu gambar untuk portrait & landscape (cover-fit di bawah); yang berubah cuma staging-nya */

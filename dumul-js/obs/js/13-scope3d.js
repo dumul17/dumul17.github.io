@@ -178,7 +178,7 @@ function* scp3dBuildG(){
   var cam=new T.OrthographicCamera(-H,H,H,-H,-300,300);cam.position.set(0,0,100);cam.lookAt(0,0,0);
   SCP3D.sc=sc;SCP3D.cam=cam;
   yield;   /* ---- tahap 0 selesai: renderer + scene ---- */
-  /* FLAG ENV TELESKOP (v16): PMREM teleskop ±0,69-0,96 dtk di itel (bench 3 Nov), tidak bisa diiris. Default MASIH PAKAI env (tampilan lama); ?senv=0 = tanpa env (A/B + cek visual).
+  /* FLAG ENV TELESKOP (v16): PMREM teleskop ±0,69-0,96 dtk di itel (bench 3 Nov), tidak bisa diiris. v17: default sekarang TANPA env; ?senv=1 = pakai env PMREM (tampilan lama, A/B + rollback).
      Tanpa env logam hanya memantulkan lampu, jadi metalness hull/face/dark dikali SCP3D_MF (?smf=N, default .45; pod kaca tidak diubah). Tahap 1 tetap ada (yield kosong) supaya scp3dT tetap 8 elemen. */
   var env=null;if(SCP3D_ENV){env=scp3dEnv(r);}
   var mf=env?1:SCP3D_MF,m=SCP3D.m,o=SCP3D.o,DS=T.DoubleSide,PI=Math.PI;
@@ -301,8 +301,8 @@ function* scp3dBuildG(){
 
 /* Build dipecah jadi 8 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG (14-drone3d.js). Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
    tahap berikut di-unshift sehingga urutan antar modul tidak berubah. ?ss=0 = sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__scp3dT, dicatat bench (R.scp3dT, R.ss). */
-/* ?senv=0 = teleskop TANPA env PMREM (default: pakai env). ?smf=N (0..1, default .45) = faktor metalness saat tanpa env. Terbaca di window.__senv / __smf, dicatat bench (R.senv, R.smf). */
-var SCP3D_ENV=(function(){var on=true;try{on=!/[?&]senv=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__senv=on?1:0;}catch(e2){}return on;})();
+/* ?senv=1 = teleskop PAKAI env PMREM (rollback ke tampilan lama; default sejak v17: TANPA env). ?smf=N (0..1, default .45) = faktor metalness saat tanpa env. Terbaca di window.__senv / __smf, dicatat bench (R.senv, R.smf). */
+var SCP3D_ENV=(function(){var on=false;try{on=/[?&]senv=1(?:&|#|$)/.test(location.search);}catch(e){}try{window.__senv=on?1:0;}catch(e2){}return on;})();
 var SCP3D_MF=(function(){var f=.45;try{var m=/[?&]smf=([0-9.]+)(?:&|#|$)/.exec(location.search);if(m)f=Math.max(0,Math.min(1,parseFloat(m[1])||0));}catch(e){}try{window.__smf=f;}catch(e2){}return f;})();
 var SCP3D_SLICE=(function(){var on=true;try{on=!/[?&]ss=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ss=on?1:0;}catch(e2){}return on;})();
 function scp3dDrive(it,tm){

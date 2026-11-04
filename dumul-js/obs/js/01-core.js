@@ -971,12 +971,12 @@ function showWhisper(id){
   clearTimeout(_whT);w.classList.remove('on');
   var wh=a?a[(Math.random()*a.length)|0]:'';
   var rows=d.rows.slice(0,3),n=rows.length;
-  var h='<div class="ci-i ci-tag" style="--d:.15s">'+d.tag+'</div><div class="ci-i ci-name" style="--d:.3s">'+f.n+'</div><div class="ci-rows">';
-  for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+rows[i][0]+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+rows[i][1]+'</span>';
+  var h='<div class="ci-i ci-tag" style="--d:.15s">'+catEsc(d.tag)+'</div><div class="ci-i ci-name" style="--d:.3s">'+catEsc(f.n)+'</div><div class="ci-rows">';
+  for(var i=0;i<n;i++)h+='<b class="ci-i" style="--d:'+(.55+i*.14)+'s">'+catEsc(rows[i][0])+'</b><span class="ci-i" style="--d:'+(.6+i*.14)+'s">'+catEsc(rows[i][1])+'</span>';
   var t=.55+n*.14+.15,cbt=catBtn(id,t);
   h+='</div>';
   if(cbt){h+=cbt;t+=.25;}   /* tombol katalog bintang (spektrum pindah ke dalam katalog) */
-  h+='<div class="ci-i ci-fact" style="--d:'+t+'s"><em>'+T('cam.fact')+'</em>'+d.fact+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+wh+'\u201d</div>';
+  h+='<div class="ci-i ci-fact" style="--d:'+t+'s"><em>'+T('cam.fact')+'</em>'+catEsc(d.fact)+'</div><div class="ci-i ci-wh" style="--d:'+(t+.7)+'s">\u201c'+catEsc(wh)+'\u201d</div>';
   w.style.setProperty('--cc','rgb('+(d.rgb||'110,229,255')+')');
   setTimeout(function(){if(FFX.id!==id)return;w.innerHTML=h;w.classList.add('on');},260);
 }
