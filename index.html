@@ -28,15 +28,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="dumul-css/index.css?v=102">
-<!-- Three.js (ES module) diunduh + diparse lebih awal, paralel (three.module -> three.core tidak lagi berurutan). fetchpriority low: tidak nyaingin CSS/script utama. URL + ?v= HARUS sama persis dgn AST3D_CFG.lib, SHELL service-worker.js, dan import di dalam three.custom.r159.js -> kalau naikkan ?v=, ganti semuanya. -->
-<link rel="modulepreload" href="dumul-js/obs/lib/three.custom.r159.js?v=1" fetchpriority="low">
+<!-- Three.js (ES module) diunduh + diparse lebih awal, paralel (three.module -> three.core tidak lagi berurutan). fetchpriority low: tidak nyaingin CSS/script utama. URL + ?v= HARUS sama persis dgn AST3D_CFG.lib, SHELL service-worker.js, dan import di dalam three.custom.r186.js -> kalau naikkan ?v=, ganti semuanya. -->
+<link rel="modulepreload" href="dumul-js/obs/lib/three.custom.r186.js?v=1" fetchpriority="low">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
 </head>
 <body data-gimmick-baseline="v25" data-gimmick-revision="v41.15-ripples-doppler-align">
 
 <div id="boot-screen" aria-hidden="false">
   <div id="boot-matrix" aria-hidden="true"></div>
-  <script src="dumul-js/obs/js/00-rain.js?v=6"></script>
+  <script src="dumul-js/obs/js/00-rain.js?v=7"></script>
   <div id="boot-scan" aria-hidden="true"></div>
   <div id="boot-core">
     <div id="boot-brand">
@@ -347,12 +347,12 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=25"></script>
-<script defer src="dumul-js/obs/js/13-scope3d.js?v=18"></script>
-<script defer src="dumul-js/obs/js/14-drone3d.js?v=16"></script>
-<script defer src="dumul-js/obs/js/15-portal3d.js?v=31"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=26"></script>
+<script defer src="dumul-js/obs/js/13-scope3d.js?v=19"></script>
+<script defer src="dumul-js/obs/js/14-drone3d.js?v=17"></script>
+<script defer src="dumul-js/obs/js/15-portal3d.js?v=32"></script>
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=6"></script>
-<script defer src="dumul-js/obs/js/17-planet3d.js?v=43"></script>
+<script defer src="dumul-js/obs/js/17-planet3d.js?v=44"></script>
 <script defer src="dumul-js/obs/js/18-tune3d.js?v=19"></script>
 <script>
 /* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
