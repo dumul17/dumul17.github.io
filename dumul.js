@@ -245,7 +245,7 @@ try{
   /* ---------- audio analyser (buat animasi glitch di hero) ---------- */
   var ctx=null,an=null,SPEC=null,PREV=null,mix=0,level=0,avgFlux=0,lastBeatT=0;
   var anB=null,BSPEC=null,BPREV=null,bAvg=.03,bPk=.25,bFl=.05,bAd=0,ePk=.3,eFl=.1;
-  var A=window.__dmA={level:0,beatAt:0,beatStr:0,beatKind:'',active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
+  var A=window.__dmA={level:0,beatAt:0,beatStr:0,beatKind:'',kick:0,active:false,phase:0,bass:0,mid:0,treble:0,memory:0,fracture:0,fracX:0.5,listen:0,sig:'default',blips:[]};
   var TRACK_SIG={
     'glitch':{amp:1.08,frac:0.85,breath:0.7,thin:0.92,sink:0,cyanPink:1,mesh:1.1},
     'glitch-instrumental':{amp:0.92,frac:0.55,breath:0.85,thin:1.08,sink:0,cyanPink:0.7,mesh:0.9},
@@ -302,7 +302,7 @@ try{
     try{
       ctx=new AC();
       an=ctx.createAnalyser();
-      an.fftSize=1024;an.smoothingTimeConstant=.6;
+      an.fftSize=1024;an.smoothingTimeConstant=.25;
       var src=ctx.createMediaElementSource(audio);
       src.connect(an);an.connect(ctx.destination);
       try{anB=ctx.createAnalyser();anB.fftSize=2048;anB.smoothingTimeConstant=.25;anB.minDecibels=-90;anB.maxDecibels=-20;src.connect(anB);BSPEC=new Uint8Array(anB.frequencyBinCount);BPREV=new Uint8Array(anB.frequencyBinCount);}catch(_e){anB=null;}
@@ -338,7 +338,7 @@ try{
     var isSnare=!isKick&&snFlux>snThr&&snE>.14&&now-lastBeatT>145;
     if(isKick||isSnare){
       lastBeatT=now;A.beatAt=now;
-      A.beatKind=isKick?'kick':'snare';
+      A.beatKind=isKick?'kick':'snare';A.kick=1;
       A.beatStr=Math.max(.18,Math.min(1,isKick?(flux-bAvg)/.38:(snFlux/snThr)*.85));
       var sig=currentSig();
       /* Fracture lebih lembut — kurang agresif di hero */
@@ -516,12 +516,12 @@ try{
     /* Analyser every other frame — spectrum motion is slower than 60fps.
        seek bar di-throttle ~30fps di dalam drawSeek (bukan full 60). */
     if(anB&&playing)beatStep(now);
-    if(an&&playing){anSkip^=1;if(!anSkip)analyse(now);}
-    else{anSkip=0;level*=.9;}
+    if(an&&playing)analyse(now);
+    else{level*=.9;}
     /* 60FPS smooth spectrum interpolation toward last analysis target */
     if(SMOOTH&&SMOOTH_T){
-      var si,sn=SMOOTH.length,a=playing?0.14:0.06;
-      for(si=0;si<sn;si++)SMOOTH[si]+=(SMOOTH_T[si]-SMOOTH[si])*a;
+      var si,sn=SMOOTH.length,rel=playing?0.12:0.06,dd;
+      for(si=0;si<sn;si++){dd=SMOOTH_T[si]-SMOOTH[si];SMOOTH[si]+=dd*(dd>0?0.65:rel);}
     }
     /* During handoff buffer, hold mix so spectrum/mesh stay lit.
        Signal Memory: residual shape collapses slowly after pause. */
@@ -541,6 +541,7 @@ try{
     A.phase=(audio.currentTime&&audio.currentTime>0)?audio.currentTime:(handoffT||A.phase||0);
     /* Beat fracture heal */
     if(A.fracture>0)A.fracture=Math.max(0,A.fracture-0.04);
+    if(A.kick>0.005)A.kick*=.86;else A.kick=0;
     /* Listening mode: idle ~7s while playing */
     if(playing){
       var _idle=typeof window.__dmIdleAt==="number"?window.__dmIdleAt:(now-8000);if(now-_idle>7000)A.listen=Math.min(1,A.listen+0.012);
@@ -560,7 +561,7 @@ try{
     drawSeek(now);
     drawMini(now,playing);
     if(seekGlitchUntil&&performance.now()>=seekGlitchUntil){seekGlitchUntil=0;seekForce=true;drawSeek(undefined,true);}
-    if(playing||mix>.001||seekAmp>.01||A.memory>0.01||A.fracture>0.01||A.listen>0.01||seekGlitchUntil>0)raf=requestAnimationFrame(loop);
+    if(playing||mix>.001||seekAmp>.01||A.memory>0.01||A.fracture>0.01||A.kick>0||A.listen>0.01||seekGlitchUntil>0)raf=requestAnimationFrame(loop);
   }
   function kick(){if(!raf)raf=requestAnimationFrame(loop);}
 

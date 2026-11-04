@@ -49,7 +49,9 @@ K+=(mid-0.35)*5.2*sig.amp;
 if(v>0)v-=c;
 let sinkY=u*(0.5+sig.sink*0.12*Math.sin(s*0.8));
 waveLayers[0].y=sinkY;waveLayers[1].y=sinkY-14*(1-sig.sink*0.4);waveLayers[2].y=sinkY+13*(1-sig.sink*0.4);
-let vAmp=0.78*sig.amp*(1+bass*0.14)*(1+listen*0.05);
+let kk=__A.kick||0;
+g=Math.min(1.25,g*(1+kk*0.25));
+let vAmp=0.78*sig.amp*(1+bass*0.14)*(1+listen*0.05)*(1+kk*0.5);
 let thin=sig.thin*(1-listen*0.08);
 /* Glow only when intensity is actually visible — preserves neon identity, skips dead work */
 let hot=__L>0.16||v>0||frac>0.1||listen>0.4||bass>0.42;
