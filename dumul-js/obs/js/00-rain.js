@@ -27,7 +27,7 @@
     var pts=[],RAD=90,RADK=130;
     /* Kolom yang kebaca: sesekali SATU kolom near berhenti, glyph-nya "mengkristal" jadi kata (vertikal, atas→bawah), tahan sebentar, lalu larut & lanjut jatuh.
        Huruf kata di luar set glyph hujan ditaruh di sel ekstra atlas (indeks >= NG) → rg() tetap hanya memilih glyph hujan biasa. Mode low: mati (WORDS kosong). */
-    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=K.wordFirst[0]+Math.random()*(K.wordFirst[1]-K.wordFirst[0]),AV=null;   /* AV = [l,t,r,b] area panel boot (CSS px) yang harus dihindari; null = belum diterima → belum mulai baca */
+    var WORDS=POT?[]:(cfg.words||[]),XCH=[],XI={},WD=[],rdCol=null,rdNext=K.wordFirst[0]+Math.random()*(K.wordFirst[1]-K.wordFirst[0]),AV=null,rdOn=!K.wordGate,rdGT=0;   /* rdOn: gerbang baca kata — tertutup sampai 07-boot memanggil read() (3D selesai) atau K.wordGateMax lewat; rdGT = ms berjalan sejak mulai */   /* AV = [l,t,r,b] area panel boot (CSS px) yang harus dihindari; null = belum diterima → belum mulai baca */
     (function(){
       for(var wi=0;wi<WORDS.length;wi++){
         var ws=String(WORDS[wi]).toUpperCase(),arr=[];
@@ -113,6 +113,7 @@
       cx.fillStyle='#02060e';cx.fillRect(0,0,cv.width,cv.height);
     }
     /* Pilih satu kolom near yang seluruh katanya muat di layar, lalu mulai "baca". Belum ada kandidat → coba lagi 0,4 dtk kemudian. */
+    function rdOpen(){if(rdOn)return;rdOn=true;rdNext=K.wordFirst[0]+Math.random()*(K.wordFirst[1]-K.wordFirst[0]);}
     function rdTry(){
       if(!AV){rdNext=K.wordRetry;return;}
       var wd=WD[(Math.random()*WD.length)|0],n=wd.length,best=null,i,c;
@@ -165,7 +166,8 @@
       if(dt>50)dt=50;            /* habis stall: lanjut pelan, jangan teleport */
       var ds=dt/1000,h=vh,w=vw;
       pS+=(pT-pS)*(1-Math.exp(-dt/320));
-      if(WD.length&&!rdCol){rdNext-=dt;if(rdNext<=0)rdTry();}
+      if(!rdOn){rdGT+=dt;if(rdGT>=K.wordGateMax)rdOpen();}
+      if(WD.length&&!rdCol&&rdOn){rdNext-=dt;if(rdNext<=0)rdTry();}
       /* gm = pengali kecepatan jatuh (pelan di awal -> makin cepat mengikuti progres). Mode low: tetap 1 (hemat). */
       var gm=POT?1:(0.85+0.6*pS);
       var np=pts.length,kIn=1-Math.exp(-dt/110),kOut=1-Math.exp(-dt/450),q;
@@ -256,6 +258,7 @@
       prog:function(v){pT=v<0?0:(v>1?1:v);},
       pt:ptSet,
       avoid:function(r){AV=r;},
+      read:function(){rdOpen();},
       mood:function(v){mT=POT?0:(v<0?0:(v>1?1:v));for(var i=0;i<cols.length;i++)cols[i].rc=200+Math.random()*1800;},
       stop:function(){alive=false;try{caf(rafId);}catch(e){}}
     };
@@ -275,6 +278,7 @@
       }else if(m.t==='size'&&eng){eng.resize(m.w,m.h,m.dpr);}
       else if(m.t==='prog'&&eng){eng.prog(m.v);}
       else if(m.t==='avoid'&&eng){eng.avoid(m.r);}
+      else if(m.t==='read'&&eng){eng.read();}
       else if(m.t==='mood'&&eng){eng.mood(m.v);}
       else if(m.t==='pt'&&eng){eng.pt(m.id,m.x,m.y,m.a);}
       else if(m.t==='stop'&&eng){eng.stop();}
@@ -294,6 +298,8 @@
     trail:0.16,   /* kekuatan jejak per 1/60 dtk (makin kecil = jejak makin panjang) */
     wordFirst:[250,600],  /* [min,max] ms sebelum kata pertama mulai dibaca */
     wordGap:[0,250],      /* [min,max] ms jeda antar kata, dihitung sejak kata sebelumnya MULAI larut (0 = langsung nyambung) */
+    wordGate:true,        /* true = kata baru mulai dibaca setelah read() (dipanggil 07-boot begitu semua modul 3D + warm selesai); false = langsung seperti v7 */
+    wordGateMax:20000,    /* ms: cadangan — gerbang dibuka sendiri kalau read() tidak pernah datang (3D macet / gagal) */
     wordRetry:120         /* ms coba lagi kalau belum ada kolom yang cocok */
   };
   /* Kata untuk "kolom yang kebaca" (nama situs + judul lagu album). Mode low: kosong. */
@@ -381,5 +387,7 @@
     /* prog: hujan ikut progres boot (v 0..1). Aman dipanggil kapan saja (no-op kalau sudah di-kill). */
     prog:function(v){if(!alive)return;if(wk)wk.postMessage({t:'prog',v:v});else if(mainEng)mainEng.prog(v);},
     /* mood: 0 = dingin (cyan/biru/hijau), 1 = hangat (magenta/pink/ungu). Mode low: no-op. */
-    mood:function(v){if(!alive)return;if(wk)wk.postMessage({t:'mood',v:v});else if(mainEng)mainEng.mood(v);}};
+    mood:function(v){if(!alive)return;if(wk)wk.postMessage({t:'mood',v:v});else if(mainEng)mainEng.mood(v);},
+    /* read: buka gerbang baca kata (idempotent). Dipanggil 07-boot begitu 3D selesai. */
+    read:function(){if(!alive)return;if(wk)wk.postMessage({t:'read'});else if(mainEng)mainEng.read();}};
 })();
