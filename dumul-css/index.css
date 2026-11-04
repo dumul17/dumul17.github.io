@@ -334,6 +334,14 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 #boot-screen.off #boot-bar.stall #boot-fill{animation:none}
 @media (prefers-reduced-motion:reduce){#boot-bar.stall #boot-fill{animation:none}}
 #boot-pct{font-variant-numeric:tabular-nums}
+/* v158 kilat unit selesai: lapisan di atas fill, opacity sekali jalan ~0,3 dtk. JS bergantian .fa/.fb (nama animasi beda) supaya animasi mulai ulang tanpa reflow. */
+#boot-bar::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;background:linear-gradient(90deg,rgba(200,248,255,.18),rgba(220,252,255,.75),rgba(200,248,255,.18))}
+@keyframes bootFlashA{0%{opacity:.8}100%{opacity:0}}
+@keyframes bootFlashB{0%{opacity:.8}100%{opacity:0}}
+#boot-bar.fa::before{animation:bootFlashA .3s ease-out}
+#boot-bar.fb::before{animation:bootFlashB .3s ease-out}
+#boot-screen.off #boot-bar::before{animation:none}
+@media (prefers-reduced-motion:reduce){#boot-bar.fa::before,#boot-bar.fb::before{animation:none}}
 #boot-pct{margin-top:5px;text-align:right;font-size:9px;letter-spacing:.16em;color:rgba(184,224,238,.75);text-shadow:0 0 4px #02070b}
 /* Log boot SATU baris: sebaris dengan persen (kiri = log, kanan = persen). Baris ini memang sudah ada (cuma berisi "0%" di kanan), jadi tinggi panel sama persis dengan sebelum ada log.
    Font log = font persen (9px / 8px landscape) dan line-height:1 (glif \u2713 dari font cadangan tidak menaikkan tinggi baris). */
