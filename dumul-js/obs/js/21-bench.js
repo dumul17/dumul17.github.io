@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.16 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.17 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
@@ -8,7 +8,8 @@
    microbench ulang di akhir (thermal/throttle delta).
    merge: v11.14 + data-v pV sampling + bm flag (?bm=0).
    v11.15: penghitung document.fonts 'loadingdone' (jumlah + waktu) dan layout() (jumlah, total ms, max, pre-capsule, yang dipicu loadingdone) -> R.loadingdone / R.layout.
-   v11.16: atribusi fromLoadingdone dibetulkan (v11.15 salah-tandai boot() yang kebetulan jalan di tick yang sama): flag dibersihkan tepat setelah listener 07-boot selesai, bukan via setTimeout(0). */
+   v11.16: atribusi fromLoadingdone dibetulkan (v11.15 salah-tandai boot() yang kebetulan jalan di tick yang sama): flag dibersihkan tepat setelah listener 07-boot selesai, bukan via setTimeout(0).
+   v11.17: resource audio/three + proto (nextHopProtocol), q (antre+connect sebelum request terkirim), w (tunggu server murni), conn (ms connect, 0 = koneksi dipakai ulang), sw (lewat service worker); R.protoAll (hitung per protokol, semua resource) dan R.audPeak (puncak request audio yang tumpang tindih di network). Untuk membedakan batas 6 koneksi HTTP/1.1 vs server/VPN lambat. */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
@@ -501,7 +502,7 @@
   function paint() {
     if (!box) return;
     var t = R.t, x = [];
-    x.push('BENCH v11.16+ ms (sejak navigasi)');
+    x.push('BENCH v11.17+ ms (sejak navigasi)');
     x.push('dcl: ' + (t.dcl || '-') + '  load: ' + (t.load || '-'));
     x.push('boot start: ' + (t.bootStart || '-'));
     x.push('capsule: ' + (t.capsule || '-') + (R.bootToCapsule != null ? ' (boot+' + R.bootToCapsule + ')' : ''));
@@ -640,6 +641,7 @@
     try {
       var rs = performance.getEntriesByType('resource');
       R.res = rs.length;
+      var PROTO_ALL = {};
       R.aud = [];
       R.threeRes = null;
       rs.forEach(function (e) {
@@ -654,8 +656,14 @@
           transferSize: e.transferSize,
           encodedBodySize: e.encodedBodySize,
           decodedBodySize: e.decodedBodySize,
-          initiatorType: e.initiatorType || null
+          initiatorType: e.initiatorType || null,
+          proto: e.nextHopProtocol || null,
+          q: e.requestStart > 0 ? Math.round(e.requestStart - e.startTime) : null,
+          w: (e.requestStart > 0 && e.responseStart > 0) ? Math.round(e.responseStart - e.requestStart) : null,
+          conn: e.connectEnd > 0 ? Math.round(e.connectEnd - e.connectStart) : null,
+          sw: e.workerStart > 0 ? 1 : 0
         };
+        try { var pk = e.nextHopProtocol || '?'; PROTO_ALL[pk] = (PROTO_ALL[pk] || 0) + 1; } catch (ePk) {}
         if (/\.opus|\.mp3|\.ogg|\.wav|audio\//i.test(e.name) || /sfx|bgm|amb|garg|collap/i.test(name)) {
           R.aud.push(obj);
         }
@@ -665,6 +673,14 @@
           else R.threeRes.push(obj);
         }
       });
+      R.protoAll = PROTO_ALL;
+      /* puncak request audio yang benar-benar ke network (transferSize > 0) dan tumpang tindih; dihitung dari start..responseEnd.
+         Kalau puncak ~6 padahal konkurensi warm 8 -> kemungkinan batas 6 koneksi HTTP/1.1 per host. */
+      var ev = [];
+      R.aud.forEach(function (a) { if (a.transferSize > 0) { ev.push([a.start, 1]); ev.push([a.responseEnd, -1]); } });
+      ev.sort(function (x, y) { return x[0] - y[0] || x[1] - y[1]; });
+      var cur = 0, pk2 = 0; ev.forEach(function (x) { cur += x[1]; if (cur > pk2) pk2 = cur; });
+      R.audPeak = pk2;
     } catch (e) {}
 
     /* v10: gate timestamps */
