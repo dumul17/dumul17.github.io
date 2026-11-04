@@ -253,7 +253,7 @@ once its files (and, optionally, its music) have been cached.
     -   Choice remembered (`ofl_choice`). Chip removed without SW/Cache API.
 -   **Limits:** at most 24 audio files and 70 MB per file are kept
     (`MAX_AUDIO_FILES`, `MAX_AUDIO_BYTES`); oldest saved goes first.
--   **`cache-status.html`:** a small diagnostic page (not linked from the
+-   **`tools/cache-status.html`** (open `/tools/cache-status.html`): a small diagnostic page (not linked from the
     site, `noindex`). Lists which tracks are saved and their sizes, shows
     storage usage, and has *Download all* / *Clear audio cache* buttons.
     Safe to delete from the repo if you don't need it.
@@ -269,8 +269,10 @@ once its files (and, optionally, its music) have been cached.
 ├── service-worker.js       # PWA: caching, offline, audio Range handling (keep at root)
 ├── manifest.json           # PWA manifest (keep at root)
 ├── google6909df6bd589a0af.html   # Google Search Console verification (keep at root, do not rename)
-├── cache-status.html       # Optional diagnostic page for the audio cache
 ├── README.md
+│
+├── tools/
+│   └── cache-status.html   # Optional diagnostic page for the audio cache (no relative paths; the root-scope service worker still controls it)
 │
 ├── dumul-css/              # All stylesheets
 │   ├── index.css           # Observatory styles
@@ -481,7 +483,7 @@ The site is configured for the user site **`dumul17.github.io`**.
     `index.html` / `dumul.html` / `service-worker.js` so the page never points at files
     that aren't there yet.
 5.  Also upload `service-worker.js`, `manifest.json` and `icons/` to the
-    repo root (and optionally `cache-status.html`). Open the live site
+    repo root (and optionally `tools/cache-status.html`). Open the live site
     once online so the service worker can install.
 6.  If `dumul-js` lives in its own repository, that repo needs GitHub
     Pages enabled so `/dumul-js/obs/…` resolves from the main site (the
