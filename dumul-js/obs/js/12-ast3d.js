@@ -129,7 +129,10 @@ var THREE_GS=(function(){var on=true;try{on=!/[?&]gs=0(?:&|#|$)/.test(location.s
 var THREE_GLG={big:null,small:null};
 /* [v29] PROBE GPU (hanya ?bench=1&gpup=1; window.__gpuP diset 21-bench). Setelah render sebuah unit: pmk(a) = CPU kirim perintah sejak marker sebelumnya,
    lalu finish() + pmk(b) = waktu TUNGGU GPU menyelesaikan antrean konteks itu. Tanpa flag: tidak melakukan apa pun. Efek samping (hanya di mode probe): GPU dipaksa sinkron. */
-function glProbe(H,a,b){if(!window.__gpuP)return;try{if(typeof pmk==='function'){pmk(a);H.G.r.getContext().finish();pmk(b);}}catch(eGp){}}
+/* [v30] gl.finish() di Chrome cuma flush (tidak menunggu GPU), jadi marker .gpu v29 selalu ±0. Sinkron SUNGGUHAN = readPixels 1x1 (CPU menunggu semua perintah konteks itu selesai). */
+var GL_SYNC_BUF=new Uint8Array(4);
+function glSync(c){try{c.readPixels(0,0,1,1,c.RGBA,c.UNSIGNED_BYTE,GL_SYNC_BUF);}catch(eGs){}}
+function glProbe(H,a,b){if(!window.__gpuP)return;try{if(typeof pmk==='function'){pmk(a);glSync(H.G.r.getContext());pmk(b);}}catch(eGp){}}
 try{window.__glG=function(){var o={},k,G,i;for(k in THREE_GLG){G=THREE_GLG[k];if(!G)continue;o[k]={w:G.w,h:G.h,aa:G.aa,units:G.us.map(function(h){return [h.u,h.w,h.h];})};}return o;};}catch(eG){}
 function threeGLMake(aa,tone,label){
   var T=THREE,cv=document.createElement('canvas');

@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.26 (?bench=1) — v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
+/* BENCH v11.27 (?bench=1) — v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
+   v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
    (header lama:) BENCH v11.19 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
@@ -1009,7 +1010,7 @@
       window.pBegin = function () {
         PM.fs0 = PM.t0 = performance.now(); PM.cur = {};
         if (window.__gpuP && typeof THREE_GLG !== 'undefined') {   /* v11.26: backlog GPU SEBELUM modul mana pun menggambar di frame ini: q.big / q.small */
-          try { for (var gk in THREE_GLG) { var gG = THREE_GLG[gk]; if (gG && gG.r) { gG.r.getContext().finish(); f('q.' + gk); } } } catch (eQ) {}
+          try { for (var gk in THREE_GLG) { var gG = THREE_GLG[gk]; if (gG && gG.r) { if (typeof glSync === 'function') glSync(gG.r.getContext()); else gG.r.getContext().finish(); f('q.' + gk); } } } catch (eQ) {}
         }
       };
       window.pEnd = pmEnd;
