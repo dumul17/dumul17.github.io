@@ -282,6 +282,7 @@ function pt3dRender(now,Rp,playing,tk){
   PT3D.grp.rotation.z=PT3D.rz;
   threeGLBegin(PT3D.gl);
   r.render(PT3D.sc,PT3D.cam);
+  if(window.__gpuP)glProbe(PT3D.gl,'pt.sub','pt.gpu');   /* [v37] probe GPU (?bench=1&gpup=1) */
   threeGLSnap(PT3D.gl);   /* dibagi: salinan 2D milik cincin; frame yang sama bisa menggambar ulang tanpa render */
 }
 function pt3dUsable(){

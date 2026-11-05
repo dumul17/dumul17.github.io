@@ -422,6 +422,7 @@ function scp3dUpdate(now,mm){
   o.winGlow.material.opacity=.32+.1*Math.sin(now*.004);
   threeGLBegin(SCP3D.gl);
   r.render(SCP3D.sc,SCP3D.cam);
+  if(window.__gpuP)glProbe(SCP3D.gl,'sc.sub','sc.gpu');   /* [v21] probe GPU (?bench=1&gpup=1) */
   threeGLSnap(SCP3D.gl);   /* dibagi: salin ke kanvas 2D milik teleskop, karena ghost copy di frame yang sama menggambar ulang tanpa render */
 }
 

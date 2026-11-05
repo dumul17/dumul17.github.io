@@ -127,6 +127,9 @@ function threeWarmNext(){
    - webglcontextlost: semua unit di grup itu jatuh ke fallback 2D masing-masing (fail() per unit). */
 var THREE_GS=(function(){var on=true;try{on=!/[?&]gs=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__gs=on?1:0;}catch(e2){}return on;})();
 var THREE_GLG={big:null,small:null};
+/* [v29] PROBE GPU (hanya ?bench=1&gpup=1; window.__gpuP diset 21-bench). Setelah render sebuah unit: pmk(a) = CPU kirim perintah sejak marker sebelumnya,
+   lalu finish() + pmk(b) = waktu TUNGGU GPU menyelesaikan antrean konteks itu. Tanpa flag: tidak melakukan apa pun. Efek samping (hanya di mode probe): GPU dipaksa sinkron. */
+function glProbe(H,a,b){if(!window.__gpuP)return;try{if(typeof pmk==='function'){pmk(a);H.G.r.getContext().finish();pmk(b);}}catch(eGp){}}
 try{window.__glG=function(){var o={},k,G,i;for(k in THREE_GLG){G=THREE_GLG[k];if(!G)continue;o[k]={w:G.w,h:G.h,aa:G.aa,units:G.us.map(function(h){return [h.u,h.w,h.h];})};}return o;};}catch(eG){}
 function threeGLMake(aa,tone,label){
   var T=THREE,cv=document.createElement('canvas');
@@ -550,6 +553,7 @@ function ast3dDraw(now,half){
     }
     threeGLBegin(AST3D.gl);
     AST3D.r.render(AST3D.sc,AST3D.cam);
+    if(window.__gpuP)glProbe(AST3D.gl,'as.sub','as.gpu');
     var cvA=AST3D.r.domElement,kx=AST3D.pw/W,ky=AST3D.ph/H,
         rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),rx1=Math.min(W,Math.ceil(bx1)+2),ry1=Math.min(H,Math.ceil(by1)+2);
     if(rx1>rx0&&ry1>ry0){

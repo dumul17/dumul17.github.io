@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.19 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
+/* BENCH v11.26 (?bench=1) — v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
+   (header lama:) BENCH v11.19 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
    gate timestamps (pageReadyAt/modsAt/warmOkAt/bgmOkAt/sfxOkAt); glLabel; media networkState@load;
    loaf aggregate by fn; microbench + battery + memory + contextlost; pV series + rAF deltas; auto-repeat ?runs=N.
@@ -14,6 +15,7 @@
    v11.19: pencatat warm/bake PASCA-BOOT dgn dump terpisah (POST COPY/JSON/TXT, window.__benchPost()): fungsi bake/warm global, rIC (asal file:baris), longtask/LoAF, rAF per detik, memori, warmLog audio, THREE_WARM. ?pbms=N = panjang jendela setelah entered (default 60000). */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
+  try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
      Inline script ini jalan sebelum script defer, jadi wrapper terpasang sebelum modul memanggil rIC. Untuk menguji apakah rIC warm steps penyebab capsule 'beku'. */
   var RIC_HOLD = /[?&]ric=hold(&|$)/.test(location.search);
@@ -617,7 +619,7 @@
     } catch (e) {}
 
     R.three = (window.THREE && window.THREE.REVISION) || null; R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
-    R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
+    R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null; R.gpup = window.__gpuP ? 1 : 0;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
     R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
 
@@ -1004,7 +1006,12 @@
       f.__pm = 1;
       window.pmk = f;
       window.__pmB = 1;   /* pl3dMk (17-planet3d v46) ikut mencatat marker pl.* */
-      window.pBegin = function () { PM.fs0 = PM.t0 = performance.now(); PM.cur = {}; };
+      window.pBegin = function () {
+        PM.fs0 = PM.t0 = performance.now(); PM.cur = {};
+        if (window.__gpuP && typeof THREE_GLG !== 'undefined') {   /* v11.26: backlog GPU SEBELUM modul mana pun menggambar di frame ini: q.big / q.small */
+          try { for (var gk in THREE_GLG) { var gG = THREE_GLG[gk]; if (gG && gG.r) { gG.r.getContext().finish(); f('q.' + gk); } } } catch (eQ) {}
+        }
+      };
       window.pEnd = pmEnd;
       PM.on = true;
     } catch (e) {}
@@ -1014,7 +1021,7 @@
     Object.keys(PM.modes).forEach(function (k) {
       var m = PM.modes[k], s = m.smp.slice().sort(function (a, b) { return a - b; });
       modes[k] = { n: m.n, avgJs: r1(m.js / m.n), p95Js: r1(s[Math.floor(s.length * 0.95)] || 0), maxJs: r1(m.mx),
-        seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 14) };
+        seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, window.__gpuP ? 28 : 14) };
     });
     return { on: PM.on, perfHudActive: !!window.PERF, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }

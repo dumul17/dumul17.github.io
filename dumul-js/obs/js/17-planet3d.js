@@ -882,7 +882,7 @@ function pl3dLimbY(gm,x){var dx=x-gm.cx,r2=gm.R*gm.R-dx*dx;return gm.cy-Math.sqr
 /* PERF/probe: catat tiap refresh PENUH strip tanah (tukar buffer / render penuh): jumlah + jeda terpanjang. Dibaca probe set 'bio' (?probe=1&pset=bio) */
 function pl3dRfMark(){try{if(typeof PERF==='undefined'||!PERF)return;var tn=performance.now(),q=PL3D.pf||(PL3D.pf={n:0,max:0,last:0});if(q.last){var gp=tn-q.last;q.n++;if(gp>q.max)q.max=gp;}q.last=tn;}catch(eRf){}}
 function pl3dMk(n){try{if(((typeof PERF!=='undefined'&&PERF)||window.__pmB)&&typeof pmk==='function')pmk(n);}catch(eM){}}   /* [v46] window.__pmB = akumulator pmk bench (21-bench): marker pl.* ikut terekam tanpa HUD PERF (pl3dMkGpu tetap hanya PERF: ada finish()) */
-function pl3dMkGpu(r){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function'){pmk('pl.sub');r.getContext().finish();pmk('pl.gpu');}}catch(eM){}}
+function pl3dMkGpu(r){try{if(((typeof PERF!=='undefined'&&PERF)||window.__gpuP)&&typeof pmk==='function'){   /* [v48] window.__gpuP = probe GPU bench (?bench=1&gpup=1) */pmk('pl.sub');r.getContext().finish();pmk('pl.gpu');}}catch(eM){}}
 function pl3dFxOn(){var C=PL3D_CFG,F=PL3D.fx;return !!(C.auroraOn||C.flareOn||C.debrisOn||C.boltOn||C.fxDebug||(F&&(F.aur>.001||F.flv>.001||(F.deb&&F.deb.length)||F.bolt)));}   /* F.aur>0: aurora masih memudar keluar setelah toggle dimatikan */
 /* stub per efek: diisi di fase berikutnya (F2 aurora, F3 flare, F4 puing, F5 petir). F = PL3D.fx (konteks per frame) */
 /* AURORA (F2 v2): tirai KONTINU di atas limb, HANYA sisi gelap (memudar mulus ke sisi terang).

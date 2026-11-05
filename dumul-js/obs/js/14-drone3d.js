@@ -355,6 +355,7 @@ function dr3dUpdate(now,x,y,col){
   if(!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
     threeGLBegin(DR3D.gl);
     r.render(sc,DR3D.cam);
+    if(window.__gpuP)glProbe(DR3D.gl,'dr.sub','dr.gpu');   /* [v18] probe GPU (?bench=1&gpup=1) */
     if(!DR3D.c2||DR3D.c2.width!==res){DR3D.c2=document.createElement('canvas');DR3D.c2.width=DR3D.c2.height=res;DR3D.x2=DR3D.c2.getContext('2d');}
     DR3D.x2.clearRect(0,0,res,res);DR3D.x2.drawImage(r.domElement,0,0,res,res,0,0,res,res);   /* sumber (0,0,res,res): kanvas dibagi bisa lebih besar dari res */
     DR3D.lastR=now;DR3D.dirty=false;
