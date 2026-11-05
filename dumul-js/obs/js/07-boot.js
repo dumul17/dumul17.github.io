@@ -182,7 +182,13 @@ var DUMUL_CHARS=(function(){
   var max3d=isRepeatVisit?12000:(IS_POTATO?9000:15000);
   /* v148: HARD_CAP = plafon mutlak dari t0. Bench itel: 5 modul state=2 tapi warmOk masih false → cap3d lama memaksa kapsul
      sebelum THREE_WARM + SFX selesai. Setelah modul settle, kita terus nunggu warmOk+SFX sampai HARD_CAP (bukan max3d). */
-  var HARD_CAP=isRepeatVisit?32000:(IS_POTATO?40000:45000);
+  var HARD_CAP=isRepeatVisit?32000:(IS_POTATO?50000:60000);   /* [PATCH v167] first visit 45->60 dtk: bench itel 5 Nov (SFX 17 file, 3 gelombang x 12-17 dtk) baru lengkap di ±42 dtk dari t0 */
+  /* [PATCH v167] GATE_100: kapsul biru HANYA tampil setelah bar benar-benar 100% (vis + BGM + 17 SFX nyata selesai DAN bar sudah menyapu ke 100).
+     Sebelumnya AUDIO_CAP/SFX_CAP meloloskan gate: bench 5 Nov kapsul muncul di bar 83% (SFX 7/17, sfxViaCap) lalu pengunjung menunggu ±17 dtk lagi sampai audio hangat.
+     Plafon darurat sekarang cuma HARD_CAP (anti hang; kapsul tetap tampil dgn bar di angka asli). ?gate=0 = perilaku lama (A/B). */
+  var GATE_100=true;try{if(/[?&]gate=0\b/.test(location.search))GATE_100=false;}catch(eG1){}
+  window.__gate100=GATE_100?1:0;
+  var gateAt=-1;   /* elapsed saat gate nyata pertama lolos; dipakai pengaman sapuan bar (maks 2,5 dtk) */
   var capTimer=0;
   /* v142: batas tunggu pekerjaan boot TIDAK memakan jatah warm-up kalau yang lambat adalah jaringan. Selama three.js belum tiba (atau baru tiba lambat), batas diperpanjang
      sebesar kelebihan waktunya di atas 3 dtk (maks +8 dtk). Plafon mutlak = max3d + 8 dtk, jadi offline/macet tetap tidak menahan capsule selamanya. */
@@ -289,7 +295,7 @@ var DUMUL_CHARS=(function(){
         sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
         bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
         sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
-        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,gate100:window.__gate100||0
       };
     }catch(eBi){}
   }
@@ -696,8 +702,8 @@ var DUMUL_CHARS=(function(){
     if(vis&&visAt<0)visAt=Math.round(elapsed);
     /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap.
        Plafon AUDIO_CAP (dari t0) / SFX_CAP (dari warmAt) hanya darurat (media macet) — happy path nunggu ok nyata. */
-    var bgmCapHit=!au.ok&&elapsed>=AUDIO_CAP;
-    var sfxCapHit=!sx.ok&&warmAt>=0&&elapsed-warmAt>=SFX_CAP;   /* v146/v147: plafon dari warmAt */
+    var bgmCapHit=!GATE_100&&!au.ok&&elapsed>=AUDIO_CAP;
+    var sfxCapHit=!GATE_100&&!sx.ok&&warmAt>=0&&elapsed-warmAt>=SFX_CAP;   /* v146/v147: plafon dari warmAt */
     var bgmOk=au.ok||bgmCapHit,sfxOk=sx.ok||sfxCapHit;
     var complete=vis&&bgmOk&&sfxOk;
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
@@ -786,7 +792,8 @@ var DUMUL_CHARS=(function(){
        - 5 modul sudah settle tapi !vis (biasanya warmOk masih false di itel) → lanjut sampai complete / HARD_CAP
        - modul macet (mods < total) → cap3d di max3d seperti dulu
        - HARD_CAP → paksa apapun (anti hang) */
-    if(c.complete){window.__bootFinish='gate';finish(c);}
+    if(c.complete&&gateAt<0)gateAt=elapsed;
+    if(c.complete&&(!GATE_100||pV>=100||elapsed-gateAt>2500)){window.__bootFinish='gate';finish(c);}   /* [PATCH v167] tunggu bar tampil 100% (sapuan animator), pengaman 2,5 dtk */
     else if(elapsed>=HARD_CAP){window.__bootFinish='cap3d';finish(c);}
     else if(elapsed>=cap3dNow(elapsed)&&!c.vis){
       var modsDone=c.th&&c.th.mods>=c.th.total;
