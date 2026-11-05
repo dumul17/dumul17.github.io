@@ -16,6 +16,7 @@
  *               (PERF yang menyala dari localStorage dumul_perf=1 juga dikenali sebagai mode PERF)
  *     muffdbg → ?muffdbg : overlay #muff-dbg spatial audio (installMuff)
  *   A/B q.big (baris di panel, tanpa mode): 5 tombol reload ke ?bench=1&gpup=1 + varian (base / ?perf=low / ?ast3d=0 / ?dpr=0.5 / ?gpuo=1 = urutan sinkron q.* dibalik, butuh 21-bench v11.28).
+ *   Matikan lapisan (butuh 21-bench v11.29): ?off=sky|skyhide|hud|mw|neb|lines,stars (bisa digabung koma), tercatat di dump R.off + pmk.off.
  *     Untuk membandingkan q.big (backlog GPU grup 'big') per mode ov / ov+H / sec+S. Dump tetap lewat bench (21-bench.js), BUKAN lewat PERF
  *     (mode PERF mematikan akumulator bench, jadi q.* tidak terekam). Varian dibaca saat load (01-core / 12-ast3d), makanya reload.
  *   Langkah 1a: installPerf / installProbe / installWP / installMuff di file ini (sumber kebenaran body tooling).
@@ -861,11 +862,18 @@
     { id: 'low',   label: 'perf=low', set: { perf: 'low' } },
     { id: 'noast', label: 'ast3d=0',  set: { ast3d: '0' } },
     { id: 'dpr5',  label: 'dpr=0.5',  set: { dpr: '0.5' } },
-    { id: 'rev',   label: 'q.* balik', set: { gpuo: '1' } }   /* 21-bench v11.28: urutan sinkron q.* dibalik (small dulu) */
+    { id: 'rev',   label: 'q.* balik', set: { gpuo: '1' } },   /* 21-bench v11.28: urutan sinkron q.* dibalik (small dulu) */
+    /* 21-bench v11.29: ?off= = matikan lapisan (tercatat di R.off / pmk.off). sky = lewati blit/raster #sky; skyhide = #sky disembunyikan CSS tapi tetap digambar (beda raster vs kompositor) */
+    { id: 'o-sky',  label: 'off sky',        set: { off: 'sky' } },
+    { id: 'o-hide', label: 'off #sky hide',  set: { off: 'skyhide' } },
+    { id: 'o-hud',  label: 'off HUD',        set: { off: 'hud' } },
+    { id: 'o-mw',   label: 'off milkyway',   set: { off: 'mw' } },
+    { id: 'o-neb',  label: 'off nebula',     set: { off: 'neb' } },
+    { id: 'o-cs',   label: 'off rasi+bintang', set: { off: 'lines,stars' } }
   ];
   function abUrl(v) {
     var u = new URL(location.href);
-    ['whperf', 'probe', 'perf', 'pset', 'pin', 'ast3d', 'dpr', 'gpuo'].forEach(function (k) { u.searchParams.delete(k); });
+    ['whperf', 'probe', 'perf', 'pset', 'pin', 'ast3d', 'dpr', 'gpuo', 'off'].forEach(function (k) { u.searchParams.delete(k); });
     u.searchParams.set('debug', '1');
     u.searchParams.set('bench', '1');
     u.searchParams.set('gpup', '1');
@@ -880,6 +888,8 @@
     if (/[?&]ast3d=0(&|$)/.test(Q)) hit.push('noast');
     if (/[?&]dpr=0\.5(&|$)/.test(Q)) hit.push('dpr5');
     if (/[?&]gpuo=1(&|$)/.test(Q)) hit.push('rev');
+    var offQ = /[?&]off=([a-z,]+)/.exec(Q);
+    if (offQ) { var offId = 'custom'; AB_VARIANTS.forEach(function (v) { if (v.set.off === offQ[1]) offId = v.id; }); hit.push(offId); }
     if (!hit.length) return 'base';
     return hit.length === 1 ? hit[0] : null;
   }
@@ -1580,6 +1590,12 @@
         go(abUrl(v));
       }, abCur === v.id));
     });
+    if (/[?&]bench=1(&|$)/.test(Q) && /[?&]gpup=1(&|$)/.test(Q)) {   /* 21-bench v11.29b: runner lapisan-mati tanpa reload */
+      abRow.appendChild(btn('seq (tanpa reload)', function () {
+        if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29b');
+        log(window.__offSeqStart() ? 'seq jalan: base, sky, skyhide, hud, mw, neb, rasi+bintang, base2 (±8 dtk/fase). Jangan ganti mode; lalu dump bench.' : 'seq sedang jalan');
+      }, false));
+    }
     panel.appendChild(abRow);
 
     var status = mk('div', 'opacity:.9;min-height:2.6em;margin-bottom:8px;font-size:10px;line-height:1.35', 'siap');

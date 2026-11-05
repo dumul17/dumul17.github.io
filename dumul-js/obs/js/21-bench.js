@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.28 (?bench=1) — v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
+/* BENCH v11.29 (?bench=1) — v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
+   v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
    v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
    (header lama:) BENCH v11.19 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
@@ -19,6 +20,28 @@
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
   try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
   try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
+  /* v11.29: ?off=a,b,c = matikan lapisan untuk tes q.big (otomatis dari URL, tercatat di dump) */
+  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast'], OFF_ALL = OFF_PX.concat(['hud', 'skyhide']), OFF_L = [];
+  try {
+    var offM = /[?&]off=([a-z,]+)/.exec(location.search);
+    if (offM) offM[1].split(',').forEach(function (t) { if (OFF_ALL.indexOf(t) >= 0 && OFF_L.indexOf(t) < 0) OFF_L.push(t); });
+    window.__offL = OFF_L.length ? OFF_L.slice() : null;
+  } catch (eOff) {}
+  /* v11.29b: CSS lewat kelas di <html> supaya bisa di-toggle saat jalan (tanpa reload) */
+  try {
+    var offSt = document.createElement('style'); offSt.id = '__bench_off_css';
+    offSt.textContent = 'html.__bo-hud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not(#__bench_box):not(#__bench_phase):not(#__bench_copy_fallback):not([id^="wh-ad"]):not(script):not(style){visibility:hidden!important}html.__bo-skyhide #sky{visibility:hidden!important}';
+    (document.head || document.documentElement).appendChild(offSt);
+  } catch (eOffC) {}
+  var OFF_CUR = OFF_L.slice(), OFF_MANAGE = OFF_L.length > 0;   /* OFF_MANAGE: baru mengatur PX/kelas kalau ?off= ada atau runner jalan */
+  function offApply() {   /* idempoten; PX = var global di 05-sector-ui.js */
+    if (!OFF_MANAGE) return;
+    try {
+      document.documentElement.classList.toggle('__bo-hud', OFF_CUR.indexOf('hud') >= 0);
+      document.documentElement.classList.toggle('__bo-skyhide', OFF_CUR.indexOf('skyhide') >= 0);
+      if (typeof PX === 'object' && PX) OFF_PX.forEach(function (k) { PX[k] = OFF_CUR.indexOf(k) >= 0 ? 1 : 0; });
+    } catch (eA) {}
+  }
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
      Inline script ini jalan sebelum script defer, jadi wrapper terpasang sebelum modul memanggil rIC. Untuk menguji apakah rIC warm steps penyebab capsule 'beku'. */
   var RIC_HOLD = /[?&]ric=hold(&|$)/.test(location.search);
@@ -622,7 +645,7 @@
     } catch (e) {}
 
     R.three = (window.THREE && window.THREE.REVISION) || null; R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
-    R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null; R.gpup = window.__gpuP ? 1 : 0;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
+    R.off = window.__offL || null; R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {n:q.n,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null; R.gpup = window.__gpuP ? 1 : 0;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
     R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
 
@@ -985,10 +1008,12 @@
     var s = typeof SECT !== 'undefined' ? SECT : null, f = typeof FS !== 'undefined' ? FS : null;
     var l = !s ? '?' : s.busy ? 'trans' : s.on ? 'ov' : s.cur ? 'sec' : 'ov?';
     if (f) { if (f.heavy) l += '+H'; if (f.slow) l += '+S'; }
+    if (window.__offPh) l += '|' + window.__offPh;   /* v11.29b: fase runner ?offseq */
     return l;
   }
   function pmEnd() {
     var t = performance.now(), k;
+    if (window.__offSkip && t < window.__offSkip) return;   /* v11.29b: frame awal fase (settle) tidak dihitung */
     PM.cur.end = (PM.cur.end || 0) + (t - PM.t0);
     if (PB.t0 == null || PB.tEnd != null) return;
     var js = t - PM.fs0, lb = pmLbl(), m = PM.modes[lb] || (PM.modes[lb] = { n: 0, js: 0, mx: 0, smp: [], seg: {} });
@@ -1003,6 +1028,7 @@
     }
   }
   function pmInstall() {
+    offApply();
     try {
       if (window.PERF || typeof window.pmk !== 'function' || window.pmk.__pm) return;
       var f = function (n) { var t = performance.now(); PM.cur[n] = (PM.cur[n] || 0) + (t - PM.t0); PM.t0 = t; };
@@ -1024,6 +1050,38 @@
       PM.on = true;
     } catch (e) {}
   }
+  /* ===== v11.29b: runner lapisan-mati TANPA reload. Tap tombol 'seq' (panel A/B) atau window.__offSeqStart() saat sudah di overview / sektor.
+     Tiap fase = set lapisan mati selama ?offms=N (default 8000) ms, 1000 ms pertama dibuang (settle). Label mode jadi 'ov+S|sky' dst, jadi satu dump memuat semua fase.
+     Urutan: base, sky, skyhide, hud, mw, neb, lines+stars, base2 (base2 = cek drift termal). Tercatat di pmk.offSeq. ?offseq=1 = mulai otomatis 6 dtk setelah obs-entered. */
+  var OS = { on: false, log: [], ms: 8000 };
+  var OS_PH = [['base', []], ['sky', ['sky']], ['skyhide', ['skyhide']], ['hud', ['hud']], ['mw', ['mw']], ['neb', ['neb']], ['lines+stars', ['lines', 'stars']], ['base2', []]];
+  function osLabel(txt) {
+    try {
+      var e = document.getElementById('__bench_phase');
+      if (!e) { e = document.createElement('div'); e.id = '__bench_phase'; e.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#ffd27f;font:10px monospace;padding:3px 6px;border:1px solid #a82;pointer-events:none'; document.body.appendChild(e); }
+      e.textContent = txt;
+    } catch (eL) {}
+  }
+  function offSeqStart() {
+    if (OS.on) return false;
+    var mm = /[?&]offms=(\d+)/.exec(location.search); OS.ms = mm ? Math.max(3000, Math.min(60000, +mm[1])) : 8000;
+    OS.on = true; OS.log = []; OFF_MANAGE = true;
+    var i = 0;
+    (function step() {
+      if (i >= OS_PH.length) {
+        OFF_CUR = OFF_L.slice(); offApply(); window.__offPh = null; window.__offSkip = 0; OS.on = false;
+        osLabel('offseq SELESAI \u2014 salin dump bench sekarang'); return;
+      }
+      var ph = OS_PH[i++]; OFF_CUR = ph[1].slice(); offApply(); window.__offPh = ph[0]; window.__offSkip = performance.now() + 1000;
+      OS.log.push([ph[0], ph[1].join('+') || '-', Math.round(performance.now())]);
+      osLabel('offseq ' + i + '/' + OS_PH.length + ' ' + ph[0] + ' (' + Math.round(OS.ms / 1000) + ' dtk)');
+      setTimeout(step, OS.ms);
+    })();
+    return true;
+  }
+  window.__offSeqStart = offSeqStart;
+  if (/[?&]offseq=1(&|$)/.test(location.search)) window.addEventListener('obs-entered', function () { setTimeout(offSeqStart, 6000); }, { once: true });
+
   function pmOut() {
     var r1 = function (v) { return Math.round(v * 10) / 10; }, modes = {};
     Object.keys(PM.modes).forEach(function (k) {
@@ -1031,7 +1089,7 @@
       modes[k] = { n: m.n, avgJs: r1(m.js / m.n), p95Js: r1(s[Math.floor(s.length * 0.95)] || 0), maxJs: r1(m.mx),
         seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, window.__gpuP ? 28 : 14) };
     });
-    return { on: PM.on, perfHudActive: !!window.PERF, qOrder: PM.qo || null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
+    return { on: PM.on, perfHudActive: !!window.PERF, qOrder: PM.qo || null, off: window.__offL || null, offSeq: OS.log.length ? { cols: '[fase, lapisan mati, t ms]', phases: OS.log, ms: OS.ms, selesai: !OS.on } : null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }
   function fsOut() {
     var f = typeof FS !== 'undefined' ? FS : null;
@@ -1100,7 +1158,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    box = document.createElement('div');
+    box = document.createElement('div'); box.id = '__bench_box';
     box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#7fffb0;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #2a6;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;pointer-events:none;';
     /* jangan tembus ke situs (06-interaction hit-test) */
     /* bubble (false): biarkan event sampai ke tombol di dalam box, tapi jangan naik ke document/situs */
@@ -1412,6 +1470,7 @@
           loadingdone: o.loadingdone && o.loadingdone.n,
           layout: o.layout && { n: o.layout.n, ms: o.layout.ms, max: o.layout.max, fromLD: o.layout.fromLoadingdone && o.layout.fromLoadingdone.n },
           net: o.net,
+          off: o.off,
           isRepeat: o.isRepeatVisit,
           finishGuess: o.finishGuess,
           threeRes: o.threeRes,
