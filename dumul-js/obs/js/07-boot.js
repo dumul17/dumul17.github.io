@@ -385,6 +385,32 @@ var DUMUL_CHARS=(function(){
       }catch(eL){clearTimeout(tm);preFin('fb');}
     },600);
   }
+  /* [PATCH v172] WARM NYATA pra-kapsul (jendela idle antara __bootVis dan kapsul: bench 5 Nov = 18 dtk (repeat) / 45 dtk (pertama) di HP lemah, CPU nyaris menganggur).
+       pl   = pl3dWarmReal (17-planet3d.js): ukuran strip nyata + render penuh pertama planet, supaya frame overview pertama tidak membayarnya.
+       tint = bake nebula bertint ke-4 sektor lewat nebTint() (jalur DICICIL ±2,5 ms/irisan yang sama dgn lazy-nya; dulu baru mulai saat menu sektor dibuka). Satu sektor sekali jalan, menunggu
+              nebPrefetch (bacaan piksel pertama) selesai & NEBJ kosong; berhenti begitu Blue (obs-entered), jalur sinkron (NEB.tintSync) TIDAK disentuh. Sisa yang belum sempat tetap lazy.
+     Tidak menahan gerbang kapsul. Hasil -> window.__warmReal {pl, tint, tintMs} (dibaca bench). */
+  var WR={on:0,t0:0,tries:0,entered:false};
+  try{window.addEventListener('obs-entered',function(){WR.entered=true;},{once:true});}catch(eWe){}
+  function warmRealTint(){
+    try{
+      var M=window.__warmReal||(window.__warmReal={}),L=(typeof SECT!=='undefined'&&SECT.list)||[],i,s,left=0;
+      if(WR.entered||M.tintDone||typeof NEB==='undefined'||!NEB.on||!NEB.MASK||NEB.tintSync)return;
+      for(i=0;i<L.length;i++)if(L[i]&&L[i].sky&&!NEB.tint[L[i].k]){left++;if(!s)s=L[i];}
+      if(!left){M.tintDone=1;M.tintMs=Math.round(performance.now()-WR.t0);return;}
+      if(!NEB.base||NEB._bdK!==NEB.base||document.hidden||(typeof NEBJ!=='undefined'&&NEBJ)||(typeof SECT!=='undefined'&&SECT.busy)){
+        if(++WR.tries<90)setTimeout(warmRealTint,500);
+        return;
+      }
+      nebTint(s);M.tint=L.length-left+1;
+      setTimeout(warmRealTint,300);
+    }catch(eWt){}
+  }
+  function warmRealStart(){
+    if(WR.on)return;WR.on=1;WR.t0=performance.now();
+    setTimeout(function(){try{if(!WR.entered&&typeof pl3dWarmReal==='function')pl3dWarmReal();}catch(eP){}},700);
+    setTimeout(warmRealTint,1500);
+  }
   function preStatus(){return {ok:pre.ui===2&&pre.ast===2&&pre.fb===2,ui:pre.ui,ast:pre.ast,fb:pre.fb};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
@@ -735,6 +761,7 @@ var DUMUL_CHARS=(function(){
       preStart();   /* PRE: UI sound + asteroid + Firebase dibayar sebelum kapsul (lihat blok PRA-KAPSUL) */   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
       /* [PATCH v169] sinkron GL pertama cincin portal (render + drawImage ke 2D) dibayar SEKARANG, bukan di frame masuk sektor (15-portal3d.js pt3dWarmSync). Ditunda sebentar supaya tidak satu tick dgn warm CPU di atas. */
       try{setTimeout(function(){try{if(typeof pt3dWarmSync==='function')pt3dWarmSync();}catch(eWs){}},120);}catch(eWt){}
+      try{warmRealStart();}catch(eWr){}   /* [PATCH v172] planet ukuran nyata + tint 4 sektor di jendela idle (lihat blok WARM NYATA) */
     }
     /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap (kerjaan nyata; plafon darurat cuma HARD_CAP / cap3d di tick). */
     var pr=preStatus();

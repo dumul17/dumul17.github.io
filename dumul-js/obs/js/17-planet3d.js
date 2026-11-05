@@ -754,6 +754,29 @@ function pl3dResize(){
   if(PL3D.r){threeGLSize(PL3D.gl,rw,rh);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
 }
 
+/* [v45] WARM NYATA pra-kapsul (dipanggil 07-boot.js sesudah __bootVis). Shader + render pertama PL3D sudah unit boot, tapi di UKURAN warm, bukan ukuran strip nyata:
+   frame overview pertama masih membayar pl3dResize (3-4 kanvas + threeGLSize) + render penuh pertama di ukuran nyata + sinkron GPU->2D (bench 5 Nov: 'planet' 84-86 ms).
+   Di sini ukuran nyata dipasang & dirender SEKALI selagi layar boot tertutup. PL3D.dirty/full dibiarkan true: frame asli tetap render ulang dgn palet/cahaya yang benar (sudah hangat).
+   Tidak menggambar ke kanvas utama. Waktunya -> window.__warmReal.pl (dibaca bench). */
+function pl3dWarmReal(){
+  try{
+    if(PL3D.warmReal||PL3D.state!==2||!PL3D.r||!PL3D.gl||document.hidden)return false;
+    pl3dSync();
+    if(!PL3D_CFG.on||!PW||!PH)return false;
+    PL3D.warmReal=1;
+    var t0=performance.now();
+    pl3dPalUpdate();pl3dPhase(t0);
+    pl3dResize();
+    pl3dUniforms(t0,true);
+    threeGLBegin(PL3D.gl);threeGLFull(PL3D.gl);
+    PL3D.r.render(PL3D.sc,PL3D.cam);
+    if(PL3D.c2&&PL3D.cv2)PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh,0,0,PL3D.rw,PL3D.rh);   /* sinkron GPU->2D pertama di ukuran nyata */
+    PL3D.dirty=true;
+    var M=window.__warmReal||(window.__warmReal={});M.pl=Math.round(performance.now()-t0);
+    return true;
+  }catch(e){return false;}
+}
+
 /* titik lampu (ruang layar tegak): overview = portal yang sedang mengorbit (P4; kalau di balik limb, lampunya di balik planet jadi cuma pinggir limb yang menyala), sektor = BH mini */
 function pl3dLightPos(){
   var p=null;
