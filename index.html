@@ -321,7 +321,7 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=146"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=185"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=129"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=172"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=174"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
@@ -353,12 +353,12 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=27"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=28"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=20"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=17"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=36"></script>
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=6"></script>
-<script defer src="dumul-js/obs/js/17-planet3d.js?v=45"></script>
+<script defer src="dumul-js/obs/js/17-planet3d.js?v=47"></script>
 <script defer src="dumul-js/obs/js/18-tune3d.js?v=19"></script>
 <script>
 /* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
@@ -642,7 +642,7 @@ if ('serviceWorker' in navigator) {
 <script>/* Bench (21-bench.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau URL punya ?bench=1. document.write supaya jalan SINKRON di titik ini
    (sebelum semua script defer) — wrapper rIC / WebGLRenderer / observer harus terpasang sebelum modul jalan, jadi TIDAK bisa pindah ke 19-auto-debug.js (dimuat setelah window load).
    Sengaja TIDAK di SHELL service-worker (sama seperti 19/20). Naikkan ?v= kalau isi 21-bench.js berubah. */
-(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.24"></scr'+'ipt>');}catch(e){}})();
+(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.25"></scr'+'ipt>');}catch(e){}})();
 </script>
 </body>
 </html>
