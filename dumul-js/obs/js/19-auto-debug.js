@@ -15,7 +15,7 @@
  *     PERF  → ?perf=1    : snapshot overlay PERF; "Sweep PERF" menyapu semua PX_MODES otomatis (1 snapshot per mode)
  *               (PERF yang menyala dari localStorage dumul_perf=1 juga dikenali sebagai mode PERF)
  *     muffdbg → ?muffdbg : overlay #muff-dbg spatial audio (installMuff)
- *   A/B q.big (baris di panel, tanpa mode): 4 tombol reload ke ?bench=1&gpup=1 + varian (base / ?perf=low / ?ast3d=0 / ?dpr=0.5).
+ *   A/B q.big (baris di panel, tanpa mode): 5 tombol reload ke ?bench=1&gpup=1 + varian (base / ?perf=low / ?ast3d=0 / ?dpr=0.5 / ?gpuo=1 = urutan sinkron q.* dibalik, butuh 21-bench v11.28).
  *     Untuk membandingkan q.big (backlog GPU grup 'big') per mode ov / ov+H / sec+S. Dump tetap lewat bench (21-bench.js), BUKAN lewat PERF
  *     (mode PERF mematikan akumulator bench, jadi q.* tidak terekam). Varian dibaca saat load (01-core / 12-ast3d), makanya reload.
  *   Langkah 1a: installPerf / installProbe / installWP / installMuff di file ini (sumber kebenaran body tooling).
@@ -860,11 +860,12 @@
     { id: 'base',  label: 'base',     set: {} },
     { id: 'low',   label: 'perf=low', set: { perf: 'low' } },
     { id: 'noast', label: 'ast3d=0',  set: { ast3d: '0' } },
-    { id: 'dpr5',  label: 'dpr=0.5',  set: { dpr: '0.5' } }
+    { id: 'dpr5',  label: 'dpr=0.5',  set: { dpr: '0.5' } },
+    { id: 'rev',   label: 'q.* balik', set: { gpuo: '1' } }   /* 21-bench v11.28: urutan sinkron q.* dibalik (small dulu) */
   ];
   function abUrl(v) {
     var u = new URL(location.href);
-    ['whperf', 'probe', 'perf', 'pset', 'pin', 'ast3d', 'dpr'].forEach(function (k) { u.searchParams.delete(k); });
+    ['whperf', 'probe', 'perf', 'pset', 'pin', 'ast3d', 'dpr', 'gpuo'].forEach(function (k) { u.searchParams.delete(k); });
     u.searchParams.set('debug', '1');
     u.searchParams.set('bench', '1');
     u.searchParams.set('gpup', '1');
@@ -878,6 +879,7 @@
     if (/[?&]perf=low(&|$)/.test(Q)) hit.push('low');
     if (/[?&]ast3d=0(&|$)/.test(Q)) hit.push('noast');
     if (/[?&]dpr=0\.5(&|$)/.test(Q)) hit.push('dpr5');
+    if (/[?&]gpuo=1(&|$)/.test(Q)) hit.push('rev');
     if (!hit.length) return 'base';
     return hit.length === 1 ? hit[0] : null;
   }

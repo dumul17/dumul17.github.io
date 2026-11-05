@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.27 (?bench=1) — v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
+/* BENCH v11.28 (?bench=1) — v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
+   v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
    (header lama:) BENCH v11.19 (?bench=1) — read-only: tidak mengubah perilaku boot. Hanya aktif kalau URL punya ?bench=1. Hapus blok ini setelah selesai ukur.
    v10: flag/build hash + isRepeatVisit; net rtt/downlink + resource detail (three + audio TTFB/size);
@@ -16,7 +17,8 @@
    v11.19: pencatat warm/bake PASCA-BOOT dgn dump terpisah (POST COPY/JSON/TXT, window.__benchPost()): fungsi bake/warm global, rIC (asal file:baris), longtask/LoAF, rAF per detik, memori, warmLog audio, THREE_WARM. ?pbms=N = panjang jendela setelah entered (default 60000). */
 (function () {
   if (!/[?&]bench=1(&|$)/.test(location.search)) return;
-  try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
+  try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
+  try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* Eksperimen ?ric=hold (hanya bersama ?bench=1): tahan SEMUA requestIdleCallback yang dijadwalkan sebelum masuk (obs-entered); dilepas 1.5 dtk setelah masuk.
      Inline script ini jalan sebelum script defer, jadi wrapper terpasang sebelum modul memanggil rIC. Untuk menguji apakah rIC warm steps penyebab capsule 'beku'. */
   var RIC_HOLD = /[?&]ric=hold(&|$)/.test(location.search);
@@ -1010,7 +1012,12 @@
       window.pBegin = function () {
         PM.fs0 = PM.t0 = performance.now(); PM.cur = {};
         if (window.__gpuP && typeof THREE_GLG !== 'undefined') {   /* v11.26: backlog GPU SEBELUM modul mana pun menggambar di frame ini: q.big / q.small */
-          try { for (var gk in THREE_GLG) { var gG = THREE_GLG[gk]; if (gG && gG.r) { if (typeof glSync === 'function') glSync(gG.r.getContext()); else gG.r.getContext().finish(); f('q.' + gk); } } } catch (eQ) {}
+          try {
+            var qk = Object.keys(THREE_GLG);   /* default: urutan pembuatan (big, small) */
+            if (window.__gpuO) qk.reverse();   /* v11.28: ?gpuo=1 -> small dulu, baru big */
+            PM.qo = qk.join(',');
+            for (var qi = 0; qi < qk.length; qi++) { var gk = qk[qi], gG = THREE_GLG[gk]; if (gG && gG.r) { if (typeof glSync === 'function') glSync(gG.r.getContext()); else gG.r.getContext().finish(); f('q.' + gk); } }
+          } catch (eQ) {}
         }
       };
       window.pEnd = pmEnd;
@@ -1024,7 +1031,7 @@
       modes[k] = { n: m.n, avgJs: r1(m.js / m.n), p95Js: r1(s[Math.floor(s.length * 0.95)] || 0), maxJs: r1(m.mx),
         seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, window.__gpuP ? 28 : 14) };
     });
-    return { on: PM.on, perfHudActive: !!window.PERF, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
+    return { on: PM.on, perfHudActive: !!window.PERF, qOrder: PM.qo || null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }
   function fsOut() {
     var f = typeof FS !== 'undefined' ? FS : null;
