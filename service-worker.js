@@ -7,7 +7,7 @@
    - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
      Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v394'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v395'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v3';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -45,12 +45,12 @@ const SHELL = [
   'dumul-js/obs/js/09-wormhole.js?v=44',
   'dumul-js/obs/js/10-ui-sound.js?v=9',
   'dumul-js/obs/js/11-live-count.js?v=5',
-  'dumul-js/obs/js/12-ast3d.js?v=30',
-  'dumul-js/obs/js/13-scope3d.js?v=21',
-  'dumul-js/obs/js/14-drone3d.js?v=18',
-  'dumul-js/obs/js/15-portal3d.js?v=37',
+  'dumul-js/obs/js/12-ast3d.js?v=31',
+  'dumul-js/obs/js/13-scope3d.js?v=22',
+  'dumul-js/obs/js/14-drone3d.js?v=19',
+  'dumul-js/obs/js/15-portal3d.js?v=38',
   'dumul-js/obs/js/16-sector-menu.js?v=6',
-  'dumul-js/obs/js/17-planet3d.js?v=49',
+  'dumul-js/obs/js/17-planet3d.js?v=50',
   'dumul-js/obs/js/18-tune3d.js?v=19',
   'dumul-js/obs/lib/three.custom.r186.js?v=1',
   'img/nebula.webp?v=1',
