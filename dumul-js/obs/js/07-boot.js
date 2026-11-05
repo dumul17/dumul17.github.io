@@ -183,12 +183,9 @@ var DUMUL_CHARS=(function(){
   /* v148: HARD_CAP = plafon mutlak dari t0. Bench itel: 5 modul state=2 tapi warmOk masih false → cap3d lama memaksa kapsul
      sebelum THREE_WARM + SFX selesai. Setelah modul settle, kita terus nunggu warmOk+SFX sampai HARD_CAP (bukan max3d). */
   var HARD_CAP=isRepeatVisit?32000:(IS_POTATO?50000:60000);   /* [PATCH v167] first visit 45->60 dtk: bench itel 5 Nov (SFX 17 file, 3 gelombang x 12-17 dtk) baru lengkap di ±42 dtk dari t0 */
-  /* [PATCH v167] GATE_100: kapsul biru HANYA tampil setelah bar benar-benar 100% (vis + BGM + 17 SFX nyata selesai DAN bar sudah menyapu ke 100).
-     Sebelumnya AUDIO_CAP/SFX_CAP meloloskan gate: bench 5 Nov kapsul muncul di bar 83% (SFX 7/17, sfxViaCap) lalu pengunjung menunggu ±17 dtk lagi sampai audio hangat.
-     Plafon darurat sekarang cuma HARD_CAP (anti hang; kapsul tetap tampil dgn bar di angka asli). ?gate=0 = perilaku lama (A/B). */
-  var GATE_100=true;try{if(/[?&]gate=0\b/.test(location.search))GATE_100=false;}catch(eG1){}
-  window.__gate100=GATE_100?1:0;
-  var SFX_SLOW1=true;try{if(/[?&]sfxo=0\b/.test(location.search))SFX_SLOW1=false;}catch(eSo){}
+  /* [PATCH v167] Gate 100%: kapsul biru HANYA tampil setelah bar benar-benar 100% (vis + BGM + 17 SFX nyata selesai DAN bar sudah menyapu ke 100).
+     Dulu plafon audio/SFX meloloskan gate: bench 5 Nov kapsul muncul di bar 83% (SFX 7/17) lalu pengunjung menunggu ±17 dtk lagi sampai audio hangat.
+     Plafon darurat sekarang cuma HARD_CAP (anti hang; kapsul tetap tampil dgn bar di angka asli). */
   var gateAt=-1;   /* elapsed saat gate nyata pertama lolos; dipakai pengaman sapuan bar (maks 2,5 dtk) */
   var capTimer=0;
   /* v142: batas tunggu pekerjaan boot TIDAK memakan jatah warm-up kalau yang lambat adalah jaringan. Selama three.js belum tiba (atau baru tiba lambat), batas diperpanjang
@@ -203,7 +200,7 @@ var DUMUL_CHARS=(function(){
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
   /* WARM_CONC = jumlah elemen audio yang di-warm (metadata) bersamaan; tetap 8, tidak ada override lewat URL. */
-  var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
+  var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai */
   /* [PATCH v160] Kejadian warm audio -> antrean untuk log boot (dikonsumsi logPoll). Menggantikan sfxLastName/sfxLastIsGlitch/sfxGlitchWarm/sfxCacheFlash (v157/v159).
      Tiap file = 1 kejadian, termasuk yang sudah siap duluan (cache/offline), jadi log tetap bisa menghitung 2 BGM + 16 bintang + 1 GARG satu per satu, bukan loncat ke "siap".
      k: 'b' BGM | 's' bintang | 'g' GARG; w: 's' mulai | 'e' selesai (meta / error). */
@@ -220,10 +217,7 @@ var DUMUL_CHARS=(function(){
   window.__warmConc=WARM_CONC;
   /* v151: SFX warm TIDAK paralel dengan build 3D. Telemetri v149/v150 (8 run, itel): slot SFX yang mulai sebelum kapsul rata-rata ±7 dtk, yang mulai sesudah kapsul ±4 dtk
      (main thread jenuh ±12 dtk long task selama build 3D -> loadedmetadata + warmPump ngantri). Sekarang antrean SFX baru jalan begitu SEMUA modul 3D settle + THREE_WARM kosong.
-     BGM (2 file kecil) tetap jalan dari awal. v154: dikembalikan paralel by default (permintaan user); mode sequential ini tetap ada lewat ?sfxpar=0. */
-  var SFX_PAR=true;   /* v154: default KEMBALI paralel (pemicu three2/allmods/bgm seperti v150); ?sfxpar=0 = sequential v151 (SFX baru mulai sesudah 3D selesai) */
-  try{if(/[?&]sfxpar=0\b/.test(location.search))SFX_PAR=false;}catch(eSp){}
-  window.__sfxPar=SFX_PAR;
+     BGM (2 file kecil) tetap jalan dari awal. v154: dikembalikan paralel (pemicu three2/allmods/bgm, lihat warmRestEarly); mode sequential v151 sudah dihapus. */
   function warmPump(){
     var gap=warmHold-performance.now();
     if(gap>0){setTimeout(warmPump,gap+20);return;}
@@ -293,7 +287,7 @@ var DUMUL_CHARS=(function(){
         sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
         bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
         sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
-        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,gate100:window.__gate100||0
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null
       };
     }catch(eBi){}
   }
@@ -303,7 +297,7 @@ var DUMUL_CHARS=(function(){
     warmAt=Math.round(performance.now()-t0);
     try{performance.mark('obs-warm');}catch(eM){}
     var sq=stars;
-    if(SFX_SLOW1){   /* [PATCH v168] file yang konsisten paling lambat (dump 5 Nov, 3 run: rigel, spica, sirius) dimulai di gelombang pertama, bukan jatuh ke gelombang terakhir dan jadi ekor gate. ?sfxo=0 = urutan lama */
+    {   /* [PATCH v168] file yang konsisten paling lambat (dump 5 Nov, 3 run: rigel, spica, sirius) dimulai di gelombang pertama, bukan jatuh ke gelombang terakhir dan jadi ekor gate */
       var sl=[],fa=[];
       stars.forEach(function(a){(/^(rigel|spica|sirius)\.opus$/i.test(warmName(a))?sl:fa).push(a);});
       sq=sl.concat(fa);
@@ -316,12 +310,8 @@ var DUMUL_CHARS=(function(){
   /* v145 Mode 2 strict: BGM (2) + SFX stellar (16) + GARG ikut bar + gate.
      Kapsul hanya setelah vis + bgmOk + sfxOk (kerjaan nyata, tanpa minMs palsu).
      warmRest (SFX+GARG) dimajukan ke gap (THREE ada + ≥2 modul settle), bukan nunggu kapsul.
-     AUDIO_CAP / SFX_CAP / cap3d = plafon darurat saja (media/modul macet), bukan jalur normal.
+     cap3d / HARD_CAP = plafon darurat saja (modul macet / anti hang), bukan jalur normal.
      Satuan = readyState>=1 atau a.error (dari elemen). Warm BGM tetap dari awal boot. */
-  var AUDIO_CAP=isRepeatVisit?6000:(IS_POTATO?8000:11000);
-  /* v146: SFX_CAP dihitung dari SAAT antrean SFX mulai (warmAt), bukan dari t0. Dari t0 (v145) plafon 22 dtk lebih pendek dari kapsul opsi B (+24-28 dtk) sehingga plafon
-     darurat jadi jalur normal. Wall SFX bench itel = ~16,9 dtk @conc4, jadi 22 dtk dari warmAt = margin ~5 dtk. warmRestEarly menjamin warmAt terisi sebelum gate. */
-  var SFX_CAP=isRepeatVisit?12000:(IS_POTATO?16000:22000);
   var audioEls=null;
   function audioList(){
     if(audioEls)return audioEls;
@@ -344,11 +334,6 @@ var DUMUL_CHARS=(function(){
   /* Trigger opsi B (plan): THREE ada + >=2 modul settle, ATAU fallback: semua modul settle (three gagal/nonaktif) atau BGM sudah siap (jaringan nganggur). Idempotent via warmed. */
   function warmRestEarly(th,au){
     if(warmed)return;
-    if(!SFX_PAR){
-      /* v151: satu pemicu — semua modul settle + antrean shader warm kosong (th.warmOk). Cadangan kalau 3D macet: finish()/enterObservatory() tetap memanggil warmRest(). */
-      if(th&&th.mods>=th.total&&th.warmOk){warmTrig='after3d';warmRest();}
-      return;
-    }
     var three=(typeof THREE!=='undefined'&&THREE.REVISION);
     if(three&&th&&th.mods>=2){warmTrig='three2';warmRest();return;}
     if(th&&th.mods>=th.total){warmTrig='allmods';warmRest();return;}
@@ -625,8 +610,8 @@ var DUMUL_CHARS=(function(){
     try{performance.mark('obs-capsule');}catch(eM){}   /* dibaca 19-auto-debug (Trace); murah */
     /* Bar hanya 100% kalau SEMUA unit (termasuk audio, v131) benar-benar selesai. Kalau belum, bar tetap di angka asli; startPost() melanjutkannya sesudah capsule tampil. */
     paintBar(c);
-    /* v147: snapshot untuk 21-bench — warmAt/trig/visAt/sfxViaCap/bar saat kapsul */
-    bootInfoSnap({sfxViaCap:!!c.sfxCapHit,bgmViaCap:!!c.bgmCapHit,bar:typeof pV!=='undefined'?pV:c.p,sx:c.sx,vis:c.vis,complete:complete});
+    /* v147: snapshot untuk 21-bench — warmAt/trig/visAt/bar saat kapsul */
+    bootInfoSnap({bar:typeof pV!=='undefined'?pV:c.p,sx:c.sx,vis:c.vis,complete:complete});
     sig.classList.add('on');
     chReadyOn();
     if(quoteEl)quoteEl.classList.add('on');
@@ -704,13 +689,13 @@ var DUMUL_CHARS=(function(){
     warmRestEarly(th,au);   /* v146: isi gap — SFX begitu ≥2 modul settle ATAU BGM siap / semua modul settle */
     var vis=ready&&th.mods>=th.total&&th.warmOk;
     if(vis&&visAt<0)visAt=Math.round(elapsed);
-    if(vis&&!window.__bootVis)window.__bootVis=1;   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
-    /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap.
-       Plafon AUDIO_CAP (dari t0) / SFX_CAP (dari warmAt) hanya darurat (media macet) — happy path nunggu ok nyata. */
-    var bgmCapHit=!GATE_100&&!au.ok&&elapsed>=AUDIO_CAP;
-    var sfxCapHit=!GATE_100&&!sx.ok&&warmAt>=0&&elapsed-warmAt>=SFX_CAP;   /* v146/v147: plafon dari warmAt */
-    var bgmOk=au.ok||bgmCapHit,sfxOk=sx.ok||sfxCapHit;
-    var complete=vis&&bgmOk&&sfxOk;
+    if(vis&&!window.__bootVis){
+      window.__bootVis=1;   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
+      /* [PATCH v169] sinkron GL pertama cincin portal (render + drawImage ke 2D) dibayar SEKARANG, bukan di frame masuk sektor (15-portal3d.js pt3dWarmSync). Ditunda sebentar supaya tidak satu tick dgn warm CPU di atas. */
+      try{setTimeout(function(){try{if(typeof pt3dWarmSync==='function')pt3dWarmSync();}catch(eWs){}},120);}catch(eWt){}
+    }
+    /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap (kerjaan nyata; plafon darurat cuma HARD_CAP / cap3d di tick). */
+    var complete=vis&&au.ok&&sx.ok;
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
@@ -730,15 +715,14 @@ var DUMUL_CHARS=(function(){
     var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
-    return {ready:ready,th:th,au:au,sx:sx,vis:vis,complete:complete,all:vis&&au.ok&&sx.ok,p:p,sfxCapHit:sfxCapHit,bgmCapHit:bgmCapHit};
+    return {ready:ready,th:th,au:au,sx:sx,vis:vis,complete:complete,all:vis&&au.ok&&sx.ok,p:p};
   }
   /* Haluskan angka: TARGET tetap jujur (calc/c.p, bobot unit selesai); yang ditampilkan MENGEJAR target secara eksponensial (BAR_TAU) dengan laju minimum (BAR_MIN %/dtk).
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
      Animator rAF sendiri (bukan bergantung pada tick/startPost) supaya sapuan ke 100% tetap selesai walau interval startPost sudah berhenti. Berhenti kalau boot screen hilang. */
   var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
-  /* v155: ?bm=0 = bar lama (style.width). Default: fill selebar bar + translateX (compositor, tetap meluncur saat main thread macet; lihat index.css .bm). */
-  var BAR_BM=true;try{BAR_BM=!/[?&]bm=0(?:&|#|$)/.test(location.search);}catch(eB){}
-  try{if(BAR_BM)document.getElementById('boot-bar').classList.add('bm');window.__bm=BAR_BM?1:0;}catch(eB){}
+  /* v155: fill selebar bar + translateX (compositor, tetap meluncur saat main thread macet; lihat index.css .bm). */
+  try{document.getElementById('boot-bar').classList.add('bm');}catch(eB){}
   /* v158: ghost = segmen TARGET jujur (pTgt) di depan fill; stall = bar macet >1,5 dtk → napas pelan (class .stall, CSS opacity). */
   var ghost=document.getElementById('boot-ghost'),bar=document.getElementById('boot-bar'),gV=-1,mvAt=performance.now(),bsT=0;
   function stallTick(){
@@ -750,7 +734,7 @@ var DUMUL_CHARS=(function(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
     mvAt=performance.now();if(bar.classList.contains('stall'))bar.classList.remove('stall');
-    pV=v;if(BAR_BM){fill.style.transform='translateX('+(v-100)+'%)';fill.setAttribute('data-v',v);}else fill.style.width=v+'%';pct.textContent=v+'%';
+    pV=v;fill.style.transform='translateX('+(v-100)+'%)';fill.setAttribute('data-v',v);pct.textContent=v+'%';
     chProg(v);
     try{if(window.__rain)window.__rain.prog(v/100);}catch(eRp){}   /* hujan matrix ikut progres */
   }
@@ -767,7 +751,7 @@ var DUMUL_CHARS=(function(){
     /* hujan: kata mulai dibaca hanya setelah semua modul 3D settle + warm selesai (c.vis); sebelum itu worker hujan cuma mengalir polos (hemat CPU di fase compile). Cadangan di 00-rain: K.wordGateMax. */
     if(c.vis&&!rainRd){rainRd=1;try{if(window.__rain)window.__rain.read();}catch(eRr){}}
     if(t>pTgt)pTgt=t;
-    if(BAR_BM&&ghost){var gv=Math.min(100,Math.round(pTgt));if(gv!==gV){gV=gv;ghost.style.transform='translateX('+(gv-100)+'%)';}}
+    if(ghost){var gv=Math.min(100,Math.round(pTgt));if(gv!==gV){gV=gv;ghost.style.transform='translateX('+(gv-100)+'%)';}}
     if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
   }
   function startPost(){
@@ -785,20 +769,20 @@ var DUMUL_CHARS=(function(){
     if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000)){
       var onlySfx=false;
       try{
-        onlySfx=c.vis&&c.sx&&c.sx.total&&!c.sx.ok&&c.au&&(c.au.ok||c.bgmCapHit);
+        onlySfx=c.vis&&c.sx&&c.sx.total&&!c.sx.ok&&c.au&&c.au.ok;
       }catch(eOs){}
       if(!onlySfx)chSlowOn();
     }
     paintBar(c);
     paintPanel(c.ready,c.th,false,c.au,c.sx);
     /* v148 strict: 
-       - complete → kapsul (BGM+SFX+vis nyata, atau plafon audio)
-       - vis true → jangan cap3d; biarkan complete (SFX_CAP dari warmAt)
+       - complete → kapsul (BGM+SFX+vis nyata)
+       - vis true → jangan cap3d; biarkan complete
        - 5 modul sudah settle tapi !vis (biasanya warmOk masih false di itel) → lanjut sampai complete / HARD_CAP
        - modul macet (mods < total) → cap3d di max3d seperti dulu
        - HARD_CAP → paksa apapun (anti hang) */
     if(c.complete&&gateAt<0)gateAt=elapsed;
-    if(c.complete&&(!GATE_100||pV>=100||elapsed-gateAt>2500)){window.__bootFinish='gate';finish(c);}   /* [PATCH v167] tunggu bar tampil 100% (sapuan animator), pengaman 2,5 dtk */
+    if(c.complete&&(pV>=100||elapsed-gateAt>2500)){window.__bootFinish='gate';finish(c);}   /* [PATCH v167] tunggu bar tampil 100% (sapuan animator), pengaman 2,5 dtk */
     else if(elapsed>=HARD_CAP){window.__bootFinish='cap3d';finish(c);}
     else if(elapsed>=cap3dNow(elapsed)&&!c.vis){
       var modsDone=c.th&&c.th.mods>=c.th.total;

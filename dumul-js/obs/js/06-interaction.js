@@ -207,7 +207,7 @@ document.addEventListener('pointerdown',function(e){
       _close();
     };
   })();
-  /* Quality HIGH/LOW: localStorage.dumul_quality (persist). Save = tulis + reload. Reset = hapus preferensi, balik deteksi device. */
+  /* Quality HIGH/LOW: localStorage.dumul_quality (persist). Save = tulis + reload. Reset = hapus preferensi, balik ke default HIGH (tanpa auto-detect device, lihat 01-core.js). */
   (function owlPerf(){
     var b=document.getElementById('owl-perf'),bSave=document.getElementById('owl-perf-save'),bReset=document.getElementById('owl-perf-reset'),bAct=document.getElementById('owl-perf-act'),bTxt=document.getElementById('owl-perf-t');
     if(!b)return;
@@ -263,7 +263,7 @@ document.addEventListener('pointerdown',function(e){
     if(bReset)bReset.addEventListener('click',function(e){
       e.stopPropagation();
       draft=null;
-      apply(null,true); /* hapus preferensi → device detect lagi */
+      apply(null,true); /* hapus preferensi → kembali ke default HIGH */
     });
   })();
 

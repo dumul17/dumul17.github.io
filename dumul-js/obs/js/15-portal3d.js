@@ -174,14 +174,13 @@ function* pt3dBuildG(){
   if(typeof threeWarm==='function')threeWarm(r,sc,cam,null,gl);
 }
 /* Build dipecah jadi 6 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG / scp3dBuildG. Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
-   tahap berikut di-unshift sehingga urutan antar modul tidak berubah. ?ps=0 = sinkron seperti dulu (A/B). Waktu tiap tahap (ms) -> window.__pt3dT, dicatat bench (R.pt3dT, R.ps).
+   tahap berikut di-unshift sehingga urutan antar modul tidak berubah. Waktu tiap tahap (ms) -> window.__pt3dT, dicatat bench (R.pt3dT).
    Kalau PT3D.state berubah dari 1 di antara dua tahap (mis. webglcontextlost -> pt3dFail), tahap berikutnya berhenti dan tidak menimpa state=3. */
-var PT3D_SLICE=(function(){var on=true;try{on=!/[?&]ps=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__ps=on?1:0;}catch(e2){}return on;})();
 function pt3dDrive(it,tm){
   var t0=performance.now(),r=it.next();
   try{tm.push(Math.round(performance.now()-t0));window.__pt3dT=tm;}catch(e){}
   if(r.done)return;
-  if(PT3D_SLICE&&typeof THREE_Q!=='undefined'){
+  if(typeof THREE_Q!=='undefined'){
     THREE_Q.q.unshift(function(){if(PT3D.state!==1)return;try{pt3dDrive(it,tm);}catch(e){pt3dFail(e&&e.message||e);}});
   }else pt3dDrive(it,tm);
 }
@@ -210,6 +209,25 @@ function pt3dWarmMax(){
       PT3D.res=res;threeGLSize(PT3D.gl,res,res);
       try{if(PT3D.sc&&PT3D.cam){threeGLBegin(PT3D.gl);PT3D.r.render(PT3D.sc,PT3D.cam);}}catch(eR){}
     }
+    return true;
+  }catch(e){return false;}
+}
+/* [PATCH v169] Sinkron GL pertama dibayar di boot, bukan di frame masuk sektor.
+   Masalah (dump 5 Nov): kanvas GL cincin (preserveDrawingBuffer=false) baru dipindah ke kanvas 2D lewat drawImage di frame overview pertama; drawImage itu memaksa GPU
+   menyelesaikan seluruh antrean yang menumpuk (link shader, upload tekstur, alokasi framebuffer) -> frame pertama 238-253 ms.
+   Di sini: 1x render lewat jalur yang sama dgn overview (pt3dRender: warna, tilt, resolusi) lalu drawImage ke kanvas 2D cadangan yang dibuang. Dipanggil 07-boot.js sekali,
+   begitu __bootVis (3D + warm shader selesai, fase tunggu SFX). Resolusi = pt3dRes(radius cincin overview), supaya overview tidak merealokasi framebuffer lagi.
+   Sengaja TIDAK menaikkan ke resMax / PT3D.big (itu tugas pt3dWarmMax saat dive / buka menu): resMax di overview = render lebih besar tiap frame. */
+function pt3dWarmSync(){
+  try{
+    if(PT3D.syncWarm||!pt3dUsable()||document.hidden||!PT3D.r||!PT3D.gl)return false;
+    var Rp=0;try{Rp=ptOrbRef();}catch(eR){}
+    if(!(Rp>2))Rp=Math.max(40,(typeof BH!=='undefined'?BH.R:26)*ptOvK());   /* sama dgn pra-ukur di pt3dBuildG */
+    PT3D.syncWarm=1;
+    pt3dRender(performance.now(),Rp,false,PT3D_CFG.tiltOv||0);   /* ikut setSize bila res beda, render, dan threeGLSnap bila renderer dibagi */
+    var rs=PT3D.res,cv=document.createElement('canvas');cv.width=cv.height=rs;
+    var cx=cv.getContext('2d');cx.drawImage(threeGLSrc(PT3D.gl),0,0,rs,rs);   /* inilah sinkron GPU->2D pertama */
+    cv.width=cv.height=0;   /* lepas memori kanvas cadangan */
     return true;
   }catch(e){return false;}
 }
@@ -652,13 +670,11 @@ function ptSparksDraw(g,Rin,now){
   g.restore();
 }
 /* x,y = pusat di layar, Rp = radius luar cincin (px), a = alpha 0..1 */
-/* Eksperimen diagnosa (opt-in, tidak mengubah default): ?pt2d=1 = cincin portal SELALU 2D (tanpa GL); ?pt2d=slow = 2D hanya saat FS.slow/heavy (bukan charge/zoom). Membandingkan: kalau biaya pt.* hilang tapi frame tidak turun, bottleneck = antrean GPU bersama, bukan portal. */
-var PT2D_Q=(/[?&]pt2d=(1|slow)(&|$)/.exec(location.search)||[])[1]||'';
 function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(!(Rp>2)||!(a>.01))return;
   opts=opts||{};var PXo=(typeof PX!=='undefined')?PX:{},ch=opts.ch||0,tk=Math.max(0,Math.min(1,opts.tilt||0)),tm=null;
   if(ch>0||opts.big)PT3D.big=1;
-  var use3d=pt3dUsable()&&!(PT2D_Q==='1'||(PT2D_Q==='slow'&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.big&&!opts.noMouth&&!(ch>0))),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
+  var use3d=pt3dUsable(),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
   g.save();
   g.translate(x,y);if(!opts.noRot&&typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());   /* noRot: window menu sektor (16) di luar stage, tidak ikut rotasi landscape */
   g.globalAlpha=a>1?1:a;
