@@ -609,7 +609,7 @@ var DUMUL_CHARS=(function(){
     sx=sfxStatus();au=audioStatus();
     if(sx.ok&&sx.total&&!logN.sfx){logN.sfx=1;ev.push({k:'ok',s:T('bl.sfx')+' '+T('bl.ready')});}
     /* satu kejadian tunggal tanpa antrean = jalur LIVE lama (jaringan lambat); >=2 kejadian dalam satu poll, atau antrean masih jalan = masuk antrean */
-    if(ev.length>=2||logQ.length||logCur){for(i=0;i<ev.length;i++)logQ.push(ev[i]);}
+    if(ev.length>=2||logQ.length||logCur){for(i=0;i<ev.length;i++){logQ.push(ev[i]);if(ev[i].k==='ok')logLast=ev[i].s;}}   /* [PATCH v176] logLast ikut kejadian yang masuk ANTREAN: dulu cuma jalur tunggal yang mengisinya, jadi begitu antrean habis baris balik ke kejadian tunggal terakhir yang basi (mis. "Suara bintang 6/16" padahal 16/16 sudah kelar) */
     else if(ev.length){e=ev[0];if(e.k==='ok')logLast=e.s;}
     /* baris LIVE (dipakai saat antrean kosong): tahap modul > BGM > bintang; GARG menyela 1 dtk tiap 3 dtk selama masih di-warm (atau sendirian kalau bintang sudah selesai) */
     if(!cur&&!au.ok&&bgmTot){cur=T('bl.bgm')+' \u00b7 '+(bgmNm||T('bl.a.bgm'))+' \u00b7 '+bgmN+'/'+bgmTot;}
