@@ -11,7 +11,8 @@
    Rombak F6 (mulut idle + charge + dive): (1) mulut wormhole IDLE di dalam cincin = terowongan warp mini (ptt*, buffer feedback 80px, ~30 fps) — tidak ada lagi mulut yang tumbuh di luar cincin saat hold / pindah sektor;
      (2) tekan & tahan: 12 plat menyala SATU PER SATU searah jarum jam (WORMHOLE.charge() 0..1), tiap plat memicu petir + percikan, full charge = ledakan petir + petir terus-menerus keliling cincin;
      (3) saat lompat, 09-wormhole.js memegang cincin (WORMHOLE.ringOwned) dan memanggil portal3dDraw(...,{noMouth:true,ch:1}) di kanvasnya sendiri: cincin membesar (zoom-in) dengan terowongan di dalamnya.
-   Matikan 3D saja: ?portal3d=0 atau localStorage dumul_portal3d=0 (cincin 2D tetap tampil). */
+   Matikan 3D saja: ?portal3d=0 atau localStorage dumul_portal3d=0 (cincin 2D tetap tampil).
+   Saklar pt2d (paksa cincin 2D tanpa memuat three.js, untuk tes fallback): ?pt2d=1 atau localStorage dumul_pt2d=1 (alias: ?portal3d=2d / dumul_portal3d=2d). */
 var PT3D_CFG={
   /* DEFAULT angka di bawah = hasil COPY TUNE 2026-10-28 (komentar angka lama bisa kadaluarsa) */
   on:true,
@@ -66,7 +67,9 @@ var PT3D_CFG={
 };
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
+  if(/[?&]pt2d=1(&|#|$)/.test(location.search)||/[?&]portal3d=2d(&|#|$)/.test(location.search)||localStorage.getItem('dumul_pt2d')==='1'||localStorage.getItem('dumul_portal3d')==='2d')PT3D_CFG.force2d=true;   /* saklar pt2d */
 }catch(ePT0){}
+try{window.__pt2d=PT3D_CFG.force2d?1:0;}catch(ePT1){}   /* dibaca 21-bench (R.pt2d) supaya dump self-describing */
 var PT_IN=PT3D_CFG.inR-.015;   /* rasio radius mulut terhadap Rp (dulu hard-code .745); dipakai juga 09-wormhole.js */
 var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0,tilt:null,lastTilt:-1,ovX:null,ovY:null,ovHid:0,orb:null,orbPhi:null,orbLast:0,orbInSect:0,cc:null,ccOK:0,ccRes:0,ccT:0};
 
@@ -74,6 +77,7 @@ function pt3dFail(why){PT3D.state=3;PT3D.err=String(why||'');try{console.warn('[
 function pt3dLoad(){
   if(PT3D.state!==0)return;
   if(!PT3D_CFG.on){PT3D.state=3;PT3D.err='off';return;}
+  if(PT3D_CFG.force2d){PT3D.state=3;PT3D.err='2d';return;}   /* saklar pt2d: three.js tidak dimuat, cincin 2D */
   PT3D.state=1;
   var go=function(){try{pt3dBuild();}catch(e){pt3dFail(e&&e.message||e);}};
   threeLoad(go,function(m){pt3dFail(m);});   /* pemuat bersama di 12-ast3d.js (import() dinamis, satu promise utk semua modul) */
