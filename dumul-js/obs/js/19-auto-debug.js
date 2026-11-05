@@ -15,6 +15,9 @@
  *     PERF  → ?perf=1    : snapshot overlay PERF; "Sweep PERF" menyapu semua PX_MODES otomatis (1 snapshot per mode)
  *               (PERF yang menyala dari localStorage dumul_perf=1 juga dikenali sebagai mode PERF)
  *     muffdbg → ?muffdbg : overlay #muff-dbg spatial audio (installMuff)
+ *   A/B q.big (baris di panel, tanpa mode): 4 tombol reload ke ?bench=1&gpup=1 + varian (base / ?perf=low / ?ast3d=0 / ?dpr=0.5).
+ *     Untuk membandingkan q.big (backlog GPU grup 'big') per mode ov / ov+H / sec+S. Dump tetap lewat bench (21-bench.js), BUKAN lewat PERF
+ *     (mode PERF mematikan akumulator bench, jadi q.* tidak terekam). Varian dibaca saat load (01-core / 12-ast3d), makanya reload.
  *   Langkah 1a: installPerf / installProbe / installWP / installMuff di file ini (sumber kebenaran body tooling).
  *   Override kualitas ?perf=high|low: baris "kualitas" di panel (auto/HIGH/LOW), ikut terbawa saat ganti mode.
  *   Mode dipilih = halaman reload dengan param yang pas (whperf/PERF/PROBE membaca
@@ -849,6 +852,43 @@
   }
   function go(url) { try { location.href = url; } catch (e) { log('gagal pindah: ' + e.message); } }
 
+  /* ---------- A/B q.big (bench + probe GPU) ----------
+     Tiap varian = reload ke ?debug=1&bench=1&gpup=1 + SATU override. Param lain (envsz, wi, gs, dst.) dipertahankan; yang dibersihkan hanya
+     mode debug (whperf/probe/pset/pin), perf (overlay 1 DAN override kualitas) dan dua param uji (ast3d, dpr), supaya varian tidak menumpuk.
+     Catatan: ?dpr hanya terbaca 0.4–1 (01-core.js) dan kanvas GL batu di-cap min(DPR, 1.25), jadi di HP DPR 1.6 baru di bawah ±0.78 ada efeknya. */
+  var AB_VARIANTS = [
+    { id: 'base',  label: 'base',     set: {} },
+    { id: 'low',   label: 'perf=low', set: { perf: 'low' } },
+    { id: 'noast', label: 'ast3d=0',  set: { ast3d: '0' } },
+    { id: 'dpr5',  label: 'dpr=0.5',  set: { dpr: '0.5' } }
+  ];
+  function abUrl(v) {
+    var u = new URL(location.href);
+    ['whperf', 'probe', 'perf', 'pset', 'pin', 'ast3d', 'dpr'].forEach(function (k) { u.searchParams.delete(k); });
+    u.searchParams.set('debug', '1');
+    u.searchParams.set('bench', '1');
+    u.searchParams.set('gpup', '1');
+    Object.keys(v.set).forEach(function (k) { u.searchParams.set(k, v.set[k]); });
+    return u.toString();
+  }
+  /* varian yang sedang jalan; null = bukan sesi A/B (tanpa bench+gpup) atau kombinasi manual lebih dari satu override */
+  function abCurrent() {
+    if (!/[?&]bench=1(&|$)/.test(Q) || !/[?&]gpup=1(&|$)/.test(Q)) return null;
+    var hit = [];
+    if (/[?&]perf=low(&|$)/.test(Q)) hit.push('low');
+    if (/[?&]ast3d=0(&|$)/.test(Q)) hit.push('noast');
+    if (/[?&]dpr=0\.5(&|$)/.test(Q)) hit.push('dpr5');
+    if (!hit.length) return 'base';
+    return hit.length === 1 ? hit[0] : null;
+  }
+  /* override yang diam-diam menang atas URL: ?ast3d=0 hanya mematikan, tapi localStorage dumul_ast3d=0 membuat 'base' tetap tanpa batu 3D */
+  function abWarn() {
+    var w = [];
+    try { if (localStorage.getItem('dumul_ast3d') === '0') w.push('localStorage dumul_ast3d=0 (batu 3D mati di SEMUA varian)'); } catch (e) {}
+    try { if (localStorage.getItem('dumul_quality')) w.push('localStorage dumul_quality=' + localStorage.getItem('dumul_quality') + ' (base ikut itu)'); } catch (e2) {}
+    return w;
+  }
+
   /* ---------- sektor / dive ---------- */
   function validSectors() {
     if (typeof SECT === 'undefined' || !SECT.list) return [];
@@ -1527,6 +1567,19 @@
     }, MODE === 'whperf'));
     panel.appendChild(modes);
 
+    /* —— A/B q.big: reload ke bench+probe GPU + 1 varian —— */
+    panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'A/B q.big (bench + gpup):'));
+    var abRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
+    var abCur = abCurrent();
+    AB_VARIANTS.forEach(function (v) {
+      abRow.appendChild(btn(v.label, function () {
+        if (running) return log('tunggu tes selesai');
+        if (abCur === v.id) return log('varian ' + v.label + ' sudah aktif — jalankan overview + sektor, lalu dump bench');
+        go(abUrl(v));
+      }, abCur === v.id));
+    });
+    panel.appendChild(abRow);
+
     var status = mk('div', 'opacity:.9;min-height:2.6em;margin-bottom:8px;font-size:10px;line-height:1.35', 'siap');
     panel.appendChild(status);
 
@@ -1677,7 +1730,10 @@
       probe: 'PROBE silent — diam sampai selesai → Hasil / Export',
       perf: 'Snap sekali atau Sweep semua mode → Export'
     };
-    log(MODE ? boot[MODE] : 'pilih Probe atau PERF');
+    if (abCur) {
+      var abw = abWarn();
+      log('A/B q.big: varian ' + abCur + ' — tunggu post-boot, diam di overview, masuk sektor, lalu dump bench' + (abw.length ? '  ⚠ ' + abw.join('; ') : ''));
+    } else log(MODE ? boot[MODE] : 'pilih Probe, PERF, atau varian A/B');
   }
 
   window.__WH_AD = {
@@ -1700,6 +1756,8 @@
     traceSave: traceSave,
     cfg: CFG,
     mode: MODE,
+    abUrl: function (id) { for (var i = 0; i < AB_VARIANTS.length; i++) if (AB_VARIANTS[i].id === id) return abUrl(AB_VARIANTS[i]); return ''; },
+    abCurrent: abCurrent,
     get store() { return store.slice(); },
     get probes() { return probeStore.slice(); },
     get perfs() { return perfStore.slice(); },
