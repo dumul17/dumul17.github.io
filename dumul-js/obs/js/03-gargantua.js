@@ -287,6 +287,23 @@ function drawHoleFallback(now,age){
   g.strokeStyle='rgba(255,255,252,.95)';g.lineWidth=Math.max(1,R*.055);g.beginPath();g.arc(0,0,R*1.025,0,6.283);g.stroke();
   g.restore();
 }
+/* v-perf: sprite serat cakram + bloom BH (bhFiberSprite ±36 ms, bhBloomSprite ±1 ms) dibuat LAZY saat BH mini pertama digambar di sektor (dump: event 35,6 ms di +32 dtk setelah masuk). Di overview BH diganti portal 3D jadi tidak pernah dipakai sampai masuk sektor. Dibangun lebih awal, SATU per tick, dengan gerbang yang sama dgn nebPrefetch (kapsul/bootDone, tidak hidden/transisi/heavy). Cache BH_FIB berkunci R*DPR: resize yang mengubah R tetap bangun ulang lazy seperti dulu. */
+var BHW={n:0,st:0,t:0};
+function bhSpriteWarm(){
+  BHW.t=0;
+  try{
+    if(BHW.st>=2||++BHW.n>80)return;   /* selesai / menyerah (~40 dtk) */
+    var cap=false,b3=window.__boot3d,w=window.WORMHOLE,s=window.SECT,menu=typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing);
+    try{cap=performance.getEntriesByName('obs-capsule').length>0;}catch(eC){}
+    var bootOK=(typeof bootDone!=='undefined'&&bootDone)||(cap&&(!b3||b3.warm));
+    var full=!!(typeof BH_CSS!=='undefined'&&BH_CSS.spr&&BH.sprite===BH_CSS.spr);
+    if(!bootOK||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy&&!menu)||!(BH.R>2)||!full){BHW.t=setTimeout(bhSpriteWarm,500);return;}
+    if(BHW.st===0){bhBloomSprite();BHW.st=1;}
+    else{bhFiberSprite();BHW.st=2;return;}
+    BHW.t=setTimeout(bhSpriteWarm,150);
+  }catch(e){}
+}
+BHW.t=setTimeout(bhSpriteWarm,2000);
 function drawHoleSafe(now,age){
   if(WH_NOHOLE&&typeof WORMHOLE!=='undefined'&&WORMHOLE.on)return;   /* ?whdbg=nohole: lewati juga drawHoleFallback */
   try{

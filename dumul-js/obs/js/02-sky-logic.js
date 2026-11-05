@@ -1486,12 +1486,13 @@ function nebPrefetch(){
     var b=NEB.base;if(!b||NEB._bdK===b||NEBJ)return;
     var menu=typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing),w=window.WORMHOLE,s=window.SECT,cap=false;
     try{cap=performance.getEntriesByName('obs-capsule').length>0;}catch(eC){}   /* kapsul sudah muncul (menunggu tap, GPU sepi) = jendela warm terbaik: jalan di SINI, sebelum overview mulai merender GL */
-    if(((typeof bootDone==='undefined'||!bootDone)&&!cap)||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy&&!menu)){NEB.pfT=setTimeout(nebPrefetch,400);return;}   /* heavy ditahan, kecuali menu sektor terbuka (sky beku) */
+    var b3=window.__boot3d,bootOK=(typeof bootDone!=='undefined'&&bootDone)||(cap&&(!b3||b3.warm));   /* kapsul: tunggu warm shader 3D selesai (antrean GPU kosong) -> bacaan pertama lebih murah (dump: 139 ms saat antrean GL masih penuh) */
+    if(!bootOK||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy&&!menu)){NEB.pfT=setTimeout(nebPrefetch,400);return;}   /* heavy ditahan, kecuali menu sektor terbuka (sky beku) */
     var P=NEB._pf;
     if(!P||P.b!==b)P=NEB._pf={b:b,y:0,n:Math.max(8,Math.ceil(b.height/8)),buf:new Uint8ClampedArray(b.width*b.height*4)};
     var t0=performance.now(),rn=Math.min(P.n,b.height-P.y);
     P.buf.set(b.getContext('2d').getImageData(0,P.y,b.width,rn).data,P.y*b.width*4);
-    try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<24)DB.push(['pf',P.y,Math.round((performance.now()-t0)*10)/10]);}catch(eDb){}
+    try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<24)DB.push(['pf',P.y,Math.round((performance.now()-t0)*10)/10,Math.round(t0),(window.__boot3d&&window.__boot3d.warm)?1:0]);}catch(eDb){}
     P.y+=rn;
     if(P.y<b.height){NEB.pfT=setTimeout(nebPrefetch,0);return;}
     if(NEB.base===b){NEB._bd=P.buf;NEB._bdK=b;}

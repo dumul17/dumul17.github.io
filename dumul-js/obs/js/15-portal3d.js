@@ -652,11 +652,13 @@ function ptSparksDraw(g,Rin,now){
   g.restore();
 }
 /* x,y = pusat di layar, Rp = radius luar cincin (px), a = alpha 0..1 */
+/* Eksperimen diagnosa (opt-in, tidak mengubah default): ?pt2d=1 = cincin portal SELALU 2D (tanpa GL); ?pt2d=slow = 2D hanya saat FS.slow/heavy (bukan charge/zoom). Membandingkan: kalau biaya pt.* hilang tapi frame tidak turun, bottleneck = antrean GPU bersama, bukan portal. */
+var PT2D_Q=(/[?&]pt2d=(1|slow)(&|$)/.exec(location.search)||[])[1]||'';
 function portal3dDraw(g,x,y,Rp,now,a,opts){
   if(!(Rp>2)||!(a>.01))return;
   opts=opts||{};var PXo=(typeof PX!=='undefined')?PX:{},ch=opts.ch||0,tk=Math.max(0,Math.min(1,opts.tilt||0)),tm=null;
   if(ch>0||opts.big)PT3D.big=1;
-  var use3d=pt3dUsable(),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
+  var use3d=pt3dUsable()&&!(PT2D_Q==='1'||(PT2D_Q==='slow'&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.big&&!opts.noMouth&&!(ch>0))),still=(typeof reduce!=='undefined'&&reduce)||(typeof IS_POTATO!=='undefined'&&IS_POTATO),playing=ptPlaying();
   g.save();
   g.translate(x,y);if(!opts.noRot&&typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')g.rotate(upAng());   /* noRot: window menu sektor (16) di luar stage, tidak ikut rotasi landscape */
   g.globalAlpha=a>1?1:a;

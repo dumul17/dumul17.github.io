@@ -869,7 +869,7 @@
   var PB_MS = (function () { var m = /[?&]pbms=(\d+)/.exec(location.search); return m ? Math.max(5000, +m[1]) : 60000; })();
   var PB = { ev: [], agg: {}, ric: [], ricN: 0, ricMs: 0, loaf: [], lt: [], fr: {}, mem: [], t0: null, tEnd: null, wrapped: [], missing: [], sampler: false };
   var PB_FN = ['bakeAstroPlates', 'bakeDustLayers', 'bakeHudGeom', 'bakeCamGrid', 'ensureCamGrid', 'nebTint', 'nebTintStep', 'nebTintSync', 'nebLiteFallback',
-    'bhBandBake', 'bhCssApply', 'bhBloomSprite', 'bhFiberSprite', 'buildSprite', 'ensureAsteroidSprites', 'ofxMakeTint', 'ringWarmStep', 'getRingSprite', 'getStarSprite',
+    'bhBandBake', 'bhCssApply', 'bhBloomSprite', 'bhFiberSprite', 'buildSprite', 'ensureAsteroidSprites', 'ofxMakeTint', 'ringWarmStep', 'nebPrefetch', 'bhSpriteWarm', 'getRingSprite', 'getStarSprite',
     'skyWarmStep', 'snBake', 'bakeCometSprites', 'panelWarmOnce', 'whPrewarm', 'buildSprites', 'threeWarm', 'threeWarmNext', 'threeGLWarmBegin',
     'pl3dBake2D', 'pl3dAurBake', 'pl3dAurBakeMk', 'pt3dWarmMax', 'warmRest', 'warmPump'];
   function pbArg(a) {
@@ -1059,7 +1059,7 @@
       threeWarm: tw ? { total: tw.total, done: tw.done, busy: tw.busy, qlen: tw.q ? tw.q.length : null } : null,
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
-      pmk: pmOut(), fsState: fsOut(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': '[ukuran base, y band, ms alokasi buffer, ms getImageData band, ms salin]',
+      pmk: pmOut(), fsState: fsOut(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
     };
