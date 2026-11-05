@@ -832,7 +832,7 @@ var zmN=0,CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
    Keluar dari slow cuma kalau frame < 23 ms selama 5 dtk (histeresis lebar: saat slow beban memang turun, jangan bolak-balik). Interaksi (pan/zoom/tap) tetap tiap frame:
    cache asteroid dibatalkan sendiri oleh AST3D.ver, aurora ikut parallax saat blit.
    ?fs=0 mati, ?fs=2 paksa slow (tes), default auto. Di ?probe=1 default MATI (supaya tidak mengacaukan ukuran) kecuali ?fs= diisi. */
-var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',cfg:{warm:8000,enter:40,hold:3000,leave:23,leaveHold:5000,clamp:80,resume:3000}};
+var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',heavy:false,ht:0,hlog:[],cfg:{warm:8000,enter:40,hold:3000,leave:23,leaveHold:5000,clamp:80,resume:3000,hOn:28,hOnHold:1500,hOff:22,hOffHold:3000,hMinN:60}};   /* heavy = beban sedang (EMA>28 ms ≥1,5 dtk), TANPA menunggu warm 8 dtk; histeresis keluar <22 ms ≥3 dtk. Dipakai untuk menahan kerja latar (ringWarmStep) — BUKAN mengubah gambar. */
 /* HARDENING (perangkat kuat TIDAK boleh masuk slow): keputusan slow ditunda sampai `warm` ms setelah boot (kompilasi shader / muat three.js / dekode gambar bikin frame panjang sesaat),
    timer di-reset selama transisi sektor / wormhole, dan `resume` ms setelah tab kembali dari background (celah frame >= 250 ms). Stall tunggal diklem `clamp` ms (dulu 120)
    supaya satu frame panjang tidak menggeser EMA. Masuk slow butuh EMA > `enter` ms terus-menerus `hold` ms. FS.why = alasan terakhir slow menyala / mati (tampil di HUD PERF). */
@@ -851,11 +851,18 @@ function fsTick(now){
   var C=FS.cfg,iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
   var mn=fsMenu();
   if(mn){FS.wasMenu=1;FS.t=0;return;}   /* menu terbuka: EMA tidak diracuni, keputusan slow/normal ditahan (dulu: interval compositor menu bikin SLOW nyangkut) */
-  if(FS.wasMenu){FS.wasMenu=0;FS.ema=16.7;FS.grace=now+C.resume;FS.t=0;return;}   /* menu baru tutup: buang EMA lama, ukur ulang dari frame sky nyata */
-  if(iv>=250)FS.grace=now+C.resume;   /* celah panjang (tab background / render ditahan): tunda keputusan, EMA tidak diracuni */
+  if(FS.wasMenu){FS.wasMenu=0;FS.ema=16.7;FS.grace=now+C.resume;FS.t=0;FS.heavy=false;FS.ht=0;return;}   /* menu baru tutup: buang EMA lama, ukur ulang dari frame sky nyata */
+  if(iv>=250){FS.grace=now+C.resume;FS.ht=0;}   /* celah panjang (tab background / render ditahan): tunda keputusan, EMA tidak diracuni */
   if(iv>0&&iv<250)FS.ema+=(Math.min(iv,C.clamp)-FS.ema)*.08;
-  if(FS.mode===0){FS.slow=false;return;}
-  if(FS.mode===2){FS.slow=true;return;}
+  if(FS.mode===0){FS.slow=false;FS.heavy=false;return;}
+  if(FS.mode===2){FS.slow=true;FS.heavy=true;return;}
+  if(FS.n>C.hMinN&&!fsBusy()){   /* heavy: jalan sebelum/tanpa grace warm, EMA tidak dihitung saat transisi */
+    if(!FS.heavy){
+      if(FS.ema>C.hOn){if(!FS.ht)FS.ht=now;else if(now-FS.ht>C.hOnHold){FS.heavy=true;FS.ht=0;if(FS.hlog.length<30)FS.hlog.push([Math.round(now),1,Math.round(FS.ema)]);}}else FS.ht=0;
+    }else{
+      if(FS.ema<C.hOff){if(!FS.ht)FS.ht=now;else if(now-FS.ht>C.hOffHold){FS.heavy=false;FS.ht=0;if(FS.hlog.length<30)FS.hlog.push([Math.round(now),0,Math.round(FS.ema)]);}}else FS.ht=0;
+    }
+  }
   if(!FS.grace)FS.grace=now+C.warm;
   if(now<FS.grace||fsBusy()){FS.t=0;return;}   /* belum waktunya memutuskan / lagi transisi: jangan hitung */
   if(!FS.slow){
@@ -979,7 +986,7 @@ function frame(now){
     try{drawAsteroids(now,-1);}catch(err){window.__hub.renderError='drawAsteroidsBack: '+(err&&err.message||err);} /* separuh belakang: di belakang Rasi & BH */
     pmk('shoot+astB');
     cullBegin();
-    sectStep(now);
+    sectStep(now);pmk('sectStep');
     if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);try{if(typeof drawTxLines==='function')drawTxLines(now);}catch(eTx){}}
     else{
     if(!PX.lines)CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
@@ -1008,9 +1015,11 @@ function frame(now){
     pmk('portals');
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
     try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* seluruh orbit asteroid (separuh depan juga) di BELAKANG planet: digambar sebelum planet3dDraw, jadi permukaan planet menutupinya */
-    try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
+    pmk('astF');
+    try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}
+    pmk('teleTop');   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
-    pmk('planet');   /* hanya planet3dDraw (shader band + efek 2D) */
+    pmk('planet');   /* hanya planet3dDraw (shader band + efek 2D); astF + teleTop dipisah di atasnya */
     try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
     pmk('txTop');   /* drone TX/RX 3D (14-drone3d) + planetGroundAt */
     pmk('astFront');

@@ -1360,7 +1360,7 @@ function nebBase(EW,EH,ds){
   var hh=Math.hypot(cw,ch)*.5,vg2=x.createRadialGradient(cw/2,ch/2,hh*.45,cw/2,ch/2,hh);
   vg2.addColorStop(0,'rgba(0,0,0,0)');vg2.addColorStop(.7,'rgba(0,0,0,'+(.15*NEB.VIG)+')');vg2.addColorStop(1,'rgba(0,0,0,'+(.65*NEB.VIG)+')');
   x.fillStyle=vg2;x.fillRect(0,0,cw,ch);
-  NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;return c;
+  NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;NEB._bd=null;NEB._bdK=null;return c;
 }
 /* ---------- Milky Way overview (gambar, ROLLING mendatar) ----------
    HANYA overview (SECT.on). Di dalam sektor tidak disentuh (plateDeep + nebula.webp jalan persis seperti dulu; bgCanvas kosong kalau nebula gambar aktif).
@@ -1484,7 +1484,12 @@ function nebTintStep(){
   try{
     if(J.st===0){
       var w=J.base.width,h=J.base.height,s=J.s,A=s.sky.acc,k=w/(W+2*plateM),bd=null,rgb;
-      try{bd=J.base.getContext('2d').getImageData(0,0,w,h).data;}catch(eG){bd=null;}
+      /* v-perf: bd (piksel mentah NEB.base) sama untuk semua sektor -> baca SEKALI, pakai ulang. Dulu getImageData penuh (spike ±49 ms) diulang tiap sektor. Kunci = objek canvas NEB.base (diganti baru di nebBase -> cache otomatis basi). */
+      if(NEB._bdK===J.base&&NEB._bd)bd=NEB._bd;
+      else{
+        try{bd=J.base.getContext('2d').getImageData(0,0,w,h).data;}catch(eG){bd=null;}
+        if(bd){NEB._bd=bd;NEB._bdK=J.base;}
+      }
       if(!bd){NEB.tintSync=1;NEBJ=null;return;}   /* getImageData ditolak -> jalur lama (blend 'color') */
       J.w=w;J.h=h;J.bd=bd;J.c=document.createElement('canvas');J.c.width=w;J.c.height=h;
       J.x=J.c.getContext('2d');J.id=J.x.createImageData(w,h);J.d=J.id.data;
@@ -1495,7 +1500,7 @@ function nebTintStep(){
     }else if(J.st===1){
       var wg,d=J.d,bd2=J.bd,n=d.length,i=J.i,lim,lo=J.lo,hi=J.hi,A2=J.A,hS=J.hS,hA=J.hA,ax=J.ax,ay=J.ay,R=J.R,sf=J.sf,w2=J.w,p,m,hb,nh,ns,l,q,pp;
       while(i<n){
-        lim=Math.min(n,i+16384);
+        lim=Math.min(n,i+8192);   /* chunk 2048 px (dulu 4096): cek budget lebih sering, irisan tidak overshoot sampai 7 ms */
         for(;i<lim;i+=4){
           m=(.3*bd2[i]+.59*bd2[i+1]+.11*bd2[i+2]-lo)/(hi-lo);m=m<0?0:m>1?1:m;
           if(m<=0)continue;
@@ -1508,7 +1513,7 @@ function nebTintStep(){
           q=l<.5?l*(1+ns):l+ns-l*ns;pp=2*l-q;
           d[i]=nebC(pp,q,nh+1/3)*255;d[i+1]=nebC(pp,q,nh)*255;d[i+2]=nebC(pp,q,nh-1/3)*255;
         }
-        if(performance.now()-t0>3)break;
+        if(performance.now()-t0>2.5)break;
       }
       J.i=i;if(i>=n)J.st=2;
     }else{

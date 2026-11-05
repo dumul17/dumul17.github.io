@@ -1595,7 +1595,7 @@ function ringWarmStep(){
   try{
     if(!RW.on)return;
     var w=window.WORMHOLE,s=window.SECT;
-    if(typeof bootDone==='undefined'||!bootDone||document.hidden||(w&&w.busy)||(s&&s.busy)||typeof TRIGGERS==='undefined'){setTimeout(ringWarmStep,1200);return;}
+    if(typeof bootDone==='undefined'||!bootDone||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy)||typeof TRIGGERS==='undefined'){setTimeout(ringWarmStep,1200);return;}   /* FS.heavy: tahan warm saat frame berat (05-sector-ui) */
     if(!RW.list){
       var seen={},k,rg,q,L=[];
       for(k in TRIGGERS){rg=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rg&&!seen[rg]){seen[rg]=1;for(q=5.5;q<=16.5;q+=.5)L.push([rg,q]);}}
