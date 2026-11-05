@@ -674,7 +674,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
     if(mAct>.004){   /* idle: lewati semua (ptMouth, terowongan, pttStep, bintang) -> tengah cincin transparan, cuma petir */
       var ga0=g.globalAlpha;
       if(mAct<1)g.globalAlpha=ga0*mAct;
-      if(still||!pttDrawAlt(g,Rm,now,!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.big&&!(ch>0))))ptMouth(g,Rm,now,!still);   /* terowongan warp mini; statis kalau potato / reduce motion */
+      if(still||!pttDrawAlt(g,Rm,now,!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.big&&!(ch>0))))ptMouth(g,Rm,now,!still);   /* terowongan warp mini; statis kalau potato / reduce motion */
       g.globalAlpha=ga0;
     }
   }
@@ -690,7 +690,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
     try{
       /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
       var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
-      var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&FS.slow&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
+      var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
       var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0):(FS.n&1)===1)   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
       if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
         PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);

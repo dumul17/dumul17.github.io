@@ -1482,14 +1482,22 @@ function nebTintStep(){
   if(NEB.base!==J.base||NEB.tint!==J.tint){NEBJ=null;return;}
   var t0=performance.now();
   try{
+    if(J.st===0&&!J.bdR){
+      /* v-perf: baca piksel mentah NEB.base (bd) di irisan TERPISAH & per pita baris (8 pita): getImageData penuh = spike ±42-49 ms di panggilan pertama. bd sama untuk semua sektor -> di-cache di NEB (kunci = objek canvas NEB.base; diganti baru di nebBase -> cache otomatis basi), sektor berikutnya tanpa baca ulang. */
+      if(NEB._bdK===J.base&&NEB._bd)J.bdR=NEB._bd;
+      else{
+        var w0=J.base.width,h0=J.base.height,rb=J.rb||(J.rb={buf:new Uint8ClampedArray(w0*h0*4),y:0,n:Math.max(8,Math.ceil(h0/8))});
+        var ry=rb.y,rn=Math.min(rb.n,h0-ry);
+        rb.buf.set(J.base.getContext('2d').getImageData(0,ry,w0,rn).data,ry*w0*4);
+        rb.y=ry+rn;
+        if(rb.y<h0){J.tm=setTimeout(nebTintStep,0);return;}
+        J.bdR=rb.buf;NEB._bd=rb.buf;NEB._bdK=J.base;J.rb=null;
+        J.tm=setTimeout(nebTintStep,0);return;   /* setup (canvas + createImageData) di irisan berikutnya */
+      }
+    }
     if(J.st===0){
       var w=J.base.width,h=J.base.height,s=J.s,A=s.sky.acc,k=w/(W+2*plateM),bd=null,rgb;
-      /* v-perf: bd (piksel mentah NEB.base) sama untuk semua sektor -> baca SEKALI, pakai ulang. Dulu getImageData penuh (spike ±49 ms) diulang tiap sektor. Kunci = objek canvas NEB.base (diganti baru di nebBase -> cache otomatis basi). */
-      if(NEB._bdK===J.base&&NEB._bd)bd=NEB._bd;
-      else{
-        try{bd=J.base.getContext('2d').getImageData(0,0,w,h).data;}catch(eG){bd=null;}
-        if(bd){NEB._bd=bd;NEB._bdK=J.base;}
-      }
+      bd=J.bdR;J.bdR=null;
       if(!bd){NEB.tintSync=1;NEBJ=null;return;}   /* getImageData ditolak -> jalur lama (blend 'color') */
       J.w=w;J.h=h;J.bd=bd;J.c=document.createElement('canvas');J.c.width=w;J.c.height=h;
       J.x=J.c.getContext('2d');J.id=J.x.createImageData(w,h);J.d=J.id.data;
