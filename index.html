@@ -321,27 +321,33 @@
 <script defer src="dumul-js/obs/js/04-render.js?v=146"></script>
 <script defer src="dumul-js/obs/js/05-sector-ui.js?v=185"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=129"></script>
-<script defer src="dumul-js/obs/js/07-boot.js?v=170"></script>
+<script defer src="dumul-js/obs/js/07-boot.js?v=171"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=15"></script>
 <script defer src="dumul-js/obs/js/09-wormhole.js?v=44"></script>
-<script defer src="dumul-js/obs/js/10-ui-sound.js?v=8"></script>
+<script defer src="dumul-js/obs/js/10-ui-sound.js?v=9"></script>
 <script>
-/* Live counter: dimuat BELAKANGAN (setelah window load + idle) supaya Firebase dari gstatic nggak rebutan bandwidth dengan boot & audio.
-   Path + ?v= di import() harus sama persis dengan SHELL service-worker.js (check-sky.js memeriksa). Gagal muat = counter tetap tersembunyi. */
+/* Live counter (Firebase): sekarang termasuk PRA-KAPSUL. 07-boot.js memanggil window.__liveLoad() begitu 3D + warm shader selesai (layar boot masih menutup, lihat blok PRA-KAPSUL di sana),
+   jadi evaluasi modul Firebase (~80-90 ms di HP) tidak lagi jatuh di Blue / frame pertama sektor. Jalur lama di bawah tetap ada sebagai CADANGAN (boot macet / 3D gagal / kunjungan tanpa vis):
+   setelah window load + idle, boot selesai (bootDone), wormhole/sektor tidak sibuk; cek tiap 1,5 dtk, batas ~60 dtk menunggu boot. __liveLoad idempoten: import() hanya SEKALI.
+   Path + ?v= di import() harus sama persis dengan SHELL service-worker.js (check-sky.js memeriksa). Gagal muat = counter tetap tersembunyi.
+   Flag A/B ?nolive=1 sudah dihapus (tidak dibutuhkan lagi). */
 (function () {
-  /* v22: evaluasi modul Firebase (~90ms di HP) jangan jatuh di boot atau di tengah animasi. Tunggu: boot selesai (bootDone) + wormhole/sektor tidak sibuk; cek tiap 1,5 dtk.
-     Batas: setelah ~60 dtk menunggu boot, lanjut asal tidak sedang transisi. ?nolive=1 = counter tidak dimuat sama sekali (A/B lag). */
+  var p = null;
+  window.__liveLoad = function () {
+    if (!p) { try { p = import('./dumul-js/obs/js/11-live-count.js?v=5').catch(function () {}); } catch (e) { p = Promise.resolve(); } }
+    return p;
+  };
   var tries = 0;
   function go() {
     var w = window.WORMHOLE, s = window.SECT, boot = (typeof bootDone !== 'undefined' && bootDone);
+    if (p) return;
     if ((!boot && tries++ < 40) || (w && w.busy) || (s && s.busy)) { setTimeout(go, 1500); return; }
-    try { import('./dumul-js/obs/js/11-live-count.js?v=5').catch(function () {}); } catch (e) {}
+    window.__liveLoad();
   }
   function idle() {
-    if (/[?&]nolive=1(&|$)/.test(location.search)) return;
     if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 6000 }); else setTimeout(go, 3000);
   }
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
@@ -636,7 +642,7 @@ if ('serviceWorker' in navigator) {
 <script>/* Bench (21-bench.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau URL punya ?bench=1. document.write supaya jalan SINKRON di titik ini
    (sebelum semua script defer) — wrapper rIC / WebGLRenderer / observer harus terpasang sebelum modul jalan, jadi TIDAK bisa pindah ke 19-auto-debug.js (dimuat setelah window load).
    Sengaja TIDAK di SHELL service-worker (sama seperti 19/20). Naikkan ?v= kalau isi 21-bench.js berubah. */
-(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.22"></scr'+'ipt>');}catch(e){}})();
+(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.23"></scr'+'ipt>');}catch(e){}})();
 </script>
 </body>
 </html>
