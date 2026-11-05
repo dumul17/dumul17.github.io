@@ -1583,7 +1583,7 @@
     if (/[?&]bench=1(&|$)/.test(Q) && /[?&]gpup=1(&|$)/.test(Q)) {
       panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'seq tanpa reload (±75 dtk, jangan ganti mode):'));
       var seqRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-      [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2']].forEach(function (c) {
+      [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2']].forEach(function (c) {
         seqRow.appendChild(btn(c[0], function () {
           if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
           if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
