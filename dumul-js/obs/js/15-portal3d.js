@@ -27,6 +27,9 @@ var PT3D_CFG={
   ringAcc:'160,120,255',   /* aksen tepi dalam cincin (lilac, dari hemisphere violet 0x7a5cd8 + rim magenta di scope3d/drone3d) */
   plateCol:0x161c23,       /* warna dasar plat gunmetal (hull scope 0x44505c / 0x2b333c, tapi di sini tanpa envMap jadi dibuat gelap) */
   alt:1,            /* HP lambat (governor FS.slow di 05-sector-ui.js): render GL cincin cuma tiap 2 frame (genap), frame ganjil memakai hasil terakhir dari kanvas cache 2D. 0 = selalu tiap frame. Petir/percikan/mulut/kilau tetap tiap frame (digambar 2D di luar GL); tidak berlaku saat charge (ch>0), zoom wormhole (big/noMouth) atau window menu */
+  ovAlt:2,          /* [ovalt] selang-seling GL cincin di OVERVIEW sejak frame pertama, TANPA menunggu FS.slow/FS.heavy (governor butuh ±8 dtk warm + 0,8-3 dtk hold, jadi detik awal selalu render penuh). Nilai = periode (2 = GL tiap 2 frame, 0/1 = mati, perilaku lama). Murni lokal portal: pakai jalur opts.alt2 + counter sendiri (PT3D.oN), TIDAK membaca/menulis FS.* (n, slow, heavy, ema) maupun PL3D_CFG (fps/bands/bandMin), jadi AST3D/SCP3D/DR3D/PL3D tidak ikut berubah. Cincin cuma putar 5°/dtk -> refresh 15-30 Hz tak terlihat; petir/percikan/kilau/mulut tetap tiap frame (2D). URL ?ovalt=N (A/B) */
+  ovAltIdle:3,      /* periode saat IDLE (tanpa SFX/audio, tanpa transisi sektor/wormhole). Naik hanya setelah idle ovAltHold ms terus-menerus; turun ke ovAlt SEGERA saat ada aktivitas (lampu plat ikut level audio -> perlu lebih rapat). Histeresis ini juga mencegah EMA frame (FS.ema -> pita adaptif planet) bolak-balik */
+  ovAltHold:1500,
   idleMouth:1,      /* 1 = saat idle mulut wormhole HILANG TOTAL (tanpa gradien gelap, spiral, terowongan, bintang; cuma cincin + petir idle). Mulut muncul (fade mouthIn) saat audio/SFX main (ptPlaying), charge, zoom wormhole, atau transisi sektor (WORMHOLE.busy/SECT.busy), lalu hilang lagi (fade mouthOut). Potato / reduce motion: muncul statis. 0 = mulut selalu ada seperti dulu */
   mouthIn:.3,       /* detik: fade muncul mulut saat bangun dari idle */
   mouthOut:.6,      /* detik: fade hilang mulut setelah aktivitas berhenti */
@@ -68,6 +71,7 @@ var PT3D_CFG={
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
   if(/[?&]pt2d=1(&|#|$)/.test(location.search)||/[?&]portal3d=2d(&|#|$)/.test(location.search)||localStorage.getItem('dumul_pt2d')==='1'||localStorage.getItem('dumul_portal3d')==='2d')PT3D_CFG.force2d=true;   /* saklar pt2d */
+  var _oa=/[?&]ovalt=([0-9]+)/.exec(location.search);if(_oa)PT3D_CFG.ovAlt=parseInt(_oa[1],10);   /* A/B: ?ovalt=0 = perilaku lama (alt hanya FS.slow/heavy), ?ovalt=3 = periode 3 */
 }catch(ePT0){}
 try{window.__pt2d=PT3D_CFG.force2d?1:0;}catch(ePT1){}   /* dibaca 21-bench (R.pt2d) supaya dump self-describing */
 var PT_IN=PT3D_CFG.inR-.015;   /* rasio radius mulut terhadap Rp (dulu hard-code .745); dipakai juga 09-wormhole.js */
@@ -716,7 +720,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
       var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
       var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
-      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0):(FS.n&1)===1)   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
+      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?(opts.ov?((PT3D.oN=(PT3D.oN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0):((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0)):(FS.n&1)===1)   /* opts.ov (overview) = counter oN sendiri, terpisah dari wN milik zoom wormhole (09) */   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
       if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
         PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);pmk('pt.gl');
         if(alt){
@@ -810,6 +814,17 @@ function ptOvPos(){return(PT3D.ovX!=null)?[PT3D.ovX,PT3D.ovY]:camBH();}
 /* (P4 lama: portal hilang di balik planet) sekarang selalu false, orbit biasa tanpa terbit/tenggelam */
 function ptOvHidden(){return false;}
 
+/* Periode selang-seling GL cincin overview (0 = render tiap frame). Lokal portal: tidak menyentuh FS.*, PL3D_CFG, atau unit 3D lain.
+   Aktivitas (SFX/audio, transisi sektor, wormhole) -> ovAlt segera; idle ovAltHold ms terus-menerus -> ovAltIdle. Saat charge (ch>0) = 0 (render penuh, jalur lama). */
+function ptOvAlt(now,ch){
+  var P=PT3D_CFG.ovAlt|0;
+  if(P<2||ch>0){PT3D.ovAI=0;return 0;}
+  var idle=!ptPlaying()&&!(typeof SECT!=='undefined'&&SECT.busy)&&!(typeof whBusy==='function'&&whBusy());
+  if(!idle){PT3D.ovAI=0;return P;}
+  if(!PT3D.ovAI)PT3D.ovAI=now;
+  var I=PT3D_CFG.ovAltIdle|0;
+  return(I>P&&now-PT3D.ovAI>=PT3D_CFG.ovAltHold)?I:P;
+}
 /* Overview: dipanggil dari drawHole (03-gargantua.js) menggantikan gambar BH. R = horizon BH sudah termasuk intro/terowongan (ARV)/swallow. true = sudah digambar. */
 function portal3dOverview(now,bp,R){
   if(!(R>1))return false;
@@ -819,7 +834,9 @@ function portal3dOverview(now,bp,R){
   var op=portalOrbit(now,bp,Rp),px=op.x,py=op.y,tk=PT3D_CFG.tiltOv||0;
   Rp*=op.s||1;   /* orbit ala drone: sedikit membesar di sisi dekat, mengecil di sisi jauh (PT3D_CFG.orb.depth); ovR (hit-test tap) ikut */
   var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
-  if(!smenuHidesSky()&&!(typeof PX!=='undefined'&&PX.pt))portal3dDraw(g,px,py,Rd,now,1,(ch>0||tk>0)?{ch:ch,tilt:tk}:null);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
+  var ova=ptOvAlt(now,ch),ovo=null;
+  if(ch>0||tk>0||ova){ovo=PT3D.ovO||(PT3D.ovO={ch:0,tilt:0,alt2:0,ov:1});ovo.ch=ch;ovo.tilt=tk;ovo.alt2=ova;}   /* objek dipakai ulang (tanpa alokasi per frame); alt2/ov cuma diset dari sini -> menu sektor (16) dan zoom wormhole (09) tidak terpengaruh */
+  if(!smenuHidesSky()&&!(typeof PX!=='undefined'&&PX.pt))portal3dDraw(g,px,py,Rd,now,1,ovo);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
   PT3D.ovR=Rp;PT3D.ovT=now;PT3D.ovX=px;PT3D.ovY=py;PT3D.ovHid=op.hid;   /* F3: radius + posisi terakhir dipakai hit-test tap portal overview (06-interaction.js), jangkar wormhole (05), lampu planet (17) */
   /* F3 (D1): petunjuk idle — selama pengunjung belum pernah membuka menu sektor, cincin luar berdenyut pelan ("portal ini bisa di-tap"). */
   if(!OVSEL.seen&&!op.hid&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
