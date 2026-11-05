@@ -386,10 +386,11 @@ var DUMUL_CHARS=(function(){
     },600);
   }
   /* [PATCH v172] WARM NYATA pra-kapsul (jendela idle antara __bootVis dan kapsul: bench 5 Nov = 18 dtk (repeat) / 45 dtk (pertama) di HP lemah, CPU nyaris menganggur).
-       pl   = pl3dWarmReal (17-planet3d.js): ukuran strip nyata + render penuh pertama planet, supaya frame overview pertama tidak membayarnya.
+       ast  = ast3dWarmReal (12-ast3d.js v28): render tiap mesh varian batu sekali (mesh varian visible=false, tidak ikut warm lama).
+       (pl3dWarmReal dihapus v174: bench 5 Nov warmReal.pl 3-4 ms dan 'planet' frame pertama tetap 81-87 ms = tidak berefek.)
        tint = bake nebula bertint ke-4 sektor lewat nebTint() (jalur DICICIL ±2,5 ms/irisan yang sama dgn lazy-nya; dulu baru mulai saat menu sektor dibuka). Satu sektor sekali jalan, menunggu
               nebPrefetch (bacaan piksel pertama) selesai & NEBJ kosong; berhenti begitu Blue (obs-entered), jalur sinkron (NEB.tintSync) TIDAK disentuh. Sisa yang belum sempat tetap lazy.
-     Tidak menahan gerbang kapsul. Hasil -> window.__warmReal {pl, tint, tintMs} (dibaca bench). */
+     Tidak menahan gerbang kapsul. Hasil -> window.__warmReal {ast, tint, tintMs} (dibaca bench). */
   var WR={on:0,t0:0,tries:0,entered:false};
   try{window.addEventListener('obs-entered',function(){WR.entered=true;},{once:true});}catch(eWe){}
   function warmRealTint(){
@@ -408,8 +409,8 @@ var DUMUL_CHARS=(function(){
   }
   function warmRealStart(){
     if(WR.on)return;WR.on=1;WR.t0=performance.now();
-    setTimeout(function(){try{if(!WR.entered&&typeof pl3dWarmReal==='function')pl3dWarmReal();}catch(eP){}},700);
     setTimeout(warmRealTint,1500);
+    setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},1100);   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
   }
   function preStatus(){return {ok:pre.ui===2&&pre.ast===2&&pre.fb===2,ui:pre.ui,ast:pre.ast,fb:pre.fb};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
@@ -761,7 +762,7 @@ var DUMUL_CHARS=(function(){
       preStart();   /* PRE: UI sound + asteroid + Firebase dibayar sebelum kapsul (lihat blok PRA-KAPSUL) */   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
       /* [PATCH v169] sinkron GL pertama cincin portal (render + drawImage ke 2D) dibayar SEKARANG, bukan di frame masuk sektor (15-portal3d.js pt3dWarmSync). Ditunda sebentar supaya tidak satu tick dgn warm CPU di atas. */
       try{setTimeout(function(){try{if(typeof pt3dWarmSync==='function')pt3dWarmSync();}catch(eWs){}},120);}catch(eWt){}
-      try{warmRealStart();}catch(eWr){}   /* [PATCH v172] planet ukuran nyata + tint 4 sektor di jendela idle (lihat blok WARM NYATA) */
+      try{warmRealStart();}catch(eWr){}   /* [PATCH v172-174] mesh batu 3D + tint 4 sektor di jendela idle (lihat blok WARM NYATA) */
     }
     /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap (kerjaan nyata; plafon darurat cuma HARD_CAP / cap3d di tick). */
     var pr=preStatus();

@@ -392,6 +392,40 @@ function ast3dResize(){
   AST3D.uni.uFall.value=Math.max(W,H)*.9;
 }
 
+/* [v28] WARM NYATA mesh batu (dipanggil 07-boot.js v173 sesudah __bootVis, di jendela idle pra-kapsul).
+   Semua mesh varian dibuat visible=false (ast3dAddVariant) dan threeWarm/threeWarmObjs hanya menelusuri objek VISIBLE, jadi shader batu + buffer geometri tiap varian + buffer instance
+   belum pernah dirender sebelum frame overview pertama (bench 5 Nov: 'shoot+astB' = drawAsteroids(-1) 50-86 ms di frame pertama; marker 'shoot' terpisah cuma ±0,1 ms).
+   Di sini tiap varian dirender SEKALI (visible=true, instanceCount=1, data instance nol = ukuran 0, tidak menggambar apa pun), satu varian per task (jarak 30 ms) supaya bukan satu long task,
+   lalu satu drawImage 1x1 dari kanvas GL memaksa sinkron GPU sekarang (bukan di blit pertama). Tidak menyentuh kanvas utama (g), AST[], cache pass, atau AST3D.n/passes; visible/instanceCount dipulihkan
+   di task yang sama (frame asli selalu menetapkan ulang visible=v.n>0). stop() = berhenti begitu Blue. Hasil -> window.__warmReal.ast {n,of,ms,sync}. */
+function ast3dWarmReal(stop){
+  try{
+    var A3=AST3D;
+    if(A3.warmReal||A3.state!==2||!A3.r||!A3.gl||!A3.vars||!A3.vars.length)return false;
+    if(!AST3D_CFG.on||(typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce)||document.hidden)return false;
+    A3.warmReal=1;
+    var vars=A3.vars,nv=vars.length,i=0,cpu=0,t00=performance.now(),M=window.__warmReal||(window.__warmReal={});
+    var step=function(){
+      try{if(stop&&stop()){M.ast={n:i,of:nv,ms:Math.round(cpu),stop:1};return;}}catch(eS){}
+      var t=performance.now(),v=vars[i];
+      try{
+        ast3dResize();
+        v.mesh.visible=true;v.geo.instanceCount=1;
+        threeGLWarmBegin(A3.r,A3.gl);
+        A3.r.render(A3.sc,A3.cam);
+      }catch(e){}
+      try{v.mesh.visible=false;v.geo.instanceCount=0;}catch(e2){}
+      cpu+=performance.now()-t;i++;
+      if(i<nv){setTimeout(step,30);return;}
+      var ts=performance.now();
+      try{var c=document.createElement('canvas');c.width=c.height=1;c.getContext('2d').drawImage(A3.r.domElement,0,0,1,1,0,0,1,1);}catch(e3){}   /* sinkron GPU pertama */
+      M.ast={n:nv,of:nv,ms:Math.round(cpu),sync:Math.round(performance.now()-ts),at:Math.round(t00)};
+    };
+    setTimeout(step,0);
+    return true;
+  }catch(e){return false;}
+}
+
 /* ---- Cache hasil render (hemat kerja sia-sia) ----
    Batu bergerak pelan, jadi selama kamera (pan/zoom), posisi BH, layout, dan slider batu TIDAK berubah, render GL + astStep cukup ~AST3D_CFG.fps;
    frame di antaranya cuma drawImage dari kanvas cache per pass (belakang/depan). Ada yang berubah / ada batu yang lagi terpental (tap) -> render tiap frame. */

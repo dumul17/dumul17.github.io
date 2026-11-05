@@ -975,7 +975,7 @@
   /* ===== v11.20: akumulator pmk ringan per segmen frame (hanya ?bench=1; dilewati kalau HUD PERF 19-auto-debug aktif).
      Menimpa window.pmk/pBegin/pEnd (no-op di produksi) setelah DOMContentLoaded. Tiap nilai segmen = waktu sejak pmk SEBELUMNYA (jadi 'cons+stars' di overview = drawSectorOverview + tx lines).
      Dipisah per label mode: ov (overview) / sec (dalam sektor) / trans (SECT.busy) + '+H' (FS.heavy) / '+S' (FS.slow). Hanya frame yang SAMPAI pBegin (frame yang di-throttle tidak dihitung). */
-  var PM = { on: false, t0: 0, fs0: 0, cur: {}, modes: {}, worst: [] };
+  var PM = { on: false, t0: 0, fs0: 0, cur: {}, modes: {}, worst: [], ff: [] };   /* ff = 6 frame pertama (semua segmen >=1,5 ms) */
   function pmLbl() {
     var s = typeof SECT !== 'undefined' ? SECT : null, f = typeof FS !== 'undefined' ? FS : null;
     var l = !s ? '?' : s.busy ? 'trans' : s.on ? 'ov' : s.cur ? 'sec' : 'ov?';
@@ -988,6 +988,7 @@
     if (PB.t0 == null || PB.tEnd != null) return;
     var js = t - PM.fs0, lb = pmLbl(), m = PM.modes[lb] || (PM.modes[lb] = { n: 0, js: 0, mx: 0, smp: [], seg: {} });
     m.n++; m.js += js; if (js > m.mx) m.mx = js; if (m.smp.length < 800) m.smp.push(js);
+    if (PM.ff.length < 6) { var ffo = {}; for (k in PM.cur) if (PM.cur[k] >= 1.5) ffo[k] = Math.round(PM.cur[k] * 10) / 10; PM.ff.push([Math.round(t), lb, Math.round(js * 10) / 10, ffo]); }
     for (k in PM.cur) { var s = m.seg[k] || (m.seg[k] = [0, 0]); s[0] += PM.cur[k]; if (PM.cur[k] > s[1]) s[1] = PM.cur[k]; }
     if (js >= 30) {   /* 15 frame terburuk + rincian 4 segmen terbesar */
       var top = Object.keys(PM.cur).sort(function (a, b) { return PM.cur[b] - PM.cur[a]; }).slice(0, 4).map(function (q) { return q + ' ' + (Math.round(PM.cur[q] * 10) / 10); });
@@ -1002,6 +1003,7 @@
       var f = function (n) { var t = performance.now(); PM.cur[n] = (PM.cur[n] || 0) + (t - PM.t0); PM.t0 = t; };
       f.__pm = 1;
       window.pmk = f;
+      window.__pmB = 1;   /* pl3dMk (17-planet3d v46) ikut mencatat marker pl.* */
       window.pBegin = function () { PM.fs0 = PM.t0 = performance.now(); PM.cur = {}; };
       window.pEnd = pmEnd;
       PM.on = true;
@@ -1014,7 +1016,7 @@
       modes[k] = { n: m.n, avgJs: r1(m.js / m.n), p95Js: r1(s[Math.floor(s.length * 0.95)] || 0), maxJs: r1(m.mx),
         seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 14) };
     });
-    return { on: PM.on, perfHudActive: !!window.PERF, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
+    return { on: PM.on, perfHudActive: !!window.PERF, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }
   function fsOut() {
     var f = typeof FS !== 'undefined' ? FS : null;

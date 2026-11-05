@@ -754,29 +754,6 @@ function pl3dResize(){
   if(PL3D.r){threeGLSize(PL3D.gl,rw,rh);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
 }
 
-/* [v45] WARM NYATA pra-kapsul (dipanggil 07-boot.js sesudah __bootVis). Shader + render pertama PL3D sudah unit boot, tapi di UKURAN warm, bukan ukuran strip nyata:
-   frame overview pertama masih membayar pl3dResize (3-4 kanvas + threeGLSize) + render penuh pertama di ukuran nyata + sinkron GPU->2D (bench 5 Nov: 'planet' 84-86 ms).
-   Di sini ukuran nyata dipasang & dirender SEKALI selagi layar boot tertutup. PL3D.dirty/full dibiarkan true: frame asli tetap render ulang dgn palet/cahaya yang benar (sudah hangat).
-   Tidak menggambar ke kanvas utama. Waktunya -> window.__warmReal.pl (dibaca bench). */
-function pl3dWarmReal(){
-  try{
-    if(PL3D.warmReal||PL3D.state!==2||!PL3D.r||!PL3D.gl||document.hidden)return false;
-    pl3dSync();
-    if(!PL3D_CFG.on||!PW||!PH)return false;
-    PL3D.warmReal=1;
-    var t0=performance.now();
-    pl3dPalUpdate();pl3dPhase(t0);
-    pl3dResize();
-    pl3dUniforms(t0,true);
-    threeGLBegin(PL3D.gl);threeGLFull(PL3D.gl);
-    PL3D.r.render(PL3D.sc,PL3D.cam);
-    if(PL3D.c2&&PL3D.cv2)PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh,0,0,PL3D.rw,PL3D.rh);   /* sinkron GPU->2D pertama di ukuran nyata */
-    PL3D.dirty=true;
-    var M=window.__warmReal||(window.__warmReal={});M.pl=Math.round(performance.now()-t0);
-    return true;
-  }catch(e){return false;}
-}
-
 /* titik lampu (ruang layar tegak): overview = portal yang sedang mengorbit (P4; kalau di balik limb, lampunya di balik planet jadi cuma pinggir limb yang menyala), sektor = BH mini */
 function pl3dLightPos(){
   var p=null;
@@ -904,7 +881,7 @@ function pl3dLimbY(gm,x){var dx=x-gm.cx,r2=gm.R*gm.R-dx*dx;return gm.cy-Math.sqr
    pl3dMkGpu = paksa gl.finish() lalu tandai: 'pl.sub' = CPU kirim perintah, 'pl.gpu' = waktu TUNGGU GPU menyelesaikan shader (ini yang tak kelihatan di js ms biasa). Efek samping: di mode PERF saja, GPU dipaksa sinkron. */
 /* PERF/probe: catat tiap refresh PENUH strip tanah (tukar buffer / render penuh): jumlah + jeda terpanjang. Dibaca probe set 'bio' (?probe=1&pset=bio) */
 function pl3dRfMark(){try{if(typeof PERF==='undefined'||!PERF)return;var tn=performance.now(),q=PL3D.pf||(PL3D.pf={n:0,max:0,last:0});if(q.last){var gp=tn-q.last;q.n++;if(gp>q.max)q.max=gp;}q.last=tn;}catch(eRf){}}
-function pl3dMk(n){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function')pmk(n);}catch(eM){}}
+function pl3dMk(n){try{if(((typeof PERF!=='undefined'&&PERF)||window.__pmB)&&typeof pmk==='function')pmk(n);}catch(eM){}}   /* [v46] window.__pmB = akumulator pmk bench (21-bench): marker pl.* ikut terekam tanpa HUD PERF (pl3dMkGpu tetap hanya PERF: ada finish()) */
 function pl3dMkGpu(r){try{if(typeof PERF!=='undefined'&&PERF&&typeof pmk==='function'){pmk('pl.sub');r.getContext().finish();pmk('pl.gpu');}}catch(eM){}}
 function pl3dFxOn(){var C=PL3D_CFG,F=PL3D.fx;return !!(C.auroraOn||C.flareOn||C.debrisOn||C.boltOn||C.fxDebug||(F&&(F.aur>.001||F.flv>.001||(F.deb&&F.deb.length)||F.bolt)));}   /* F.aur>0: aurora masih memudar keluar setelah toggle dimatikan */
 /* stub per efek: diisi di fase berikutnya (F2 aurora, F3 flare, F4 puing, F5 petir). F = PL3D.fx (konteks per frame) */
@@ -1242,7 +1219,7 @@ function planet3dDraw(now){
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.arrive&&WORMHOLE.arrive()<.15)return;   /* wormhole sudah menutup layar: planet tidak kelihatan, jangan render */
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.noPlanet)return;   /* ?whdbg=noplanet (A/B hitch exit): planet tidak dirender & tidak digambar selama wormhole aktif; normal lagi setelah wormhole selesai (planet tampak hilang/beku selama transisi: memang begitu) */
   try{
-    pl3dResize();
+    pl3dResize();pl3dMk('pl.rsz');
     var use3d=PL3D.state===2&&PL3D.r;
     var palCh=pl3dPalUpdate();   /* true selama palette bergeser (masuk/keluar sektor) */
     if(use3d){
@@ -1287,7 +1264,8 @@ function planet3dDraw(now){
           PL3D.lastR=now;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.fadeT=null;PL3D.renders++;pl3dRfMark();
         }else{pl3dCycleStart(now,lx,ly,nb,perOnly&&PL3D_CFG.fade>0);pl3dCycleStep();}
       }
-      pl3dBoltWin();   /* petir: render parsial kotak kecil, di atas hasil siklus frame ini */
+      pl3dMk('pl.rnd');   /* render penuh/siklus pita + salin ke 2D (dan sinkron GPU) selesai */
+      pl3dBoltWin();pl3dMk('pl.bolt');   /* petir: render parsial kotak kecil, di atas hasil siklus frame ini */
         }else if(PL3D.state===3||PL3D.state===0||PL3D.state===1){
       /* fallback 2D / sementara 3D belum siap (supaya tidak ada "pop" kosong -> planet): bake ulang kalau perlu, dan selama crossfade palette (maks ~11x/dtk, murah) */
       var s3=PL3D.state===3,p2=pl3dPar(),parC=Math.abs(p2.x-PL3D.rox)+Math.abs(p2.y-PL3D.roy)>6||Math.abs(p2.f-PL3D.rf)>.01;   /* 2D: selisih kecil cukup digeser saat drawImage, bake ulang kalau jauh */
