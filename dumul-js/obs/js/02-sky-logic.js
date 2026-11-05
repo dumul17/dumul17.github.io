@@ -1486,10 +1486,11 @@ function nebTintStep(){
       /* v-perf: baca piksel mentah NEB.base (bd) di irisan TERPISAH & per pita baris (8 pita): getImageData penuh = spike ±42-49 ms di panggilan pertama. bd sama untuk semua sektor -> di-cache di NEB (kunci = objek canvas NEB.base; diganti baru di nebBase -> cache otomatis basi), sektor berikutnya tanpa baca ulang. */
       if(NEB._bdK===J.base&&NEB._bd)J.bdR=NEB._bd;
       else{
-        var w0=J.base.width,h0=J.base.height,rb=J.rb||(J.rb={buf:new Uint8ClampedArray(w0*h0*4),y:0,n:Math.max(8,Math.ceil(h0/8))});
-        var ry=rb.y,rn=Math.min(rb.n,h0-ry);
-        rb.buf.set(J.base.getContext('2d').getImageData(0,ry,w0,rn).data,ry*w0*4);
+        var tA=performance.now(),w0=J.base.width,h0=J.base.height,rb=J.rb||(J.rb={buf:new Uint8ClampedArray(w0*h0*4),y:0,n:Math.max(8,Math.ceil(h0/8))});
+        var ry=rb.y,rn=Math.min(rb.n,h0-ry),tB=performance.now(),imgB=J.base.getContext('2d').getImageData(0,ry,w0,rn),tC=performance.now();
+        rb.buf.set(imgB.data,ry*w0*4);
         rb.y=ry+rn;
+        try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<14)DB.push([w0+'x'+h0,ry,Math.round((tB-tA)*10)/10,Math.round((tC-tB)*10)/10,Math.round((performance.now()-tC)*10)/10]);}catch(eDb){}   /* bench: [ukuran, y band, ms alokasi, ms getImageData, ms salin] */
         if(rb.y<h0){J.tm=setTimeout(nebTintStep,0);return;}
         J.bdR=rb.buf;NEB._bd=rb.buf;NEB._bdK=J.base;J.rb=null;
         J.tm=setTimeout(nebTintStep,0);return;   /* setup (canvas + createImageData) di irisan berikutnya */

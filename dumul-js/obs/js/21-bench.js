@@ -1059,7 +1059,7 @@
       threeWarm: tw ? { total: tw.total, done: tw.done, busy: tw.busy, qlen: tw.q ? tw.q.length : null } : null,
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
-      pmk: pmOut(), fsState: fsOut(),
+      pmk: pmOut(), fsState: fsOut(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': '[ukuran base, y band, ms alokasi buffer, ms getImageData band, ms salin]',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
     };

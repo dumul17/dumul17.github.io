@@ -678,12 +678,14 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       g.globalAlpha=ga0;
     }
   }
+  pmk('pt.mouth');
   /* visualizer = kilatan petir di dalam cincin (debu + pulse elips visualizer BH lama dibuang). updateAVColor / avbUpdate dulu dipanggil lewat drawAudioVisualizer, sekarang dari sini. */
   try{
     if(typeof updateAVColor==='function')updateAVColor(now);
     if(playing&&typeof avbUpdate==='function')avbUpdate(now);
     if(!PXo.ptb&&!(typeof reduce!=='undefined'&&reduce)){ptBoltTick(now,playing,still&&!playing);ptBoltsDraw(g,Rp*PT_IN,now,PT3D_CFG.boltCol);}
   }catch(eV){}
+  pmk('pt.bolts');
   if(tm)g.restore();
   if(PXo.ptr){}   /* probe: cincin GL dimatikan */
   else if(use3d){
@@ -693,17 +695,17 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
       var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0):(FS.n&1)===1)   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
       if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
-        PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);
+        PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);pmk('pt.gl');
         if(alt){
           var cc=PT3D.cc||(PT3D.cc=document.createElement('canvas')),rs=PT3D.res;
           if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}
           var cx2=cc.getContext('2d');cx2.globalCompositeOperation='copy';cx2.drawImage(threeGLSrc(PT3D.gl),0,0,rs,rs);cx2.globalCompositeOperation='source-over';
-          PT3D.ccOK=1;PT3D.ccRes=rs;PT3D.ccT=now;
+          PT3D.ccOK=1;PT3D.ccRes=rs;PT3D.ccT=now;pmk('pt.copy');
         }else PT3D.ccOK=0;
       }
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality=opts.lq?'low':'high';   /* v11: opts.lq (wormhole zoom): tekstur 256px di-upscale sampai layar penuh; filter 'high' mahal di GPU sesuai area -> 'low' */
-      g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);
+      g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);pmk('pt.blit');
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
