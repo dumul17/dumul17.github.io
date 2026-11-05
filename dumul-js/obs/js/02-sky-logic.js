@@ -1360,7 +1360,9 @@ function nebBase(EW,EH,ds){
   var hh=Math.hypot(cw,ch)*.5,vg2=x.createRadialGradient(cw/2,ch/2,hh*.45,cw/2,ch/2,hh);
   vg2.addColorStop(0,'rgba(0,0,0,0)');vg2.addColorStop(.7,'rgba(0,0,0,'+(.15*NEB.VIG)+')');vg2.addColorStop(1,'rgba(0,0,0,'+(.65*NEB.VIG)+')');
   x.fillStyle=vg2;x.fillRect(0,0,cw,ch);
-  NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;NEB._bd=null;NEB._bdK=null;return c;
+  NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;NEB._bd=null;NEB._bdK=null;NEB._pf=null;
+  if(NEB.pfT)clearTimeout(NEB.pfT);NEB.pfT=setTimeout(nebPrefetch,300);   /* bd dibaca lebih awal, di luar jalur masuk sektor */
+  return c;
 }
 /* ---------- Milky Way overview (gambar, ROLLING mendatar) ----------
    HANYA overview (SECT.on). Di dalam sektor tidak disentuh (plateDeep + nebula.webp jalan persis seperti dulu; bgCanvas kosong kalau nebula gambar aktif).
@@ -1477,6 +1479,25 @@ function nebTint(s){
   if(!NEBJ){NEBJ={k:s.k,s:s,base:NEB.base,tint:NEB.tint,st:0,i:0,tm:0};NEBJ.tm=setTimeout(nebTintStep,0);}
   return null;
 }
+/* v-perf: bacaan PERTAMA getImageData di NEB.base mahal tetap (dump: 41-81 ms; pita berikutnya cuma 1,4-2,1 ms) = flush + readback GPU yang menunggu antrean GL bersama, BUKAN jumlah piksel. Jadi dibayar lebih awal (pita demi pita, irisan ~2 ms) selagi tidak ada transisi / frame berat; nebTintStep tinggal memakai cache NEB._bd. Berhenti kalau tint job sudah jalan (job membaca sendiri). */
+function nebPrefetch(){
+  NEB.pfT=0;
+  try{
+    var b=NEB.base;if(!b||NEB._bdK===b||NEBJ)return;
+    var menu=typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing),w=window.WORMHOLE,s=window.SECT,cap=false;
+    try{cap=performance.getEntriesByName('obs-capsule').length>0;}catch(eC){}   /* kapsul sudah muncul (menunggu tap, GPU sepi) = jendela warm terbaik: jalan di SINI, sebelum overview mulai merender GL */
+    if(((typeof bootDone==='undefined'||!bootDone)&&!cap)||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy&&!menu)){NEB.pfT=setTimeout(nebPrefetch,400);return;}   /* heavy ditahan, kecuali menu sektor terbuka (sky beku) */
+    var P=NEB._pf;
+    if(!P||P.b!==b)P=NEB._pf={b:b,y:0,n:Math.max(8,Math.ceil(b.height/8)),buf:new Uint8ClampedArray(b.width*b.height*4)};
+    var t0=performance.now(),rn=Math.min(P.n,b.height-P.y);
+    P.buf.set(b.getContext('2d').getImageData(0,P.y,b.width,rn).data,P.y*b.width*4);
+    try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<24)DB.push(['pf',P.y,Math.round((performance.now()-t0)*10)/10]);}catch(eDb){}
+    P.y+=rn;
+    if(P.y<b.height){NEB.pfT=setTimeout(nebPrefetch,0);return;}
+    if(NEB.base===b){NEB._bd=P.buf;NEB._bdK=b;}
+    NEB._pf=null;
+  }catch(e){NEB._pf=null;}
+}
 function nebTintStep(){
   var J=NEBJ;if(!J)return;J.tm=0;
   if(NEB.base!==J.base||NEB.tint!==J.tint){NEBJ=null;return;}
@@ -1490,7 +1511,7 @@ function nebTintStep(){
         var ry=rb.y,rn=Math.min(rb.n,h0-ry),tB=performance.now(),imgB=J.base.getContext('2d').getImageData(0,ry,w0,rn),tC=performance.now();
         rb.buf.set(imgB.data,ry*w0*4);
         rb.y=ry+rn;
-        try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<14)DB.push([w0+'x'+h0,ry,Math.round((tB-tA)*10)/10,Math.round((tC-tB)*10)/10,Math.round((performance.now()-tC)*10)/10]);}catch(eDb){}   /* bench: [ukuran, y band, ms alokasi, ms getImageData, ms salin] */
+        try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<24)DB.push([w0+'x'+h0,ry,Math.round((tB-tA)*10)/10,Math.round((tC-tB)*10)/10,Math.round((performance.now()-tC)*10)/10]);}catch(eDb){}   /* bench: [ukuran, y band, ms alokasi, ms getImageData, ms salin] */
         if(rb.y<h0){J.tm=setTimeout(nebTintStep,0);return;}
         J.bdR=rb.buf;NEB._bd=rb.buf;NEB._bdK=J.base;J.rb=null;
         J.tm=setTimeout(nebTintStep,0);return;   /* setup (canvas + createImageData) di irisan berikutnya */
