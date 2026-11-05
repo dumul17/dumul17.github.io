@@ -428,6 +428,8 @@ function scp3dUpdate(now,mm){
 
 /* v15: ?whtele=1 menyalakan render GL teleskop selang-seling selama travel wormhole (whAlt dulu dimatikan permanen lewat '0&&'; umur cache 45ms terlalu pendek utk frame 66ms -> 150ms). */
 var SCP3D_WHALT=(function(){try{var m=/[?&]whtele=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>=2?v:(m&&v===1?2:0);}catch(e){return 2;}})();   /* v16: DEFAULT ON, periode 2 (GL tiap 2 frame). ?whtele=0 = mati, ?whtele=3 = tiap 3 frame. Terukur di HP: zoom med 66 -> 50ms */
+/* v23: throttle GL teleskop di overview/sektor saat HP lambat (FS.slow/FS.heavy). GL dirender tiap SCP3D_SLOWALT frame (default 2, fase = paritas FS.n, gantian dgn portal yg render di FS.n genap), frame lain memakai salinan 2D SCP3D.cc (posisi/rotasi/skala tetap per frame, cuma pose+cahaya 3D telat 1 frame). ?slowalt=0 mati, ?slowalt=3 tiap 3 frame. Dikecualikan: warp, wormhole.busy, belt zoom, perubahan skala >8%, cache >130 ms. Data: hemat +-6-7 ms (sc.sub+sc.gpu 13-15 ms), lihat log.txt bagian Analisis kode. */
+var SCP3D_SLOWALT=(function(){try{var m=/[?&]slowalt=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>=2?Math.min(v,4):(m?0:2);}catch(e){return 2;}})();
 /* Dipanggil dari teleDrawBody() (04-render.js). true = badan 3D sudah digambar (2D dilewati); false = pakai badan 2D. */
 function tele3dBody(g,now){
   if(SCP3D.state===0){scp3dLoad();return false;}
@@ -442,10 +444,17 @@ function tele3dBody(g,now){
     if(!bf)SCP3D.bz=false;
     if(bf&&SCP3D.bz&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res)cache=SCP3D.cc;   /* zoom masuk dumul.html: pose kapal dibekukan (salinan 2D), tanpa update/GL */
     else if(now-SCP3D.last>3||now<SCP3D.last){   /* ghost copy di frame yang sama memakai hasil render yang sama */
-      if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)%SCP3D_WHALT!==0)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<130*SCP3D_WHALT)cache=SCP3D.cc;
+      var sa=false,scl=Math.hypot(mm.a,mm.b);
+      if(!wh&&!bf&&SCP3D_SLOWALT>0&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!(typeof WORMHOLE!=='undefined'&&WORMHOLE.busy)&&!(typeof TELESCOPE!=='undefined'&&TELESCOPE&&TELESCOPE.mode==='warp'))sa=true;   /* v23: jalur slow-alt */
+      if(sa){   /* render GL cuma di frame berfase; selain itu pakai cache kalau masih valid */
+        var okC=SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now>=SCP3D.ccT&&now-SCP3D.ccT<130&&SCP3D.ccSc>0&&Math.abs(scl/SCP3D.ccSc-1)<.08;
+        if(okC&&(FS.n%SCP3D_SLOWALT)!==1%SCP3D_SLOWALT){cache=SCP3D.cc;SCP3D.altSk=(SCP3D.altSk|0)+1;}
+      }
+      if(cache){}
+      else if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)%SCP3D_WHALT!==0)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<130*SCP3D_WHALT)cache=SCP3D.cc;
       else{
         SCP3D.last=now;scp3dUpdate(now,mm);
-        if(wh||bf){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;if(bf)SCP3D.bz=true;}
+        if(wh||bf||sa){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;SCP3D.ccSc=scl;if(bf)SCP3D.bz=true;if(sa)cache=cc;}   /* sa: gambar dari cc (satu baca GL saja per frame render) */
       }
     }
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
