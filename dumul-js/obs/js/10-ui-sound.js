@@ -225,5 +225,15 @@ var UIS=(function(){
     if(t&&t.closest&&t.closest('#mode-cluster button,#owl-source,#music-toggle,.portal,.portal-hit,#cam-focus button,#music-close,#exit-panel,#exit-backdrop,#owl-close,#owl-backdrop,.owl-link,.owl-chip,.owl-tab,#lis-ask button,#bh-panel button,#owl-perf-save,#owl-perf-reset,#mode-silence,#mp-av-toggle,.mp-grp-head,.mp-ctrl,#cam-band button,#cg-btn,.ci-catbtn,#cam-cat button,#cam-ach button,#sf-close,.boot-cap,.mp-play,.mp-track,.cc-row:not([disabled]),.cc-x,.cc-back'))tap();
   },true);
 
-  return {noise:noise,radar:radar,pop:pop,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul,warpBegin:warpBegin,warpUpd:warpUpd,warpFx:warpFx};
+  /* Pra-bangun graph tanpa bunyi: AudioContext + analyser + lowpass (ensureAVGraph), bus UI, dan noise buffer 2 dtk.
+     Dipanggil 07-boot (blok PRA-KAPSUL) selagi layar boot masih menutup, supaya tap pertama (Blue) tidak membayar ±170 ms di HP lemah. Sebelum gestur konteks tetap 'suspended'
+     (resume dicoba diam-diam oleh ensureAVGraph, ditolak browser = tidak apa-apa); ctx() melanjutkannya saat tap pertama. Idempoten, tanpa efek suara. */
+  function warm(){
+    try{if(typeof ensureAVGraph==='function'&&!ensureAVGraph())return false;}catch(e){return false;}
+    var c=window.AV&&AV.ctx;if(!c)return false;
+    try{out(c);noiseBuf(c);}catch(e2){}
+    return true;
+  }
+
+  return {warm:warm,noise:noise,radar:radar,pop:pop,tap:tap,deny:deny,chime:chime,duck:duck,duckMul:duckMul,warpBegin:warpBegin,warpUpd:warpUpd,warpFx:warpFx};
 })();

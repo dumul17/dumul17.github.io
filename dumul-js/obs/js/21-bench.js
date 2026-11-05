@@ -577,9 +577,9 @@
       R.loafByFnAll = aggregateLoafByFn(LOAF, null);
     } catch (e) { R.loafByFnPre = []; R.loafByFnAll = []; }
 
-    R.bootTimeout = !!window.__bootTimeout; R.bootFinish = window.__bootFinish || null; R.warmConc = window.__warmConc != null ? window.__warmConc : null; R.ca = window.__ca != null ? window.__ca : null;   /* pass 11: tercatat di JSON supaya run ?nolive=1 dan normal bisa dibedakan */
+    R.bootTimeout = !!window.__bootTimeout; R.bootFinish = window.__bootFinish || null; R.ca = window.__ca != null ? window.__ca : null;   /* pass 11: tercatat di JSON supaya run ?nolive=1 dan normal bisa dibedakan */
     R.bootInfo = window.__bootInfo || R.bootInfo || null;   /* v147: warmAt, warmTrig, visAt, sfxViaCap, bar @capsule */
-    try { R.nolive = /[?&]nolive=1(&|$)/.test(location.search); } catch (eNl) { R.nolive = null; }
+    R.preMs = window.__preMs || null;   /* PRA-KAPSUL (07-boot): ms dari vis sampai ui / ast / fb selesai */
     R.evt = EVT; /* [event, start, inputDelay, processing, total] untuk event >=100ms (klik Blue dll) */
     R.ltTop = LT.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10); /* [startTime, durasi] terpanjang; bandingkan dgn t.capsule/blue/frame1 dan marks */
     try { var m0 = performance.getEntriesByName('obs-t0')[0], mw = performance.getEntriesByName('obs-warm')[0]; R.t0Start = m0 ? Math.round(m0.startTime) : null; R.warmStart = mw ? Math.round(mw.startTime) : null; R.t0mode = /[?&]legacy=1/.test(location.search) ? 'legacy' : (/[?&]t0=capsule/.test(location.search) ? 'capsule' : 'dcl'); } catch (e) {}
@@ -635,7 +635,6 @@
 
     R.swNow = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlled' : 'no-controller';
     R.swRegAt = window.__swRegAt != null ? window.__swRegAt : null; R.swLog = window.__swLog || []; R.warmLog = window.__warmLog || []; R.warmMax = window.__warmMax || 0;   /* v129 diagnostik */
-    R.sfxPar = window.__sfxPar != null ? window.__sfxPar : null;
     R.isRepeatVisit = IS_REPEAT;
     R.bootRepeatFlag = IS_REPEAT; /* kompat */
 

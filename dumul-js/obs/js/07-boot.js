@@ -196,10 +196,21 @@ var DUMUL_CHARS=(function(){
   }
   /* v127: metadata 16 SFX (lalu BGM/GARG, preload='none' di 01-core) dihangatkan mulai SAAT CAPSULE TAMPIL (finish()), bukan setelah Blue +4,2 dtk.
      Alasan (telemetri v126 itel A6610L): boot 12,2 dtk memblokir main thread 89%, jaringan nganggur, audio baru dimulai setelah Blue -> tap pertama cold. Saat capsule tampil
-     main thread bebas (build + warm shader sudah selesai). Berbasis penyelesaian: maks WARM_CONC (2) elemen sekaligus, elemen berikutnya jalan setelah loadedmetadata/error
+     main thread bebas (build + warm shader sudah selesai). Berbasis penyelesaian: maks WARM_CONC (8) elemen sekaligus, elemen berikutnya jalan setelah loadedmetadata/error
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
-  /* WARM_CONC = jumlah elemen audio yang di-warm (metadata) bersamaan; tetap 8, tidak ada override lewat URL. */
+  /* ======================================================================================================================================
+     CATATAN DIAGNOSIS — JANGAN DIULANG: "TTFB audio ±3 dtk + 3 gelombang" = LATENSI JARINGAN VPN, BUKAN BUG KODE.
+     Gejala (bench itel A6610L, 5 Nov 2026, jaringan SSH VPN): tiap request audio TTFB median ±2,9 dtk (maks 4,2 dtk) walau main thread kosong; tiap file butuh DUA request
+       berurutan (probe ±300 B tanpa body, lalu Range ±84 KB) -> 17-19 file jadi ±3 gelombang x ±3 dtk. Kapsul baru tampil ±24 dtk dari boot.
+     Penyebab: round-trip lewat tunnel SSH VPN. Di jaringan biasa (tanpa VPN) TTFB 3 dtk itu TIDAK terjadi. Sebagai pembanding, og.webp (±0,3 dtk) dan three.js (±0,8 dtk) di run yang sama TTFB-nya jauh lebih kecil;
+       diagnosis akhir tetap dari pembanding di jaringan biasa, bukan dari angka ini.
+     Sudah dicoba habis-habisan dan TIDAK menolong: WARM_CONC 2/4/8, urutan antrean, slot release (loadedmetadata / tmo / abort), mulai paralel vs sesudah build 3D, dan flag A/B URL.
+       Semua flag A/B itu sudah DIHAPUS (WARM_CONC kini konstanta, tanpa override URL). Kalau boot terasa lambat di VPN / jaringan tunnel: itu normal, jangan utak-atik antrean ini lagi.
+     Cara uji yang benar: ukur di jaringan biasa. Kalau TTFB audio di sana juga >1 dtk, baru anggap ada masalah server / CDN dan buka diagnosis baru dari window.__warmLog (bukan dari angka VPN).
+     Dampak ke angka lain: HARD_CAP 60 dtk (v167), WT_SFX (v157) dan urutan rigel/spica/sirius paling dulu (v168) semuanya dikalibrasi dari run VPN ini -> anggap KONSERVATIF; hitung ulang
+       bersama kalibrasi progress bar (lihat catatan di WT_PAGE). Pra-kapsul (PRE) di bawah sengaja mulai saat `vis` (paralel dengan fetch audio), bukan menunggu SFX selesai.
+     ====================================================================================================================================== */
   var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai */
   /* [PATCH v160] Kejadian warm audio -> antrean untuk log boot (dikonsumsi logPoll). Menggantikan sfxLastName/sfxLastIsGlitch/sfxGlitchWarm/sfxCacheFlash (v157/v159).
      Tiap file = 1 kejadian, termasuk yang sudah siap duluan (cache/offline), jadi log tetap bisa menghitung 2 BGM + 16 bintang + 1 GARG satu per satu, bukan loncat ke "siap".
@@ -213,11 +224,8 @@ var DUMUL_CHARS=(function(){
     return 's';
   }
   function warmEvPush(k,w,nm){if(warmEv.length<80)warmEv.push({k:k,w:w,nm:nm||''});}
-  /* v152: WARM_CONC 8 (dulu 4): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB), jadi yang menentukan latensi per request, bukan bandwidth; konkurensi 4 terlalu sempit. */
-  window.__warmConc=WARM_CONC;
-  /* v151: SFX warm TIDAK paralel dengan build 3D. Telemetri v149/v150 (8 run, itel): slot SFX yang mulai sebelum kapsul rata-rata ±7 dtk, yang mulai sesudah kapsul ±4 dtk
-     (main thread jenuh ±12 dtk long task selama build 3D -> loadedmetadata + warmPump ngantri). Sekarang antrean SFX baru jalan begitu SEMUA modul 3D settle + THREE_WARM kosong.
-     BGM (2 file kecil) tetap jalan dari awal. v154: dikembalikan paralel (pemicu three2/allmods/bgm, lihat warmRestEarly); mode sequential v151 sudah dihapus. */
+  /* WARM_CONC 8: tiap SFX cuma ±80 KB, yang menentukan latensi per request, bukan bandwidth (lihat CATATAN DIAGNOSIS di atas). */
+  /* Antrean SFX jalan paralel dengan build 3D (pemicu three2 / allmods / bgm, lihat warmRestEarly); BGM (2 file kecil) dari awal boot. Mode sequential v151 sudah dihapus. */
   function warmPump(){
     var gap=warmHold-performance.now();
     if(gap>0){setTimeout(warmPump,gap+20);return;}
@@ -345,6 +353,39 @@ var DUMUL_CHARS=(function(){
     for(i=0;i<l.length;i++){try{if(l[i].readyState>=1||l[i].error)n++;}catch(eS){n++;}}
     return {n:n,total:l.length,ok:n>=l.length};
   }
+  /* PRA-KAPSUL (PRE): pekerjaan warm yang dulu jatuh SESUDAH kapsul / Blue (dan ikut menjank di frame pertama sektor) dibayar di sini, selagi layar boot masih tertutup.
+       ui  = graph Web Audio UI sound (AudioContext + analyser + lowpass + bus + noise buffer). Dulu baru dibangun di tap pertama = Blue (bench 5 Nov: 10-ui-sound.js ±172 ms long-frame di Blue).
+       ast = 8 sprite batu 2D + tint BGM (ensureAsteroidSprites / ofxMakeTint). Dulu menunggu frame awal / ringWarmStep (timer 3 dtk + idle) sehingga bisa jatuh sesudah Blue.
+       fb  = modul Firebase live counter (import 11-live-count.js lewat window.__liveLoad di index.html; evaluasi ±80-90 ms di HP). Dulu menunggu bootDone.
+     Planet: TIDAK ada langkah sendiri. Shader PL3D + render pertamanya (compileAsync + warmSync) sudah unit boot (MODS) dan sudah masuk `vis`; yang tersisa sesudah kapsul cuma bake aurora
+       per-keyframe (butuh geometri frame sektor yang hidup, ±10 ms pertama), tidak bisa dihangatkan tanpa frame itu. Asteroid 3D (AST3D) juga sudah di MODS + THREE_WARM.
+     Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
+     Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
+     Belum masuk bobot bar (WT_*) / baris status: sengaja, kalibrasi ulang bar menyusul. Konsekuensi sementara: bar tertahan di 99% sampai PRE selesai (biasanya < 1 dtk di jaringan normal). */
+  var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,ms:{}};   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
+  function preFin(k){if(pre[k]===2)return;pre[k]=2;try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
+  function preStart(){
+    if(pre.at>=0)return;
+    pre.at=performance.now();pre.ui=pre.ast=pre.fb=1;
+    setTimeout(function(){
+      try{if(!IS_POTATO&&typeof UIS!=='undefined'&&UIS.warm)UIS.warm();}catch(eU){}
+      preFin('ui');
+    },0);
+    setTimeout(function(){
+      try{ensureAsteroidSprites();}catch(eA){}
+      try{if(typeof OFX!=='undefined'&&typeof ofxMakeTint==='function'){if(!OFX.tc)OFX.tc=ofxMakeTint('c');if(!OFX.tk)OFX.tk=ofxMakeTint('k');}}catch(eT){}
+      preFin('ast');
+    },300);
+    setTimeout(function(){
+      var tm=setTimeout(function(){preFin('fb');},PRE_MAX);
+      try{
+        var pr=typeof window.__liveLoad==='function'?window.__liveLoad():null;
+        if(pr&&pr.then)pr.then(function(){clearTimeout(tm);preFin('fb');},function(){clearTimeout(tm);preFin('fb');});
+        else{clearTimeout(tm);preFin('fb');}
+      }catch(eL){clearTimeout(tm);preFin('fb');}
+    },600);
+  }
+  function preStatus(){return {ok:pre.ui===2&&pre.ast===2&&pre.fb===2,ui:pre.ui,ast:pre.ast,fb:pre.fb};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
        5 unit  modul 3D: AST3D, SCP3D, DR3D, PT3D, PL3D, masing-masing state 2 (siap) atau 3 (gagal/nonaktif). PL3D sudah termasuk shader warm-up sendiri.
@@ -690,12 +731,14 @@ var DUMUL_CHARS=(function(){
     var vis=ready&&th.mods>=th.total&&th.warmOk;
     if(vis&&visAt<0)visAt=Math.round(elapsed);
     if(vis&&!window.__bootVis){
-      window.__bootVis=1;   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
+      window.__bootVis=1;
+      preStart();   /* PRE: UI sound + asteroid + Firebase dibayar sebelum kapsul (lihat blok PRA-KAPSUL) */   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
       /* [PATCH v169] sinkron GL pertama cincin portal (render + drawImage ke 2D) dibayar SEKARANG, bukan di frame masuk sektor (15-portal3d.js pt3dWarmSync). Ditunda sebentar supaya tidak satu tick dgn warm CPU di atas. */
       try{setTimeout(function(){try{if(typeof pt3dWarmSync==='function')pt3dWarmSync();}catch(eWs){}},120);}catch(eWt){}
     }
     /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap (kerjaan nyata; plafon darurat cuma HARD_CAP / cap3d di tick). */
-    var complete=vis&&au.ok&&sx.ok;
+    var pr=preStatus();
+    var complete=vis&&au.ok&&sx.ok&&pr.ok;   /* PRE ikut gerbang (tiap langkah dibatasi PRE_MAX, jadi tidak bisa menggantung) */
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
@@ -715,7 +758,7 @@ var DUMUL_CHARS=(function(){
     var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
     if(p<pLast)p=pLast;
     pLast=p;
-    return {ready:ready,th:th,au:au,sx:sx,vis:vis,complete:complete,all:vis&&au.ok&&sx.ok,p:p};
+    return {ready:ready,th:th,au:au,sx:sx,pre:pr,vis:vis,complete:complete,all:vis&&au.ok&&sx.ok&&pr.ok,p:p};
   }
   /* Haluskan angka: TARGET tetap jujur (calc/c.p, bobot unit selesai); yang ditampilkan MENGEJAR target secara eksponensial (BAR_TAU) dengan laju minimum (BAR_MIN %/dtk).
      Tidak pernah melewati target, tidak pernah turun, dan 100% hanya kalau c.all. dt dijepit 64 ms: sesudah blok main-thread 2 dtk bar menyapu pelan di frame berikutnya, bukan loncat.
