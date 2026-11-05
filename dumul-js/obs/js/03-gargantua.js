@@ -295,7 +295,7 @@ function bhSpriteWarm(){
     if(BHW.st>=2||++BHW.n>80)return;   /* selesai / menyerah (~40 dtk) */
     var cap=false,b3=window.__boot3d,w=window.WORMHOLE,s=window.SECT,menu=typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing);
     try{cap=performance.getEntriesByName('obs-capsule').length>0;}catch(eC){}
-    var bootOK=(typeof bootDone!=='undefined'&&bootDone)||(cap&&(!b3||b3.warm));
+    var bootOK=(typeof bootDone!=='undefined'&&bootDone)||window.__bootVis||(cap&&(!b3||b3.warm));   /* [v168] __bootVis: warm di fase tunggu SFX */
     var full=!!(typeof BH_CSS!=='undefined'&&BH_CSS.spr&&BH.sprite===BH_CSS.spr);
     if(!bootOK||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy&&!menu)||!(BH.R>2)||!full){BHW.t=setTimeout(bhSpriteWarm,500);return;}
     if(BHW.st===0){bhBloomSprite();BHW.st=1;}

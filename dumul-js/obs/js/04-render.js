@@ -1595,8 +1595,9 @@ function ringWarmStep(){
   try{
     if(!RW.on)return;
     var w=window.WORMHOLE,s=window.SECT;
-    if(typeof bootDone==='undefined'||!bootDone||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy)||typeof TRIGGERS==='undefined'){setTimeout(ringWarmStep,1200);return;}   /* FS.heavy: tahan warm saat frame berat (05-sector-ui) */
+    if(typeof bootDone==='undefined'||!(bootDone||window.__bootVis)||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy)||typeof TRIGGERS==='undefined'){setTimeout(ringWarmStep,1200);return;}   /* FS.heavy: tahan warm saat frame berat (05-sector-ui) */
     if(!RW.list){
+      try{ensureAsteroidSprites();}catch(eAw){}   /* [v168] 8 sprite batu (±17-24 ms) di-bake sekali di sini, bukan di frame masuk sektor; idempoten (cache AST_SPRITES) */
       var seen={},k,rg,q,L=[];
       for(k in TRIGGERS){rg=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rg&&!seen[rg]){seen[rg]=1;for(q=5.5;q<=16.5;q+=.5)L.push([rg,q]);}}
       RW.list=L;

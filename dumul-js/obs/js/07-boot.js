@@ -188,6 +188,7 @@ var DUMUL_CHARS=(function(){
      Plafon darurat sekarang cuma HARD_CAP (anti hang; kapsul tetap tampil dgn bar di angka asli). ?gate=0 = perilaku lama (A/B). */
   var GATE_100=true;try{if(/[?&]gate=0\b/.test(location.search))GATE_100=false;}catch(eG1){}
   window.__gate100=GATE_100?1:0;
+  var SFX_SLOW1=true;try{if(/[?&]sfxo=0\b/.test(location.search))SFX_SLOW1=false;}catch(eSo){}
   var gateAt=-1;   /* elapsed saat gate nyata pertama lolos; dipakai pengaman sapuan bar (maks 2,5 dtk) */
   var capTimer=0;
   /* v142: batas tunggu pekerjaan boot TIDAK memakan jatah warm-up kalau yang lambat adalah jaringan. Selama three.js belum tiba (atau baru tiba lambat), batas diperpanjang
@@ -201,7 +202,7 @@ var DUMUL_CHARS=(function(){
      main thread bebas (build + warm shader sudah selesai). Berbasis penyelesaian: maks WARM_CONC (2) elemen sekaligus, elemen berikutnya jalan setelah loadedmetadata/error
      elemen sebelumnya (atau WARM_SLOT_MS sebagai pelepas slot). Tanpa rIC timeout. Selama ±1,5 dtk setelah Blue antrean ditahan supaya frame pertama sektor tidak berebut.
      Satu jalur retry tetap milik safePlay: elemen yang sedang _retrying/_want/diputar dilewati. */
-  /* v130: WARM_CONC default 4 (v129: 2 tidak pernah berlaku, lihat catatan abort di warmSlot). Override untuk A/B: ?wc=1..8. Angka 4 = tebakan titik tengah, belum diukur. */
+  /* WARM_CONC = jumlah elemen audio yang di-warm (metadata) bersamaan; tetap 8, tidak ada override lewat URL. */
   var WARM_CONC=8,WARM_SLOT_MS=8000,WARM_SLOT_MAX=20000,warmed=false,warmAt=-1,warmQ=[],warmActive=0,warmHold=0;   /* v146: warmAt = elapsed (dari t0) saat antrean SFX mulai; dasar SFX_CAP */
   /* [PATCH v160] Kejadian warm audio -> antrean untuk log boot (dikonsumsi logPoll). Menggantikan sfxLastName/sfxLastIsGlitch/sfxGlitchWarm/sfxCacheFlash (v157/v159).
      Tiap file = 1 kejadian, termasuk yang sudah siap duluan (cache/offline), jadi log tetap bisa menghitung 2 BGM + 16 bintang + 1 GARG satu per satu, bukan loncat ke "siap".
@@ -215,10 +216,7 @@ var DUMUL_CHARS=(function(){
     return 's';
   }
   function warmEvPush(k,w,nm){if(warmEv.length<80)warmEv.push({k:k,w:w,nm:nm||''});}
-  try{var wcm=/[?&]wc=(\d+)/.exec(location.search);if(wcm)WARM_CONC=Math.max(1,Math.min(16,+wcm[1]));}catch(eWc){}
-  /* v152: WARM_CONC default 4 -> 8, batas override ?wc= 8 -> 16. Telemetri v151 (SFX baru mulai sesudah 3D): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB, unduh 0,06-0,2 dtk) tapi TTFB 1,6-3 dtk per request
-     -> latency-bound, bukan bandwidth-bound; konkurensi 4 terlalu sempit. 7 run ?wc=8 (wc=16 sempat terpotong ke 8): fase SFX 5-18 dtk di 5 run (16/16 saat kapsul), dulu ±27 dtk @conc4.
-     2 run buruk (TTFB 4,6 dan 12,7 dtk) = jaringan sedang ambruk, bukan perilaku kode. */
+  /* v152: WARM_CONC 8 (dulu 4): tiap SFX cuma ±80 KB (probe 300 B + range ±80 KB), jadi yang menentukan latensi per request, bukan bandwidth; konkurensi 4 terlalu sempit. */
   window.__warmConc=WARM_CONC;
   /* v151: SFX warm TIDAK paralel dengan build 3D. Telemetri v149/v150 (8 run, itel): slot SFX yang mulai sebelum kapsul rata-rata ±7 dtk, yang mulai sesudah kapsul ±4 dtk
      (main thread jenuh ±12 dtk long task selama build 3D -> loadedmetadata + warmPump ngantri). Sekarang antrean SFX baru jalan begitu SEMUA modul 3D settle + THREE_WARM kosong.
@@ -304,7 +302,13 @@ var DUMUL_CHARS=(function(){
     if(!warmTrig)warmTrig='finish';   /* dipanggil dari finish tanpa early trigger */
     warmAt=Math.round(performance.now()-t0);
     try{performance.mark('obs-warm');}catch(eM){}
-    warmQ=warmQ.concat(stars);   /* v132: sisa antrean BGM (kalau ?wc=1) tetap di depan; AMB/MUSIC_COLLAP TIDAK di-load() ulang di sini (memutus request yang sedang jalan) */
+    var sq=stars;
+    if(SFX_SLOW1){   /* [PATCH v168] file yang konsisten paling lambat (dump 5 Nov, 3 run: rigel, spica, sirius) dimulai di gelombang pertama, bukan jatuh ke gelombang terakhir dan jadi ekor gate. ?sfxo=0 = urutan lama */
+      var sl=[],fa=[];
+      stars.forEach(function(a){(/^(rigel|spica|sirius)\.opus$/i.test(warmName(a))?sl:fa).push(a);});
+      sq=sl.concat(fa);
+    }
+    warmQ=warmQ.concat(sq);   /* v132: sisa antrean BGM (kalau belum habis) tetap di depan; AMB/MUSIC_COLLAP TIDAK di-load() ulang di sini (memutus request yang sedang jalan) */
     try{if(GARG)warmQ.push(GARG);}catch(e){}
     warmPump();
     bootInfoSnap({});
@@ -700,6 +704,7 @@ var DUMUL_CHARS=(function(){
     warmRestEarly(th,au);   /* v146: isi gap — SFX begitu ≥2 modul settle ATAU BGM siap / semua modul settle */
     var vis=ready&&th.mods>=th.total&&th.warmOk;
     if(vis&&visAt<0)visAt=Math.round(elapsed);
+    if(vis&&!window.__bootVis)window.__bootVis=1;   /* [PATCH v168] 3D + warm shader selesai (GPU sepi): warm CPU kecil (nebPrefetch, bhSpriteWarm, ringWarmStep, sprite batu) boleh jalan di fase tunggu SFX, bukan menumpuk tepat saat kapsul tampil */
     /* Mode 2 strict: kapsul hanya setelah BGM+SFX benar-benar siap.
        Plafon AUDIO_CAP (dari t0) / SFX_CAP (dari warmAt) hanya darurat (media macet) — happy path nunggu ok nyata. */
     var bgmCapHit=!GATE_100&&!au.ok&&elapsed>=AUDIO_CAP;
