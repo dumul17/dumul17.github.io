@@ -1297,7 +1297,7 @@ function planet3dDraw(now){
       m.globalCompositeOperation='source-over';m.globalAlpha=1;
       src=PL3D.cvM;
     }
-    g.drawImage(src,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
+    if(!(window.__offB&&window.__offB.pl))g.drawImage(src,cp.x-(PL3D.rox||0),PH-sh+(PL3D.bo||0)+cp.y-(PL3D.roy||0),PW,sh);pl3dMk('pl.blit');   /* ?off=plb (21-bench) */   /* geser selisih parallax sejak render terakhir: gerak mulus walau render cuma 4-20 fps */
     if(!PL3D.fxOff&&!(typeof reduce!=='undefined'&&reduce)&&pl3dFxOn()){   /* efek 2D: error di sini TIDAK boleh mematikan planet 3D (pl3dFail) */
       try{pl3dFx(g,now,cp);}catch(eFx){PL3D.fxOff=1;try{console.warn('[planet3d] efek 2D dimatikan:',eFx&&eFx.message);}catch(eW){}}
       pl3dMk('pl.fx');

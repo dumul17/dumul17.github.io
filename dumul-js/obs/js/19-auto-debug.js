@@ -1549,7 +1549,7 @@
     fab.title = 'debug';
 
     var panel = mk('div',
-      'display:none;min-width:min(260px,88vw);max-width:min(300px,92vw);padding:10px 12px;' +
+      'display:none;min-width:min(260px,88vw);max-width:min(300px,92vw);padding:10px 12px;max-height:min(72vh,calc(100vh - 110px));overflow-y:auto;-webkit-overflow-scrolling:touch;' +
       'background:rgba(0,10,18,.94);border:1px solid rgba(100,255,220,.32);border-radius:10px;' +
       'box-shadow:0 8px 28px rgba(0,0,0,.5)');
 
@@ -1579,6 +1579,21 @@
     }, MODE === 'whperf'));
     panel.appendChild(modes);
 
+    /* —— runner lapisan-mati tanpa reload (21-bench v11.29c): di atas supaya cepat dijangkau; saat jalan panel ini & bench terlipat otomatis —— */
+    if (/[?&]bench=1(&|$)/.test(Q) && /[?&]gpup=1(&|$)/.test(Q)) {
+      panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'seq tanpa reload (±75 dtk, jangan ganti mode):'));
+      var seqRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
+      [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2']].forEach(function (c) {
+        seqRow.appendChild(btn(c[0], function () {
+          if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
+          if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
+          log('seq ' + c[1] + ' jalan: ' + c[2] + '. Timer di kiri bawah; selesai → salin dump bench.');
+          expand(false);
+        }, false));
+      });
+      panel.appendChild(seqRow);
+    }
+
     /* —— A/B q.big: reload ke bench+probe GPU + 1 varian —— */
     panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'A/B q.big (bench + gpup):'));
     var abRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
@@ -1590,12 +1605,6 @@
         go(abUrl(v));
       }, abCur === v.id));
     });
-    if (/[?&]bench=1(&|$)/.test(Q) && /[?&]gpup=1(&|$)/.test(Q)) {   /* 21-bench v11.29b: runner lapisan-mati tanpa reload */
-      abRow.appendChild(btn('seq (tanpa reload)', function () {
-        if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29b');
-        log(window.__offSeqStart() ? 'seq jalan: base, sky, skyhide, hud, mw, neb, rasi+bintang, base2 (±8 dtk/fase). Jangan ganti mode; lalu dump bench.' : 'seq sedang jalan');
-      }, false));
-    }
     panel.appendChild(abRow);
 
     var status = mk('div', 'opacity:.9;min-height:2.6em;margin-bottom:8px;font-size:10px;line-height:1.35', 'siap');
@@ -1733,9 +1742,10 @@
     }
     fab.onclick = function (e) { e.stopPropagation(); expand(true); };
     ui.expand = expand;
+    window.__WH_AD && (window.__WH_AD.collapse = function () { expand(false); });
 
     document.body.appendChild(root);
-    expand(true);
+    expand(false);   /* v18: default terlipat (fab saja); buka dengan tap 🐞 */
     updateList();
     installProbeSilence();
     if (MODE === 'probe') startProbeWatch();
@@ -1755,6 +1765,7 @@
   }
 
   window.__WH_AD = {
+    collapse: function () { if (ui && ui.expand) ui.expand(false); },
     open: open,
     installPerf: installPerf,
     installProbe: installProbe,

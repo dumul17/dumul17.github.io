@@ -492,7 +492,7 @@ function ast3dStore(ci,sx,sy,sw,sh,dx,dy,dw,dh,n){
 function ast3dBlitCache(ci){
   var c=AST3D.cache[ci];
   if(!c)return false;
-  if(c.sw>0&&c.sh>0)g.drawImage(c.c,0,0,c.sw,c.sh,c.dx,c.dy,c.dw,c.dh);
+  if(c.sw>0&&c.sh>0&&!(window.__offB&&window.__offB.ast))g.drawImage(c.c,0,0,c.sw,c.sh,c.dx,c.dy,c.dw,c.dh);   /* ?off=astb (21-bench): 4 titik blit batu */
   AST_DRAWN+=c.n;
   return true;
 }
@@ -560,7 +560,7 @@ function ast3dDraw(now,half){
     var cvA=AST3D.r.domElement,kx=AST3D.pw/W,ky=AST3D.ph/H,
         rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),rx1=Math.min(W,Math.ceil(bx1)+2),ry1=Math.min(H,Math.ceil(by1)+2);
     if(rx1>rx0&&ry1>ry0){
-      if(!AST3D_CFG.reuse)g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama persis dgn blit penuh: di luar bbox kanvas GL transparan */
+      if(!AST3D_CFG.reuse&&!(window.__offB&&window.__offB.ast))g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama persis dgn blit penuh: di luar bbox kanvas GL transparan */
       else{
         /* salin bbox (piksel perangkat, bulat, 1:1) ke kanvas cache pass ini, lalu blit dari cache -> hasil sama, dan frame berikut bisa pakai ulang */
         var sx=Math.max(0,Math.floor(rx0*kx)),sy=Math.max(0,Math.floor(ry0*ky)),ex=Math.min(AST3D.pw,Math.ceil(rx1*kx)),ey=Math.min(AST3D.ph,Math.ceil(ry1*ky)),sw=ex-sx,sh=ey-sy;
@@ -569,7 +569,7 @@ function ast3dDraw(now,half){
           if(cc.c.width<sw||cc.c.height<sh){cc.c.width=Math.max(cc.c.width,sw+32);cc.c.height=Math.max(cc.c.height,sh+32);}   /* cuma membesar (set width = kosongkan + realokasi) */
           else cc.x.clearRect(0,0,cc.c.width,cc.c.height);
           cc.x.drawImage(cvA,sx,sy,sw,sh,0,0,sw,sh);
-          g.drawImage(cc.c,0,0,sw,sh,cc.dx,cc.dy,cc.dw,cc.dh);
+          if(!(window.__offB&&window.__offB.ast))g.drawImage(cc.c,0,0,sw,sh,cc.dx,cc.dy,cc.dw,cc.dh);
         }else ast3dStore(ci,0,0,0,0,0,0,0,0,0);
       }
     }else ast3dStore(ci,0,0,0,0,0,0,0,0,0);
@@ -677,7 +677,7 @@ function ast3dHeads(list,now){
     AST3D.r.render(D.sc,AST3D.cam);
     var cvA=AST3D.r.domElement,kx=AST3D.pw/W,ky=AST3D.ph/H,
         rx0=Math.max(0,Math.floor(bx0)-2),ry0=Math.max(0,Math.floor(by0)-2),rx1=Math.min(W,Math.ceil(bx1)+2),ry1=Math.min(H,Math.ceil(by1)+2);
-    if(rx1>rx0&&ry1>ry0)g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama dgn blit non-cache ast3dDraw */
+    if(rx1>rx0&&ry1>ry0&&!(window.__offB&&window.__offB.ast))g.drawImage(cvA,rx0*kx,ry0*ky,(rx1-rx0)*kx,(ry1-ry0)*ky,rx0,ry0,rx1-rx0,ry1-ry0);   /* sama dgn blit non-cache ast3dDraw */
     return true;
   }catch(e){D.bad=true;try{console.warn('[ast3d] kepala komet gagal, pakai bulatan 2D:',e&&e.message||e);}catch(e2){}return false;}
 }

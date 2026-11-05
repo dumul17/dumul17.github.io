@@ -724,7 +724,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       }
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality=opts.lq?'low':'high';   /* v11: opts.lq (wormhole zoom): tekstur 256px di-upscale sampai layar penuh; filter 'high' mahal di GPU sesuai area -> 'low' */
-      g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);pmk('pt.blit');
+      if(!(window.__offB&&window.__offB.pt))g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);pmk('pt.blit');   /* ?off=ptb (21-bench) */
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}

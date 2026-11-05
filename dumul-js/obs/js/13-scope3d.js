@@ -450,7 +450,7 @@ function tele3dBody(g,now){
     }
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
     var H=SCP3D_CFG.half;
-    g.drawImage(cache||threeGLSrc(SCP3D.gl),-H,-H,H*2,H*2);
+    if(!(window.__offB&&window.__offB.sc))g.drawImage(cache||threeGLSrc(SCP3D.gl),-H,-H,H*2,H*2);   /* ?off=scb (21-bench): lewati blit saja, GL tetap dirender */
     return true;
   }catch(e){
     scp3dFail(e&&e.message||e);

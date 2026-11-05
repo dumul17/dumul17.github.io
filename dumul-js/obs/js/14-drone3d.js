@@ -379,7 +379,7 @@ function drone3dDraw(g,x,y,col,a,now,sc){
     g.fillStyle='rgba('+col+','+Math.min(1,.14*a*hk)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();}
     g.globalAlpha=a>1?1:(a<0?0:a);
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-    if(DR3D.c2)g.drawImage(DR3D.c2,x-S/2,y-S/2,S,S);
+    if(DR3D.c2&&!(window.__offB&&window.__offB.dr))g.drawImage(DR3D.c2,x-S/2,y-S/2,S,S);   /* ?off=drb (21-bench) */
     g.restore();
     return true;
   }catch(e){
