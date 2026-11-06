@@ -109,6 +109,7 @@
     /* nama tahap (kunci = isi LOG_M di 07-boot.js) */
     'bl.a.canvas':{en:'canvas',id:'kanvas'},'bl.a.light':{en:'light reflections',id:'pantulan cahaya'},'bl.a.paint':{en:'materials',id:'bahan'},
     'bl.a.body':{en:'body',id:'badan'},'bl.a.cockpit':{en:'cockpit',id:'kokpit'},'bl.a.engine':{en:'engines',id:'mesin'},'bl.a.lamps':{en:'lights',id:'lampu'},
+    'bl.a.rsm':{en:'small rocks',id:'batu kecil'},'bl.a.rmd':{en:'medium rocks',id:'batu sedang'},'bl.a.rlg':{en:'big rocks',id:'batu besar'},
     'bl.a.wings':{en:'wings',id:'sayap'},'bl.a.join':{en:'final assembly',id:'merakit…'},'bl.a.size':{en:'screen fit',id:'pasin ke layar'},
     'bl.a.circuit':{en:'circuit pattern',id:'pola sirkuit'},'bl.a.plates':{en:'plates',id:'pelat'},
     'boot.red':{en:'Red',id:'Merah'},'boot.blue':{en:'Blue',id:'Biru'},'boot.or':{en:'or',id:'atau'},
