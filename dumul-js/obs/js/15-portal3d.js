@@ -720,7 +720,7 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
       var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
       var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
-      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?(opts.ov?((PT3D.oN=(PT3D.oN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0):((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0)):(FS.n&1)===1)   /* opts.ov (overview) = counter oN sendiri, terpisah dari wN milik zoom wormhole (09) */   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
+      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?(opts.ov?(((typeof FS!=='undefined'?FS.n|0:0)%(opts.alt2>1?opts.alt2:2))!==0):   /* fase dari FS.n (bukan counter sendiri): gantian pasti dgn teleskop (render di FS.n ganjil) */((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0)):(FS.n&1)===1)   /* opts.ov (overview) = counter oN sendiri, terpisah dari wN milik zoom wormhole (09) */   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
       if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
         PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);pmk('pt.gl');
         if(alt){
@@ -818,7 +818,7 @@ function ptOvHidden(){return false;}
    Aktivitas (SFX/audio, transisi sektor, wormhole) -> ovAlt segera; idle ovAltHold ms terus-menerus -> ovAltIdle. Saat charge (ch>0) = 0 (render penuh, jalur lama). */
 function ptOvAlt(now,ch){
   var P=PT3D_CFG.ovAlt|0;
-  if(P<2||ch>0){PT3D.ovAI=0;return 0;}
+  if(P<2||ch>0||!(typeof FS!=='undefined'&&(FS.slow||FS.heavy))){PT3D.ovAI=0;return 0;}   /* v-perf2: hanya saat HP berat (FS.slow/heavy); perangkat lumayan tetap render GL tiap frame (gerak tidak telat) */
   var idle=!ptPlaying()&&!(typeof SECT!=='undefined'&&SECT.busy)&&!(typeof whBusy==='function'&&whBusy());
   if(!idle){PT3D.ovAI=0;return P;}
   if(!PT3D.ovAI)PT3D.ovAI=now;

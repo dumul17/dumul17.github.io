@@ -832,7 +832,8 @@ var zmN=0,CAP_MS=1000/60,capVs=100,capPrev=0,capLast=0;
    Keluar dari slow cuma kalau frame < 23 ms selama 5 dtk (histeresis lebar: saat slow beban memang turun, jangan bolak-balik). Interaksi (pan/zoom/tap) tetap tiap frame:
    cache asteroid dibatalkan sendiri oleh AST3D.ver, aurora ikut parallax saat blit.
    ?fs=0 mati, ?fs=2 paksa slow (tes), default auto. Di ?probe=1 default MATI (supaya tidak mengacaukan ukuran) kecuali ?fs= diisi. */
-var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',heavy:false,ht:0,hlog:[],cfg:{warm:8000,enter:40,hold:3000,leave:23,leaveHold:5000,clamp:80,resume:3000,hOn:28,hOnHold:800,hOff:22,hOffHold:3000,hMinN:24}};   /* heavy = beban sedang (EMA>28 ms ≥0,8 dtk, setelah 24 frame), TANPA menunggu warm 8 dtk; histeresis keluar <22 ms ≥3 dtk. Dipakai untuk menahan kerja latar (ringWarmStep) — BUKAN mengubah gambar. */
+var FS={n:0,ema:16.7,last:0,slow:false,mode:1,t:0,grace:0,why:'',heavy:false,ht:0,hlog:[],cfg:{warm:8000,enter:40,hold:3000,leave:23,leaveHold:5000,clamp:80,resume:3000,hOn:33,hOnHold:800,hOff:25,hOffHold:3000,hMinN:24}};   /* v-perf2: ambang naik 28/22 -> 33/25 (rata2 <30 fps baru dianggap berat): heavy sekarang ikut menggerakkan alt portal/teleskop, jadi perangkat 'lumayan' tidak boleh ikut. Uji cepat tanpa deploy: ?heavyon=NN (hOff = NN-8) */
+try{var _ho=/[?&]heavyon=([0-9]+)/.exec(location.search);if(_ho){FS.cfg.hOn=parseInt(_ho[1],10);FS.cfg.hOff=Math.max(10,FS.cfg.hOn-8);}}catch(eHo){};   /* heavy = beban sedang (EMA>28 ms ≥0,8 dtk, setelah 24 frame), TANPA menunggu warm 8 dtk; histeresis keluar <22 ms ≥3 dtk. Dipakai untuk menahan kerja latar (ringWarmStep) — BUKAN mengubah gambar. */
 /* HARDENING (perangkat kuat TIDAK boleh masuk slow): keputusan slow ditunda sampai `warm` ms setelah boot (kompilasi shader / muat three.js / dekode gambar bikin frame panjang sesaat),
    timer di-reset selama transisi sektor / wormhole, dan `resume` ms setelah tab kembali dari background (celah frame >= 250 ms). Stall tunggal diklem `clamp` ms (dulu 120)
    supaya satu frame panjang tidak menggeser EMA. Masuk slow butuh EMA > `enter` ms terus-menerus `hold` ms. FS.why = alasan terakhir slow menyala / mati (tampil di HUD PERF). */
@@ -851,7 +852,7 @@ function fsTick(now){
   var C=FS.cfg,iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
   var mn=fsMenu();
   if(mn){FS.wasMenu=1;FS.t=0;return;}   /* menu terbuka: EMA tidak diracuni, keputusan slow/normal ditahan (dulu: interval compositor menu bikin SLOW nyangkut) */
-  if(FS.wasMenu){FS.wasMenu=0;FS.ema=16.7;FS.grace=now+C.resume;FS.t=0;FS.heavy=false;FS.ht=0;return;}   /* menu baru tutup: buang EMA lama, ukur ulang dari frame sky nyata */
+  if(FS.wasMenu){FS.wasMenu=0;FS.ema=16.7;FS.grace=now+C.resume;FS.t=0;FS.ht=0;return;}   /* heavy TIDAK di-reset: alt portal/teleskop bergantung padanya; reset dulu bikin render penuh ±1-1,5 dtk setelah menu tutup = spike */   /* menu baru tutup: buang EMA lama, ukur ulang dari frame sky nyata */
   if(iv>=250){FS.grace=now+C.resume;FS.ht=0;}   /* celah panjang (tab background / render ditahan): tunda keputusan, EMA tidak diracuni */
   if(iv>0&&iv<250)FS.ema+=(Math.min(iv,C.clamp)-FS.ema)*.08;
   if(FS.mode===0){FS.slow=false;FS.heavy=false;return;}
