@@ -107,7 +107,7 @@
     /* [v175] log boot: lensa (warm shader), persiapan akhir (pra-kapsul), warm nyata batu + nebula */
     'bl.warm':{en:'Lenses',id:'Lensa'},'bl.a.warm':{en:'warming up',id:'lagi dihangatin'},
     'bl.pre':{en:'Final prep',id:'Persiapan akhir'},'bl.a.pui':{en:'button sounds',id:'suara tombol'},'bl.a.past':{en:'rock pictures',id:'gambar batu'},'bl.a.pfb':{en:'observer count',id:'hitungan pengamat'},
-    'bl.a.wast':{en:'rock shapes',id:'bentuk batu'},'bl.a.ppl':{en:'planet view',id:'tampilan planet'},'bl.a.psc':{en:'telescope view',id:'tampilan teleskop'},'bl.neb':{en:'Nebula',id:'Nebula'},'bl.a.tint':{en:'sector colors',id:'warna sektor'},
+    'bl.a.wast':{en:'rock shapes',id:'bentuk batu'},'bl.a.ppl':{en:'planet view',id:'tampilan planet'},'bl.a.psc':{en:'telescope view',id:'tampilan teleskop'},'bl.a.prg':{en:'signal rings',id:'cincin sinyal'},'bl.neb':{en:'Nebula',id:'Nebula'},'bl.a.tint':{en:'sector colors',id:'warna sektor'},
     /* nama tahap (kunci = isi LOG_M di 07-boot.js) */
     'bl.a.canvas':{en:'canvas',id:'kanvas'},'bl.a.light':{en:'light reflections',id:'pantulan cahaya'},'bl.a.paint':{en:'materials',id:'bahan'},
     'bl.a.body':{en:'body',id:'badan'},'bl.a.cockpit':{en:'cockpit',id:'kokpit'},'bl.a.engine':{en:'engines',id:'mesin'},'bl.a.lamps':{en:'lights',id:'lampu'},
