@@ -1298,6 +1298,7 @@
         summary = parsePerfText(panel) || { n: n, fps: null, intMs: null, jsMs: null, imax: PP.imax || 0, jank: PP.jank || 0, mode: perfModeNow(), src: 'kosong' };
       }
     } catch (e2) {}
+    try { if (typeof scDumpLine === 'function') panel += '\n' + scDumpLine(); } catch (eSc) {}   /* starcache (04-render.js) ikut di panel snapshot */
     var snap = { ts: nowIso(), dpr: dpr(), ctx: ctxNow(), quality: qualityNow(), tag: opt.tag || 'snap', url: String(location.href), summary: summary, panel: panel };
     perfStore.push(snap);
     updateList();

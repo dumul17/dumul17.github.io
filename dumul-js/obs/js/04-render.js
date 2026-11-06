@@ -1900,6 +1900,121 @@ function drawStars(c,age,now){
     }
   });
 }
+/* ================= STARCACHE (prototipe, nyala: ?starcache=1) =================
+   Foto lapisan bintang per rasi (canvas seukuran bbox yang kelihatan), disegarkan bergiliran: SATU rasi per frame, yang paling lama dulu.
+   Idle ~6 Hz, rasi FULL (BGM constellation.opus, fK=1) ~10 Hz, FS.heavy = separuhnya. Foto cuma dipakai kalau kunci geometri/gaya sama
+   dengan saat difoto (zoom, rot, c.ox/c.oy = pan+parallax+sway, lensa BH, fokus rasi, fK, halo); kalau ada yang berubah rasi itu digambar live
+   seperti biasa dan baru difoto lagi setelah kunci stabil beberapa frame. Selalu live: rasi SFX aktif, transisi fK, sweep kedip (_tw), label (_la),
+   collapsars (sway/redup), mode kamera, sektor busy, Pleiades. Refresh yang jatuh di frame spike ditunda (maksimal maxAge ms). Matikan/nyalakan
+   saat jalan: SCACHE.on=false/true (console). Statistik: SCACHE.st {bake,blit,live,skip,bms}. */
+var SCACHE={on:/[?&]starcache=1\b/.test(location.search),hz:6,hzFull:10,maxAge:380,stable:3,pick:null,lastNow:0,spike:false,idleF:0,has:false,err:0,
+  act:false,G:[0,0,0,0,0,0,0,0,0],st:{fr:0,bake:0,blit:0,live:0,skip:0,bms:0,bmx:0}};
+var SC_TOL=[1e-6,.5,.5,1e-4,1e-5,.2,.35,.35,1e-4,.35,.35,.004,.001,.5,1e-4,1e-4,.5,.001];
+function scClose(a,b){for(var i=0;i<18;i++){if(!(Math.abs(a[i]-b[i])<=SC_TOL[i]))return false;}return true;}
+function scCopy(d,s){for(var i=0;i<18;i++)d[i]=s[i];}
+function scRelease(){
+  var i,c;
+  for(i=0;i<CONS.length;i++){c=CONS[i];if(c._sc){c._sc.cv=null;c._sc.cx=null;c._sc.cw=0;c._sc.ch=0;c._sc.ok=false;}}
+  SCACHE.has=false;
+}
+/* rasi boleh difoto: tidak ada animasi cepat yang tidak ikut kunci (SFX, transisi fK, sweep kedip, label, collapsars, fade-in awal) */
+function scEligible(c,age,now){
+  var j,ks,s,fK,m;
+  if(typeof c.ox!=='number'||consSfxOn(c))return false;
+  fK=consFullK(c,now);
+  if(fK!==0&&fK!==1)return false;
+  if(AT.pK>.004||AT.swayK>.003)return false;
+  if(typeof ALIGN!=='undefined'&&ALIGN.cid)return false;
+  ks=c._keys||(c._keys=Object.keys(c.stars));
+  if(c._scA===undefined){m=0;for(j=0;j<ks.length;j++)if(c.stars[ks[j]].t0>m)m=c.stars[ks[j]].t0;c._scA=m+.55;}
+  if(age<c._scA)return false;
+  for(j=0;j<ks.length;j++){s=c.stars[ks[j]];if(s._tw>.001||s._la>.02)return false;}
+  return true;
+}
+/* dipanggil sekali per frame sebelum loop drawStars. true = cache aktif frame ini (pakai starCacheDraw per rasi). */
+function starCacheBegin(now,age){
+  var S=SCACHE,G=S.G,i,j,c,sc,kn,R,bp,gap,audio,iv,ivC,ds,pickT=1e15,pickC=null,ok;
+  S.pick=null;
+  gap=S.lastNow?now-S.lastNow:0;S.lastNow=now;
+  S.spike=gap>Math.max(26,((typeof FS!=='undefined'&&FS.ema)||16.7)*1.35)&&gap<400;   /* frame sebelumnya berat (modul 3D dll): tunda refresh, kecuali sudah lewat maxAge */
+  ok=S.on&&S.err<3&&!CAMERA_MODE&&!SECT.on&&!SECT.busy&&!SW&&!BELT&&!(window.WORMHOLE&&window.WORMHOLE.busy)&&!isLayoutEdit()&&!(drag.on&&drag.moved);
+  S.act=false;
+  if(!ok){if(S.has&&++S.idleF>240)scRelease();return false;}
+  S.idleF=0;
+  try{
+    R=BH.Rr*(BHZ||1);bp=(SECT.cur&&R>=1)?camBH():null;
+    G[0]=DPR;G[1]=W;G[2]=H;G[3]=skyZoom;G[4]=skyRot;G[5]=bp?R:0;G[6]=bp?bp[0]:0;G[7]=bp?bp[1]:0;G[8]=BHU.str;
+    audio=potatoAudioFocus()?1:0;
+    iv=1000/S.hz*((typeof FS!=='undefined'&&FS.heavy)?2:1);
+    for(i=0;i<CONS.length;i++){
+      c=CONS[i];c._scS=0;
+      if(!sectShow(c.id))continue;
+      sc=c._sc||(c._sc={cv:null,cx:null,cw:0,ch:0,ok:false,t:-1e9,x0:0,y0:0,pw:0,ph:0,empty:false,key:[],kl:[],kn:[],stable:0});
+      if(!scEligible(c,age,now)){sc.ok=false;sc.stable=0;continue;}
+      kn=sc.kn;
+      for(j=0;j<9;j++)kn[j]=G[j];
+      kn[9]=c.ox;kn[10]=c.oy;kn[11]=constellationFocus(c);kn[12]=c._fK;kn[13]=audio;kn[14]=HALO_IDLE_S;kn[15]=HALO_IDLE_A;kn[16]=AMB_TW?1:0;kn[17]=AT.pK;
+      sc.stable=scClose(kn,sc.kl)?sc.stable+1:0;scCopy(sc.kl,kn);
+      if(sc.ok&&now-sc.t<1500&&scClose(kn,sc.key)){
+        c._scS=1;   /* foto valid: tempel */
+        ds=now-sc.t;ivC=(c._fK===1)?1000/S.hzFull*(iv*S.hz/1000):iv;
+        if(ds>=ivC){if(S.spike&&ds<S.maxAge)S.st.skip++;else if(sc.t<pickT){pickT=sc.t;pickC=c;}}
+      }else if(sc.stable>=S.stable){   /* kunci berubah tapi sudah diam beberapa frame: foto ulang (prioritas di atas refresh biasa) */
+        if(-1e9+i<pickT){pickT=-1e9+i;pickC=c;}
+      }
+    }
+    S.pick=pickC;S.act=true;S.st.fr++;
+    return true;
+  }catch(e){S.err++;try{window.__hub.renderError='starCacheBegin: '+(e&&e.message||e);}catch(e2){}return false;}
+}
+function scBake(c,age,now,sc){
+  var S=SCACHE,t0=performance.now(),k2=W<500?.95:1.2,ks=c._keys,D=DPR,j,s,q,m,x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,pw,ph,cw,ch,gm;
+  try{
+    for(j=0;j<ks.length;j++){
+      s=c.stars[ks[j]];if(!((age-s.t0)>0))continue;
+      q=gSkyC(s.x+c.ox,s.y+c.oy,72,true);if(!q)continue;
+      m=s.r*k2*8+6;   /* batas halo terbesar (FULL + napas + kedip) */
+      if(q[0]-m<x0)x0=q[0]-m;if(q[0]+m>x1)x1=q[0]+m;if(q[1]-m<y0)y0=q[1]-m;if(q[1]+m>y1)y1=q[1]+m;
+    }
+    x0=Math.floor(Math.max(0,x0)*D)/D;y0=Math.floor(Math.max(0,y0)*D)/D;x1=Math.min(W,x1);y1=Math.min(H,y1);
+    if(!(x1>x0+1&&y1>y0+1)){c._vis=0;sc.empty=true;scCopy(sc.key,sc.kn);sc.ok=true;sc.t=now;return true;}
+    pw=Math.ceil((x1-x0)*D);ph=Math.ceil((y1-y0)*D);
+    if(!sc.cv||sc.cw<pw||sc.ch<ph){
+      if(!sc.cv)sc.cv=document.createElement('canvas');
+      cw=Math.max(pw,Math.min(Math.ceil(W*D),Math.ceil(pw*1.25)));ch=Math.max(ph,Math.min(Math.ceil(H*D),Math.ceil(ph*1.25)));
+      sc.cv.width=sc.cw=cw;sc.cv.height=sc.ch=ch;sc.cx=sc.cv.getContext('2d');
+    }
+    sc.cx.setTransform(1,0,0,1,0,0);sc.cx.globalAlpha=1;sc.cx.globalCompositeOperation='source-over';sc.cx.clearRect(0,0,pw,ph);
+    sc.cx.setTransform(D,0,0,D,-x0*D,-y0*D);
+    sc.cx.imageSmoothingEnabled=true;sc.cx.imageSmoothingQuality='low';
+    gm=g;g=sc.cx;
+    try{drawStars(c,age,now);}finally{g=gm;}
+    sc.x0=x0;sc.y0=y0;sc.pw=pw;sc.ph=ph;sc.empty=false;
+    scCopy(sc.key,sc.kn);sc.ok=true;sc.t=now;S.has=true;
+    S.st.bake++;t0=performance.now()-t0;S.st.bms+=t0;if(t0>S.st.bmx)S.st.bmx=t0;
+    return true;
+  }catch(e){S.err++;sc.ok=false;try{window.__hub.renderError='scBake: '+(e&&e.message||e);}catch(e2){}return false;}
+}
+/* true = rasi ini sudah digambar (tempel foto / foto baru); false = pemanggil menggambar live (drawStars) */
+function starCacheDraw(c,age,now){
+  var S=SCACHE,sc=c._sc;
+  if(!sc||g.globalCompositeOperation!=='source-over')return false;
+  if(S.pick===c){if(!scBake(c,age,now,sc)){S.st.live++;return false;}}
+  else if(c._scS!==1){S.st.live++;return false;}
+  if(!sc.empty)g.drawImage(sc.cv,0,0,sc.pw,sc.ph,sc.x0,sc.y0,sc.pw/DPR,sc.ph/DPR);
+  S.st.blit++;
+  return true;
+}
+/* ringkasan buat dump ?bench=1 (R.sc) dan panel ?debug=1; kosong/null kalau dipanggil sebelum blok ini ada */
+function scDumpObj(){
+  var S=SCACHE,t=S.st;
+  return {on:S.on,err:S.err,hz:S.hz,hzFull:S.hzFull,maxAge:S.maxAge,stable:S.stable,has:S.has,fr:t.fr,bake:t.bake,blit:t.blit,live:t.live,skip:t.skip,
+    bakeMsAvg:t.bake?+(t.bms/t.bake).toFixed(3):0,bakeMsMax:+t.bmx.toFixed(2),bakePerFrame:t.fr?+(t.bake/t.fr).toFixed(3):0,blitPerFrame:t.fr?+(t.blit/t.fr).toFixed(2):0,livePerFrame:t.fr?+(t.live/t.fr).toFixed(2):0};
+}
+function scDumpLine(){
+  var o=scDumpObj();
+  return 'starcache: '+(o.on?'ON':'off')+'  fr '+o.fr+'  bake '+o.bake+' (avg '+o.bakeMsAvg+'ms, max '+o.bakeMsMax+'ms, '+o.bakePerFrame+'/frame)  blit '+o.blit+' ('+o.blitPerFrame+'/frame)  live '+o.live+' ('+o.livePerFrame+'/frame)  skip '+o.skip+'  err '+o.err;
+}
 /* Pleiades: klaster muda, bintangnya panas tipe B (~12-14 ribu K) -> terang di UV, meredup di IR. Pleione pakai STAR_PHYS (pleiades.pleione);
    bintang klaster lain tidak punya data per bintang, jadi memakai Teff klaster (PL_TEFF) dan tanpa label tipe spektral. Cache per bintang per pita. */
 var PL_TEFF=13000;

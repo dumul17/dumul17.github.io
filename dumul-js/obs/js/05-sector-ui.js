@@ -992,7 +992,8 @@ function frame(now){
     else{
     if(!PX.lines)CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
     if(!PX.pulse)drawPulses(now,age);
-    if(!PX.stars){CONS.forEach(function(c){if(sectShow(c.id))drawStars(c,age,now);});
+    if(!PX.stars){var _sce=(typeof starCacheBegin==='function')&&starCacheBegin(now,age);   /* ?starcache=1 (04-render.js): foto bintang per rasi */
+    CONS.forEach(function(c){if(sectShow(c.id)){if(_sce&&starCacheDraw(c,age,now))return;drawStars(c,age,now);}});
     if(sectShow('pleiades'))drawPleiades(age,now);}
     try{if(!PX.pulse&&typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
     }

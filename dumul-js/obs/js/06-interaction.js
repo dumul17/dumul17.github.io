@@ -476,6 +476,7 @@ function beginSkyPan(e){
      dan jari ke-2 cuma ditolak kalau jatuh di UI (panel/tombol), bukan di bintang. */
   var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#title,#footer,#owl-source,#bh-clock,#music-toggle';
   if(e.target.closest&&e.target.closest(UI_T))return false;
+  if(!CAMERA_MODE)return false;   /* idle/mode biasa: geser + putar sky dimatikan; hanya cam constellation yang boleh */
   var multi=false;
   if(e.pointerType!=='mouse'){
     var tNow=performance.now(),ak;
