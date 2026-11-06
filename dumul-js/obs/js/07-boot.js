@@ -361,7 +361,7 @@ var DUMUL_CHARS=(function(){
        per-keyframe (butuh geometri frame sektor yang hidup, ±10 ms pertama), tidak bisa dihangatkan tanpa frame itu. Asteroid 3D (AST3D) juga sudah di MODS + THREE_WARM.
      Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
-     Belum masuk bobot bar (WT_*) / baris status: sengaja, kalibrasi ulang bar menyusul. [PATCH v175] Sudah masuk LOG BOOT ("Persiapan akhir"), bar tetap belum. Konsekuensi sementara: bar tertahan di 99% sampai PRE selesai (biasanya < 1 dtk di jaringan normal). */
+     [PATCH v175] Masuk LOG BOOT ("Persiapan akhir"). [PATCH v181] Sekarang juga masuk bobot bar (WT_PRE) dan baris status ke-7 (boot.pre.*): bar tidak lagi tertahan di 99% menunggu PRE. */
   var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
   function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
     try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
@@ -441,7 +441,9 @@ var DUMUL_CHARS=(function(){
      Tetap jujur: bar hanya naik saat pekerjaan nyata SELESAI, tanpa komponen waktu. Bedanya, unit yang makan 5 dtk (warm) kini mengisi ±48% bar,
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
   var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
-  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0);
+  /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
+  var WT_PRE={ui:100,ast:400,pl:350,fb:350},WT_PRE_EST={ui:150,ast:450,pl:600,fb:700},PRE_KEYS=['ui','ast','pl','fb'];
+  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+WT_PRE.ui+WT_PRE.ast+WT_PRE.pl+WT_PRE.fb;
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){
@@ -503,21 +505,22 @@ var DUMUL_CHARS=(function(){
   function paintPanel(ready,th,complete,au,sx){
     if(!statusEl)return;
     /* v145: satu kalimat karakter per baris (tanpa angka mentah di status atas). sx = sfxStatus. */
-    var modsOk=th.mods>=th.total,auOk=!!(au&&au.ok),sxOk=!!(sx&&sx.ok);
+    var modsOk=th.mods>=th.total,auOk=!!(au&&au.ok),sxOk=!!(sx&&sx.ok),prOk=preStatus().ok;
     var d=[
       [ready?T('boot.observer.ok'):T('boot.observer.work'),'',ready],
       [ready?T('boot.starmap.ok'):T('boot.starmap.work'),'',ready],
       [modsOk?T('boot.mods.ok'):T('boot.mods.work'),'',modsOk],
       [th.warmOk?T('boot.warm.ok'):T('boot.warm.work'),'',th.warmOk],
       [auOk?T('boot.audio.ok'):T('boot.audio.work'),'',auOk],
-      [sxOk?T('boot.sfx.ok'):T('boot.sfx.work'),'',sxOk]
+      [sxOk?T('boot.sfx.ok'):T('boot.sfx.work'),'',sxOk],
+      [prOk?T('boot.pre.ok'):T('boot.pre.work'),'',prOk]   /* v181: PRE jadi baris status ke-7 (muncul begitu PRE mulai) */
     ],i,r,now=performance.now();
     for(i=0;i<d.length;i++){
       r=R[i]||(R[i]={q:false,at:now,val:''});
       r.label=d[i][0];
       if(r.val!==d[i][1]){r.val=d[i][1];r.at=now;}
       r.ok=!!d[i][2];
-      r.hold=(i===5&&!warmed&&!r.ok);   /* v146: baris SFX belum boleh tampil sebelum antreannya benar-benar mulai */
+      r.hold=(i===5&&!warmed&&!r.ok)||(i===6&&pre.at<0&&!r.ok);   /* v146: baris SFX belum boleh tampil sebelum antreannya benar-benar mulai */
       if(r.ok&&!r.q){r.q=true;doneQ.push(i);}
     }
     stageStep();
@@ -806,16 +809,19 @@ var DUMUL_CHARS=(function(){
     var complete=vis&&au.ok&&sx.ok&&pr.ok;   /* PRE ikut gerbang (tiap langkah dibatasi PRE_MAX, jadi tidak bisa menggantung) */
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
+    for(wi=0;wi<4;wi++)if(pr[PRE_KEYS[wi]]===2)wDone+=WT_PRE[PRE_KEYS[wi]];   /* v181: langkah PRE selesai (sukses/gagal/timeout = gerbang kapsul juga lepas) */
     var astF=0;   /* v177: AST3D beririsan -> tahap selesai ikut mengisi bar (jujur: hanya tahap nyata), rayapan di bawah cuma untuk sisanya */
     try{if(!th.fins[0]&&th.st[0]===1&&window.__ast3dT){astF=Math.min(.95,window.__ast3dT.length/(LOG_M[0][3].length+1));wDone+=WT_MODS[0]*astF;}}catch(eAf){}
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])uD++;
+    if(pr.ok)uD++;   /* v181: PRE = satu unit kilat */
     if(uD>uLast){uLast=uD;barFlash();}
     var wc=0;
     wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi+(wi===0?'_'+((window.__ast3dT&&window.__ast3dT.length)|0):''),!th.fins[wi]&&th.st[wi]===1,wi===0?WT_MODS[0]*(1-astF):WT_MODS[wi],wi===0?WT_MODS[0]/6:WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
+    for(wi=0;wi<4;wi++)wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,WT_PRE[PRE_KEYS[wi]],WT_PRE_EST[PRE_KEYS[wi]],elapsed);   /* v181 */
     if(!sx.ok&&sx.total>0){
       var per=WT_SFX/sx.total;
       wc+=crp('s'+sx.n,warmed,per,per,elapsed);   /* v151: per langkah metadata selesai */
