@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
+/* BENCH v11.29 (?bench=1) — v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
    v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
    v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
@@ -21,7 +21,7 @@
   try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
   try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* v11.29: ?off=a,b,c = matikan lapisan untuk tes q.big (otomatis dari URL, tercatat di dump) */
-  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
+  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
   try {
     var offM = /[?&]off=([a-z,]+)/.exec(location.search);
     if (offM) offM[1].split(',').forEach(function (t) { if (OFF_ALL.indexOf(t) >= 0 && OFF_L.indexOf(t) < 0) OFF_L.push(t); });
@@ -897,7 +897,7 @@
      (2) requestIdleCallback dibungkus: asal (file:baris dari stack saat dijadwalkan), jeda jadwal->jalan, durasi, timeRemaining awal, didTimeout. Hanya yang JALAN sesudah kapsul.
      (3) longtask + LoAF (>=50 ms, atribusi skrip), rAF per detik (n, max, >33 ms, >50 ms) selama jendela, memori tiap 10 dtk, warmLog audio, THREE_WARM + __threeQ.warm.
      Hasil: ringkasan per nama + timeline gabungan (relatif kapsul) + detail. window.__benchPost() = snapshot string (console). */
-  var PB_MS = (function () { var m = /[?&]pbms=(\d+)/.exec(location.search); return m ? Math.max(5000, +m[1]) : (/[?&]gpup=1(&|$)/.test(location.search) ? 200000 : 60000); })();   /* v11.29c: dengan gpup=1 jendela 200 dtk supaya seq (±75-100 dtk) tidak terpotong */
+  var PB_MS = (function () { var m = /[?&]pbms=(\d+)/.exec(location.search); return m ? Math.max(5000, +m[1]) : (/[?&]gpup=1(&|$)/.test(location.search) ? 200000 : (/[?&]debug=1(&|$)/.test(location.search) ? 300000 : 60000)); })();   /* v11.29c: dengan gpup=1 jendela 200 dtk supaya seq (±75-100 dtk) tidak terpotong */
   var PB = { ev: [], agg: {}, ric: [], ricN: 0, ricMs: 0, loaf: [], lt: [], fr: {}, mem: [], t0: null, tEnd: null, wrapped: [], missing: [], sampler: false };
   var PB_FN = ['bakeAstroPlates', 'bakeDustLayers', 'bakeHudGeom', 'bakeCamGrid', 'ensureCamGrid', 'nebTint', 'nebTintStep', 'nebTintSync', 'nebLiteFallback',
     'bhBandBake', 'bhCssApply', 'bhBloomSprite', 'bhFiberSprite', 'buildSprite', 'ensureAsteroidSprites', 'ofxMakeTint', 'ringWarmStep', 'nebPrefetch', 'bhSpriteWarm', 'getRingSprite', 'getStarSprite',
@@ -1017,11 +1017,13 @@
     return l;
   }
   function pmEnd() {
-    var t = performance.now(), k;
+    var t = performance.now(), k, fdt = (PM.pf0 != null) ? PM.fs0 - PM.pf0 : null;
+    PM.pf0 = PM.fs0;   /* periode antar frame yang SAMPAI pBegin (frame ter-throttle ikut memanjangkan periode) */
     if (window.__offSkip && t < window.__offSkip) return;   /* v11.29b: frame awal fase (settle) tidak dihitung */
     PM.cur.end = (PM.cur.end || 0) + (t - PM.t0);
     if (PB.t0 == null || PB.tEnd != null) return;
-    var js = t - PM.fs0, lb = pmLbl(), m = PM.modes[lb] || (PM.modes[lb] = { n: 0, js: 0, mx: 0, smp: [], seg: {} });
+    var js = t - PM.fs0, lb = pmLbl(), m = PM.modes[lb] || (PM.modes[lb] = { n: 0, js: 0, mx: 0, smp: [], seg: {}, dn: 0, dt: 0, ds: [] });
+    if (fdt != null && fdt > 0 && fdt < 600) { m.dn++; m.dt += fdt; if (m.ds.length < 800) m.ds.push(fdt); }
     m.n++; m.js += js; if (js > m.mx) m.mx = js; if (m.smp.length < 800) m.smp.push(js);
     if (PM.ff.length < 6) { var ffo = {}; for (k in PM.cur) if (PM.cur[k] >= 1.5) ffo[k] = Math.round(PM.cur[k] * 10) / 10; PM.ff.push([Math.round(t), lb, Math.round(js * 10) / 10, ffo]); }
     for (k in PM.cur) { var s = m.seg[k] || (m.seg[k] = [0, 0]); s[0] += PM.cur[k]; if (PM.cur[k] > s[1]) s[1] = PM.cur[k]; }
@@ -1033,6 +1035,7 @@
     }
   }
   function pmInstall() {
+    try { var sb = /[?&]stb=([0-9.]+),([0-9.]+)/.exec(location.search); if (sb && typeof STB === 'object') { STB[0] = +sb[1]; STB[1] = +sb[2]; } } catch (eSb) {}
     offApply();
     try {
       if (window.PERF || typeof window.pmk !== 'function' || window.pmk.__pm) return;
@@ -1063,6 +1066,8 @@
     blit: [['base', []], ['plb', ['plb']], ['astb', ['astb']], ['ptb', ['ptb']], ['scb', ['scb']], ['drb', ['drb']], ['blit', ['blit']], ['ast', ['ast']], ['base2', []]],   /* blit = lewati drawImage GL->#sky tiap unit; ast = lewati batu sama sekali (GL+blit) */
     floor: [['base', []], ['all', ['all']], ['hole', ['hole']], ['pulse', ['pulse']], ['plfx', ['plfx']], ['combo', ['blit', 'hole', 'pulse', 'plfx', 'ast']], ['combo+', ['blit', 'hole', 'pulse', 'plfx', 'ast', 'sky', 'lines', 'stars']], ['base2', []]],   /* all = TIDAK ada gambar sama sekali (PX.all; pBegin + q.* tetap jalan) = LANTAI backlog; combo/combo+ = semua lapisan yang sudah ketahuan mati; selisih combo+ vs all = sisa yang bukan dari gambar kita */
     stars: [['base', []], ['cname', ['cname']], ['lstroke', ['lstroke']], ['lines', ['lines']], ['sglow', ['sglow']], ['score', ['score']], ['slbl', ['slbl']], ['splei', ['splei']], ['sdraw', ['sdraw']], ['stars', ['stars']], ['base2', []]],   /* v11.29g: pecah 'lines+stars' di SEKTOR (±13 ms). cname=nama rasi+nebula; lstroke=goresan garis (hitung gSky tetap); lines=drawCons utuh; sglow=halo bintang; score=inti bintang; slbl=silang+label+spektrum; splei=Pleiades; sdraw=semua gambar bintang mati (tinggal hitung); stars=drawStars+Pleiades utuh. Sisa lines−cname−lstroke = hitung/culling garis; stars−sdraw−splei = hitung bintang. Dump juga memuat seg s.cons/s.pulse/s.stars/s.plei (waktu JS perekaman, bukan raster) */
+    sizes: [['base', []], ['sgs', ['sgs']], ['sgm', ['sgm']], ['sgl', ['sgl']], ['scs', ['scs']], ['scm', ['scm']], ['scl', ['scl']], ['sglow', ['sglow']], ['score', ['score']], ['base2', []]],   /* v11.29h: halo (sg*) dan inti (sc*) dimatikan per ember ukuran s.r mentah: s=kecil (<STB[0]), m=sedang, l=besar (>=STB[1]); sglow/score = semua ukuran (pembanding). Dump: stCnt = jumlah bintang + luas halo per frame per ember */
+    plei: [['base', []], ['pname', ['pname']], ['pglow', ['pglow']], ['pcore', ['pcore']], ['pint', ['pint']], ['splei', ['splei']], ['base2', []]],   /* v11.29h: Pleiades: pname=kotak nama, pglow=halo, pcore=inti, pint=pulse+label Pleione (composite lighter), splei=semua */
     layer: [['base', []], ['sky', ['sky']], ['skyhide', ['skyhide']], ['hud', ['hud']], ['mw', ['mw']], ['neb', ['neb']], ['lines+stars', ['lines', 'stars']], ['base2', []]]
   };
   function osBox(c) { try { var b = document.getElementById('__bench_box'); if (b) b.classList.toggle('bc', !!c); } catch (e) {} }
@@ -1095,12 +1100,20 @@
     window.__stSeg = /[?&]stseg=1(&|$)/.test(location.search) ? 1 : 0;
     osBox(false); osLabel('seq DIBATALKAN \u2014 dump hanya memuat fase yang sudah jalan', false);
   }
-  function offSeqStart(kind) {
+  function offSeqStart(kind, tok) {
     if (OS.on) return false;
-    kind = OS_SETS[kind] ? kind : 'blit';
-    var PH = OS_SETS[kind], mm = /[?&]offms=(\d+)/.exec(location.search); OS.ms = mm ? Math.max(3000, Math.min(60000, +mm[1])) : 8000;
+    var PH, mm = /[?&]offms=(\d+)/.exec(location.search), msDef = 8000;
+    if (kind === 'abab') {   /* v11.29h: A (base) / B (token) bergantian, N pasang (?abn=3), 10 dtk/fase; dibaca dari fps/dtAvg + avgJs (tanpa gpup=1 juga bisa) */
+      var tl = String(tok || 'sglow').split('+').filter(function (t) { return OFF_ALL.indexOf(t) >= 0; });
+      if (!tl.length) return false;
+      var an = /[?&]abn=(\d+)/.exec(location.search), np = an ? Math.max(1, Math.min(6, +an[1])) : 3, ii;
+      PH = []; for (ii = 1; ii <= np; ii++) { PH.push(['A' + ii, []]); PH.push(['B' + ii + '_' + tl.join('+'), tl]); }
+      msDef = 10000; OS.ab = tl.join('+');
+    } else { kind = OS_SETS[kind] ? kind : 'blit'; PH = OS_SETS[kind]; OS.ab = null; }
+    OS.ms = mm ? Math.max(3000, Math.min(60000, +mm[1])) : msDef;
     OS.on = true; OS.log = []; OS.kind = kind; OS.n = PH.length; OS.i = 0; OFF_MANAGE = true;
-    if (kind === 'stars') window.__stSeg = 1;   /* penanda s.* aktif di semua fase seq stars (base ikut, jadi sebanding) */
+    if (kind === 'stars' || kind === 'sizes' || kind === 'plei') window.__stSeg = 1;
+    if (kind === 'sizes') { try { if (typeof ST_C === 'object') { ST_C.f = 0; ST_C.n = [0, 0, 0]; ST_C.a = [0, 0, 0]; } } catch (eSt) {} }   /* penanda s.* aktif di semua fase seq stars (base ikut, jadi sebanding) */
     OS.totEnd = performance.now() + PH.length * OS.ms;
     osBox(true); try { if (window.__WH_AD && window.__WH_AD.collapse) window.__WH_AD.collapse(); } catch (eC) {}   /* panel lain dilipat selama seq */
     OS.iv = setInterval(osTick, 250);
@@ -1118,19 +1131,21 @@
     })();
     return true;
   }
-  window.__stSegOk = 1;
+  window.__stSegOk = 1; window.__abOk = 1;
   window.__offSeqStart = offSeqStart; window.__offSeqStop = offSeqStop;
   window.__offSeqOn = function () { return OS.on; };
-  (function () { var q = /[?&]offseq=(1|blit|layer|floor|stars)(&|$)/.exec(location.search); if (q) window.addEventListener('obs-entered', function () { setTimeout(function () { offSeqStart(q[1] === '1' ? 'blit' : q[1]); }, 6000); }, { once: true }); })();
+  (function () { var q = /[?&]offseq=(1|blit|layer|floor|stars|sizes|plei|abab)(&|$)/.exec(location.search); if (q) window.addEventListener('obs-entered', function () { setTimeout(function () { var am = /[?&]ab=([a-z+]+)/.exec(location.search); offSeqStart(q[1] === '1' ? 'blit' : q[1], am ? am[1] : null); }, 6000); }, { once: true }); })();
 
   function pmOut() {
     var r1 = function (v) { return Math.round(v * 10) / 10; }, modes = {};
     Object.keys(PM.modes).forEach(function (k) {
       var m = PM.modes[k], s = m.smp.slice().sort(function (a, b) { return a - b; });
-      modes[k] = { n: m.n, avgJs: r1(m.js / m.n), p95Js: r1(s[Math.floor(s.length * 0.95)] || 0), maxJs: r1(m.mx),
+      var ds = m.ds.slice().sort(function (a, b) { return a - b; });
+      modes[k] = { n: m.n, dtAvg: m.dn ? r1(m.dt / m.dn) : null, dtP50: ds.length ? r1(ds[Math.floor(ds.length * 0.5)]) : null, dtP95: ds.length ? r1(ds[Math.floor(ds.length * 0.95)]) : null, fps: m.dn ? r1(1000 / (m.dt / m.dn)) : null, avgJs: r1(m.js / m.n), p95Js: r1(s[Math.floor(s.length * 0.95)] || 0), maxJs: r1(m.mx),
         seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, window.__gpuP ? 28 : 14) };
     });
-    return { on: PM.on, perfHudActive: !!window.PERF, qOrder: PM.qo || null, off: window.__offL || null, offSeq: OS.log.length ? { cols: '[fase, lapisan mati, t ms]', kind: OS.kind, phases: OS.log, ms: OS.ms, selesai: !OS.on && OS.i >= OS.n } : null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
+    var stc = null; try { if (typeof ST_C === 'object' && ST_C.f) stc = { frames: ST_C.f, stb: STB.slice(), '_cols': 'per frame: n = bintang digambar, haloPx2 = jumlah luas halo (pi*(5r)^2, px CSS) per ember s/m/l', n: ST_C.n.map(function (v) { return r1(v / ST_C.f); }), haloPx2: ST_C.a.map(function (v) { return Math.round(v * 25 * 3.1416 / ST_C.f); }) }; } catch (eSc) {}
+    return { on: PM.on, stCnt: stc, abTok: OS.ab || null, perfHudActive: !!window.PERF, qOrder: PM.qo || null, off: window.__offL || null, offSeq: OS.log.length ? { cols: '[fase, lapisan mati, t ms]', kind: OS.kind, phases: OS.log, ms: OS.ms, selesai: !OS.on && OS.i >= OS.n } : null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }
   function fsOut() {
     var f = typeof FS !== 'undefined' ? FS : null;

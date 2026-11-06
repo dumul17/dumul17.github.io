@@ -1729,6 +1729,8 @@ function coreStyle(col,al){
   var b=al>=1?64:(al<=0?0:(al*64+.5)|0),t=CORE_STY[col]||(CORE_STY[col]=[]);
   return t[b]||(t[b]='rgba('+col+','+(b/64)+')');
 }
+/* bench (?off=sgs,sgm,sgl,scs,scm,scl | seq sizes): ember ukuran bintang menurut s.r mentah, batas STB (default 2.4 / 3.0; ?stb=a,b). ST_C = hitungan per frame (hanya saat window.__stSeg). */
+var STB=[2.4,3.0],ST_C={f:0,n:[0,0,0],a:[0,0,0]};
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   c._vis=0;
@@ -1775,6 +1777,8 @@ function drawStars(c,age,now){
       a*=Math.max(.1,Math.min(1.5,Math.sqrt(bf)));
       bandCol=s._bg;bandCore=s._bk;
     }
+    var _z=s.r<STB[0]?0:(s.r<STB[1]?1:2),_ng=PX.sglow||(_z===0?PX.sgs:(_z===1?PX.sgm:PX.sgl)),_nc=PX.score||(_z===0?PX.scs:(_z===1?PX.scm:PX.scl));   /* bench: lewati halo / inti per ember ukuran */
+    if(window.__stSeg){ST_C.n[_z]++;ST_C.a[_z]+=r*r;}
     if(cheap){
       /* During potato audio-focus, keep the star visible but replace its
          animated halo with one tiny core draw. This removes a radial-gradient
@@ -1786,9 +1790,9 @@ function drawStars(c,age,now){
       var cc=bandCore||s.rgb,rz=r*camZK();
       /* halo tipis ada saat cam free di zoom ~1x (kayak idle); hilang saat fokus / auto-zoom fit, dan inti jadi lebih terang */
       var hk=hkC;
-      if(hk>.02&&!PX.sglow){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
+      if(hk>.02&&!_ng){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
       if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}   /* lensa grup (1 lensa utk bintang berdekatan) atau lensa tunggal; cuma bintang bernama terang (titik anonim seperti ekor Scorpius tidak) */
-      if(hk>.02&&!PX.score){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a*hk);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
+      if(hk>.02&&!_nc){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a*hk);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
       if(hk<.98){   /* inti tajam sensor (warna asli + putih panas): menggantikan inti idle secara halus saat fokus / zoom, dan lebih terang */
         var ik=1-hk;
         g.fillStyle='rgba('+cc+','+(.95*a*ik*1.1)+')';g.beginPath();g.arc(x,y,Math.max(.9,rz*.62),0,6.283);g.fill();
@@ -1796,8 +1800,8 @@ function drawStars(c,age,now){
       }
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
-      if(!PX.sglow)drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
-      if(!PX.score){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}
+      if(!_ng)drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
+      if(!_nc){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}
     }
     var am=(ALIGN.cid&&!PX.smark)?alignMark(c,k):null;
     if(am==='lit'){
@@ -2037,7 +2041,7 @@ function drawPleiades(age,now){
   var selected=activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended;
   var pFK=consFullK(PLEIADES,now),pAP=(selected&&!reduce)?(AV.beat*.45+AV.bass*.35):0,pDK=(CAMERA_MODE||clusterSfxOn())?0:AT.pK;
   var pNA=nameFadeStep(PLEIADES,(CAMERA_MODE||selected)?1:0,now);   /* nama cluster: cam ON atau Pleione bunyi, fade halus */
-  if(!consLocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
+  if(!PX.pname&&!consLocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
     var pS=PLEIADES.scale,pA=clamp((age-1.6)/1.6)*pNA;
     var pq1=skyXF(PLEIADES.x+.22*pS+ox,PLEIADES.y+.22*pS+oy),pt1=[pq1[0],pq1[1]];
     var pq2=skyXF(PLEIADES.x+.84*pS+ox,PLEIADES.y+.62*pS+oy),pt2=[pq2[0],pq2[1]];
@@ -2086,10 +2090,10 @@ function drawPleiades(age,now){
        drawStarGlow uses extent=r*5, so pass rAdj = r * factor/5. */
     var rAdj=r*((dim?4.5:5.8)/5);
     var pHK=CAMERA_MODE?clamp(1-(skyZoom-CAM_HALO_Z0)/CAM_HALO_Z1):1,pHF=CAMERA_MODE?0:pFK;   /* halo: sama dengan drawStars (idle / cam free ~1x tipis, FULL penuh, fokus cam tanpa halo) */
-    if(pHK>.02)drawStarGlow(x,y,rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),rgbc,a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK);   /* mode kamera: tanpa halo, sama dengan drawStars */
+    if(pHK>.02&&!PX.pglow)drawStarGlow(x,y,rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),rgbc,a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK);   /* mode kamera: tanpa halo, sama dengan drawStars */
     if(CAMERA_MODE&&!dim){var plg=plLens&&star._lg;if(plg){if(!plg.drawn){plg.drawn=true;camLensR(plg.x,plg.y,plg.R,bandCore||'238,246,255',a,now);}}else camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);}   /* bintang terang klaster (non-dim): lensa pembelok cahaya di bawah inti */
-    g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94*(CAMERA_MODE?(1+.1*(1-pHK)):1))+')';g.beginPath();g.arc(x,y,CAMERA_MODE?(Math.max(.7,r*.58)*pHK+Math.max(.9,r*.7*camZK())*(1-pHK)):Math.max(.7,r*.58),0,6.283);g.fill();
-    if(star.interactive){
+    if(!PX.pcore){g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94*(CAMERA_MODE?(1+.1*(1-pHK)):1))+')';g.beginPath();g.arc(x,y,CAMERA_MODE?(Math.max(.7,r*.58)*pHK+Math.max(.9,r*.7*camZK())*(1-pHK)):Math.max(.7,r*.58),0,6.283);g.fill();}
+    if(star.interactive&&!PX.pint){
       var hotP=(hot==='pleione'),tr=TRIGGERS.pleione;
       /* Exact same compact pulse geometry as Betelgeuse/Rigel/Spica/Sirius (TRIGGER_PULSE_BASE). */
       var phase=(tn*.00135+(star.ph||0))%1;
