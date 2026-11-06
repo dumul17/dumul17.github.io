@@ -362,12 +362,12 @@ var DUMUL_CHARS=(function(){
      Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
      [PATCH v175] Masuk LOG BOOT ("Persiapan akhir"). [PATCH v181] Sekarang juga masuk bobot bar (WT_PRE) dan baris status ke-7 (boot.pre.*): bar tidak lagi tertahan di 99% menunggu PRE. */
-  var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
+  var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
   function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
     try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
   function preStart(){
     if(pre.at>=0)return;
-    pre.at=performance.now();pre.ui=pre.ast=pre.fb=pre.pl=pre.sc=1;
+    pre.at=performance.now();pre.ui=pre.ast=pre.fb=pre.pl=pre.sc=pre.rg=1;
     setTimeout(function(){
       try{if(!IS_POTATO&&typeof UIS!=='undefined'&&UIS.warm)UIS.warm();}catch(eU){}
       preFin('ui');
@@ -390,7 +390,11 @@ var DUMUL_CHARS=(function(){
     setTimeout(function(){   /* [v181b] sc = sinkron GL pertama teleskop (13-scope3d scp3dWarmSync), jauh dari langkah planet supaya tidak bertumpuk */
       try{if(!WR.entered&&typeof scp3dWarmSync==='function')scp3dWarmSync(function(){return WR.entered;});}catch(eS){}
       preFin('sc');
-    },900);   /* sesudah sprite batu (±424 ms di itel, langkah 'ast'), sejajar dgn Firebase (600 ms) supaya gerbang tidak memanjang banyak */
+    },900);
+    setTimeout(function(){   /* [v182] rg = sprite cincin trigger (04-render ringWarmPre): dikebut pra-kapsul, batas 1,5 dtk; sisa dilanjutkan ringWarmStep (tidak menahan gerbang lebih lama dari itu) */
+      var f=function(){preFin('rg');};
+      try{if(!WR.entered&&typeof ringWarmPre==='function')ringWarmPre(f,function(){return WR.entered;},1500);else f();}catch(eR){f();}
+    },1000);   /* sesudah sprite batu (±424 ms di itel, langkah 'ast'), sejajar dgn Firebase (600 ms) supaya gerbang tidak memanjang banyak */
     setTimeout(function(){
       var tm=setTimeout(function(){preFin('fb',1);},PRE_MAX);
       try{
@@ -427,8 +431,8 @@ var DUMUL_CHARS=(function(){
     setTimeout(warmRealTint,1500);
     setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},300);   /* [v180] dimajukan 1100 -> 300 ms: jendela kapsul di jaringan normal pendek. Planet pertama (pl3dWarmFirst) pindah ke gerbang PRE (preStart, langkah 'pl') */   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
   }
-  function preAll(){return pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2&&pre.sc===2;}
-  function preStatus(){return {ok:preAll(),ui:pre.ui,ast:pre.ast,fb:pre.fb,pl:pre.pl,sc:pre.sc};}
+  function preAll(){return pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2&&pre.sc===2&&pre.rg===2;}
+  function preStatus(){return {ok:preAll(),ui:pre.ui,ast:pre.ast,fb:pre.fb,pl:pre.pl,sc:pre.sc,rg:pre.rg};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
        5 unit  modul 3D: AST3D, SCP3D, DR3D, PT3D, PL3D, masing-masing state 2 (siap) atau 3 (gagal/nonaktif). PL3D sudah termasuk shader warm-up sendiri.
@@ -450,8 +454,8 @@ var DUMUL_CHARS=(function(){
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
   var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
   /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
-  var WT_PRE={ui:100,ast:400,pl:450,fb:350,sc:150},WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000},PRE_KEYS=['ui','ast','pl','fb','sc'];
-  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+WT_PRE.ui+WT_PRE.ast+WT_PRE.pl+WT_PRE.fb+WT_PRE.sc;
+  var WT_PRE={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300},WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1600},PRE_KEYS=['ui','ast','pl','fb','sc','rg'];
+  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+WT_PRE.ui+WT_PRE.ast+WT_PRE.pl+WT_PRE.fb+WT_PRE.sc+WT_PRE.rg;
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){

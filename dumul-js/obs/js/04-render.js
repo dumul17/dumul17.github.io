@@ -1619,9 +1619,7 @@ function ringWarmStep(){
     if(typeof bootDone==='undefined'||!(bootDone||window.__bootVis)||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy)||typeof TRIGGERS==='undefined'){setTimeout(ringWarmStep,1200);return;}   /* FS.heavy: tahan warm saat frame berat (05-sector-ui) */
     if(!RW.list){
       try{ensureAsteroidSprites();}catch(eAw){}   /* [v168] 8 sprite batu (±17-24 ms) di-bake sekali di sini, bukan di frame masuk sektor; idempoten (cache AST_SPRITES) */
-      var seen={},k,rg,q,L=[];
-      for(k in TRIGGERS){rg=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rg&&!seen[rg]){seen[rg]=1;for(q=5.5;q<=16.5;q+=.5)L.push([rg,q]);}}
-      RW.list=L;
+      ringWarmList();
     }
     var t0=performance.now(),it;
     while(RW.i<RW.list.length&&performance.now()-t0<2.5){it=RW.list[RW.i++];getRingSprite(it[0],it[1],false);}
@@ -1629,6 +1627,30 @@ function ringWarmStep(){
     window.__rw={n:RW.i,tot:RW.list.length,ms:Math.round(RW.ms)};
     if(RW.i<RW.list.length)setTimeout(ringWarmStep,45);
   }catch(eRs){}
+}
+/* [v153] RING WARM PRA-KAPSUL (07-boot preStart langkah 'rg'). ringWarmStep (2,5 ms per 45 ms, baru jalan sesudah __bootVis) di jaringan normal tidak sempat selesai sebelum kapsul/Blue: sisa sprite (21 warna x 23 radius = 483, dump:
+   getRingSprite total 156-346 ms) jatuh di frame masuk sektor. Di sini daftar yang SAMA (RW.list, indeks RW.i dipakai bersama ringWarmStep, jadi tidak ada kerja ganda) dikebut: 4 ms per 16 ms sampai habis, berhenti di batas capMs
+   atau kalau stop() true (Blue) / FS.heavy; sisanya tetap dilanjutkan ringWarmStep seperti dulu. Tidak memanggil ensureAsteroidSprites (langkah 'ast' PRE sudah mengurusnya, jangan saling timpa). ?whdbg=nowarmring mematikan keduanya. */
+function ringWarmList(){
+  if(RW.list)return RW.list;
+  var seen={},k,rg,q,L=[];
+  for(k in TRIGGERS){rg=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rg&&!seen[rg]){seen[rg]=1;for(q=5.5;q<=16.5;q+=.5)L.push([rg,q]);}}
+  return (RW.list=L);
+}
+function ringWarmPre(fin,stop,capMs){
+  var t00=performance.now(),done=false;
+  function end(){if(done)return;done=true;try{window.__rwPre={n:RW.i,tot:RW.list?RW.list.length:0,ms:Math.round(performance.now()-t00)};}catch(e){}try{fin();}catch(e2){}}
+  function step(){
+    try{
+      if(!RW.on||typeof TRIGGERS==='undefined'||document.hidden||(stop&&stop())||performance.now()-t00>capMs||(typeof FS!=='undefined'&&FS.heavy)){end();return;}
+      var L=ringWarmList(),t0=performance.now(),it;
+      while(RW.i<L.length&&performance.now()-t0<4){it=L[RW.i++];getRingSprite(it[0],it[1],false);}
+      RW.ms+=performance.now()-t0;
+      window.__rw={n:RW.i,tot:L.length,ms:Math.round(RW.ms)};
+      if(RW.i<L.length)setTimeout(step,16);else end();
+    }catch(eRp){end();}
+  }
+  step();
 }
 (function(){var go=function(){setTimeout(ringWarmStep,3000);};if(document.readyState==='complete')go();else window.addEventListener('load',go);})();
 function getStarSprite(rgbStr){
