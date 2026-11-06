@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
+/* BENCH v11.29 (?bench=1) — v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
    v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
    v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
@@ -21,10 +21,11 @@
   try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
   try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* v11.29: ?off=a,b,c = matikan lapisan untuk tes q.big (otomatis dari URL, tercatat di dump) */
-  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['hud', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
+  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
   try {
     var offM = /[?&]off=([a-z,]+)/.exec(location.search);
     if (offM) offM[1].split(',').forEach(function (t) { if (OFF_ALL.indexOf(t) >= 0 && OFF_L.indexOf(t) < 0) OFF_L.push(t); });
+    window.__stSeg = /[?&]stseg=1(&|$)/.test(location.search) ? 1 : 0;   /* v11.29g: ?stseg=1 = penanda pmk s.cons/s.pulse/s.stars/s.plei di loop sektor (05-sector-ui) */
     window.__offL = OFF_L.length ? OFF_L.slice() : null;
   } catch (eOff) {}
   /* v11.29b: CSS lewat kelas di <html> supaya bisa di-toggle saat jalan (tanpa reload) */
@@ -39,7 +40,7 @@
     try {
       document.documentElement.classList.toggle('__bo-hud', OFF_CUR.indexOf('hud') >= 0);
       document.documentElement.classList.toggle('__bo-skyhide', OFF_CUR.indexOf('skyhide') >= 0);
-      if (typeof PX === 'object' && PX) OFF_PX.forEach(function (k) { PX[k] = OFF_CUR.indexOf(k) >= 0 ? 1 : 0; });
+      if (typeof PX === 'object' && PX) { var sd = OFF_CUR.indexOf('sdraw') >= 0; OFF_PX.forEach(function (k) { PX[k] = (OFF_CUR.indexOf(k) >= 0 || (sd && (k === 'sglow' || k === 'score' || k === 'smark' || k === 'slbl'))) ? 1 : 0; }); }   /* sdraw = semua gambar bintang mati (halo+inti+tanda+label), loop hitung tetap jalan */
       var all = OFF_CUR.indexOf('blit') >= 0, ob = {}; Object.keys(OFF_B).forEach(function (k) { ob[OFF_B[k]] = ((all && k !== 'plfx') || OFF_CUR.indexOf(k) >= 0) ? 1 : 0; });   /* 'blit' = 5 blit GL->#sky, TIDAK termasuk plfx */
       window.__offB = ob;   /* dibaca guard `g.drawImage` di 12/13/14/15/17: lewati blit GL->#sky saja, render GL tetap jalan */
     } catch (eA) {}
@@ -1061,6 +1062,7 @@
   var OS_SETS = {
     blit: [['base', []], ['plb', ['plb']], ['astb', ['astb']], ['ptb', ['ptb']], ['scb', ['scb']], ['drb', ['drb']], ['blit', ['blit']], ['ast', ['ast']], ['base2', []]],   /* blit = lewati drawImage GL->#sky tiap unit; ast = lewati batu sama sekali (GL+blit) */
     floor: [['base', []], ['all', ['all']], ['hole', ['hole']], ['pulse', ['pulse']], ['plfx', ['plfx']], ['combo', ['blit', 'hole', 'pulse', 'plfx', 'ast']], ['combo+', ['blit', 'hole', 'pulse', 'plfx', 'ast', 'sky', 'lines', 'stars']], ['base2', []]],   /* all = TIDAK ada gambar sama sekali (PX.all; pBegin + q.* tetap jalan) = LANTAI backlog; combo/combo+ = semua lapisan yang sudah ketahuan mati; selisih combo+ vs all = sisa yang bukan dari gambar kita */
+    stars: [['base', []], ['cname', ['cname']], ['lstroke', ['lstroke']], ['lines', ['lines']], ['sglow', ['sglow']], ['score', ['score']], ['slbl', ['slbl']], ['splei', ['splei']], ['sdraw', ['sdraw']], ['stars', ['stars']], ['base2', []]],   /* v11.29g: pecah 'lines+stars' di SEKTOR (±13 ms). cname=nama rasi+nebula; lstroke=goresan garis (hitung gSky tetap); lines=drawCons utuh; sglow=halo bintang; score=inti bintang; slbl=silang+label+spektrum; splei=Pleiades; sdraw=semua gambar bintang mati (tinggal hitung); stars=drawStars+Pleiades utuh. Sisa lines−cname−lstroke = hitung/culling garis; stars−sdraw−splei = hitung bintang. Dump juga memuat seg s.cons/s.pulse/s.stars/s.plei (waktu JS perekaman, bukan raster) */
     layer: [['base', []], ['sky', ['sky']], ['skyhide', ['skyhide']], ['hud', ['hud']], ['mw', ['mw']], ['neb', ['neb']], ['lines+stars', ['lines', 'stars']], ['base2', []]]
   };
   function osBox(c) { try { var b = document.getElementById('__bench_box'); if (b) b.classList.toggle('bc', !!c); } catch (e) {} }
@@ -1090,6 +1092,7 @@
     if (!OS.on) return;
     OS.on = false; clearTimeout(OS.tm); clearInterval(OS.iv);
     OFF_CUR = OFF_L.slice(); offApply(); window.__offPh = null; window.__offSkip = 0;
+    window.__stSeg = /[?&]stseg=1(&|$)/.test(location.search) ? 1 : 0;
     osBox(false); osLabel('seq DIBATALKAN \u2014 dump hanya memuat fase yang sudah jalan', false);
   }
   function offSeqStart(kind) {
@@ -1097,6 +1100,7 @@
     kind = OS_SETS[kind] ? kind : 'blit';
     var PH = OS_SETS[kind], mm = /[?&]offms=(\d+)/.exec(location.search); OS.ms = mm ? Math.max(3000, Math.min(60000, +mm[1])) : 8000;
     OS.on = true; OS.log = []; OS.kind = kind; OS.n = PH.length; OS.i = 0; OFF_MANAGE = true;
+    if (kind === 'stars') window.__stSeg = 1;   /* penanda s.* aktif di semua fase seq stars (base ikut, jadi sebanding) */
     OS.totEnd = performance.now() + PH.length * OS.ms;
     osBox(true); try { if (window.__WH_AD && window.__WH_AD.collapse) window.__WH_AD.collapse(); } catch (eC) {}   /* panel lain dilipat selama seq */
     OS.iv = setInterval(osTick, 250);
@@ -1114,9 +1118,10 @@
     })();
     return true;
   }
+  window.__stSegOk = 1;
   window.__offSeqStart = offSeqStart; window.__offSeqStop = offSeqStop;
   window.__offSeqOn = function () { return OS.on; };
-  (function () { var q = /[?&]offseq=(1|blit|layer|floor)(&|$)/.exec(location.search); if (q) window.addEventListener('obs-entered', function () { setTimeout(function () { offSeqStart(q[1] === '1' ? 'blit' : q[1]); }, 6000); }, { once: true }); })();
+  (function () { var q = /[?&]offseq=(1|blit|layer|floor|stars)(&|$)/.exec(location.search); if (q) window.addEventListener('obs-entered', function () { setTimeout(function () { offSeqStart(q[1] === '1' ? 'blit' : q[1]); }, 6000); }, { once: true }); })();
 
   function pmOut() {
     var r1 = function (v) { return Math.round(v * 10) / 10; }, modes = {};

@@ -1481,14 +1481,14 @@ function drawCons(c,age,now){
   c.ox=ox;c.oy=oy;
   var locked=(typeof isLayoutEdit==='function'&&isLayoutEdit())?false:consLocked(c.id);
   var obr=ofxBreath(ld.phase,now)*fK; /* napas rasi: -1..1 x kehadiran BGM Constellation */
-  if(c.nebula){
+  if(c.nebula&&!PX.cname){
     var na=clamp((age-c.delay-1.2)/1.5);
     if(na>0&&nebulaIn(c.nebula.x+ox,c.nebula.y+oy,c.scale*1.5)){var nt=skyXF(c.nebula.x+ox,c.nebula.y+oy),nx=nt[0],ny=nt[1],nr=c.scale*1.5;
       var gr=g.createRadialGradient(nx,ny,0,nx,ny,nr);
       gr.addColorStop(0,'rgba(255,122,217,'+(.34*na)+')');gr.addColorStop(.5,'rgba(110,229,255,'+(.12*na)+')');gr.addColorStop(1,'rgba(110,229,255,0)');
       g.fillStyle=gr;g.beginPath();g.arc(nx,ny,nr,0,6.283);g.fill();}
   }
-  drawConsName(c,age,now,ox,oy,focus,locked); /* teks nama rasi: lapisan paling bawah, di bawah garis & bintang */
+  if(!PX.cname)drawConsName(c,age,now,ox,oy,focus,locked); /* [bench ?off=cname] teks nama rasi: lapisan paling bawah, di bawah garis & bintang */
   g.lineCap='round';
   /* Terkunci: garis disembunyikan, diganti pulse di tiap bintang + titik cahaya yang jalan sesuai urutan alignment. */
   if(locked)drawLockedSignal(c,age,now,ox,oy,focus);
@@ -1528,7 +1528,7 @@ function drawCons(c,age,now){
     // Hitung efek dentuman audio bass pada garis rasi
     var audioPulse=0;   /* dulu garis berkedip ngikut bass SFX; sekarang dentuman itu diterapkan ke bintang rasi SFX (drawStars) */
 
-    for(pass=doGlow?0:1;pass<2;pass++){
+    for(pass=doGlow?0:1;pass<2&&!PX.lstroke;pass++){   /* [bench ?off=lstroke] lewati glow+stroke, sampling gSky tetap jalan */
       if(pass===0){
         g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus*lfa*(1+.5*obr))+')';
         g.lineWidth=(lineHot?6:4) + audioPulse * 2.0;
@@ -1786,9 +1786,9 @@ function drawStars(c,age,now){
       var cc=bandCore||s.rgb,rz=r*camZK();
       /* halo tipis ada saat cam free di zoom ~1x (kayak idle); hilang saat fokus / auto-zoom fit, dan inti jadi lebih terang */
       var hk=hkC;
-      if(hk>.02){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
+      if(hk>.02&&!PX.sglow){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
       if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}   /* lensa grup (1 lensa utk bintang berdekatan) atau lensa tunggal; cuma bintang bernama terang (titik anonim seperti ekor Scorpius tidak) */
-      if(hk>.02){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a*hk);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
+      if(hk>.02&&!PX.score){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a*hk);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
       if(hk<.98){   /* inti tajam sensor (warna asli + putih panas): menggantikan inti idle secara halus saat fokus / zoom, dan lebih terang */
         var ik=1-hk;
         g.fillStyle='rgba('+cc+','+(.95*a*ik*1.1)+')';g.beginPath();g.arc(x,y,Math.max(.9,rz*.62),0,6.283);g.fill();
@@ -1796,10 +1796,10 @@ function drawStars(c,age,now){
       }
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
-      drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
-      g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();
+      if(!PX.sglow)drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
+      if(!PX.score){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}
     }
-    var am=ALIGN.cid?alignMark(c,k):null;
+    var am=(ALIGN.cid&&!PX.smark)?alignMark(c,k):null;
     if(am==='lit'){
       g.strokeStyle='rgba(110,229,255,'+(.55*a)+')';g.lineWidth=1;
       g.beginPath();g.arc(x,y,Math.max(3.2,r*2.1),0,6.283);g.stroke();
@@ -1828,7 +1828,7 @@ function drawStars(c,age,now){
     s._la=lblA;s._lt=now;
     /* Cross reticle only on named bright stars — skips Scorpius tail (Shaula)
        and other anonymous bright points so the sting doesn't show a "+". */
-    if(lblA>.02 && s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath') && !(lensOn&&s._lg&&clamp((skyZoom-2.5)/3)>.01)){   /* anggota grup lensa: tanpa silang sendiri (reticle area katalog yang melingkupi grup) */
+    if(!PX.slbl && lblA>.02 && s.r>=2.9 && s.name && !(c.id==='taurus' && k==='elnath') && !(lensOn&&s._lg&&clamp((skyZoom-2.5)/3)>.01)){   /* anggota grup lensa: tanpa silang sendiri (reticle area katalog yang melingkupi grup) */
       g.strokeStyle='rgba('+s.rgb+','+(.4*(a/focusK)*tw*Math.min(1,lblA*1.6))+')';g.lineWidth=.8;   /* a/focusK: retikel tetap seterang sebelumnya walau inti bintang cam di zoom ~1x disamakan dengan idle */
       /* Saat zoom, lensa pembelok cahaya (camLens) membesar ~akar zoom sedangkan retikel dulu tetap r*2.2 -> ketutup lensa. Sekarang lengan retikel
          menjauh ke LUAR cincin terluar lensa (1.42*(3*rc+4)) mengikuti fade lensa (az); tanpa lensa = silang penuh seperti semula. */
@@ -1836,7 +1836,7 @@ function drawStars(c,age,now){
           rG=azR*lensOut*CAM_RET_GAP,rL=r*2.2+azR*(lensOut*CAM_RET_GAP+Math.max(CAM_RET_ARM,lensOut*.45)-r*2.2);
       g.beginPath();g.moveTo(x-rL,y);g.lineTo(x-rG,y);g.moveTo(x+rG,y);g.lineTo(x+rL,y);g.moveTo(x,y-rL);g.lineTo(x,y-rG);g.moveTo(x,y+rG);g.lineTo(x,y+rL);g.stroke();
     }
-    if(lblA>.02){
+    if(!PX.slbl && lblA>.02){
       /* Audio-trigger labels: each one inherits its own pulse color. */
       /* triggerKey / tr / isPlaying were resolved above so potato audio-focus
          can decide the cheap star path before any gradient work is allocated. */

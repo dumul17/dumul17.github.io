@@ -82,7 +82,7 @@
   function installPerf() {
     if (window.__WH_AD_instPerf) return true;
     try {
-      var PX0 = { sky:0, lines:0, stars:0, pulse:0, ast:0, hole:0, all:0, pa:0, pw:0, pb:0, slow:0, mw:0, pt:0, neb:0, ptr:0, ptm:0, ptb:0 };
+      var PX0 = { sky:0, lines:0, stars:0, pulse:0, ast:0, hole:0, all:0, pa:0, pw:0, pb:0, slow:0, mw:0, pt:0, neb:0, ptr:0, ptm:0, ptb:0, cname:0, lstroke:0, sglow:0, score:0, smark:0, slbl:0, splei:0 };
       if (typeof window.PX !== 'object' || !window.PX) window.PX = PX0;
       else {
         for (var k in PX0) if (!(k in window.PX)) window.PX[k] = 0;
@@ -1588,9 +1588,14 @@
     if (/[?&]bench=1(&|$)/.test(Q) && /[?&]gpup=1(&|$)/.test(Q)) {
       panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'seq tanpa reload (±75 dtk, jangan ganti mode):'));
       var seqRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-      [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2']].forEach(function (c) {
+      [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2'], ['seq stars', 'stars', 'base, nama rasi, goresan garis, garis rasi, halo, inti, label, Pleiades, semua gambar bintang, bintang OFF, base2 (±90 dtk, WAJIB di dalam sektor)']].forEach(function (c) {
         seqRow.appendChild(btn(c[0], function () {
           if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
+          if (c[1] === 'stars') {
+            if (typeof window.__offSeqOn === 'function' && window.__offSeqOn()) return log('seq sedang jalan');
+            if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('seq stars: masuk SEKTOR dulu (di overview rasi/bintang tidak digambar), lalu tap lagi');
+            if (!window.__stSegOk) return log('seq stars butuh 21-bench v11.29g (?v=11.29g)');
+          }
           if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
           log('seq ' + c[1] + ' jalan: ' + c[2] + '. Timer di kiri bawah; selesai → salin dump bench.');
           expand(false);
