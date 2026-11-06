@@ -1731,6 +1731,18 @@ function coreStyle(col,al){
 }
 /* bench (?off=sgs,sgm,sgl,scs,scm,scl | seq sizes): ember ukuran bintang menurut s.r mentah, batas STB (default 2.4 / 3.0; ?stb=a,b). ST_C = hitungan per frame (hanya saat window.__stSeg). */
 var STB=[2.4,3.0],STSI=0,ST_C={f:0,n:[0,0,0],a:[0,0,0],g:0,ga:0,c:0};   /* STSI = indeks urut bintang (sekali per bintang) buat token jumlah sghalf/sgquart/schalf/scquart; g/ga/c = halo & inti yang BENAR-BENAR digambar (idle) */
+/* LOD halo bintang (v151): saat FS.slow || FS.heavy, halo bintang kecil+sedang (s.r < STLOD, default 3,0 = ±59 dari 79 bintang sektor) dipudarkan sampai mati (inti tetap digambar);
+   halo bintang besar (s.r >= STLOD) tetap penuh. ABAB sgs+sgm (145520): +5,8% (semua pasangan) / +8,4% (tanpa pasangan 1) frame, CPU cons+stars -1,3 ms. HP kuat (tanpa slow/heavy) tidak berubah.
+   Pudar ~350 ms (STLK 1 -> 0) supaya halo tidak muncul/hilang mendadak waktu FS pindah. URL uji visual: ?stlod=<r> ganti ambang (0 = LOD mati), ?stlodf=1 paksa LOD aktif tanpa menunggu slow/heavy. */
+var STLOD=3.0,STLOD_F=0,STLK=1,STLK_T=-1;
+(function(){try{var m=/[?&]stlod=([0-9.]+)/.exec(location.search);if(m)STLOD=parseFloat(m[1])||0;STLOD_F=/[?&]stlodf=1(&|$)/.test(location.search)?1:0;}catch(eL){}})();
+function stLodK(now){   /* 1 = halo penuh, 0 = halo kecil/sedang mati; diperbarui sekali per frame */
+  if(STLK_T!==now){
+    var dt=STLK_T<0?1000:Math.min(120,Math.max(0,now-STLK_T)),on=STLOD_F||(typeof FS!=='undefined'&&FS&&(FS.slow||FS.heavy));
+    STLK+=((on?0:1)-STLK)*Math.min(1,dt/350);STLK_T=now;
+  }
+  return STLK;
+}
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   c._vis=0;
@@ -1778,6 +1790,7 @@ function drawStars(c,age,now){
       bandCol=s._bg;bandCore=s._bk;
     }
     var _z=s.r<STB[0]?0:(s.r<STB[1]?1:2),_ng=PX.sglow||(_z===0?PX.sgs:(_z===1?PX.sgm:PX.sgl)),_nc=PX.score||(_z===0?PX.scs:(_z===1?PX.scm:PX.scl));
+    var _lk=1;if(STLOD>0&&s.r<STLOD){_lk=stLodK(now);if(_lk<.03)_ng=1;}   /* LOD halo (lihat stLodK) */
     if(s._si===undefined)s._si=STSI++;
     if(PX.sghalf||PX.sgquart||PX.schalf||PX.scquart){var _si=s._si;if((PX.sghalf&&!(_si&1))||(PX.sgquart&&(_si&3)))_ng=1;if((PX.schalf&&!(_si&1))||(PX.scquart&&(_si&3)))_nc=1;}   /* bench: tinggal 50% / 25% bintang yang digambar halo / intinya (deterministik per bintang) */   /* bench: lewati halo / inti per ember ukuran */
     if(window.__stSeg||window.__stCnt){ST_C.n[_z]++;ST_C.a[_z]+=r*r;}
@@ -1792,7 +1805,7 @@ function drawStars(c,age,now){
       var cc=bandCore||s.rgb,rz=r*camZK();
       /* halo tipis ada saat cam free di zoom ~1x (kayak idle); hilang saat fokus / auto-zoom fit, dan inti jadi lebih terang */
       var hk=hkC;
-      if(hk>.02&&!_ng){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc));}
+      if(hk>.02&&!_ng){var sbc=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;drawStarGlow(x,y,r*HALO_IDLE_S*(1+.14*sbc),bandCol||s.rgb,a*tw*HALO_IDLE_A*hk*(1+.3*sbc)*_lk);}
       if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}   /* lensa grup (1 lensa utk bintang berdekatan) atau lensa tunggal; cuma bintang bernama terang (titik anonim seperti ekor Scorpius tidak) */
       if(hk>.02&&!_nc){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a*hk);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}   /* inti gaya idle (putih): persis sama dengan idle di zoom ~1x */
       if(hk<.98){   /* inti tajam sensor (warna asli + putih panas): menggantikan inti idle secara halus saat fokus / zoom, dan lebih terang */
@@ -1802,7 +1815,7 @@ function drawStars(c,age,now){
       }
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
-      if(!_ng){if(window.__stCnt){ST_C.g++;ST_C.ga+=r*r;}drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));}   /* IDLE: halo tipis & kecil; FULL: penuh */
+      if(!_ng){if(window.__stCnt){ST_C.g++;ST_C.ga+=r*r;}drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb)*_lk);}   /* IDLE: halo tipis & kecil; FULL: penuh */
       if(!_nc){if(window.__stCnt)ST_C.c++;g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}
     }
     var am=(ALIGN.cid&&!PX.smark)?alignMark(c,k):null;
