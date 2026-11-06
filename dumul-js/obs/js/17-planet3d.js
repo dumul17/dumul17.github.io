@@ -1234,6 +1234,31 @@ function pl3dWarmFirst(stop){
     return true;
   }catch(e){return false;}
 }
+/* [v53] WARM AURORA planet pra-kapsul (07-boot preStart langkah 'pl', sesudah pl3dWarmFirst). Dump 6 Nov: frame overview 2-3 masih kena pl.pre 25,7 ms (kanvas offscreen 3x + sprite gradien) dan pl.bake 52,7 / 12,9 ms
+   (bake keyframe pertama + kedua). Di sini jalur SAMA (pl3dFxAurora) dijalankan pra-kapsul ke kanvas 8x8 buangan: kanvas + sprite + keyframe tunggal pertama tersimpan di PL3D.fx. Frame nyata pertama memakai keyframe itu
+   kalau geometri (R, cahaya) dan warna palette belum bergeser (syarat sama dgn jalur steady); kalau bergeser, bake ulang seperti dulu (tidak rugi). Keyframe kedua (mode ganda) tetap dibake ±250 ms sesudah frame pertama.
+   F.aur dikembalikan 0 supaya fade-in .6 dtk tetap mulai dari nol saat Blue. Gagal / dilewati (potato, reduce, auroraOn mati, state bukan 2) -> false, perilaku lama. ?plwf=0 = nonaktif (satu flag dgn pl3dWarmFirst). Hasil: __warmReal.paw {ms,at}. */
+function pl3dWarmAur(stop){
+  try{
+    var C=PL3D_CFG;
+    if(!PL3D_WF||PL3D.warmA||PL3D.state!==2||!C.on||!C.auroraOn||PL3D.fxOff||document.hidden)return false;
+    if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
+    if(stop&&stop())return false;
+    var t0=performance.now(),F=PL3D.fx,lp,g;
+    pl3dSync();if(!PW||!PH)return false;
+    PL3D.warmA=1;
+    if(!F)F=PL3D.fx={t:t0,dt:0,gm:null,lx:0,ly:0,pal:null,lc:C.lightCol,pot:false,frames:0,aur:0,flv:0};
+    pl3dPalUpdate();
+    lp=pl3dLightPos();
+    F.t=t0;F.dt=.05;F.gm=pl3dGeom(false,false,true);F.lx=lp[0];F.ly=lp[1];F.lc=C.lightCol;F.pot=false;F.pal=C.pal;
+    g=document.createElement('canvas');g.width=g.height=8;g=g.getContext('2d');
+    g.globalCompositeOperation='lighter';
+    pl3dFxAurora(g,F);
+    F.aur=0;
+    try{var M=window.__warmReal||(window.__warmReal={});M.paw={ms:Math.round(performance.now()-t0),at:Math.round(t0)};}catch(eM){}
+    return true;
+  }catch(e){return false;}
+}
 /* dipanggil dari frame() (05-sector-ui.js) setelah drawFloatingTelescopeTop. Tidak melempar; tidak punya timer render sendiri. */
 function planet3dDraw(now){
   try{if(typeof SECT!=='undefined'&&SECT.cur&&typeof PT3D!=='undefined')PT3D.orbInSect=1;}catch(eO){}   /* P4: lagi di sektor -> orbit portal overview mulai dari puncak begitu kembali */

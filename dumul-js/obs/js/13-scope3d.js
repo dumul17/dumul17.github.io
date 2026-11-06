@@ -430,6 +430,25 @@ function scp3dUpdate(now,mm){
 var SCP3D_WHALT=(function(){try{var m=/[?&]whtele=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>=2?v:(m&&v===1?2:0);}catch(e){return 2;}})();   /* v16: DEFAULT ON, periode 2 (GL tiap 2 frame). ?whtele=0 = mati, ?whtele=3 = tiap 3 frame. Terukur di HP: zoom med 66 -> 50ms */
 /* v23: throttle GL teleskop di overview/sektor saat HP lambat (FS.slow/FS.heavy). GL dirender tiap SCP3D_SLOWALT frame (default 2, fase = paritas FS.n, gantian dgn portal yg render di FS.n genap), frame lain memakai salinan 2D SCP3D.cc (posisi/rotasi/skala tetap per frame, cuma pose+cahaya 3D telat 1 frame). ?slowalt=0 mati, ?slowalt=3 tiap 3 frame. Dikecualikan: warp, wormhole.busy, belt zoom, perubahan skala >8%, cache >130 ms. Data: hemat +-6-7 ms (sc.sub+sc.gpu 13-15 ms), lihat log.txt bagian Analisis kode. */
 var SCP3D_SLOWALT=(function(){try{var m=/[?&]slowalt=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>=2?Math.min(v,4):(m?0:2);}catch(e){return 2;}})();
+/* [v24] WARM SINKRON GL teleskop pra-kapsul (07-boot preStart langkah 'sc'). Pola sama dgn pt3dWarmSync (15-portal3d): threeWarm hanya compile + render tanpa sinkron, jadi drawImage GL->2D pertama (menunggu seluruh antrean
+   GPU) jatuh di frame overview awal (dump 6 Nov: teleTop 19,6 / 70,7 ms di frame 1-2). Di sini 1x scp3dUpdate lewat jalur yang sama (skala .5 -> res = resMin, cocok pra-ukur build sehingga tanpa setSize) lalu drawImage ke kanvas buangan.
+   Efek samping sama dgn satu frame teleskop biasa (fase pose SCP3D.ip/pn mulai berjalan); SCP3D.last TIDAK diubah. Gagal / dilewati (potato, reduce, cfg off) -> false. ?scwf=0 = nonaktif (A/B). Hasil: __warmReal.scf {ms,at}. */
+var SCP3D_WF=(function(){var on=true;try{on=!/[?&]scwf=0(?:&|#|$)/.test(location.search);}catch(e){}return on;})();
+function scp3dWarmSync(stop){
+  try{
+    if(!SCP3D_WF||SCP3D.syncWarm||SCP3D.state!==2||!SCP3D_CFG.on||!SCP3D.r||!SCP3D.gl||document.hidden)return false;
+    if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
+    if(stop&&stop())return false;
+    SCP3D.syncWarm=1;
+    var t0=performance.now();
+    scp3dUpdate(t0,{a:.5,b:0,c:0,d:.5,e:0,f:0});
+    var rs=SCP3D.res,cv=document.createElement('canvas');cv.width=cv.height=rs;
+    cv.getContext('2d').drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);   /* sinkron GPU->2D pertama */
+    cv.width=cv.height=0;
+    try{var M=window.__warmReal||(window.__warmReal={});M.scf={ms:Math.round(performance.now()-t0),at:Math.round(t0)};}catch(eM){}
+    return true;
+  }catch(e){return false;}
+}
 /* Dipanggil dari teleDrawBody() (04-render.js). true = badan 3D sudah digambar (2D dilewati); false = pakai badan 2D. */
 function tele3dBody(g,now){
   if(SCP3D.state===0){scp3dLoad();return false;}
