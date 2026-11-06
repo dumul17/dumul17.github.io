@@ -362,12 +362,12 @@ var DUMUL_CHARS=(function(){
      Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
      Belum masuk bobot bar (WT_*) / baris status: sengaja, kalibrasi ulang bar menyusul. [PATCH v175] Sudah masuk LOG BOOT ("Persiapan akhir"), bar tetap belum. Konsekuensi sementara: bar tertahan di 99% sampai PRE selesai (biasanya < 1 dtk di jaringan normal). */
-  var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
+  var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
   function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
     try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
   function preStart(){
     if(pre.at>=0)return;
-    pre.at=performance.now();pre.ui=pre.ast=pre.fb=1;
+    pre.at=performance.now();pre.ui=pre.ast=pre.fb=pre.pl=1;
     setTimeout(function(){
       try{if(!IS_POTATO&&typeof UIS!=='undefined'&&UIS.warm)UIS.warm();}catch(eU){}
       preFin('ui');
@@ -380,6 +380,10 @@ var DUMUL_CHARS=(function(){
       };
       try{if(typeof ensureAsteroidSpritesSliced==='function')ensureAsteroidSpritesSliced(fin);else{ensureAsteroidSprites();fin();}}catch(eA){fin();}
     },300);
+    setTimeout(function(){   /* [v180] pl = render penuh planet pertama (17-planet3d pl3dWarmFirst) DI DALAM gerbang: dulu opportunistik (+2,8 dtk) dan di jaringan normal kapsul-tap bisa keburu sebelum jalan. ±130 ms di itel, sinkron; gagal/dilewati = tetap selesai */
+      try{if(!WR.entered&&typeof pl3dWarmFirst==='function')pl3dWarmFirst(function(){return WR.entered;});}catch(eP){}
+      preFin('pl');
+    },450);   /* sesudah sprite batu (±424 ms di itel, langkah 'ast'), sejajar dgn Firebase (600 ms) supaya gerbang tidak memanjang banyak */
     setTimeout(function(){
       var tm=setTimeout(function(){preFin('fb',1);},PRE_MAX);
       try{
@@ -414,10 +418,9 @@ var DUMUL_CHARS=(function(){
   function warmRealStart(){
     if(WR.on)return;WR.on=1;WR.t0=performance.now();
     setTimeout(warmRealTint,1500);
-    setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},1100);
-    setTimeout(function(){try{if(!WR.entered&&typeof pl3dWarmFirst==='function')pl3dWarmFirst(function(){return WR.entered;});}catch(eP){}},2800);   /* [v179] render penuh planet pertama (17-planet3d v50) dibayar pra-kapsul, sesudah warm batu (18 x 30 ms) */   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
+    setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},300);   /* [v180] dimajukan 1100 -> 300 ms: jendela kapsul di jaringan normal pendek. Planet pertama (pl3dWarmFirst) pindah ke gerbang PRE (preStart, langkah 'pl') */   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
   }
-  function preStatus(){return {ok:pre.ui===2&&pre.ast===2&&pre.fb===2,ui:pre.ui,ast:pre.ast,fb:pre.fb};}
+  function preStatus(){return {ok:pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2,ui:pre.ui,ast:pre.ast,fb:pre.fb,pl:pre.pl};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
        5 unit  modul 3D: AST3D, SCP3D, DR3D, PT3D, PL3D, masing-masing state 2 (siap) atau 3 (gagal/nonaktif). PL3D sudah termasuk shader warm-up sendiri.
@@ -592,12 +595,11 @@ var DUMUL_CHARS=(function(){
     }
     /* [PATCH v175] PRA-KAPSUL (preEv diisi preFin): suara tombol, gambar batu, hitungan pengamat. Yang timeout / gagal tidak dicatat; "siap" hanya kalau ketiganya beres tanpa masalah. */
     while(preEv.length){pk=preEv.shift();ev.push({k:'ok',g:'pr',s:T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk)});}
-    if(pre.at>=0&&pre.ui===2&&pre.ast===2&&pre.fb===2&&!pre.bad&&!logN.pre){logN.pre=1;ev.push({k:'ok',s:T('bl.pre')+' '+T('bl.ready')});}
+    if(pre.at>=0&&pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2&&!pre.bad&&!logN.pre){logN.pre=1;ev.push({k:'ok',s:T('bl.pre')+' '+T('bl.ready')});}
     /* [PATCH v175] WARM NYATA v172-174 (window.__warmReal): bentuk batu 3D (ast: hasil baru ada saat selesai, tanpa pecahan) + warna nebula 4 sektor (tint: x/y naik satu-satu). Yang berhenti karena Blue (stop) tidak dicatat. */
     M2=window.__warmReal;
     if(M2){
       if(M2.ast&&!M2.ast.stop&&!logN.wra){logN.wra=1;ev.push({k:'ok',s:T('bl.rock')+' \u00b7 '+T('bl.a.wast')});}
-      if(M2.plf&&!logN.wrp){logN.wrp=1;ev.push({k:'ok',s:T('bl.planet')+' \u00b7 '+T('bl.a.wpl')});}
       tl=(typeof SECT!=='undefined'&&SECT.list)||[];tt=0;for(li=0;li<tl.length;li++)if(tl[li]&&tl[li].sky)tt++;
       if(tt>0&&M2.tint){logN.wrt=logN.wrt|0;while(logN.wrt<Math.min(M2.tint,tt)){logN.wrt++;ev.push({k:'ok',g:'wt',s:T('bl.neb')+' \u00b7 '+T('bl.a.tint')+' \u00b7 '+logN.wrt+'/'+tt});}}
       if(M2.tintDone&&!logN.wrtOk){logN.wrtOk=1;ev.push({k:'ok',s:T('bl.neb')+' '+T('bl.ready')});}
@@ -623,8 +625,8 @@ var DUMUL_CHARS=(function(){
       if(!decLive)cur=T('bl.sfx')+' \u00b7 '+(sfxNm||T('bl.a.sfx'))+' \u00b7 '+starN+'/'+starTot;
     }
     /* [PATCH v175] LIVE prioritas terbawah (kalau BGM / bintang masih nunggu jaringan, itu yang tampil): pra-kapsul yang masih jalan, lalu warm nyata batu + nebula */
-    if(!cur&&pre.at>=0&&!(pre.ui===2&&pre.ast===2&&pre.fb===2)){
-      for(i=0;i<3;i++){pk=['ui','ast','fb'][i];if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)){cur=T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk);break;}}
+    if(!cur&&pre.at>=0&&!(pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2)){
+      for(i=0;i<4;i++){pk=['ui','ast','fb','pl'][i];if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)){cur=T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk);break;}}
     }
     if(!cur&&M2&&!WR.entered){
       if(typeof AST3D!=='undefined'&&AST3D.warmReal&&!M2.ast)cur=T('bl.rock')+' \u00b7 '+T('bl.a.wast');
