@@ -226,11 +226,11 @@ var THREE_Q={q:[],run:false};
      gapMs = jeda 150 ms antar-item dijumlah. objN = jumlah objek scene (ciri modul: ±7-8 AST3D, ±43 SCP3D, ±12 DR3D, ±14 PT3D, 1 PL3D). */
 var THREE_QS={n:0,runMs:0,waitMs:0,waitMax:0,tmo:0,lw:0,lv:'',turns:[],warm:{n:0,idleMs:0,cpuMs:0,sl:0,gapMs:0,last:0,items:[]}};
 try{window.__threeQ=THREE_QS;}catch(eQ){}
-var THREE_QN=['SCP3D','DR3D','PT3D','PL3D'];
-function threeQLens(){try{return [(window.__scp3dT||[]).length,(window.__dr3dT||[]).length,(window.__pt3dT||[]).length,(window.__pl3dT||[]).length];}catch(e){return [0,0,0,0];}}
+var THREE_QN=['SCP3D','DR3D','PT3D','PL3D','AST3D'];
+function threeQLens(){try{return [(window.__scp3dT||[]).length,(window.__dr3dT||[]).length,(window.__pt3dT||[]).length,(window.__pl3dT||[]).length,(window.__ast3dT||[]).length];}catch(e){return [0,0,0,0,0];}}
 function threeQRec(a,l0,w,v){
   var S=THREE_QS,run=performance.now()-a,l1=threeQLens(),lb='AST?',i;
-  for(i=0;i<4;i++){if(l1[i]>l0[i]){lb=THREE_QN[i];break;}}
+  for(i=0;i<5;i++){if(l1[i]>l0[i]){lb=THREE_QN[i];break;}}
   S.n++;S.runMs+=run;S.waitMs+=w;if(w>S.waitMax)S.waitMax=w;if(v==='t')S.tmo++;
   if(S.turns.length<100)S.turns.push([lb,Math.round(run),Math.round(w),v]);
 }
@@ -239,7 +239,7 @@ function threeWarmRec1(W){try{var S=THREE_QS.warm,t=performance.now();S.n++;S.id
 function threeQNext(){
   var f=THREE_Q.q.shift();
   if(!f){THREE_Q.run=false;return;}
-  var qa=0,ql=[0,0,0,0],qw=THREE_QS.lw,qv=THREE_QS.lv;
+  var qa=0,ql=[0,0,0,0,0],qw=THREE_QS.lw,qv=THREE_QS.lv;
   try{qa=performance.now();ql=threeQLens();}catch(eq){}
   try{f();}catch(e){try{console.warn('[three] build modul gagal:',e&&e.message||e);}catch(e2){}}
   try{threeQRec(qa,ql,qw,qv);}catch(eq2){}
@@ -280,8 +280,7 @@ function ast3dLoad(){
   var go=function(){
     try{ast3dBuild();}catch(e){ast3dFail(e&&e.message||e);}
   };
-  if(typeof THREE!=='undefined'&&THREE.REVISION){go();return;}
-  threeLoad(go,ast3dFail);
+  threeLoad(go,ast3dFail);   /* v32: selalu lewat antrean (threeLoad -> threeRun), juga bila THREE sudah ada; tahap irisan perlu antrean yang hidup */
 }
 
 function ast3dMulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -330,12 +329,29 @@ function ast3dAddVariant(geo,tier){
   return v;
 }
 
-function ast3dBuild(){
+/* [v32] Build dipecah jadi 5 tahap (generator, yield di batas tahap), pola sama dgn scp3dBuildG / dr3dBuildG / pt3dBuildG. Dulu satu blok sinkron 0,6-1,0 dtk di itel (bench 6 Nov;
+   18 geometri batu = 3 tier x 6 varian, + renderer + shader) -> bar boot beku lalu loncat. Sekarang tiap tahap = satu giliran THREE_Q + satu frame paint; tahap berikut di-unshift
+   supaya urutan antar modul tidak berubah. Tahap: 0 canvas (renderer+scene+kamera), 1 paint (ShaderMaterial), 2 rsm (tier detail rendah), 3 rmd (tier sedang), 4 rlg (tier detail penuh);
+   sesudahnya state=2 + threeWarm. Waktu tiap tahap (ms) -> window.__ast3dT (dibaca 07-boot logPoll + bench). ?ss=0 = sinkron seperti dulu (A/B).
+   Kalau AST3D.state berubah dari 1 di antara dua tahap (mis. webglcontextlost -> ast3dFail), tahap berikutnya berhenti dan tidak menimpa state=3. */
+var AST3D_SLICE=(function(){var on=true;try{on=!/[?&]ss=0(?:&|#|$)/.test(location.search);}catch(e){}return on;})();
+function ast3dDrive(it,tm){
+  var t0=performance.now(),r=it.next();
+  try{tm.push(Math.round(performance.now()-t0));window.__ast3dT=tm;}catch(e){}
+  if(r.done)return;
+  if(AST3D_SLICE&&typeof THREE_Q!=='undefined'){
+    THREE_Q.q.unshift(function(){if(AST3D.state!==1)return;try{ast3dDrive(it,tm);}catch(e){ast3dFail(e&&e.message||e);}});
+    if(!THREE_Q.run){THREE_Q.run=true;threeQWait();}   /* aman kalau dipanggil di luar giliran antrean */
+  }else ast3dDrive(it,tm);
+}
+function ast3dBuild(){ast3dDrive(ast3dBuildG(),[]);}
+function* ast3dBuildG(){
   var T=THREE;
   var gl=threeGLGet('AST3D','big',true,false,null,ast3dFail),r=gl.r;   /* v22: renderer grup 'big' (dibagi dgn PL3D, antialias:false); ?gs=0 = renderer sendiri antialias:true */
   AST3D.gl=gl;AST3D.r=r;
   AST3D.sc=new T.Scene();
   AST3D.cam=new T.OrthographicCamera(0,W,H,0,-600,600);
+  yield;   /* ---- tahap 0 selesai: renderer + scene + kamera ---- */
   AST3D.uni={uBH:{value:new T.Vector2(W*.5,H*.5)},uBack:{value:0},uFall:{value:Math.max(W,H)*.9}};
   AST3D.mat=new T.ShaderMaterial({
     uniforms:AST3D.uni,
@@ -372,9 +388,12 @@ function ast3dBuild(){
     ].join('\n')
   });
   AST3D.cap=Math.max(128,(AST&&AST.length||0)+16);
+  yield;   /* ---- tahap 1 selesai: ShaderMaterial ---- */
   var LD=AST3D_CFG.lod,ti,i;
-  for(ti=0;ti<=LD.length;ti++)
+  for(ti=0;ti<=LD.length;ti++){
     for(i=0;i<AST3D_CFG.procVariants;i++)ast3dAddVariant(ast3dRockGeo(i+1,ti<LD.length?LD[ti][0]:3),ti);   /* seed sama per tier -> bentuk batu sama, cuma kerapatan mesh beda */
+    yield;   /* ---- tahap 2..(2+LD.length) selesai: satu tier geometri per tahap (default 3 tier: rsm, rmd, rlg) ---- */
+  }
   AST3D.state=2;   /* siap dipakai segera dengan batu procedural */
   threeWarm(r,AST3D.sc,AST3D.cam,function(){ast3dResize();},gl);   /* ukuran layar penuh dipasang di warm-up, bukan di frame batu pertama */
 }

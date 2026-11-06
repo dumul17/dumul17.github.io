@@ -525,7 +525,7 @@ var DUMUL_CHARS=(function(){
        Antrean cuma kosmetik: tidak menahan bar, status atas, atau gerbang kapsul. Kalau menumpuk, jedanya mengecil (logDwell) dan tahap modul yang sama dilipat jadi satu. */
   var logEl=document.getElementById('boot-log'),logLast='',logN={},logOut='',bootTh=null;
   var LOG_M=[   /* urutan = antrean threeLoad (AST, SCP, DR, PT, PL); [global, array tahap, kunci nama, kunci tahap]. Jumlah langkah = tahap bernama + 1 (langkah penutup = \"siap\") */
-    ['AST3D',null,'bl.rock',null],
+    ['AST3D','__ast3dT','bl.rock',['canvas','paint','rsm','rmd','rlg']],   /* v177: build batu diiris 5 tahap (12-ast3d v32) */
     ['SCP3D','__scp3dT','bl.scope',['canvas','light','paint','body','cockpit','engine','lamps']],
     ['DR3D','__dr3dT','bl.drone',['canvas','light','paint','wings','engine','join','size']],
     ['PT3D','__pt3dT','bl.portal',['canvas','circuit','plates','lamps','size']],
@@ -799,12 +799,14 @@ var DUMUL_CHARS=(function(){
     var complete=vis&&au.ok&&sx.ok&&pr.ok;   /* PRE ikut gerbang (tiap langkah dibatasi PRE_MAX, jadi tidak bisa menggantung) */
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
+    var astF=0;   /* v177: AST3D beririsan -> tahap selesai ikut mengisi bar (jujur: hanya tahap nyata), rayapan di bawah cuma untuk sisanya */
+    try{if(!th.fins[0]&&th.st[0]===1&&window.__ast3dT){astF=Math.min(.95,window.__ast3dT.length/(LOG_M[0][3].length+1));wDone+=WT_MODS[0]*astF;}}catch(eAf){}
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])uD++;
     if(uD>uLast){uLast=uD;barFlash();}
     var wc=0;
     wc+=crp('pg',!ready,WT_PAGE,WT_PAGE,elapsed);
-    for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi,!th.fins[wi]&&th.st[wi]===1,WT_MODS[wi],WT_MODS[wi],elapsed);
+    for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi+(wi===0?'_'+((window.__ast3dT&&window.__ast3dT.length)|0):''),!th.fins[wi]&&th.st[wi]===1,wi===0?WT_MODS[0]*(1-astF):WT_MODS[wi],wi===0?WT_MODS[0]/6:WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
     if(!sx.ok&&sx.total>0){
