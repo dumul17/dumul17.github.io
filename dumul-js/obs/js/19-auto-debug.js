@@ -1605,7 +1605,7 @@
       /* ABAB tanpa reload (21-bench v11.29h): A=base, B=token mati, 3 pasang x 10 dtk (+ &abn=N). Hanya di sektor. */
       panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'ABAB (A=base, B=lapisan mati; label A unik per token; 1 token ±60 dtk, 3 token ±2 dtk x4 = ±4 mnt; di sektor):'));
       var abbRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-      [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']].forEach(function (c) {
+      [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo sgs+sgm', 'sgs+sgm'], ['halo sgl x3', 'sgl,sgl,sgl'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']].forEach(function (c) {
         abbRow.appendChild(btn('ABAB ' + c[0], function () {
           if (!window.__abOk || typeof window.__offSeqStart !== 'function') return log('ABAB butuh 21-bench v11.29h (?v=11.29h)');
           if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('ABAB: masuk SEKTOR dulu, lalu tap lagi');
