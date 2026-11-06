@@ -1730,7 +1730,7 @@ function coreStyle(col,al){
   return t[b]||(t[b]='rgba('+col+','+(b/64)+')');
 }
 /* bench (?off=sgs,sgm,sgl,scs,scm,scl | seq sizes): ember ukuran bintang menurut s.r mentah, batas STB (default 2.4 / 3.0; ?stb=a,b). ST_C = hitungan per frame (hanya saat window.__stSeg). */
-var STB=[2.4,3.0],ST_C={f:0,n:[0,0,0],a:[0,0,0]};
+var STB=[2.4,3.0],STSI=0,ST_C={f:0,n:[0,0,0],a:[0,0,0],g:0,ga:0,c:0};   /* STSI = indeks urut bintang (sekali per bintang) buat token jumlah sghalf/sgquart/schalf/scquart; g/ga/c = halo & inti yang BENAR-BENAR digambar (idle) */
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   c._vis=0;
@@ -1777,8 +1777,10 @@ function drawStars(c,age,now){
       a*=Math.max(.1,Math.min(1.5,Math.sqrt(bf)));
       bandCol=s._bg;bandCore=s._bk;
     }
-    var _z=s.r<STB[0]?0:(s.r<STB[1]?1:2),_ng=PX.sglow||(_z===0?PX.sgs:(_z===1?PX.sgm:PX.sgl)),_nc=PX.score||(_z===0?PX.scs:(_z===1?PX.scm:PX.scl));   /* bench: lewati halo / inti per ember ukuran */
-    if(window.__stSeg){ST_C.n[_z]++;ST_C.a[_z]+=r*r;}
+    var _z=s.r<STB[0]?0:(s.r<STB[1]?1:2),_ng=PX.sglow||(_z===0?PX.sgs:(_z===1?PX.sgm:PX.sgl)),_nc=PX.score||(_z===0?PX.scs:(_z===1?PX.scm:PX.scl));
+    if(s._si===undefined)s._si=STSI++;
+    if(PX.sghalf||PX.sgquart||PX.schalf||PX.scquart){var _si=s._si;if((PX.sghalf&&!(_si&1))||(PX.sgquart&&(_si&3)))_ng=1;if((PX.schalf&&!(_si&1))||(PX.scquart&&(_si&3)))_nc=1;}   /* bench: tinggal 50% / 25% bintang yang digambar halo / intinya (deterministik per bintang) */   /* bench: lewati halo / inti per ember ukuran */
+    if(window.__stSeg||window.__stCnt){ST_C.n[_z]++;ST_C.a[_z]+=r*r;}
     if(cheap){
       /* During potato audio-focus, keep the star visible but replace its
          animated halo with one tiny core draw. This removes a radial-gradient
@@ -1800,8 +1802,8 @@ function drawStars(c,age,now){
       }
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
-      if(!_ng)drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));   /* IDLE: halo tipis & kecil; FULL: penuh */
-      if(!_nc){g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}
+      if(!_ng){if(window.__stCnt){ST_C.g++;ST_C.ga+=r*r;}drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb));}   /* IDLE: halo tipis & kecil; FULL: penuh */
+      if(!_nc){if(window.__stCnt)ST_C.c++;g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}
     }
     var am=(ALIGN.cid&&!PX.smark)?alignMark(c,k):null;
     if(am==='lit'){

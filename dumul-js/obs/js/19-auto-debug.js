@@ -82,7 +82,7 @@
   function installPerf() {
     if (window.__WH_AD_instPerf) return true;
     try {
-      var PX0 = { sky:0, lines:0, stars:0, pulse:0, ast:0, hole:0, all:0, pa:0, pw:0, pb:0, slow:0, mw:0, pt:0, neb:0, ptr:0, ptm:0, ptb:0, cname:0, lstroke:0, sglow:0, score:0, smark:0, slbl:0, splei:0, sgs:0, sgm:0, sgl:0, scs:0, scm:0, scl:0, pglow:0, pcore:0, pint:0, pname:0 };
+      var PX0 = { sky:0, lines:0, stars:0, pulse:0, ast:0, hole:0, all:0, pa:0, pw:0, pb:0, slow:0, mw:0, pt:0, neb:0, ptr:0, ptm:0, ptb:0, cname:0, lstroke:0, sglow:0, score:0, smark:0, slbl:0, splei:0, sgs:0, sgm:0, sgl:0, scs:0, scm:0, scl:0, sghalf:0, sgquart:0, schalf:0, scquart:0, pglow:0, pcore:0, pint:0, pname:0 };
       if (typeof window.PX !== 'object' || !window.PX) window.PX = PX0;
       else {
         for (var k in PX0) if (!(k in window.PX)) window.PX[k] = 0;
@@ -1603,14 +1603,14 @@
       });
       panel.appendChild(seqRow);
       /* ABAB tanpa reload (21-bench v11.29h): A=base, B=token mati, 3 pasang x 10 dtk (+ &abn=N). Hanya di sektor. */
-      panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'ABAB (A=base, B=lapisan mati; ±60 dtk, di sektor):'));
+      panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'ABAB (A=base, B=lapisan mati; label A unik per token; 1 token ±60 dtk, 3 token ±2 dtk x4 = ±4 mnt; di sektor):'));
       var abbRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-      [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['sgl+scl', 'sgl+scl'], ['pint', 'pint'], ['stars', 'stars']].forEach(function (c) {
+      [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']].forEach(function (c) {
         abbRow.appendChild(btn('ABAB ' + c[0], function () {
           if (!window.__abOk || typeof window.__offSeqStart !== 'function') return log('ABAB butuh 21-bench v11.29h (?v=11.29h)');
           if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('ABAB: masuk SEKTOR dulu, lalu tap lagi');
           if (!window.__offSeqStart('abab', c[1])) return log('seq sedang jalan');
-          log('ABAB ' + c[1] + ' jalan: A1 B1 A2 B2 A3 B3. Timer di kiri bawah; selesai → salin dump bench.');
+          log('ABAB ' + c[1] + ' jalan (label A1_<token>, B1_<token>, ...). Timer di kiri bawah; selesai → salin dump bench.');
           expand(false);
         }, false));
       });

@@ -792,7 +792,7 @@ function sectJumpTo(s,carry,always){
 /* ---------- PERF / PROBE STUB (body pindah ke 19-auto-debug.js: installPerf / installProbe) ----------
    Tanpa ?debug=1: no-op, zero cost. Dengan ?debug=1&perf|probe=1: 19 override pmk/pBegin/pEnd/probe* setelah load.
    Call site di frame() TIDAK diubah. FS governor di bawah tetap produksi. */
-var PX={sky:0,lines:0,stars:0,pulse:0,ast:0,hole:0,all:0,pa:0,pw:0,pb:0,slow:0,mw:0,pt:0,neb:0,ptr:0,ptm:0,ptb:0,cname:0,lstroke:0,sglow:0,score:0,smark:0,slbl:0,splei:0,sgs:0,sgm:0,sgl:0,scs:0,scm:0,scl:0,pglow:0,pcore:0,pint:0,pname:0};   /* cname..splei = pecahan rasi+bintang (bench ?off=, seq stars) */
+var PX={sky:0,lines:0,stars:0,pulse:0,ast:0,hole:0,all:0,pa:0,pw:0,pb:0,slow:0,mw:0,pt:0,neb:0,ptr:0,ptm:0,ptb:0,cname:0,lstroke:0,sglow:0,score:0,smark:0,slbl:0,splei:0,sgs:0,sgm:0,sgl:0,scs:0,scm:0,scl:0,sghalf:0,sgquart:0,schalf:0,scquart:0,pglow:0,pcore:0,pint:0,pname:0};   /* cname..splei = pecahan rasi+bintang (bench ?off=, seq stars) */
 var PX_MODES=['normal'];   /* 19 installPerf mengisi daftar lengkap */
 var PX_PANEL={};
 var PERF=false;   /* dinyalakan 19-auto-debug.js (installPerf). JANGAN baca URL/localStorage di sini: tanpa 19, ?perf=1 akan nyalakan gl.finish() di 17 pl3dMkGpu */
@@ -990,7 +990,7 @@ function frame(now){
     sectStep(now);pmk('sectStep');
     if(SECT.on){if(PU.length)PU.length=0;drawSectorOverview(now,age);try{if(typeof drawTxLines==='function')drawTxLines(now);}catch(eTx){}}
     else{
-    if(window.__stSeg)ST_C.f++;
+    if(window.__stSeg||window.__stCnt)ST_C.f++;
     if(!PX.lines)CONS.forEach(function(c){if(sectShow(c.id))drawCons(c,age,now);});
     if(window.__stSeg)pmk('s.cons');   /* penanda pecahan (bench seq stars / ?stseg=1) */
     if(!PX.pulse)drawPulses(now,age);
