@@ -318,8 +318,8 @@
 <script defer src="dumul-js/obs/js/01-core.js?v=145"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=150"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=114"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=149"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=189"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=150"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=190"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=130"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=176"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
@@ -366,7 +366,7 @@
    check-sky.js mengecualikan file ini. Naikkan ?v= kalau file-nya diubah. */
 (function () {
   if (!/[?&]debug=1(&|$)/.test(location.search)) return;
-  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=24'; s.async = true; document.body.appendChild(s); }
+  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=25'; s.async = true; document.body.appendChild(s); }
   if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
 })();
 </script>
@@ -642,7 +642,7 @@ if ('serviceWorker' in navigator) {
 <script>/* Bench (21-bench.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau URL punya ?bench=1. document.write supaya jalan SINKRON di titik ini
    (sebelum semua script defer) — wrapper rIC / WebGLRenderer / observer harus terpasang sebelum modul jalan, jadi TIDAK bisa pindah ke 19-auto-debug.js (dimuat setelah window load).
    Sengaja TIDAK di SHELL service-worker (sama seperti 19/20). Naikkan ?v= kalau isi 21-bench.js berubah. */
-(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.29h"></scr'+'ipt>');}catch(e){}})();
+(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.29i"></scr'+'ipt>');}catch(e){}})();
 </script>
 </body>
 </html>
