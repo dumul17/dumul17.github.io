@@ -1065,10 +1065,8 @@ function scatterAsteroidArea(x,y,R){
 /* Bake a small set of rocky asteroid sprites once. Per-frame cost is then only
    translate/rotate/drawImage (+ the cheap spring for kick/scatter). Visual
    matches the previous live polygon+gradient path. */
-function ensureAsteroidSprites(){
-  if(AST_SPRITES&&AST_SPRITES.length)return AST_SPRITES;
-  var n=8,list=[],back=[];
-  for(var si=0;si<n;si++){
+/* [v-perf 6 Nov] Satu sprite batu (depan + belakang) per panggilan: dulu 8 sprite sekaligus (shadowBlur + path) dalam SATU task di preStart. Badan loop dipindah apa adanya. */
+function astBuildSprite(si,list,back){
     var sides=6+(si%5),seed=si*1.618+0.37;
     /* ---- DEPAN: besar, tajam, detail penuh (facet, kawah, rim light hangat dari sisi BH) ---- */
     var R=AST_SPRITE_R,pad=Math.ceil(R*1.55+6),size=pad*2,sc=document.createElement('canvas');
@@ -1123,9 +1121,32 @@ function ensureAsteroidSprites(){
     }
     bg2.closePath();bg2.fill();
     back.push({c:bc,pad:padb,R:Rb});
-  }
+}
+function ensureAsteroidSprites(){
+  if(AST_SPRITES&&AST_SPRITES.length)return AST_SPRITES;
+  var n=8,list=[],back=[];
+  for(var si=0;si<n;si++)astBuildSprite(si,list,back);
   AST_SPRITES=list;AST_SPRITES.back=back;
   return list;
+}
+/* Versi diiris untuk 07-boot preStart: satu sprite per task (setTimeout 0), done() setelah selesai. Hasil dirakit di list lokal lalu dipasang sekali; kalau ensureAsteroidSprites() sinkron
+   sudah memasangnya lebih dulu (frame batu pertama), hasil iris dibuang (tidak menimpa). ?ss=0 = satu blok seperti dulu. Waktu tiap sprite (ms) -> window.__astSpT (bench). */
+function ensureAsteroidSpritesSliced(done){
+  if(AST_SPRITES&&AST_SPRITES.length){done();return;}
+  var sliced=true;try{sliced=!/[?&]ss=0(?:&|#|$)/.test(location.search);}catch(e){}
+  if(!sliced){try{ensureAsteroidSprites();}catch(e2){}done();return;}
+  var list=[],back=[],si=0,tm=[];
+  var step=function(){
+    if(AST_SPRITES&&AST_SPRITES.length){done();return;}
+    var t=performance.now();
+    try{astBuildSprite(si,list,back);}catch(e){}
+    try{tm.push(Math.round((performance.now()-t)*10)/10);window.__astSpT=tm;}catch(e3){}
+    si++;
+    if(si<8){setTimeout(step,0);return;}
+    if(!(AST_SPRITES&&AST_SPRITES.length)){AST_SPRITES=list;AST_SPRITES.back=back;}
+    done();
+  };
+  setTimeout(step,0);
 }
 /* Radius orbit dasar 1 batu (sebelum pengali lebar/zoom) */
 function astRk(a){return a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*AST_CFG.t):a.r;}

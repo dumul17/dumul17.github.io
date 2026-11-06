@@ -1201,6 +1201,39 @@ function pl3dFx(g,now,cp){
     g.restore();
   }
 }
+
+/* [v52] WARM FRAME PERTAMA planet (dipanggil 07-boot warmRealStart, jendela idle pra-kapsul). Frame overview pertama selalu render PENUH sekali jalan (cache kosong: PL3D.full/!chk) = pl.rnd ±78-81 ms
+   di itel, dan warm lama (v172: render tanpa sinkron + tanpa menyimpan hasil, dihapus v174) tidak mengurangi itu. Di sini jalur yang SAMA dijalankan pra-kapsul dan hasilnya DISIMPAN:
+   render penuh + cek piksel dasar-tengah (PL3D.chk) + sinkron GPU lewat drawImage ke cv2, lalu lastR/lastLx/lastLy/dirty/full diset seperti blok render penuh di planet3dDraw.
+   Frame pertama sesudah Blue lalu memakai cache ini; kalau keadaan sudah beda (cahaya/palette/parallax), yang terjadi hanya refresh berpita biasa (jalur steady), bukan render penuh 80 ms.
+   Tidak menggambar apa pun ke layar. Gagal / syarat tak terpenuhi -> return false, frame pertama tetap render penuh seperti dulu. ?plwf=0 = nonaktif (A/B). Hasil: window.__warmReal.plf {ms,sync}. */
+var PL3D_WF=(function(){var on=true;try{on=!/[?&]plwf=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__plwf=on?1:0;}catch(e2){}return on;})();
+function pl3dWarmFirst(stop){
+  try{
+    if(!PL3D_WF||PL3D.warmF||PL3D.state!==2||!PL3D.r||PL3D.chk||!PL3D_CFG.on||document.hidden)return false;
+    if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
+    if(stop&&stop())return false;
+    var t0=performance.now();
+    pl3dSync();if(!PW||!PH)return false;
+    PL3D.warmF=1;
+    pl3dPalUpdate();pl3dPhase(t0);pl3dResize();
+    if(!PL3D.cv2||!PL3D.cv3)return false;
+    var bp=pl3dLightPos(),lx=bp[0],ly=PH-bp[1],gl,px=new Uint8Array(4),ts;
+    PL3D.curNow=t0;
+    pl3dUniforms(t0,true);
+    threeGLBegin(PL3D.gl);threeGLFull(PL3D.gl);
+    PL3D.r.render(PL3D.sc,PL3D.cam);
+    gl=PL3D.r.getContext();
+    gl.readPixels(PL3D.rw>>1,threeGLOy(PL3D.gl),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);   /* sinkron GPU SEKARANG (bukan di frame pertama) + cek isi */
+    if(px[3]<200)return false;   /* render kosong: biarkan frame pertama memutuskan (pl3dFail di sana) */
+    PL3D.chk=1;
+    PL3D.c2.clearRect(0,0,PL3D.rw,PL3D.rh);
+    PL3D.c2.drawImage(PL3D.r.domElement,0,0,PL3D.rw,PL3D.rh,0,0,PL3D.rw,PL3D.rh);
+    PL3D.lastR=t0;PL3D.lastLx=lx;PL3D.lastLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.cyc=null;PL3D.fadeT=null;PL3D.renders++;
+    try{var M=window.__warmReal||(window.__warmReal={});M.plf={ms:Math.round(performance.now()-t0),at:Math.round(t0)};}catch(eM){}
+    return true;
+  }catch(e){return false;}
+}
 /* dipanggil dari frame() (05-sector-ui.js) setelah drawFloatingTelescopeTop. Tidak melempar; tidak punya timer render sendiri. */
 function planet3dDraw(now){
   try{if(typeof SECT!=='undefined'&&SECT.cur&&typeof PT3D!=='undefined')PT3D.orbInSect=1;}catch(eO){}   /* P4: lagi di sektor -> orbit portal overview mulai dari puncak begitu kembali */

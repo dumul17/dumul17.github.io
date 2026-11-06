@@ -373,9 +373,12 @@ var DUMUL_CHARS=(function(){
       preFin('ui');
     },0);
     setTimeout(function(){
-      try{ensureAsteroidSprites();}catch(eA){}
-      try{if(typeof OFX!=='undefined'&&typeof ofxMakeTint==='function'){if(!OFX.tc)OFX.tc=ofxMakeTint('c');if(!OFX.tk)OFX.tk=ofxMakeTint('k');}}catch(eT){}
-      preFin('ast');
+      /* v177: 8 sprite batu diiris satu per task (04-render ensureAsteroidSpritesSliced), baru tint BGM, lalu selesai. Dulu satu task untuk semuanya. PRE_MAX tidak berlaku (tiap irisan kecil). */
+      var fin=function(){
+        try{if(typeof OFX!=='undefined'&&typeof ofxMakeTint==='function'){if(!OFX.tc)OFX.tc=ofxMakeTint('c');if(!OFX.tk)OFX.tk=ofxMakeTint('k');}}catch(eT){}
+        preFin('ast');
+      };
+      try{if(typeof ensureAsteroidSpritesSliced==='function')ensureAsteroidSpritesSliced(fin);else{ensureAsteroidSprites();fin();}}catch(eA){fin();}
     },300);
     setTimeout(function(){
       var tm=setTimeout(function(){preFin('fb',1);},PRE_MAX);
@@ -411,7 +414,8 @@ var DUMUL_CHARS=(function(){
   function warmRealStart(){
     if(WR.on)return;WR.on=1;WR.t0=performance.now();
     setTimeout(warmRealTint,1500);
-    setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},1100);   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
+    setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},1100);
+    setTimeout(function(){try{if(!WR.entered&&typeof pl3dWarmFirst==='function')pl3dWarmFirst(function(){return WR.entered;});}catch(eP){}},2800);   /* [v179] render penuh planet pertama (17-planet3d v50) dibayar pra-kapsul, sesudah warm batu (18 x 30 ms) */   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
   }
   function preStatus(){return {ok:pre.ui===2&&pre.ast===2&&pre.fb===2,ui:pre.ui,ast:pre.ast,fb:pre.fb};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
@@ -593,6 +597,7 @@ var DUMUL_CHARS=(function(){
     M2=window.__warmReal;
     if(M2){
       if(M2.ast&&!M2.ast.stop&&!logN.wra){logN.wra=1;ev.push({k:'ok',s:T('bl.rock')+' \u00b7 '+T('bl.a.wast')});}
+      if(M2.plf&&!logN.wrp){logN.wrp=1;ev.push({k:'ok',s:T('bl.planet')+' \u00b7 '+T('bl.a.wpl')});}
       tl=(typeof SECT!=='undefined'&&SECT.list)||[];tt=0;for(li=0;li<tl.length;li++)if(tl[li]&&tl[li].sky)tt++;
       if(tt>0&&M2.tint){logN.wrt=logN.wrt|0;while(logN.wrt<Math.min(M2.tint,tt)){logN.wrt++;ev.push({k:'ok',g:'wt',s:T('bl.neb')+' \u00b7 '+T('bl.a.tint')+' \u00b7 '+logN.wrt+'/'+tt});}}
       if(M2.tintDone&&!logN.wrtOk){logN.wrtOk=1;ev.push({k:'ok',s:T('bl.neb')+' '+T('bl.ready')});}

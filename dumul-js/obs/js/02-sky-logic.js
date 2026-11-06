@@ -1360,6 +1360,7 @@ function nebBase(EW,EH,ds){
   var hh=Math.hypot(cw,ch)*.5,vg2=x.createRadialGradient(cw/2,ch/2,hh*.45,cw/2,ch/2,hh);
   vg2.addColorStop(0,'rgba(0,0,0,0)');vg2.addColorStop(.7,'rgba(0,0,0,'+(.15*NEB.VIG)+')');vg2.addColorStop(1,'rgba(0,0,0,'+(.65*NEB.VIG)+')');
   x.fillStyle=vg2;x.fillRect(0,0,cw,ch);
+  c._rp={im:im,dx:(cw-dw)/2,dy:(ch-dh)/2,dw:dw,dh:dh,gx:gx,gy:gy,R:R,hh:hh,vig:NEB.VIG};   /* v-perf: resep gambar ulang, dipakai nebPrefetch untuk salinan CPU (bacaan piksel tanpa flush GPU) */
   NEB.base=c;NEB.key=key;NEB.tint={};NEB.ovc=null;NEB._bd=null;NEB._bdK=null;NEB._pf=null;
   if(NEB.pfT)clearTimeout(NEB.pfT);NEB.pfT=setTimeout(nebPrefetch,300);   /* bd dibaca lebih awal, di luar jalur masuk sektor */
   return c;
@@ -1480,6 +1481,10 @@ function nebTint(s){
   return null;
 }
 /* v-perf: bacaan PERTAMA getImageData di NEB.base mahal tetap (dump: 41-81 ms; pita berikutnya cuma 1,4-2,1 ms) = flush + readback GPU yang menunggu antrean GL bersama, BUKAN jumlah piksel. Jadi dibayar lebih awal (pita demi pita, irisan ~2 ms) selagi tidak ada transisi / frame berat; nebTintStep tinggal memakai cache NEB._bd. Berhenti kalau tint job sudah jalan (job membaca sendiri). */
+/* [v-perf 6 Nov] Biaya band 0 (80-180 ms di itel, dump pra-kapsul) = flush GL + readback kanvas ter-akselerasi, bukan jumlah piksel (band berikutnya 1,4-2,1 ms): tidak bisa dipecah lebih kecil.
+   Jadi dihindari: nebula digambar ulang SEKALI ke kanvas CPU (willReadFrequently, tanpa GPU) dari resep c._rp, dua irisan (gambar, lalu gradien), lalu semua pita dibaca dari kanvas itu.
+   Piksel sama (gambar + 2 gradien yang sama; beda raster CPU vs GPU <= beberapa level). ?pfcpu=0 = jalur lama (baca langsung dari NEB.base, A/B). */
+var NEB_PFCPU=(function(){var on=true;try{on=!/[?&]pfcpu=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__pfcpu=on?1:0;}catch(e2){}return on;})();
 function nebPrefetch(){
   NEB.pfT=0;
   try{
@@ -1489,9 +1494,32 @@ function nebPrefetch(){
     var b3=window.__boot3d,bootOK=(typeof bootDone!=='undefined'&&bootDone)||window.__bootVis||(cap&&(!b3||b3.warm));   /* [v168] __bootVis = 3D + warm shader selesai, jalan di fase tunggu SFX (kapsul sekarang muncul terakhir). Dulu: kapsul: tunggu warm shader 3D selesai (antrean GPU kosong) -> bacaan pertama lebih murah (dump: 139 ms saat antrean GL masih penuh) */
     if(!bootOK||document.hidden||(w&&w.busy)||(s&&s.busy)||(typeof FS!=='undefined'&&FS.heavy&&!menu)){NEB.pfT=setTimeout(nebPrefetch,400);return;}   /* heavy ditahan, kecuali menu sektor terbuka (sky beku) */
     var P=NEB._pf;
-    if(!P||P.b!==b)P=NEB._pf={b:b,y:0,n:Math.max(8,Math.ceil(b.height/8)),buf:new Uint8ClampedArray(b.width*b.height*4)};
+    if(!P||P.b!==b)P=NEB._pf={b:b,y:0,n:Math.max(8,Math.ceil(b.height/8)),buf:new Uint8ClampedArray(b.width*b.height*4),cs:0,src:null};
+    var RP=b._rp,tq=performance.now();
+    if(NEB_PFCPU&&RP&&!P.src&&P.cs<2){
+      try{
+        if(P.cs===0){   /* irisan 1: kanvas CPU + gambar nebula (cover-fit) */
+          P.cc=document.createElement('canvas');P.cc.width=b.width;P.cc.height=b.height;
+          P.cx=P.cc.getContext('2d',{willReadFrequently:true});
+          P.cx.drawImage(RP.im,RP.dx,RP.dy,RP.dw,RP.dh);
+          P.cs=1;
+          try{var D0=window.__nebDbg||(window.__nebDbg=[]);if(D0.length<24)D0.push(['pfc0',0,Math.round((performance.now()-tq)*10)/10,Math.round(tq),0]);}catch(eD0){}
+          NEB.pfT=setTimeout(nebPrefetch,0);return;
+        }
+        /* irisan 2: dua gradien (sama dgn nebBase) */
+        var cx=P.cx,g1=cx.createRadialGradient(RP.gx,RP.gy,0,RP.gx,RP.gy,RP.R),hw=b.width,hh2=b.height,g2;
+        g1.addColorStop(0,'rgba(5,11,18,.62)');g1.addColorStop(.55,'rgba(5,11,18,.28)');g1.addColorStop(1,'rgba(5,11,18,0)');
+        cx.fillStyle=g1;cx.fillRect(0,0,hw,hh2);
+        g2=cx.createRadialGradient(hw/2,hh2/2,RP.hh*.45,hw/2,hh2/2,RP.hh);
+        g2.addColorStop(0,'rgba(0,0,0,0)');g2.addColorStop(.7,'rgba(0,0,0,'+(.15*RP.vig)+')');g2.addColorStop(1,'rgba(0,0,0,'+(.65*RP.vig)+')');
+        cx.fillStyle=g2;cx.fillRect(0,0,hw,hh2);
+        P.src=P.cc;P.cs=2;
+        try{var D1=window.__nebDbg||(window.__nebDbg=[]);if(D1.length<24)D1.push(['pfc1',0,Math.round((performance.now()-tq)*10)/10,Math.round(tq),0]);}catch(eD1){}
+        NEB.pfT=setTimeout(nebPrefetch,0);return;
+      }catch(eCp){P.cs=9;P.src=null;P.cc=P.cx=null;}   /* gagal -> jalur lama untuk sisa pita */
+    }
     var t0=performance.now(),rn=Math.min(P.n,b.height-P.y);
-    P.buf.set(b.getContext('2d').getImageData(0,P.y,b.width,rn).data,P.y*b.width*4);
+    P.buf.set((P.src||b).getContext('2d').getImageData(0,P.y,b.width,rn).data,P.y*b.width*4);
     try{var DB=window.__nebDbg||(window.__nebDbg=[]);if(DB.length<24)DB.push(['pf',P.y,Math.round((performance.now()-t0)*10)/10,Math.round(t0),(window.__bootVis||(window.__boot3d&&window.__boot3d.warm))?1:0]);}catch(eDb){}
     P.y+=rn;
     if(P.y<b.height){NEB.pfT=setTimeout(nebPrefetch,0);return;}
