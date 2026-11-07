@@ -848,6 +848,14 @@ function fsMenu(){   /* window menu sektor (16) terbuka/menutup: kanvas sky beku
   try{if(typeof SMENU!=='undefined'&&(SMENU.open||SMENU.closing))return true;}catch(e){}
   return false;
 }
+/* [v191] PENGUKUR PASIF waktu tunggu render (tidak mengubah perilaku, tidak dipakai governor): FS.js = EMA waktu JS callback frame (ms), FS.wait = max(0, FS.ema - FS.js) = sisa frame yang dihabiskan menunggu GPU/compositor di luar JS. wlog = [abs ms, wait, js, ema] tiap ±2 dtk (maks 60) untuk dump bench. Dasar rencana bandMin adaptif: dump v423/v424 menunjukkan sektor itel wait ±31-58 ms vs Redmi ±92 ms, tapi di overview tumpang tindih, jadi ambang harus dilihat dari data ini dulu. */
+function fsJs(ms,now){
+  if(!(ms>=0)||ms>400)return;
+  FS.js=(FS.js==null)?ms:FS.js+(ms-FS.js)*.08;
+  FS.wait=Math.max(0,FS.ema-FS.js);
+  if(!FS.wlog)FS.wlog=[];
+  if(!FS.wl0||now-FS.wl0>=2000){FS.wl0=now;if(FS.wlog.length<60&&FS.n>24)FS.wlog.push([Math.round(now),Math.round(FS.wait),Math.round(FS.js),Math.round(FS.ema)]);}
+}
 function fsTick(now){
   var C=FS.cfg,iv=FS.last?now-FS.last:0;FS.last=now;FS.n=(FS.n+1)|0;
   var mn=fsMenu();
@@ -890,6 +898,7 @@ function frame(now){
     if(++zmN%4){renderRAF=requestAnimationFrame(frame);return;}
   }else zmN=0;
   capLast=now;fsTick(now);
+  var _fj0=performance.now();   /* [v191] awal kerja JS frame (untuk FS.js) */
   /* The whole frame is now one safety net: whatever throws, wherever, the
      loop always reschedules itself in the finally block below. A single
      bad frame can no longer freeze the page until a manual reload - at
@@ -1045,6 +1054,7 @@ function frame(now){
     /* Only reschedule if this generation is still current and the tab is
        visible. Stale RAF callbacks (after watchdog cancel + restart) exit
        without queuing another frame. */
+    try{if(typeof _fj0==='number')fsJs(performance.now()-_fj0,now);}catch(eFj){}   /* [v191] pengukur pasif */
     if(!pageHidden&&gen===renderGeneration){
       renderRAF=requestAnimationFrame(frame);
     }else{
