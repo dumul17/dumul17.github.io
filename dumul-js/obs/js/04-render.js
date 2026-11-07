@@ -736,7 +736,7 @@ var STAR_DATA = SKY.STAR_DATA;
 /* Posisi panel HUD (LOCK/DIST/SPEC) relatif ke bintang. Coba beberapa sisi berurutan (HP: bawah/atas dulu,
    desktop: sisi yang berlawanan dengan nama bintang dulu), jepit ke area kelihatan vb=[x0,y0,x1,y1], lalu pilih
    yang tidak menyentuh zona reticle (radius R). Kalau semua menyentuh, ambil yang paling longgar. */
-function hudPlace(sx,sy,R,pw,ph,vb,mobile,labelRight){
+function hudPlace(sx,sy,R,pw,ph,vb,mobile,labelRight,lim){   /* lim (opsional) = (x0,x1)->y batas bawah panel (limb planet, planetLblLimit): sisi yang tenggelam di balik planet kalah dari sisi yang tidak */
   var gp=4,below=[-pw*.5,R+gp],above=[-pw*.5,-R-gp-ph],right=[R+gp,-ph*.5],left=[-R-gp-pw,-ph*.5];
   var side=labelRight?[left,right]:[right,left];
   var order=mobile?[below,above].concat(side):side.concat([below,above]);
@@ -747,10 +747,11 @@ function hudPlace(sx,sy,R,pw,ph,vb,mobile,labelRight){
     rx=hiX<loX?loX:Math.max(loX,Math.min(hiX,rx));
     ry=hiY<loY?loY:Math.max(loY,Math.min(hiY,ry));
     var dx=rx>0?rx:(rx+pw<0?-(rx+pw):0),dy=ry>0?ry:(ry+ph<0?-(ry+ph):0);
-    var short=Math.max(0,R-Math.sqrt(dx*dx+dy*dy));
-    if(short<bestShort){bestShort=short;best=[rx,ry];}
-    if(short===0)break;
+    var short=Math.max(0,R-Math.sqrt(dx*dx+dy*dy)),over=lim?Math.max(0,sy+ry+ph-lim(sx+rx,sx+rx+pw)):0,sc=over*20+short;   /* over = px panel yang menembus limb; bobot besar -> prioritas lebih tinggi dari tumpang-tindih reticle */
+    if(sc<bestShort){bestShort=sc;best=[rx,ry];}
+    if(sc===0)break;
   }
+  if(lim&&best){var lmB=lim(sx+best[0],sx+best[0]+pw);if(sy+best[1]+ph>lmB){best[1]=lmB-sy-ph;if(sy+best[1]<vb[1])best[1]=vb[1]-sy;}}   /* semua sisi tembus limb: geser naik sampai di atas limb (tetap di dalam area kelihatan) */
   return best;
 }
 
@@ -857,7 +858,7 @@ function drawTargetLock(now){
     sp0 = v2c(x, y);
     vb = [Math.min(pA[0], pB[0]), Math.min(pA[1], pB[1]), Math.max(pA[0], pB[0]), Math.max(pA[1], pB[1])];
   }
-  var pos = hudPlace(sp0[0], sp0[1], sz * 1.45 + 6, pw, ph, vb, isMobile, !!(s.nx && s.nx > 0));
+  var pos = hudPlace(sp0[0], sp0[1], sz * 1.45 + 6, pw, ph, vb, isMobile, !!(s.nx && s.nx > 0), (typeof planetLblLimit === 'function') ? planetLblLimit(HUD_LIMB_GAP) : null);   /* guard limb: panel LOCK tidak tenggelam di balik planet (Spica di sektor Spring) */
   var tx = x + pos[0], ty = y + pos[1];   /* pojok kiri-atas panel */
 
   g.drawImage(hs.c, tx, ty, hs.c.width / DPR, hs.c.height / DPR);
@@ -1715,6 +1716,7 @@ function bandDimDraw(){
 /* Mode kamera = sensor teleskop masa depan: TANPA halo (halo = kesan polusi cahaya), TANPA diffraction spike dan TANPA cincin Airy (lensa pembelok cahaya sudah membelokkannya menjauh dari inti).
    Bintang = titik inti berwarna; bintang bernama yang terang dapat lensa pembelok cahaya (camLens) saat zoom tinggi. */
 var CAM_LBL_Z=4.5;   /* zoom mulai munculnya label semua bintang bernama (mode kamera) */
+var HUD_LIMB_GAP=10;   /* jarak aman (px) panel LOCK/DIST/SPEC (drawTargetLock/hudPlace) ke limb; lebih besar dari label karena aurora/halo di atas limb. -999 = guard mati */
 var LBL_LIMB_GAP=6;   /* jarak aman (px) label bintang SFX aktif ke limb planet (planetLblLimit di 17-planet3d.js); label di bawah garis ini digeser/dipindah kandidat. 0 = nempel limb, -999 = guard mati (A/B) */
 var RING_R=3.6;   /* ambang s.r bintang rasi yang dapat lensa pembelok cahaya (≈ bintang bernama paling terang: Sirius, Spica, Arcturus, Betelgeuse, Rigel, ...) — diturunkan lewat ringR() saat zoom */
 var _czV=-1,_czK=1;
