@@ -858,11 +858,33 @@ var DUMUL_CHARS=(function(){
     try{bar.classList.toggle('stall',performance.now()-mvAt>1500);}catch(e){}
   }
   bsT=setInterval(stallTick,500);
+  /* [v184] BAR MULUS SAAT MAIN THREAD MACET (?bglide=0 = perilaku lama). Dump 7 Nov (itel, VPN): gap bar >=350 ms jatuh pada long task 3D (0% diam 1,85 dtk di awal; 4,6-5,2 / 6,1-6,5 / 7,5-9,5 dtk). Dua tambahan, keduanya compositor-only:
+     (a) GLIDE AWAL: animasi WAAPI 0 -> BG_START_PCT% (BG_START_MS) dimulai begitu bar ada; jalan di compositor walau main thread diblok compile GL / build 3D. Diserahkan ke jalur normal (commitStyles + cancel) begitu angka jujur melewatinya, jadi tidak pernah mundur.
+     (b) LEAD: target visual fill = angka + lead (<= BG_LEAD_MAX %, ~ laju target 2 dtk terakhir x .9 dtk) dgn transisi linear BG_HZ ms. Transisi CSS tetap jalan di compositor selama main thread macet, jadi bar terus merayap pelan alih-alih membeku; saat tidak macet, posisi mengikuti angka dgn lag ~ laju x BG_HZ yang persis ditutup lead. Visual tak pernah >= 99 sebelum c.all. */
+  var BG_ON=true,BG_START_PCT=4,BG_START_MS=4200,BG_LEAD_MAX=2,BG_HZ=900,bgHist=[],bgA=null,bgLead=[],bgTake=null;
+  try{BG_ON=!/[?&]bglide=0(?:&|#|$)/.test(location.search);}catch(eBg){}
+  function bgPct(){try{var m=/matrix\(([^)]+)\)/.exec(getComputedStyle(fill).transform);if(!m)return 0;var a=m[1].split(','),w=fill.offsetWidth||1;return Math.max(0,100+(parseFloat(a[4])||0)/w*100);}catch(e){return 0;}}
+  if(BG_ON){try{if(fill.animate)bgA=fill.animate([{transform:'translateX(-100%)'},{transform:'translateX('+(BG_START_PCT-100)+'%)'}],{duration:BG_START_MS,easing:'cubic-bezier(.25,.6,.35,1)',fill:'forwards'});}catch(eBa){bgA=null;}}
+  function bgRate(now){var n=bgHist.length,i=0;while(i<n-1&&now-bgHist[i][0]>2500)i++;if(i>0)bgHist.splice(0,i);if(bgHist.length<1)return 0;var h=bgHist[0],dt=Math.max(1,now-h[0])/1000;return Math.max(0,(pTgt-h[1])/dt);}
   function barShow(){
     var v=(pTgt>=100&&pShown>=99.5)?100:Math.min(99,Math.floor(pShown+.5));
     if(v===pV)return;
     mvAt=performance.now();if(bar.classList.contains('stall'))bar.classList.remove('stall');
-    pV=v;fill.style.transform='translateX('+(v-100)+'%)';fill.setAttribute('data-v',v);pct.textContent=v+'%';
+    pV=v;
+    var vis=v,tr='';
+    if(bgA){   /* glide awal masih memegang fill: serahkan hanya kalau angka jujur sudah melewati posisi glide (atau v=100) */
+      var gp=bgPct();
+      if(v>=gp+.5||v>=100||pTgt>=100){try{bgA.commitStyles();bgA.cancel();}catch(eBc){}bgA=null;bgTake=[Math.round(performance.now()),v,Math.round(gp*10)/10];void fill.offsetWidth;}
+      else vis=-1;
+    }
+    if(vis>=0){
+      var ld=0;
+      if(BG_ON&&v<99&&pTgt<100){ld=Math.min(BG_LEAD_MAX,bgRate(performance.now())*BG_HZ/1000,99-v);if(ld<.15)ld=0;}
+      if(ld>0){fill.style.transition='transform '+BG_HZ+'ms linear';if(bgLead.length<80)bgLead.push([Math.round(performance.now()),v,Math.round(ld*100)/100]);}
+      else if(fill.style.transition)fill.style.transition='';
+      fill.style.transform='translateX('+(v+ld-100)+'%)';
+    }
+    fill.setAttribute('data-v',v);pct.textContent=v+'%';
     chProg(v);
     try{if(window.__rain)window.__rain.prog(v/100);}catch(eRp){}   /* hujan matrix ikut progres */
   }
@@ -873,12 +895,13 @@ var DUMUL_CHARS=(function(){
     barShow();
     if(pShown<pTgt&&!bs.classList.contains('off'))pRaf=requestAnimationFrame(barStep);
   }
+  try{window.__barG=function(){return {on:BG_ON,take:bgTake,lead:bgLead,glide:!!bgA};};}catch(eBg2){}
   var rainRd=0;
   function paintBar(c){
     var t=c.all?100:c.p;
     /* hujan: kata mulai dibaca hanya setelah semua modul 3D settle + warm selesai (c.vis); sebelum itu worker hujan cuma mengalir polos (hemat CPU di fase compile). Cadangan di 00-rain: K.wordGateMax. */
     if(c.vis&&!rainRd){rainRd=1;try{if(window.__rain)window.__rain.read();}catch(eRr){}}
-    if(t>pTgt)pTgt=t;
+    if(t>pTgt){pTgt=t;try{bgHist.push([performance.now(),pTgt]);}catch(eBh){}}
     if(ghost){var gv=Math.min(100,Math.round(pTgt));if(gv!==gV){gV=gv;ghost.style.transform='translateX('+(gv-100)+'%)';}}
     if(!pRaf&&pShown<pTgt){pAt=performance.now();pRaf=requestAnimationFrame(barStep);}
   }
