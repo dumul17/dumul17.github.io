@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
+/* BENCH v11.29 (?bench=1) — v11.29v: pmk.secP = probe PER DETIK 15 dtk pertama sektor (n, fps, dt, js, wait, ema, gpuSum, rata2 ms/frame tiap segmen pmk; dgn ?gpup=1 ikut .gpu per modul + q.big/q.small; hump = puncak vs late otomatis; maks 3 kunjungan). v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
    v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
    v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
@@ -1009,6 +1009,66 @@
      Menimpa window.pmk/pBegin/pEnd (no-op di produksi) setelah DOMContentLoaded. Tiap nilai segmen = waktu sejak pmk SEBELUMNYA (jadi 'cons+stars' di overview = drawSectorOverview + tx lines).
      Dipisah per label mode: ov (overview) / sec (dalam sektor) / trans (SECT.busy) + '+H' (FS.heavy) / '+S' (FS.slow). Hanya frame yang SAMPAI pBegin (frame yang di-throttle tidak dihitung). */
   var PM = { on: false, t0: 0, fs0: 0, cur: {}, modes: {}, worst: [], ff: [] };   /* ff = 6 frame pertama (semua segmen >=1,5 ms) */
+  /* ===== v11.29v: probe PER DETIK untuk 15 dtk pertama SEKTOR (dump: pmk.secP). Tujuan: cari modul pelaku punuk ±6-8 dtk sesudah entri sektor
+     (ema 72-79 ms, wait 47-67 vs js 10-19 = GPU/compositor-bound; log "Langkah berikut" nomor 8).
+     Kunjungan = rentang frame berlabel 'sec*' tanpa selingan (label lain mereset). t0 = frame 'sec' pertama (SESUDAH wormhole selesai); jendela SP.ms dibagi per 1000 ms.
+     Tiap detik: n frame, fps/dt (periode antar frame), js, mx, wait = dt - js (sisa frame di luar JS: GPU/compositor/vsync), FS.ema akhir detik, label mode terbanyak,
+     gpuSum, dan RATA-RATA ms per frame tiap segmen pmk. Dengan ?gpup=1 segmen .gpu per modul (pl/sc/as/dr/pt) + q.big/q.small ikut terekam per detik (gpuSum = jumlahnya);
+     tanpa gpup cuma segmen CPU + wait (tidak mengubah perilaku). hump = ringkasan otomatis: 3 detik dengan dt terbesar (puncak) vs 3 detik terakhir jendela (late), segmen urut (puncak - late). */
+  var SP = { v: [], cur: null, max: 3, ms: 15000 };
+  function spRec(t, js, fdt, lb) {
+    if (lb.indexOf('sec') !== 0) { SP.cur = null; return; }
+    if (!SP.cur) {
+      if (SP.v.length >= SP.max) return;
+      SP.cur = { t0: Math.round(t), s: [] }; SP.v.push(SP.cur);
+    }
+    var e = t - SP.cur.t0; if (e < 0 || e >= SP.ms) return;
+    var k = Math.floor(e / 1000), b = SP.cur.s[k] || (SP.cur.s[k] = { n: 0, js: 0, mx: 0, dn: 0, dt: 0, ema: null, lb: {}, seg: {} }), q;
+    b.n++; b.js += js; if (js > b.mx) b.mx = js;
+    if (fdt != null && fdt > 0 && fdt < 600) { b.dn++; b.dt += fdt; }
+    b.lb[lb] = (b.lb[lb] || 0) + 1;
+    try { if (typeof FS !== 'undefined' && FS.ema != null) b.ema = FS.ema; } catch (eSf) {}
+    for (q in PM.cur) b.seg[q] = (b.seg[q] || 0) + PM.cur[q];
+  }
+  function spOut() {
+    if (!SP.v.length) return null;
+    var r1 = function (v) { return Math.round(v * 10) / 10; }, FORCE = { 'q.big': 1, 'q.small': 1, 'pl.gpu': 1, 'sc.gpu': 1, 'as.gpu': 1, 'dr.gpu': 1, 'pt.gpu': 1 };
+    var isG = function (q) { return /\.gpu$/.test(q) || q.indexOf('q.') === 0; };
+    var dtOf = function (b) { return b.dn ? b.dt / b.dn : null; };
+    var grp = function (ks, S) {   /* rata-rata per frame dari sekumpulan detik */
+      var n = 0, js = 0, dt = 0, dn = 0, seg = {}, i, q, b;
+      for (i = 0; i < ks.length; i++) { b = S[ks[i]]; n += b.n; js += b.js; dt += b.dt; dn += b.dn; for (q in b.seg) seg[q] = (seg[q] || 0) + b.seg[q]; }
+      for (q in seg) seg[q] = seg[q] / (n || 1);
+      return { n: n, js: n ? js / n : null, dt: dn ? dt / dn : null, seg: seg };
+    };
+    return {
+      '_cols': 'visits[i].rows[j] = [detik ke-k sejak entri sektor, n frame, fps, dt ms, avgJs, maxJs, wait (dt-js), FS.ema, label mode terbanyak, gpuSum (jumlah .gpu + q.*), {segmen: ms/frame rata-rata; yang >=0,4 ms + q.big/q.small/pl/sc/as/dr/pt .gpu}]; hump.seg = [nama, puncak, late, selisih]',
+      gpup: window.__gpuP ? 1 : 0, ms: SP.ms,
+      visits: SP.v.map(function (V) {
+        var rows = [], ks = [], k, b, q, sg, names, lbBest, lbN, gs, o, i, hump = null;
+        for (k = 0; k < V.s.length; k++) {
+          b = V.s[k]; if (!b || !b.n) continue;
+          ks.push(k); sg = {}; gs = 0; names = Object.keys(b.seg);
+          for (i = 0; i < names.length; i++) { q = names[i]; o = b.seg[q] / b.n; if (isG(q)) gs += o; if (o >= 0.4 || FORCE[q]) sg[q] = r1(o); }
+          lbBest = '-'; lbN = 0; for (q in b.lb) if (b.lb[q] > lbN) { lbN = b.lb[q]; lbBest = q; }
+          rows.push([k, b.n, b.dn ? r1(1000 / (b.dt / b.dn)) : null, b.dn ? r1(b.dt / b.dn) : null, r1(b.js / b.n), r1(b.mx), b.dn ? r1(Math.max(0, b.dt / b.dn - b.js / b.n)) : null, b.ema == null ? null : r1(b.ema), lbBest, r1(gs), sg]);
+        }
+        if (ks.length >= 8) {   /* puncak = 3 detik ber-dt terbesar di luar 3 detik terakhir; late = 3 detik terakhir */
+          var late = ks.slice(-3), rest = ks.slice(0, -3).filter(function (x) { return V.s[x].dn >= 2; });
+          rest.sort(function (a, c) { return dtOf(V.s[c]) - dtOf(V.s[a]); });
+          var pk = rest.slice(0, 3).sort(function (a, c) { return a - c; });
+          if (pk.length === 3) {
+            var gP = grp(pk, V.s), gL = grp(late, V.s), all = {}, lst = [];
+            for (q in gP.seg) all[q] = 1; for (q in gL.seg) all[q] = 1;
+            for (q in all) { var dv = (gP.seg[q] || 0) - (gL.seg[q] || 0); if (Math.abs(dv) >= 0.3) lst.push([q, r1(gP.seg[q] || 0), r1(gL.seg[q] || 0), r1(dv)]); }
+            lst.sort(function (a, c) { return c[3] - a[3]; });
+            hump = { peak: pk, late: late, dtPeak: r1(gP.dt || 0), dtLate: r1(gL.dt || 0), jsPeak: r1(gP.js || 0), jsLate: r1(gL.js || 0), waitPeak: r1(Math.max(0, (gP.dt || 0) - (gP.js || 0))), waitLate: r1(Math.max(0, (gL.dt || 0) - (gL.js || 0))), seg: lst.slice(0, 14) };
+          }
+        }
+        return { t0: V.t0, rows: rows, hump: hump };
+      })
+    };
+  }
   function pmLbl() {
     var s = typeof SECT !== 'undefined' ? SECT : null, f = typeof FS !== 'undefined' ? FS : null;
     var l = !s ? '?' : s.busy ? 'trans' : s.on ? 'ov' : s.cur ? 'sec' : 'ov?';
@@ -1027,6 +1087,7 @@
     if (fdt != null && fdt > 0 && fdt < 600) { m.dn++; m.dt += fdt; if (m.ds.length < 800) m.ds.push(fdt); }
     if (window.__stCnt && typeof ST_C === 'object') { var d1 = ST_C.f - (PM.sf || 0), d2 = ST_C.g - (PM.sg || 0), d3 = ST_C.c - (PM.sc || 0), d4 = ST_C.ga - (PM.sga || 0); PM.sf = ST_C.f; PM.sg = ST_C.g; PM.sc = ST_C.c; PM.sga = ST_C.ga; if (d1 >= 0 && d1 <= 2) { m.sf = (m.sf || 0) + d1; m.sg = (m.sg || 0) + d2; m.sc = (m.sc || 0) + d3; m.sga = (m.sga || 0) + d4; } }
     m.n++; m.js += js; if (js > m.mx) m.mx = js; if (m.smp.length < 800) m.smp.push(js);
+    try { spRec(t, js, fdt, lb); } catch (eSp) {}   /* v11.29v: probe per detik sektor */
     if (PM.ff.length < 6) { var ffo = {}; for (k in PM.cur) if (PM.cur[k] >= 1.5) ffo[k] = Math.round(PM.cur[k] * 10) / 10; PM.ff.push([Math.round(t), lb, Math.round(js * 10) / 10, ffo]); }
     for (k in PM.cur) { var s = m.seg[k] || (m.seg[k] = [0, 0]); s[0] += PM.cur[k]; if (PM.cur[k] > s[1]) s[1] = PM.cur[k]; }
     if (js >= 30) {   /* 15 frame terburuk + rincian 4 segmen terbesar */
@@ -1154,7 +1215,8 @@
         seg: Object.keys(m.seg).map(function (q) { return [q, r1(m.seg[q][0] / m.n), r1(m.seg[q][1])]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, window.__gpuP ? 28 : 14) };
     });
     var stc = null; try { if (typeof ST_C === 'object' && ST_C.f) stc = { frames: ST_C.f, stb: STB.slice(), '_cols': 'per frame: n = bintang digambar, haloPx2 = jumlah luas halo (pi*(5r)^2, px CSS) per ember s/m/l', n: ST_C.n.map(function (v) { return r1(v / ST_C.f); }), haloPx2: ST_C.a.map(function (v) { return Math.round(v * 25 * 3.1416 / ST_C.f); }) }; } catch (eSc) {}
-    return { on: PM.on, stCnt: stc, abTok: OS.ab || null, perfHudActive: !!window.PERF, qOrder: PM.qo || null, off: window.__offL || null, offSeqRuns: OS.runs.length > 1 || (OS.runs[0] && OS.runs[0].kind === 'abab') ? OS.runs.map(function (q) { return { kind: q.kind, ab: q.ab, t0: q.t0, ms: q.ms, phases: q.log.map(function (p) { return p[0]; }) }; }) : null, offSeq: OS.log.length ? { cols: '[fase, lapisan mati, t ms]', kind: OS.kind, phases: OS.log, ms: OS.ms, selesai: !OS.on && OS.i >= OS.n } : null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
+    var secP = null; try { secP = spOut(); } catch (eSo) { secP = { err: String(eSo && eSo.message || eSo) }; }
+    return { on: PM.on, secP: secP, stCnt: stc, abTok: OS.ab || null, perfHudActive: !!window.PERF, qOrder: PM.qo || null, off: window.__offL || null, offSeqRuns: OS.runs.length > 1 || (OS.runs[0] && OS.runs[0].kind === 'abab') ? OS.runs.map(function (q) { return { kind: q.kind, ab: q.ab, t0: q.t0, ms: q.ms, phases: q.log.map(function (p) { return p[0]; }) }; }) : null, offSeq: OS.log.length ? { cols: '[fase, lapisan mati, t ms]', kind: OS.kind, phases: OS.log, ms: OS.ms, selesai: !OS.on && OS.i >= OS.n } : null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }
   /* v11.29p: setelan aktif yang mempengaruhi rasa halus (planet bands/rate/q, portal spin/alt/res) + ukuran kanvas hasilnya, supaya dump antar HP bisa dibandingkan tanpa menebak. */
   function cfgOut() {
