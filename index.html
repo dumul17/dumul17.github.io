@@ -319,7 +319,7 @@
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=151"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=114"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=153"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=190"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=191"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=130"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=186"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
@@ -642,7 +642,7 @@ if ('serviceWorker' in navigator) {
 <script>/* Bench (21-bench.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau URL punya ?bench=1. document.write supaya jalan SINKRON di titik ini
    (sebelum semua script defer) — wrapper rIC / WebGLRenderer / observer harus terpasang sebelum modul jalan, jadi TIDAK bisa pindah ke 19-auto-debug.js (dimuat setelah window load).
    Sengaja TIDAK di SHELL service-worker (sama seperti 19/20). Naikkan ?v= kalau isi 21-bench.js berubah. */
-(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.29q"></scr'+'ipt>');}catch(e){}})();
+(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.29r"></scr'+'ipt>');}catch(e){}})();
 </script>
 </body>
 </html>
