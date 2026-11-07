@@ -432,8 +432,9 @@ var SCP3D_WHALT=(function(){try{var m=/[?&]whtele=([0-9]+)/.exec(location.search
 var SCP3D_SLOWALT=(function(){try{var m=/[?&]slowalt=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>=2?Math.min(v,4):(m?0:2);}catch(e){return 2;}})();
 /* [v24] WARM SINKRON GL teleskop pra-kapsul (07-boot preStart langkah 'sc'). Pola sama dgn pt3dWarmSync (15-portal3d): threeWarm hanya compile + render tanpa sinkron, jadi drawImage GL->2D pertama (menunggu seluruh antrean
    GPU) jatuh di frame overview awal (dump 6 Nov: teleTop 19,6 / 70,7 ms di frame 1-2). Di sini 1x scp3dUpdate lewat jalur yang sama (skala .5 -> res = resMin, cocok pra-ukur build sehingga tanpa setSize) lalu drawImage ke kanvas buangan.
-   Efek samping sama dgn satu frame teleskop biasa (fase pose SCP3D.ip/pn mulai berjalan); SCP3D.last TIDAK diubah. Gagal / dilewati (potato, reduce, cfg off) -> false. ?scwf=0 = nonaktif (A/B). Hasil: __warmReal.scf {ms,at}. */
-var SCP3D_WF=(function(){var on=true;try{on=!/[?&]scwf=0(?:&|#|$)/.test(location.search);}catch(e){}return on;})();
+   Efek samping sama dgn satu frame teleskop biasa (fase pose SCP3D.ip/pn mulai berjalan); SCP3D.last TIDAK diubah. Gagal / dilewati (potato, reduce, cfg off) -> false. ?scwf=1 = aktif (default mati sejak v25). Hasil: __warmReal.scf {ms,at}. */
+/* [v25] DEFAULT MATI. Dump 7 Nov: scf 230 ms di PRE, teleTop frame 1 malah 27,7 ms (sebelumnya 19,6) dan frame 2-6 tetap 15-25 ms = tidak ada gain terukur. ?scwf=1 menyalakan lagi (A/B). */
+var SCP3D_WF=(function(){var on=false;try{on=/[?&]scwf=1(?:&|#|$)/.test(location.search);}catch(e){}return on;})();
 function scp3dWarmSync(stop){
   try{
     if(!SCP3D_WF||SCP3D.syncWarm||SCP3D.state!==2||!SCP3D_CFG.on||!SCP3D.r||!SCP3D.gl||document.hidden)return false;

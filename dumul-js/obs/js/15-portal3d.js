@@ -30,6 +30,7 @@ var PT3D_CFG={
   ovAlt:2,          /* [ovalt] selang-seling GL cincin di OVERVIEW sejak frame pertama, TANPA menunggu FS.slow/FS.heavy (governor butuh ±8 dtk warm + 0,8-3 dtk hold, jadi detik awal selalu render penuh). Nilai = periode (2 = GL tiap 2 frame, 0/1 = mati, perilaku lama). Murni lokal portal: pakai jalur opts.alt2 + counter sendiri (PT3D.oN), TIDAK membaca/menulis FS.* (n, slow, heavy, ema) maupun PL3D_CFG (fps/bands/bandMin), jadi AST3D/SCP3D/DR3D/PL3D tidak ikut berubah. Cincin cuma putar 5°/dtk -> refresh 15-30 Hz tak terlihat; petir/percikan/kilau/mulut tetap tiap frame (2D). URL ?ovalt=N (A/B) */
   ovAltIdle:3,      /* periode saat IDLE (tanpa SFX/audio, tanpa transisi sektor/wormhole). Naik hanya setelah idle ovAltHold ms terus-menerus; turun ke ovAlt SEGERA saat ada aktivitas (lampu plat ikut level audio -> perlu lebih rapat). Histeresis ini juga mencegah EMA frame (FS.ema -> pita adaptif planet) bolak-balik */
   ovAltHold:1500,
+  ovAltBoot:4000,   /* [v43] ms sesudah 'obs-entered' (Blue) di mana selang-seling GL portal overview AKTIF walau governor (FS.slow/heavy) belum menyala. Dump 7 Nov (itel PowerVR): governor baru nyala +2,9 dtk sesudah Blue, 38 frame overview pertama rata-rata 75 ms dgn pt.blit 36 ms/frame (blit GL->2D menunggu antrean GPU). Periode = ovAlt (2); tidak naik ke ovAltIdle di jendela ini. Sesudah jendela habis: aturan lama (hanya FS.slow/heavy). 0 = mati. URL ?ovaltboot=N (A/B) */
   idleMouth:1,      /* 1 = saat idle mulut wormhole HILANG TOTAL (tanpa gradien gelap, spiral, terowongan, bintang; cuma cincin + petir idle). Mulut muncul (fade mouthIn) saat audio/SFX main (ptPlaying), charge, zoom wormhole, atau transisi sektor (WORMHOLE.busy/SECT.busy), lalu hilang lagi (fade mouthOut). Potato / reduce motion: muncul statis. 0 = mulut selalu ada seperti dulu */
   mouthIn:.3,       /* detik: fade muncul mulut saat bangun dari idle */
   mouthOut:.6,      /* detik: fade hilang mulut setelah aktivitas berhenti */
@@ -71,6 +72,7 @@ var PT3D_CFG={
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
   if(/[?&]pt2d=1(&|#|$)/.test(location.search)||/[?&]portal3d=2d(&|#|$)/.test(location.search)||localStorage.getItem('dumul_pt2d')==='1'||localStorage.getItem('dumul_portal3d')==='2d')PT3D_CFG.force2d=true;   /* saklar pt2d */
+  var _ob=/[?&]ovaltboot=([0-9]+)/.exec(location.search);if(_ob)PT3D_CFG.ovAltBoot=parseInt(_ob[1],10);
   var _oa=/[?&]ovalt=([0-9]+)/.exec(location.search);if(_oa)PT3D_CFG.ovAlt=parseInt(_oa[1],10);   /* A/B: ?ovalt=0 = perilaku lama (alt hanya FS.slow/heavy), ?ovalt=3 = periode 3 */
 }catch(ePT0){}
 try{window.__pt2d=PT3D_CFG.force2d?1:0;}catch(ePT1){}   /* dibaca 21-bench (R.pt2d) supaya dump self-describing */
@@ -818,7 +820,9 @@ function ptOvHidden(){return false;}
    Aktivitas (SFX/audio, transisi sektor, wormhole) -> ovAlt segera; idle ovAltHold ms terus-menerus -> ovAltIdle. Saat charge (ch>0) = 0 (render penuh, jalur lama). */
 function ptOvAlt(now,ch){
   var P=PT3D_CFG.ovAlt|0;
-  if(P<2||ch>0||!(typeof FS!=='undefined'&&(FS.slow||FS.heavy))){PT3D.ovAI=0;return 0;}   /* v-perf2: hanya saat HP berat (FS.slow/heavy); perangkat lumayan tetap render GL tiap frame (gerak tidak telat) */
+  var hv=typeof FS!=='undefined'&&(FS.slow||FS.heavy),B=PT3D_CFG.ovAltBoot|0,te=window.__enteredAt,bw=B>0&&te>0&&now>=te&&now-te<B;   /* bw = jendela awal sesudah Blue (v43) */
+  if(P<2||ch>0||!(hv||bw)){PT3D.ovAI=0;return 0;}   /* v-perf2: hanya saat HP berat (FS.slow/heavy); perangkat lumayan tetap render GL tiap frame (gerak tidak telat). v43: + jendela awal sesudah Blue */
+  if(bw&&!hv){PT3D.ovAI=0;return P;}   /* jendela awal: periode P saja, tanpa histeresis idle (ovAltIdle) */
   var idle=!ptPlaying()&&!(typeof SECT!=='undefined'&&SECT.busy)&&!(typeof whBusy==='function'&&whBusy());
   if(!idle){PT3D.ovAI=0;return P;}
   if(!PT3D.ovAI)PT3D.ovAI=now;

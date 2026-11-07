@@ -390,7 +390,7 @@ var DUMUL_CHARS=(function(){
     setTimeout(function(){   /* [v181b] sc = sinkron GL pertama teleskop (13-scope3d scp3dWarmSync), jauh dari langkah planet supaya tidak bertumpuk */
       try{if(!WR.entered&&typeof scp3dWarmSync==='function')scp3dWarmSync(function(){return WR.entered;});}catch(eS){}
       preFin('sc');
-    },900);
+    },(typeof SCP3D_WF!=='undefined'&&!SCP3D_WF)?0:900);   /* v184: sc default MATI (SCP3D_WF) -> selesai langsung, tidak menunggu 900 ms */
     setTimeout(function(){   /* [v182] rg = sprite cincin trigger (04-render ringWarmPre): dikebut pra-kapsul, batas 1,5 dtk; sisa dilanjutkan ringWarmStep (tidak menahan gerbang lebih lama dari itu) */
       var f=function(){preFin('rg');};
       try{if(!WR.entered&&typeof ringWarmPre==='function')ringWarmPre(f,function(){return WR.entered;},1500);else f();}catch(eR){f();}
@@ -411,7 +411,7 @@ var DUMUL_CHARS=(function(){
               nebPrefetch (bacaan piksel pertama) selesai & NEBJ kosong; berhenti begitu Blue (obs-entered), jalur sinkron (NEB.tintSync) TIDAK disentuh. Sisa yang belum sempat tetap lazy.
      Tidak menahan gerbang kapsul. Hasil -> window.__warmReal {ast, tint, tintMs} (dibaca bench). */
   var WR={on:0,t0:0,tries:0,entered:false};
-  try{window.addEventListener('obs-entered',function(){WR.entered=true;},{once:true});}catch(eWe){}
+  try{window.addEventListener('obs-entered',function(){WR.entered=true;try{window.__enteredAt=performance.now();}catch(eEa){}},{once:true});   /* __enteredAt dibaca 15-portal3d (ptOvAlt, jendela ovAltBoot) */}catch(eWe){}
   function warmRealTint(){
     try{
       var M=window.__warmReal||(window.__warmReal={}),L=(typeof SECT!=='undefined'&&SECT.list)||[],i,s,left=0;
