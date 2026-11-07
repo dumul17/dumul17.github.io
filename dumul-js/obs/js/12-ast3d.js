@@ -16,6 +16,7 @@ var AST3D_CFG={
   slowAlt:0,     /* HP lambat (FS.slow): 1 = pass belakang cuma di frame genap & depan cuma di ganjil (hemat GL, tapi tiap pass cuma ~fps/2 -> orbit patah-patah). 0 = kedua pass boleh render tiap frame (mulus) */
   slowMax:0,     /* HP lambat (FS.slow): batas atas jeda render batu (ms); jeda = max(1000/fps, min(slowMax, 2 x interval frame)). Dulu 140 -> ~8 update/dtk. 60 pun masih bikin frame 50 ms (kuantisasi vsync 16,6 ms) kena cache selang-seling -> patah. 0 = jeda tidak dilebarkan (default, orbit mulus seperti ?fs=0) */
   fps:30,        /* laju render batu saat diam (cache dipakai ulang di antaranya). Saat pan/zoom/BH bergerak: tiap frame */
+  smooth:{on:1,s0:1.5,s1:4,fLo:.6,fHi:1.4},   /* [v41] anti-kilau batu kecil (resolusi rendah, tanpa antialias): s0..s1 (px radius) = batu dari 'rata' (tanpa specular/rim, kontras hilang) sampai shading penuh; rotasi dibekukan di bawah s0 (shading sudah rata di sana, jadi tidak ada loncatan); fLo..fHi = fade alpha batu sub-piksel. ?astsm=0 = mati (A/B) */
   lod:[[1,2.6],[2,4.2]]   /* LOD batu: [detail ikosahedron, batas _sz (px)]; batu dgn _sz di bawah batas pakai mesh detail itu, sisanya detail 3 (320 segitiga). Batu 1-4px nggak butuh 320 segitiga. [] = semua detail 3 seperti dulu */
 };
 try{
@@ -370,7 +371,7 @@ function* ast3dBuildG(){
   AST3D.sc=new T.Scene();
   AST3D.cam=new T.OrthographicCamera(0,W,H,0,-600,600);
   yield;   /* ---- tahap 0 selesai: renderer + scene + kamera ---- */
-  AST3D.uni={uBH:{value:new T.Vector2(W*.5,H*.5)},uBack:{value:0},uFall:{value:Math.max(W,H)*.9}};
+  AST3D.uni={uBH:{value:new T.Vector2(W*.5,H*.5)},uBack:{value:0},uFall:{value:Math.max(W,H)*.9},uSm:{value:new T.Vector2(AST3D_CFG.smooth.on?AST3D_CFG.smooth.s0:-2,AST3D_CFG.smooth.on?AST3D_CFG.smooth.s1:-1)}};   /* [v41] uSm (-2,-1) = mati: smoothstep selalu 1 */
   AST3D.mat=new T.ShaderMaterial({
     uniforms:AST3D.uni,
     transparent:true,depthTest:true,depthWrite:true,
@@ -378,20 +379,20 @@ function* ast3dBuildG(){
     vertexShader:[
       'attribute vec4 iA;attribute vec4 iB;attribute float iZ;',
       'uniform vec2 uBH;',
-      'varying vec3 vN;varying vec3 vL;varying float vA;varying float vD;',
+      'varying vec3 vN;varying vec3 vL;varying float vA;varying float vD;varying float vS;',
       'vec3 rot(vec3 v,vec3 k,float a){float c=cos(a),s=sin(a);return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c);}',
       'void main(){',
       '  vec3 p=rot(position,iB.xyz,iB.w);',
       '  vN=rot(normal,iB.xyz,iB.w);',
       '  vec2 d=uBH-iA.xy;float len=length(d);',
       '  vL=normalize(vec3(d,len*.5+18.));',   /* arah ke Gargantua (sedikit mengangkat ke arah kamera biar sisi depan juga kena) */
-      '  vA=iA.w;vD=len;',
+      '  vA=iA.w;vD=len;vS=iA.z;',
       '  gl_Position=projectionMatrix*vec4(vec3(iA.xy,iZ)+p*iA.z,1.);',
       '}'
     ].join('\n'),
     fragmentShader:[
-      'uniform float uBack;uniform float uFall;',
-      'varying vec3 vN;varying vec3 vL;varying float vA;varying float vD;',
+      'uniform float uBack;uniform float uFall;uniform vec2 uSm;',
+      'varying vec3 vN;varying vec3 vL;varying float vA;varying float vD;varying float vS;',
       'void main(){',
       '  vec3 n=normalize(vN),L=normalize(vL);',
       '  float nl=max(dot(n,L),0.);',
@@ -400,6 +401,8 @@ function* ast3dBuildG(){
       '  vec3 col=base*.22+base*warm*nl*fall*1.5+warm*pow(nl,4.)*fall*.22;',   /* badan gelap, sisi yang menghadap BH menyala hangat */
       '  float rim=pow(1.-max(n.z,0.),2.5)*pow(max(dot(normalize(n.xy+1e-4),normalize(L.xy+1e-4)),0.),1.5);',
       '  col+=warm*rim*fall*.30;',
+      '  vec3 colS=base*.22+base*warm*.5*fall*1.5;',   /* [v41] batu kecil: warna rata (tetap ikut gradasi jarak ke BH), tanpa specular/rim, supaya tidak kilau saat berputar di resolusi rendah */
+      '  col=mix(colS,col,smoothstep(uSm.x,uSm.y,vS));',
       '  col=mix(col,col*vec3(.72,.86,1.12)*.82,uBack);',   /* pass belakang: lebih dingin + redup, seperti sprite belakang */
       '  gl_FragColor=vec4(col*vA,vA);',
       '}'
@@ -426,6 +429,7 @@ function ast3dPick(a){
 }
 
 var _arw=/[?&]astrw=(\d+)/.exec(location.search);if(_arw)AST3D_CFG.rwSlow=parseInt(_arw[1],10);   /* [v38] A/B: ?astrw=0 = tanpa batas lebar saat FS.slow (perilaku lama) */
+try{if(/[?&]astsm=0(?:&|#|$)/.test(location.search))AST3D_CFG.smooth.on=0;}catch(eSm){}   /* [v41] A/B: ?astsm=0 = tanpa anti-kilau batu kecil (perilaku lama) */
 function ast3dPr(){
   var pr=Math.min(DPR||1,AST3D_CFG.dprMax),w=AST3D_CFG.rwSlow;
   if(w>0&&W>0&&typeof FS!=='undefined'&&FS.slow)pr=Math.min(pr,Math.max(1,w/W));   /* [v38] sama dgn pl3dQ: batas lebar absolut saat FS.slow */
@@ -575,9 +579,11 @@ function ast3dDraw(now,half){
       v=ast3dPick(a);k=v.n++;
       var al=a._fl?.96:(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s));
       al*=(a._fa==null?1:a._fa);
+      var SM=AST3D_CFG.smooth,smOn=SM&&SM.on;
+      if(smOn&&a._sz<SM.fHi){var ft=(a._sz-SM.fLo)/(SM.fHi-SM.fLo);ft=ft<0?0:ft;al*=ft*ft*(3-2*ft);}   /* [v41] fade batu sub-piksel (tanpa antialias batu muncul/hilang per piksel) */
       var A=v.A.array,B=v.B.array,o=k*4;
       A[o]=a._x;A[o+1]=H-a._y;A[o+2]=a._sz;A[o+3]=al>1?1:(al<0?0:al);
-      B[o]=a._ax;B[o+1]=a._ay;B[o+2]=a._az;B[o+3]=a.rot*2+now*a.rs;
+      B[o]=a._ax;B[o+1]=a._ay;B[o+2]=a._az;B[o+3]=a.rot*2+((smOn&&a._sz<SM.s0)?0:now*a.rs);   /* [v41] batu < s0 px: rotasi dibekukan (shading di sana sudah rata) */
       v.Z.array[k]=a._s*120;
       if(a._x-hf<bx0)bx0=a._x-hf;if(a._x+hf>bx1)bx1=a._x+hf;if(a._y-hf<by0)by0=a._y-hf;if(a._y+hf>by1)by1=a._y+hf;
       total++;
