@@ -72,6 +72,7 @@ var PT3D_CFG={
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
   if(/[?&]pt2d=1(&|#|$)/.test(location.search)||/[?&]portal3d=2d(&|#|$)/.test(location.search)||localStorage.getItem('dumul_pt2d')==='1'||localStorage.getItem('dumul_portal3d')==='2d')PT3D_CFG.force2d=true;   /* saklar pt2d */
+  PT3D_CFG.ovLiftGap=6;   /* v437: jarak aman (px) tepi cincin (sudah membengkak) ke limb saat angkat portal */
   PT3D_CFG.ovLift=/[?&]ptlift=0(&|#|$)/.test(location.search)?0:1;   /* v435 A/B: ?ptlift=0 = tanpa angkat portal dari limb saat charge dive (perilaku lama: portal loncat ke depan planet saat cincin pindah ke kanvas wormhole) */
   var _ob=/[?&]ovaltboot=([0-9]+)/.exec(location.search);if(_ob)PT3D_CFG.ovAltBoot=parseInt(_ob[1],10);
   var _oa=/[?&]ovalt=([0-9]+)/.exec(location.search);if(_oa)PT3D_CFG.ovAlt=parseInt(_oa[1],10);   /* A/B: ?ovalt=0 = perilaku lama (alt hanya FS.slow/heavy), ?ovalt=3 = periode 3 */
@@ -822,11 +823,18 @@ function ptOvPos(){return(PT3D.ovX!=null)?[PT3D.ovX,PT3D.ovY]:camBH();}
 function ptOvLiftArm(bp,R){
   PT3D.lift=null;
   try{
-    if(!PT3D_CFG.ovLift||!(R>2)||typeof planetObjClamp!=='function'||(typeof reduce!=='undefined'&&reduce))return bp;
-    var q=planetObjClamp(bp[0],bp[1],R,0),dx=q[0]-bp[0],dy=q[1]-bp[1];
-    if(!(isFinite(dx)&&isFinite(dy))||(Math.abs(dx)<.5&&Math.abs(dy)<.5))return bp;
+    if(!PT3D_CFG.ovLift||!(R>2)||typeof pl3dGeom!=='function'||(typeof reduce!=='undefined'&&reduce))return bp;
+    if(!(PL3D_CFG.on&&PL3D.al>.5)||(typeof CAMERA_MODE!=='undefined'&&CAMERA_MODE))return bp;
+    pl3dSync();if(!PW||!PH||!isFinite(bp[0])||!isFinite(bp[1]))return bp;
+    /* v437: pakai radius SETELAH membengkak (PT_SWELL, charge penuh) + limb tertinggi di seluruh lebar cincin (kolom terdekat ke pusat planet), bukan cuma limb di tengah. gap = jarak aman ke limb. */
+    var q=pl3dScr(bp[0],bp[1]),gm=pl3dGeom(false,false),Rr=R*(1+PT_SWELL),Gp=PT3D_CFG.ovLiftGap==null?6:PT3D_CFG.ovLiftGap,
+        xc=gm.cx<q[0]-Rr?q[0]-Rr:(gm.cx>q[0]+Rr?q[0]+Rr:gm.cx),   /* x di [x-Rr,x+Rr] yang paling dekat ke pusat planet = limb tertinggi */
+        ym=pl3dLimbY(gm,xc)-Rr-Gp;
+    if(!(q[1]>ym))return bp;   /* sudah di atas limb: tidak digeser */
+    var o=pl3dStage(q[0],ym),dx=o[0]-bp[0],dy=o[1]-bp[1];
+    if(!(isFinite(dx)&&isFinite(dy)))return bp;
     PT3D.lift={dx:dx,dy:dy};
-    return q;
+    return o;
   }catch(e){PT3D.lift=null;return bp;}
 }
 function ptOvHidden(){return false;}
