@@ -116,11 +116,15 @@ PL3D_CFG.pal={lo:PL3D_CFG.ov.lo.slice(),mid:PL3D_CFG.ov.mid.slice(),hi:PL3D_CFG.
 try{
   var _pq=(location.search.match(/[?&]planet3d=(\w+)/)||[])[1]||localStorage.getItem('dumul_planet3d')||'';
   if(_pq==='0')PL3D_CFG.on=false;else if(_pq==='2d')PL3D_CFG.force2d=true;
-  try{if(/[?&]bmad=0(?:&|#|$)/.test(location.search))PL3D_CFG.bmAdapt.on=0;}catch(eBm){}   /* [v55] A/B: ?bmad=0 = tanpa latch bandMin adaptif */
+  try{if(/[?&]bmad=0(?:&|#|$)/.test(location.search))PL3D_CFG.bmAdapt.on=0;}catch(eBm){}
+  PL3D_CFG.slowHint={on:1,force:0,key:'dumul_pl_slow',ttl:2592000000};   /* [v57] petunjuk slow: perangkat yang pernah FS.slow langsung memakai q slow sejak awal (tanpa resize + 10 dtk q penuh di sektor pertama). ?plhint=0 = mati (A/B, tidak baca/tulis), ?plhint=1 = paksa nyala tanpa tulis storage */
+  try{var _phm=/[?&]plhint=([01])(?:&|#|$)/.exec(location.search);if(_phm){if(_phm[1]==='0')PL3D_CFG.slowHint.on=0;else PL3D_CFG.slowHint.force=1;}}catch(ePh){}   /* [v55] A/B: ?bmad=0 = tanpa latch bandMin adaptif */
   var _prw=/[?&]plrw=(\d+)/.exec(location.search);if(_prw)PL3D_CFG.rwSlow=parseInt(_prw[1],10);   /* [v54] A/B: ?plrw=0 = tanpa batas lebar saat FS.slow (perilaku lama), ?plrw=563 dst */
 }catch(ePL0){}
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
   rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0,cv3:null,c3:null,cyc:null,full:true,bwR:null};
+PL3D.hint=0;PL3D.hintAt=null;PL3D.hintT=0;PL3D.fsPrev=-1;PL3D.rsl=[];
+try{var _SH=PL3D_CFG.slowHint;if(_SH.on){if(_SH.force)PL3D.hint=1;else{var _hv=+localStorage.getItem(_SH.key);if(_hv>0&&Date.now()-_hv>=0&&Date.now()-_hv<_SH.ttl)PL3D.hint=1;}}}catch(eH0){}   /* [v57] baca petunjuk slow dari kunjungan sebelumnya */
 
 /* ---- palette (P2) ----
    Bobot per sektor = SKYT[k].v (04-render.js; sudah diperhalus .06/frame di sectDrawSky, 1 = sedang di sektor itu, semua 0 = overview).
@@ -738,11 +742,30 @@ function pl3dBuild(){
 }
 
 /* ukuran strip + kanvas 2D penyimpan hasil (kanvas WebGL offscreen tidak dijamin menyimpan isinya antar-task) */
-function pl3dQ(){var C=PL3D_CFG,q=C.q,qs=C.qSlow,w=C.rwSlow;if(typeof FS==='undefined'||!FS.slow)return q;if(qs>0&&qs<q)q=qs;if(w>0&&typeof PW!=='undefined'&&PW>0)q=Math.min(q,Math.max(1,w/PW));return q;}   /* [v54] + batas lebar absolut rwSlow saat FS.slow */   /* q efektif: lebih kecil saat FS.slow */
+function pl3dSlowEff(){return (typeof FS!=='undefined'&&FS.slow)||(PL3D.hint===1&&typeof FS!=='undefined'&&FS.mode!==0);}   /* [v57] slow efektif untuk ukuran kanvas: governor FS.slow ATAU petunjuk dari kunjungan sebelumnya (FS.mode 0 = ?fs=0/?probe=1 mengabaikan petunjuk) */
+/* [v57] urus petunjuk: simpan saat FS.slow menyala; hapus saat governor pulih, atau saat petunjuk aktif tapi governor tidak pernah slow dan EMA < leave terus-menerus leaveHold (perangkat sudah kuat) */
+function pl3dHintTrack(now){
+  var C=PL3D_CFG.slowHint;if(!C||!C.on||typeof FS==='undefined')return;
+  var s=FS.slow?1:0;
+  if(PL3D.fsPrev<0){PL3D.fsPrev=s;}
+  else if(s!==PL3D.fsPrev){
+    PL3D.fsPrev=s;
+    if(s){if(!C.force){try{localStorage.setItem(C.key,String(Date.now()));PL3D.hintAt=Math.round(now);}catch(eS){}}}
+    else if(!C.force){PL3D.hint=0;PL3D.hintT=0;try{localStorage.removeItem(C.key);}catch(eR){}}
+  }
+  if(PL3D.hint===1&&!C.force&&!FS.slow){
+    var busy=false;try{busy=(typeof fsBusy==='function'&&fsBusy());}catch(eB){}
+    if(busy||!FS.grace||now<FS.grace||FS.ema>=FS.cfg.leave){PL3D.hintT=0;}
+    else if(!PL3D.hintT)PL3D.hintT=now;
+    else if(now-PL3D.hintT>FS.cfg.leaveHold){PL3D.hint=0;PL3D.hintT=0;try{localStorage.removeItem(C.key);}catch(eR2){}}
+  }
+}
+function pl3dQ(){var C=PL3D_CFG,q=C.q,qs=C.qSlow,w=C.rwSlow;if(!pl3dSlowEff())return q;if(qs>0&&qs<q)q=qs;if(w>0&&typeof PW!=='undefined'&&PW>0)q=Math.min(q,Math.max(1,w/PW));return q;}   /* [v54] + batas lebar absolut rwSlow saat FS.slow */   /* q efektif: lebih kecil saat FS.slow */
 function pl3dResize(){
   pl3dSync();
   var gm=pl3dGeom(true,false,true),q=pl3dQ(),rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
   if(PL3D.W===PW&&PL3D.H===PH&&PL3D.rw===rw&&PL3D.rh===rh&&PL3D.cv2)return;
+  var _rt0=performance.now();   /* [v57] catat waktu resize nyata untuk dump bench (cfg.pl.rsl) */
   PL3D.W=PW;PL3D.H=PH;PL3D.rw=rw;PL3D.rh=rh;PL3D.stripH=gm.stripH;PL3D.dirty=true;
   if(window.__plSt)window.__plSt.rs++;   /* diagnosa v12c: ukuran strip berubah (overview<->sektor) */
   if(!PL3D.cv2){PL3D.cv2=document.createElement('canvas');PL3D.c2=PL3D.cv2.getContext('2d');}
@@ -756,6 +779,7 @@ function pl3dResize(){
   PL3D.cyc=null;PL3D.full=true;PL3D.bwR=null;   /* ukuran berubah: render penuh sekali jalan dulu */
   PL3D.fb=null;
   if(PL3D.r){threeGLSize(PL3D.gl,rw,rh);if(PL3D.uni)PL3D.uni.uFall.value=Math.max(PW,PH)*.9*PL3D_CFG.fallK;}
+  try{if(PL3D.rsl.length<24)PL3D.rsl.push([Math.round(_rt0),Math.round((performance.now()-_rt0)*10)/10,rw,rh,(typeof FS!=='undefined'&&FS.slow)?1:0,PL3D.hint|0]);}catch(eL){}   /* [abs ms, ms resize, rw, rh, FS.slow, hint] */
 }
 
 /* titik lampu (ruang layar tegak): overview = portal yang sedang mengorbit (P4; kalau di balik limb, lampunya di balik planet jadi cuma pinggir limb yang menyala), sektor = BH mini */
@@ -1281,7 +1305,7 @@ function planet3dDraw(now){
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.arrive&&WORMHOLE.arrive()<.15)return;   /* wormhole sudah menutup layar: planet tidak kelihatan, jangan render */
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.on&&WORMHOLE.noPlanet)return;   /* ?whdbg=noplanet (A/B hitch exit): planet tidak dirender & tidak digambar selama wormhole aktif; normal lagi setelah wormhole selesai (planet tampak hilang/beku selama transisi: memang begitu) */
   try{
-    pl3dResize();pl3dMk('pl.rsz');
+    pl3dHintTrack(now);pl3dResize();pl3dMk('pl.rsz');
     var use3d=PL3D.state===2&&PL3D.r;
     var palCh=pl3dPalUpdate();   /* true selama palette bergeser (masuk/keluar sektor) */
     if(use3d){
