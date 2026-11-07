@@ -36,6 +36,7 @@ function scp3dLoad(){
   if(!SCP3D_CFG.on){SCP3D.state=3;SCP3D.err='off';return;}
   SCP3D.state=1;
   var go=function(){try{scp3dBuild();}catch(e){scp3dFail(e&&e.message||e);}};
+  go.hv=1;   /* tahap 0 = renderer + konteks GL kecil (±300-570 ms): selalu mulai sesudah yield (12-ast3d v34, THREE_QH) */
   threeLoad(go,function(m){scp3dFail(m);});   /* pemuat bersama di 12-ast3d.js (import() dinamis, satu promise utk semua modul) */
 }
 
