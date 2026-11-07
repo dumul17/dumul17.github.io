@@ -1424,6 +1424,92 @@ function focusStep(){
   }
   if(ch){try{syncSkyPanHits();}catch(e){}syncBHDom();}
 }
+/* ===== SNAP: tangkap langit mode kamera + Web Share API =====
+   Sumber = kanvas #sky (bintang, rasi, label, planet, BH sudah tergambar di situ). Digabung dgn gradient latar body (kanvas bisa transparan di sebagian
+   area), diputar balik kalau HP landscape (STG.rot: stage diputar CSS, kanvasnya tetap portrait), ditambah cap kecil di pojok kiri bawah.
+   Share: navigator.share({files}) kalau canShare(files) didukung; batal (AbortError) = diam; selain itu / tidak didukung -> unduh file. */
+var SNAP={busy:false,max:2400};
+function snapFlash(){
+  if(reduce)return;
+  var f=document.getElementById('cam-flash');
+  if(!f){f=document.createElement('div');f.id='cam-flash';document.body.appendChild(f);}
+  f.style.transition='none';f.style.opacity='.55';
+  requestAnimationFrame(function(){requestAnimationFrame(function(){f.style.transition='opacity .4s ease-out';f.style.opacity='0';});});
+}
+function snapName(sec,d){
+  function z(n){return (n<10?'0':'')+n;}
+  return 'dumul-sky'+(sec?'-'+sec:'')+'-'+d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+'-'+z(d.getHours())+z(d.getMinutes())+z(d.getSeconds())+'.jpg';
+}
+function snapCompose(){
+  var sw=cv.width,sh=cv.height,rot=STG.rot||0,i;
+  if(!sw||!sh)return null;
+  var ow=rot?sh:sw,oh=rot?sw:sh,sc=Math.min(1,SNAP.max/Math.max(ow,oh));
+  ow=Math.round(ow*sc);oh=Math.round(oh*sc);
+  var out=document.createElement('canvas');out.width=ow;out.height=oh;
+  var x=out.getContext('2d');if(!x)return null;
+  /* latar = gradient body (radial 120% 80% di 50% 28%), supaya area transparan kanvas tidak jadi hitam */
+  var gr=x.createRadialGradient(0,0,0,0,0,1);
+  gr.addColorStop(0,'#10222f');gr.addColorStop(.55,'#08121b');gr.addColorStop(1,'#04080d');
+  x.save();x.translate(ow*.5,oh*.28);x.scale(ow*1.2,oh*.8);x.fillStyle=gr;x.fillRect(-2,-2,4,4);x.restore();
+  /* kanvas sky (diputar balik biar sama dgn yang terlihat di layar) */
+  x.save();x.translate(ow/2,oh/2);if(rot)x.rotate(rot*Math.PI/180);
+  x.drawImage(cv,-sw*sc/2,-sh*sc/2,sw*sc,sh*sc);x.restore();
+  /* cap: nama situs + sektor/fokus/pita/zoom + waktu */
+  var f=FOCUS.list&&FOCUS.list[FOCUS.i],sec=SECT.cur?String(SECT.cur.k).toUpperCase():'',parts=[];
+  if(sec)parts.push(sec);
+  if(f&&f.id!=='free'&&f.id!=='bh'&&f.n)parts.push(String(f.n).toUpperCase());
+  parts.push('BAND '+String(BAND).toUpperCase());
+  parts.push((Math.round(skyZoom*10)/10)+'\u00d7');
+  var d=new Date();
+  function z2(n){return (n<10?'0':'')+n;}
+  var stamp=d.getFullYear()+'-'+z2(d.getMonth()+1)+'-'+z2(d.getDate())+' '+z2(d.getHours())+':'+z2(d.getMinutes());
+  var fs=Math.max(11,Math.round(Math.min(ow,oh)*.028)),pad=Math.round(fs*1.1);
+  var gb=x.createLinearGradient(0,oh-fs*5,0,oh);gb.addColorStop(0,'rgba(2,6,10,0)');gb.addColorStop(1,'rgba(2,6,10,.55)');
+  x.fillStyle=gb;x.fillRect(0,oh-fs*5,ow,fs*5);
+  x.textBaseline='alphabetic';x.shadowColor='rgba(0,0,0,.8)';x.shadowBlur=fs*.5;
+  x.font='700 '+fs+"px 'Courier New',monospace";x.fillStyle='rgba(142,238,255,.92)';
+  x.fillText("DUMUL'S OBSERVATORY",pad,oh-pad-fs*1.35);
+  x.font='600 '+Math.round(fs*.82)+"px 'Courier New',monospace";x.fillStyle='rgba(214,232,244,.82)';
+  x.fillText(parts.join(' \u00b7 ')+'  //  '+stamp,pad,oh-pad);
+  return {cv:out,sec:sec?sec.toLowerCase():'',d:d};
+}
+function snapSave(blob,name){
+  try{
+    var u=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=u;a.download=name;a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();
+    setTimeout(function(){try{document.body.removeChild(a);URL.revokeObjectURL(u);}catch(e){}},4000);
+    showModeToast(T('snap.saved'),null,2000);
+  }catch(e){showModeToast(T('snap.fail'),null,2200);}
+}
+function snapEnd(){
+  SNAP.busy=false;
+  var b=document.getElementById('cs-btn');if(b)b.removeAttribute('aria-busy');
+}
+function camSnap(){
+  if(SNAP.busy||!CAMERA_MODE)return;
+  SNAP.busy=true;haptic(12);
+  var b=document.getElementById('cs-btn');if(b)b.setAttribute('aria-busy','true');
+  var r=null;
+  try{r=snapCompose();}catch(e){r=null;}
+  if(!r){showModeToast(T('snap.fail'),null,2200);snapEnd();return;}
+  snapFlash();
+  var out=r.cv,name=snapName(r.sec,r.d);
+  function done(blob){
+    out.width=out.height=0;   /* lepas memori kanvas sementara */
+    if(!blob){showModeToast(T('snap.fail'),null,2200);snapEnd();return;}
+    var file=null;
+    try{file=new File([blob],name,{type:blob.type||'image/jpeg'});}catch(eF){file=null;}
+    var can=false;
+    try{can=!!(file&&navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}));}catch(eC){can=false;}
+    if(!can){snapSave(blob,name);snapEnd();return;}
+    var base='';try{base=location.origin+location.pathname;}catch(eL){}
+    navigator.share({files:[file],title:"Dumul's Observatory",text:T('snap.share.text')+(base?'\n'+base:'')}).then(function(){snapEnd();},function(e){
+      if(e&&e.name==='AbortError'){snapEnd();return;}   /* dibatalkan pengguna: diam */
+      snapSave(blob,name);snapEnd();
+    });
+  }
+  try{out.toBlob(done,'image/jpeg',.92);}catch(eB){done(null);}
+}
 (function(){
   function bind(id,fn){var b=document.getElementById(id);if(!b)return;
     b.addEventListener('pointerdown',function(e){e.stopPropagation();});
@@ -1435,7 +1521,7 @@ function focusStep(){
   var cl=document.getElementById('cl-btn');
   if(cl){cl.addEventListener('pointerdown',function(e){e.stopPropagation();});
     cl.addEventListener('click',function(e){e.stopPropagation();toggleLines();});}
-  bind('cg-btn',toggleGame);bind('ca-btn',achToggle);
+  bind('cg-btn',toggleGame);bind('ca-btn',achToggle);bind('cs-btn',camSnap);
   /* layout berubah (rotasi / resize / varian compact): hitung ulang posisi 🎮 setelah layout selesai */
   var _gbT=0;
   function gbSoon(){clearTimeout(_gbT);_gbT=setTimeout(function(){placeGameBtn();setTimeout(placeGameBtn,450);},150);}
