@@ -100,13 +100,14 @@
     'bl.engine':{en:'3D engine',id:'Mesin 3D'},'bl.scope':{en:'Telescope',id:'Teleskop'},'bl.drone':{en:'Drone',id:'Drone'},
     'bl.portal':{en:'Portal',id:'Portal'},'bl.planet':{en:'Planet',id:'Planet'},'bl.rock':{en:'Space rocks',id:'Batu angkasa'},
     'bl.sfx':{en:'Star voices',id:'Suara bintang'},
-    'bl.bgm':{en:'Music',id:'Musik'},'bl.glitch':{en:'Glitch signal',id:'Sinyal glitch'},   /* [v160] log boot: 2 BGM + GARG */
-    'bl.ready':{en:'ready',id:'siap'},'bl.a.dl':{en:'downloading',id:'lagi unduh'},'bl.a.load':{en:'loading',id:'lagi muat'},
-    'bl.a.sfx':{en:'waking up',id:'lagi bangun'},
-    'bl.a.bgm':{en:'tuning',id:'lagi disetel'},'bl.a.decode':{en:'decoding…',id:'lagi decode…'},
+    'bl.bgm':{en:'Music',id:'Musik'},'bl.glitch':{en:'owl.sys',id:'owl.sys'},'bl.glitch.ok':{en:'owl.sys \u00b7 works. do not ask',id:'owl.sys \u00b7 jalan. jangan tanya'},   /* [v186] baris glitch = suara Dumb Owl (deadpan, huruf kecil, seperti log terminal OWL) */
+       /* [v160] log boot: 2 BGM + GARG */
+    'bl.ready':{en:'all set',id:'udah siap'},'bl.a.dl':{en:'fetching it',id:'lagi kujemput'},'bl.a.load':{en:'on it',id:'lagi kukerjain'},   /* [v186] log boot = suara Teleskop: hangat, pakai aku/ku- */
+    'bl.a.sfx':{en:'waking them gently',id:'lagi kubangunin pelan'},
+    'bl.a.bgm':{en:'tuning it softly',id:'lagi kusetel pelan'},'bl.a.decode':{en:'perched, not parsed…',id:'bertengger, tak di-parse…'},
     /* [v175] log boot: lensa (warm shader), persiapan akhir (pra-kapsul), warm nyata batu + nebula */
-    'bl.warm':{en:'Lenses',id:'Lensa'},'bl.a.warm':{en:'warming up',id:'lagi dihangatin'},
-    'bl.pre':{en:'Final prep',id:'Persiapan akhir'},'bl.a.pui':{en:'button sounds',id:'suara tombol'},'bl.a.past':{en:'rock pictures',id:'gambar batu'},'bl.a.pfb':{en:'observer count',id:'hitungan pengamat'},
+    'bl.warm':{en:'Lenses',id:'Lensa'},'bl.a.warm':{en:'warming them up',id:'lagi kuhangatin'},
+    'bl.pre':{en:'Last touches',id:'Sentuhan akhir'},'bl.a.pui':{en:'button sounds',id:'suara tombol'},'bl.a.past':{en:'rock pictures',id:'gambar batu'},'bl.a.pfb':{en:'counting observers',id:'ngitung pengamat'},
     'bl.a.wast':{en:'rock shapes',id:'bentuk batu'},'bl.a.ppl':{en:'planet view',id:'tampilan planet'},'bl.a.psc':{en:'telescope view',id:'tampilan teleskop'},'bl.a.prg':{en:'signal rings',id:'cincin sinyal'},'bl.neb':{en:'Nebula',id:'Nebula'},'bl.a.tint':{en:'sector colors',id:'warna sektor'},
     /* nama tahap (kunci = isi LOG_M di 07-boot.js) */
     'bl.a.canvas':{en:'canvas',id:'kanvas'},'bl.a.light':{en:'light reflections',id:'pantulan cahaya'},'bl.a.paint':{en:'materials',id:'bahan'},
