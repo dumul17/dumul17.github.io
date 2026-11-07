@@ -25,6 +25,7 @@
  *   Mode dipilih = halaman reload dengan param yang pas (whperf/PERF/PROBE membaca
  *   URL saat load, jadi tidak bisa dinyalakan tanpa reload).
  *   Export: JSON / TXT (semua hasil), tombol Clr untuk reset.
+ *   UI v27: kit gaya bersama 'dk-*' (cyan tunggal, tanpa blur, tombol 22px); panel = mode segmented + status + aksi + Hasil/Export/Clr, sisanya di 'lanjutan' (select ringkas). Teks overlay PERF TIDAK diubah (parsePerfText membacanya).
 *   UI minimal: panel emas PROBE disilent (tombol Hasil); #whperf dive auto-remove setelah rekam;
 *     daftar hasil di tombol Log (hide default) — runtime cuma status + aksi.
  *
@@ -64,7 +65,7 @@
     var m = /[?&]whdbg=([a-z,]+)/.exec(Q), f = m ? ',' + m[1] + ',' : '', nh = f.indexOf(',nohud,') >= 0, nb = f.indexOf(',nohole,') >= 0, nl = f.indexOf(',nolc,') >= 0, na = f.indexOf(',nolcanim,') >= 0, de = document.documentElement, st;
     if (!nh && !nb && !nl && !na) return;
     st = document.createElement('style'); st.id = 'wh-nohud-css';
-    st.textContent = (nh ? 'html.wh-nohud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not([id^="wh-ad"]):not(script):not(style){visibility:hidden!important}' : '')
+    st.textContent = (nh ? 'html.wh-nohud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not([id^="wh-ad"]):not(.dk):not(script):not(style){visibility:hidden!important}' : '')
       + (nb ? 'html.wh-nohole #bh,html.wh-nohole #cap-bh{visibility:hidden!important}' : '')
       + (nl ? 'html.wh-nolc #live-count{visibility:hidden!important}' : '')
       + (na ? 'html.wh-nolcanim #live-count i{animation:none!important}' : '');
@@ -143,7 +144,7 @@
           PP.upd = now;
           if (!PP.el) {
             var d = document.createElement('pre');
-            d.style.cssText = 'position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:4px 6px;font:9px/1.25 monospace;color:#9ff;background:rgba(0,0,0,.72);pointer-events:auto;white-space:pre';
+            d.className = 'dk dk-ov'; dkStyle();
             document.body.appendChild(d);
             PP.el = d;
             PP.mode = PP.mode | 0;
@@ -339,12 +340,13 @@
         if (PROBE.box) return;
         var bx = document.createElement('div'), pr = document.createElement('pre'), row = document.createElement('div');
         var b1 = document.createElement('button'), b2 = document.createElement('button');
-        var bs = 'font:inherit;color:inherit;background:rgba(255,210,127,.1);border:1px solid rgba(255,210,127,.5);border-radius:4px;padding:5px 12px;';
-        bx.style.cssText = 'position:fixed;left:4px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:99998;max-width:calc(100vw - 8px);box-sizing:border-box;padding:6px 8px;background:rgba(2,8,14,.9);border:1px solid rgba(255,210,127,.3);border-radius:6px;font:10px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#ffd27f;pointer-events:none';
-        pr.style.cssText = 'margin:0;font:inherit;white-space:pre;overflow:hidden';
-        row.style.cssText = 'display:none;gap:8px;margin-top:6px';
-        b1.textContent = 'SALIN'; b1.style.cssText = bs; b1.onclick = function () { window.probeCopy(b1); };
-        b2.textContent = 'TUTUP'; b2.style.cssText = bs; b2.onclick = function () { bx.style.display = 'none'; };
+        dkStyle();
+        bx.className = 'dk dk-p'; bx.style.cssText = 'position:fixed;left:4px;bottom:calc(36px + env(safe-area-inset-bottom,0px));z-index:99998;max-width:calc(100vw - 8px);pointer-events:none';
+        pr.className = 'dk-pre'; pr.style.cssText = 'white-space:pre;overflow:hidden;color:#9fe8f5';
+        row.className = 'dk-r'; row.style.cssText = 'display:none;margin-top:6px';
+        b1.className = b2.className = 'dk-b'; b1.type = b2.type = 'button';
+        b1.textContent = 'SALIN'; b1.onclick = function () { window.probeCopy(b1); };
+        b2.textContent = 'TUTUP'; b2.onclick = function () { bx.style.display = 'none'; };
         row.appendChild(b1); row.appendChild(b2); bx.appendChild(pr); bx.appendChild(row); document.body.appendChild(bx);
         PROBE.box = bx; PROBE.el = pr; PROBE.row = row;
       };
@@ -583,7 +585,7 @@
           try { ['zoom', 'tunnel', 'exit'].forEach(function (ph) { var L = WP.lf && WP.lf[ph]; out.push(WP.lfSup + ' ' + ph + ' >60ms (+ms dlm fase: total | pre | script | render | s+l | forced | sumber | skrip teratas): ' + (L && L.length ? L.map(function (x) { return '[+' + Math.round(x.o) + '] ' + Math.round(x.d) + ' | ' + Math.round(x.pr || 0) + ' | ' + Math.round(x.sc) + ' | ' + Math.round(x.rn) + ' | ' + Math.round(x.sl) + ' | ' + Math.round(x.fl) + ' | ' + (x.src || '-') + ' | ' + (x.ls || '-'); }).join('  ;  ') : 'tidak ada')); }); } catch (eL) {}
           if (window.__plSt) out.push('planet3d sejak zoom-in: resize ' + window.__plSt.rs + ' | render-penuh ' + window.__plSt.fl + ' (terlama ' + window.__plSt.mx + 'ms' + (/(^|,)plfin(,|$)/.test(WH_DBG) ? ', GPU' : ', js') + ')');   /* diisi 05-sector-ui.js (blok u>=1 fase in) */
           var el = document.getElementById('whperf') || document.body.appendChild(document.createElement('div'));
-          el.id = 'whperf'; el.style.cssText = 'position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9ff;font:11px/1.45 monospace;white-space:pre-wrap;padding:8px 10px;border-radius:8px;pointer-events:auto';
+          el.id = 'whperf'; el.className = 'dk dk-ov'; dkStyle(); el.style.cssText = 'right:4px;font-size:10px;line-height:1.4;white-space:pre-wrap;padding:6px 8px;max-height:70vh;overflow:auto';
           el.textContent = 'whperf (tap = tutup) zoom=' + (I.zoom ? 'on' : 'off') + ' dpr=' + I.dpr.toFixed(2) + ' dbg=' + (WH_DBG || '-') + ' | build v19 ring=' + I.ring + ' step=' + I.step + ' bloom=' + (I.nobloom ? 'zoomOFF' : 'on') + ' tele=' + (typeof SCP3D_WHALT !== 'undefined' ? SCP3D_WHALT : 'LAMA(13 belum v16)') + ' cov=' + (typeof WORMHOLE !== 'undefined' && ('covered' in WORMHOLE) ? 'ok' : 'LAMA') + ' ringwarm=' + (window.__rw ? window.__rw.n + '/' + window.__rw.tot + ' ' + window.__rw.ms + 'ms' : 'off') + '\n' + out.join('\n'); el.onclick = function () { el.remove(); };
         } catch (e) {}
       };
@@ -636,7 +638,7 @@
           if (!el) {
             el = document.createElement('div');
             el.id = 'muff-dbg';
-            el.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99999;font:10px/1.35 monospace;color:#8eeeff;background:rgba(0,0,0,.7);padding:4px 6px;pointer-events:none;white-space:pre';
+            el.className = 'dk dk-ov'; dkStyle(); el.style.pointerEvents = 'none';
             document.body.appendChild(el);
           }
           el.textContent = msg;
@@ -645,7 +647,7 @@
       /* #muff-dbg (dibuat 01-core.spatialDbg di kiri-atas) bertabrakan dengan overlay PERF/WP di kiri-atas → pindah ke kiri-bawah lewat stylesheet */
       if (!document.getElementById('muff-dbg-pos')) {
         var ms = document.createElement('style'); ms.id = 'muff-dbg-pos';
-        ms.textContent = '#muff-dbg{top:auto!important;bottom:calc(6px + env(safe-area-inset-bottom,0px))!important;left:6px!important;max-width:60vw}';
+        ms.textContent = '#muff-dbg{top:auto!important;bottom:calc(36px + env(safe-area-inset-bottom,0px))!important;left:4px!important;max-width:60vw}';
         (document.head || document.documentElement).appendChild(ms);
       }
       window.__WH_AD_instMuff = true;
@@ -1489,36 +1491,88 @@
     ui.list.textContent = parts.length ? parts.join('\n') : '(kosong)';
   }
 
-  var BTN = 'background:#0e2430;color:#cfe;border:1px solid #2a6;border-radius:6px;padding:5px 8px;font:inherit;font-size:10px;cursor:pointer;pointer-events:auto;touch-action:manipulation;line-height:1.2';
-  var BTN_ON = 'background:#1b6b55;color:#fff;border-color:#7fffd4;font-weight:700';
-
-  function mk(tag, css, text) {
+  /* kit gaya bersama (blok DK_CSS identik di 21-bench.js; <style id="dk-css"> pertama yang masuk menang).
+     Satu aksen cyan, tanpa blur/backdrop-filter (GPU HP lemah), tombol 24px, semua teks mono 10px. */
+var DK_CSS =
+  '.dk,.dk *{box-sizing:border-box}' +
+  '.dk{font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfe9ef;-webkit-text-size-adjust:none}' +
+  '.dk-p{background:rgba(6,11,17,.93);border:1px solid rgba(110,229,255,.16);border-radius:8px;padding:6px}' +
+  '.dk-b{appearance:none;-webkit-appearance:none;font:inherit;height:22px;padding:0 8px;margin:0;color:#bfeaf3;background:rgba(110,229,255,.06);border:1px solid rgba(110,229,255,.18);border-radius:5px;cursor:pointer;pointer-events:auto;touch-action:manipulation;white-space:nowrap}' +
+  '.dk-b:active{opacity:.55}' +
+  '.dk-b.on{color:#04202a;background:#6ee5ff;border-color:#6ee5ff;font-weight:600}' +
+  '.dk-b.dg{color:#ff9b9b;border-color:rgba(255,155,155,.28);background:none}' +
+  '.dk-r{display:flex;flex-wrap:wrap;align-items:center;gap:4px}' +
+  '.dk-g{display:flex;flex-direction:column;gap:4px;padding:6px 0;border-top:1px solid rgba(110,229,255,.1)}' +
+  '.dk-g:first-child{border-top:0;padding-top:0}' +
+  '.dk-l{font-size:9px;letter-spacing:.08em;text-transform:uppercase;opacity:.45}' +
+  '.dk-seg{display:flex;border:1px solid rgba(110,229,255,.18);border-radius:6px;overflow:hidden}' +
+  '.dk-seg .dk-b{flex:1;border:0;border-radius:0;background:none}' +
+  '.dk-seg .dk-b+.dk-b{border-left:1px solid rgba(110,229,255,.18)}' +
+  '.dk-seg .dk-b.on{background:#6ee5ff}' +
+  '.dk-pre{margin:0;white-space:pre-wrap;word-break:break-word;overflow:auto;-webkit-overflow-scrolling:touch}' +
+  '.dk-ov{position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:3px 6px;font:9px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#9fe8f5;background:rgba(6,11,17,.82);border:1px solid rgba(110,229,255,.14);border-radius:6px;white-space:pre;pointer-events:auto}' +
+  'html.dk-hb .dk-ov{top:calc(34px + env(safe-area-inset-top,0px))}' +
+  '.dk-d>summary{list-style:none;cursor:pointer;opacity:.7;padding:2px 0;touch-action:manipulation}' +
+  '.dk-d>summary::-webkit-details-marker{display:none}' +
+  '.dk-d>summary::before{content:"\\25B8  "}' +
+  '.dk-d[open]>summary::before{content:"\\25BE  "}' +
+  '.dk-d[open]>summary{opacity:1}' +
+  '.dk-d>.dk-g{border-top:0;padding-bottom:2px}' +
+  '.dk-g.in{flex-direction:row;align-items:center;gap:6px}' +
+  '.dk-g.in .dk-l{flex:none;width:4.2em}' +
+  'select.dk-b{background-color:#0b1219;color:#bfeaf3;padding:0 4px;max-width:100%;text-overflow:ellipsis}';
+  function dkStyle() {
+    if (document.getElementById('dk-css')) return;
+    var st = document.createElement('style'); st.id = 'dk-css'; st.textContent = DK_CSS;
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function mk(tag, cls, text) {
     var el = document.createElement(tag);
-    if (css) el.style.cssText = css;
+    if (cls) el.className = cls;
     if (text != null) el.textContent = text;
     return el;
   }
-  function btn(label, onclick, on) {
-    var b = mk('button', BTN + (on ? ';' + BTN_ON : ''), label);
+  function btn(label, onclick, on, cls) {
+    var b = mk('button', 'dk-b' + (on ? ' on' : '') + (cls ? ' ' + cls : ''), label);
     b.type = 'button';
     b.onclick = function (e) { e.stopPropagation(); onclick(); };
     return b;
   }
+  function pick(row, items, cur, label, fn) {   /* select ringkas + tombol aksi; items[i][0] = teks */
+    var s = mk('select', 'dk-b'); s.style.cssText = 'flex:1 1 0;min-width:0';
+    items.forEach(function (it, i) { var o = document.createElement('option'); o.value = i; o.textContent = it[0]; s.appendChild(o); });
+    if (cur >= 0) s.selectedIndex = cur;
+    row.appendChild(s);
+    row.appendChild(btn(label, function () { fn(items[s.selectedIndex], s.selectedIndex); }));
+  }
+  function grp(label, inl) {   /* grup: label kecil + baris tombol (inl = label sebaris); kembalikan [grup, baris] */
+    var g = mk('div', 'dk-g' + (inl ? ' in' : '')), r = mk('div', 'dk-r');
+    if (label) g.appendChild(mk('div', 'dk-l', label));
+    g.appendChild(r);
+    return [g, r];
+  }
 
-  /* posisi lewat stylesheet (bukan inline) supaya bisa pakai media query; angka diambil dari index.css:
-     #music-toggle = right 12 / bottom 12 / 32px; #mode-cluster = bottom 12 (3 tombol, tumbuh ke kiri).
-     Kita duduk satu baris di ATAS keduanya: bottom = 12 + 32 + 6. #music-player (z 12, bottom 58) menutupi kita
-     saat dibuka — kita z 11 sehingga tidak pernah menutupi panel musik. */
+  /* Posisi lewat stylesheet (bukan inline) supaya bisa pakai media query; angka dari index.css:
+     #music-toggle = right 12 / bottom 12 / 32px; #mode-cluster = bottom 12. Kita satu baris di ATAS keduanya
+     (bottom = 12 + 32 + 6). #music-player (z 12) menutupi kita saat dibuka; kita z 11 jadi tidak pernah menutupinya. */
   function addStyle() {
+    dkStyle();
     if (document.getElementById('wh-ad-css')) return;
     var st = document.createElement('style');
     st.id = 'wh-ad-css';
     st.textContent =
-      '#wh-autodive{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;' +
-      'font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#b8fff0;pointer-events:auto;touch-action:manipulation;' +
-      'user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;align-items:flex-end}' +
-      '@media (max-width:520px){#wh-autodive{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}#wh-ad-fab{width:31px!important;height:31px!important}}' +
-      '@media (orientation:landscape) and (max-height:520px){#wh-autodive{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}#wh-ad-fab{width:28px!important;height:28px!important;font-size:13px!important}}' +
+      '#wh-autodive{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;display:flex;flex-direction:column;align-items:flex-end;gap:4px;user-select:none;-webkit-user-select:none}' +
+      '#wh-autodive .wa-p{width:min(268px,88vw);max-height:min(72vh,calc(100vh - 110px));overflow-y:auto;-webkit-overflow-scrolling:touch}' +
+      '#wh-ad-fab{background:rgba(6,11,17,.55);opacity:.75}#wh-ad-fab.on{background:rgba(6,11,17,.8);color:#6ee5ff;border-color:#6ee5ff;opacity:1;font-weight:400}' +
+      '.wa-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}' +
+      '.wa-h b{font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:9px;opacity:.7}' +
+      '.wa-h .dk-b{height:20px;padding:0 6px;border-color:transparent;background:none}' +
+      '.wa-st{margin:6px 0 2px;padding:2px 0 2px 7px;min-height:2.8em;border-left:2px solid #6ee5ff;opacity:.85;font-size:10px}' +
+      '.wa-n{min-width:1.6em;text-align:center;opacity:.9}' +
+      '.wa-v{margin-top:6px;padding:5px 6px;max-height:min(38vh,280px);font-size:9px;line-height:1.35;border:1px solid rgba(110,229,255,.16);border-radius:6px;background:rgba(0,0,0,.35);color:#9fe8f5}' +
+      '.wa-ls{max-height:5.5em;margin-top:4px;opacity:.8}' +
+      '@media (max-width:520px){#wh-autodive{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}}' +
+      '@media (orientation:landscape) and (max-height:520px){#wh-autodive{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}}' +
       'body.ls #wh-autodive{translate:var(--gut,0px) 0}' +
       'body.layout-edit #wh-autodive{display:none}';
     (document.head || document.documentElement).appendChild(st);
@@ -1526,203 +1580,87 @@
 
   function open() {
     if (ui && ui.root && ui.root.parentNode) {
-      ui.root.style.display = 'block';
+      ui.root.style.display = '';
       return;
     }
-    if (!document.getElementById('wh-ad-css')) {
-      var st = document.createElement('style');
-      st.id = 'wh-ad-css';
-      st.textContent =
-        '#wh-autodive{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;' +
-        'font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#b8fff0;pointer-events:auto;touch-action:manipulation}' +
-        '@media (max-width:520px){#wh-autodive{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}#wh-ad-fab{width:31px!important;height:31px!important}}' +
-        '@media (orientation:landscape) and (max-height:520px){#wh-autodive{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}#wh-ad-fab{width:28px!important;height:28px!important;font-size:13px!important}}' +
-        'body.ls #wh-autodive{translate:var(--gut,0px) 0}' +
-        'body.layout-edit #wh-autodive{display:none}';
-      document.head.appendChild(st);
-    }
+    addStyle();
 
-    var root = document.createElement('div');
+    var root = mk('div', 'dk');
     root.id = 'wh-autodive';
     ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'wheel'].forEach(function (ev) {
       root.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: false });
     });
 
-    var fab = mk('button', BTN + ';width:32px;height:32px;padding:0;font-size:15px;border-radius:5px;background:rgba(6,11,17,.34);border-color:rgba(110,229,255,.17);display:grid;place-items:center', '🐞');
-    fab.id = 'wh-ad-fab';
-    fab.type = 'button';
-    fab.title = 'debug';
+    var MODE_LBL = { probe: 'probe', perf: 'perf', whperf: 'dive' };
+    var fab = mk('button', 'dk-b' + (MODE ? ' on' : ''), 'dbg' + (MODE ? ' · ' + MODE_LBL[MODE] : ''));
+    fab.id = 'wh-ad-fab'; fab.type = 'button'; fab.title = 'debug';
 
-    var panel = mk('div',
-      'display:none;min-width:min(260px,88vw);max-width:min(300px,92vw);padding:10px 12px;max-height:min(72vh,calc(100vh - 110px));overflow-y:auto;-webkit-overflow-scrolling:touch;' +
-      'background:rgba(0,10,18,.94);border:1px solid rgba(100,255,220,.32);border-radius:10px;' +
-      'box-shadow:0 8px 28px rgba(0,0,0,.5)');
+    var panel = mk('div', 'dk-p wa-p');
 
-    var head = mk('div', 'display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px');
-    head.appendChild(mk('div', 'font-weight:700;font-size:11px', 'debug'));
+    /* header */
+    var head = mk('div', 'wa-h');
+    head.appendChild(mk('b', '', 'debug'));
     head.appendChild(btn('✕', function () { expand(false); }));
     panel.appendChild(head);
 
-    /* —— 2 mode utama —— */
-    panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'mode:'));
-    var modes = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-    [
-      { id: 'probe', label: 'Probe' },
-      { id: 'perf', label: 'PERF' }
-    ].forEach(function (m) {
-      modes.appendChild(btn(m.label, function () {
+    /* mode (segmented) */
+    var seg = mk('div', 'dk-seg');
+    [['probe', 'Probe'], ['perf', 'PERF'], ['whperf', 'Dive']].forEach(function (m) {
+      seg.appendChild(btn(m[1], function () {
         if (running) return log('tunggu tes selesai');
-        if (MODE === m.id) return;
-        go(urlFor(m.id));
-      }, MODE === m.id));
+        if (MODE === m[0]) return;
+        go(urlFor(m[0]));
+      }, MODE === m[0]));
     });
-    /* Dive tetap ada tapi sekunder (wormhole) */
-    modes.appendChild(btn('Dive', function () {
-      if (running) return log('tunggu tes selesai');
-      if (MODE === 'whperf') return;
-      go(urlFor('whperf'));
-    }, MODE === 'whperf'));
-    panel.appendChild(modes);
+    panel.appendChild(seg);
 
-    /* —— runner lapisan-mati tanpa reload (21-bench v11.29c): di atas supaya cepat dijangkau; saat jalan panel ini & bench terlipat otomatis —— */
-    if (/[?&]bench=1(&|$)/.test(Q)) {   /* v23: baris seq juga tanpa gpup=1 (baca dtAvg/fps + avgJs; q.* kosong) */
-      panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'seq tanpa reload (±75 dtk, jangan ganti mode)' + (/[?&]gpup=1(&|$)/.test(Q) ? ':' : ' — tanpa gpup=1: baca fps/dtAvg + avgJs:')));
-      var seqRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-      [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2'], ['seq stars', 'stars', 'base, nama rasi, goresan garis, garis rasi, halo, inti, label, Pleiades, semua gambar bintang, bintang OFF, base2 (±90 dtk, WAJIB di dalam sektor)'], ['seq sizes', 'sizes', 'base, halo kecil/sedang/besar, inti kecil/sedang/besar, halo semua, inti semua, base2 (±80 dtk, di dalam sektor)'], ['seq plei', 'plei', 'base, nama, halo, inti, pulse Pleione, Pleiades semua, base2 (±56 dtk, di sektor winter)']].forEach(function (c) {
-        seqRow.appendChild(btn(c[0], function () {
-          if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
-          if (c[1] === 'stars' || c[1] === 'sizes' || c[1] === 'plei') {
-            if (typeof window.__offSeqOn === 'function' && window.__offSeqOn()) return log('seq sedang jalan');
-            if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('seq stars: masuk SEKTOR dulu (di overview rasi/bintang tidak digambar), lalu tap lagi');
-            if (!window.__stSegOk || !window.__abOk) return log('seq ' + c[1] + ' butuh 21-bench v11.29h (?v=11.29h)');
-          }
-          if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
-          log('seq ' + c[1] + ' jalan: ' + c[2] + '. Timer di kiri bawah; selesai → salin dump bench.');
-          expand(false);
-        }, false));
-      });
-      panel.appendChild(seqRow);
-      /* ABAB tanpa reload (21-bench v11.29h): A=base, B=token mati, 3 pasang x 10 dtk (+ &abn=N). Hanya di sektor. */
-      panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'ABAB (A=base, B=lapisan mati; label A unik per token; 1 token ±60 dtk, 3 token ±2 dtk x4 = ±4 mnt; di sektor):'));
-      var abbRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-      [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo sgs+sgm', 'sgs+sgm'], ['halo sgl x3', 'sgl,sgl,sgl'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']].forEach(function (c) {
-        abbRow.appendChild(btn('ABAB ' + c[0], function () {
-          if (!window.__abOk || typeof window.__offSeqStart !== 'function') return log('ABAB butuh 21-bench v11.29h (?v=11.29h)');
-          if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('ABAB: masuk SEKTOR dulu, lalu tap lagi');
-          if (!window.__offSeqStart('abab', c[1])) return log('seq sedang jalan');
-          log('ABAB ' + c[1] + ' jalan (label A1_<token>, B1_<token>, ...). Timer di kiri bawah; selesai → salin dump bench.');
-          expand(false);
-        }, false));
-      });
-      panel.appendChild(abbRow);
-    }
-
-    /* —— A/B q.big: reload ke bench+probe GPU + 1 varian —— */
-    panel.appendChild(mk('div', 'opacity:.7;font-size:10px;margin-bottom:3px', 'A/B q.big (bench + gpup):'));
-    var abRow = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
-    var abCur = abCurrent();
-    AB_VARIANTS.forEach(function (v) {
-      abRow.appendChild(btn(v.label, function () {
-        if (running) return log('tunggu tes selesai');
-        if (abCur === v.id) return log('varian ' + v.label + ' sudah aktif — jalankan overview + sektor, lalu dump bench');
-        go(abUrl(v));
-      }, abCur === v.id));
-    });
-    panel.appendChild(abRow);
-
-    var status = mk('div', 'opacity:.9;min-height:2.6em;margin-bottom:8px;font-size:10px;line-height:1.35', 'siap');
+    var status = mk('div', 'dk-pre wa-st', 'siap');
     panel.appendChild(status);
 
-    /* aksi mode-spesifik (satu baris, ringkas) */
-    var acts = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px');
+    /* aksi khusus mode */
+    var A = grp(MODE === 'whperf' ? 'dive' : MODE === 'probe' ? 'probe' : MODE === 'perf' ? 'perf' : '', true), acts = A[1];
     if (MODE === 'whperf') {
-      /* pilih sektor 1..4 */
-      var secRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:4px;width:100%');
-      secRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'sektor:'));
-      var secBtns = [];
-      var vsec = validSectors();
-      var nSec = Math.max(4, vsec.length || 4);
-      function paintSec() {
-        secBtns.forEach(function (b, i) {
-          var on = i === diveSecIdx;
-          b.style.background = on ? 'rgba(80,200,180,.28)' : '';
-          b.style.borderColor = on ? 'rgba(120,255,220,.55)' : '';
-        });
-      }
+      var secBtns = [], vsec = validSectors(), nSec = Math.max(4, vsec.length || 4);
+      function paintSec() { secBtns.forEach(function (b, i) { b.classList.toggle('on', i === diveSecIdx); }); }
+      var sg = mk('div', 'dk-seg');
       for (var si = 0; si < Math.min(4, nSec); si++) {
         (function (idx) {
-          var lab = String(idx + 1);
-          try {
-            if (vsec[idx] && (vsec[idx].k || vsec[idx].name))
-              lab = (idx + 1) + '';
-          } catch (e) {}
-          var b = btn(lab, function () {
-            diveSecIdx = idx;
-            paintSec();
+          var b = btn(String(idx + 1), function () {
+            diveSecIdx = idx; paintSec();
             var s = sectorByIndex(idx);
             log('sektor ' + (idx + 1) + (s ? ' (' + (s.k || s.name) + ')' : ''));
           }, idx === diveSecIdx);
-          secBtns.push(b);
-          secRow.appendChild(b);
+          secBtns.push(b); sg.appendChild(b);
         })(si);
       }
       paintSec();
-      acts.appendChild(secRow);
-
-      /* jumlah siklus */
-      var nRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:4px;width:100%');
-      nRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'siklus:'));
-      var nLab = mk('span', 'font-size:10px;opacity:.9', '×' + CFG.dives);
-      [['−', -1], ['+', 1]].forEach(function (p) {
-        nRow.appendChild(btn(p[0], function () {
-          var n = CFG.dives + p[1];
-          if (n < 1) n = 1;
-          if (n > 20) n = 20;
-          CFG.dives = n;
-          nLab.textContent = '×' + CFG.dives;
-        }));
-      });
-      nRow.appendChild(nLab);
-      acts.appendChild(nRow);
-
-      acts.appendChild(btn('Loop', function () { runLoopOne(); }));
-      acts.appendChild(btn('Loop ALL', function () { runLoopAll(); }));
-      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }));
+      acts.appendChild(mk('span', 'dk-l', 'sektor')); acts.appendChild(sg);
+      var nLab = mk('span', 'wa-n', '×' + CFG.dives);
+      function bump(d) { var n = Math.max(1, Math.min(20, CFG.dives + d)); CFG.dives = n; nLab.textContent = '×' + n; }
+      acts.appendChild(btn('−', function () { bump(-1); }));
+      acts.appendChild(nLab);
+      acts.appendChild(btn('+', function () { bump(1); }));
+      var A2 = grp(''), r2 = A2[1];
+      r2.appendChild(btn('Loop', function () { runLoopOne(); }));
+      r2.appendChild(btn('Loop ALL', function () { runLoopAll(); }));
+      r2.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }, false, 'dg'));
+      A[0].appendChild(r2);
     } else if (MODE === 'probe') {
       acts.appendChild(btn('set normal', function () { go(probeUrl({ pset: '' })); }, param('pset') !== 'bio'));
       acts.appendChild(btn('set bio', function () { go(probeUrl({ pset: 'bio' })); }, param('pset') === 'bio'));
     } else if (MODE === 'perf') {
       acts.appendChild(btn('Snap', function () { snapshotPerf(); }));
       acts.appendChild(btn('Sweep', sweepPerf));
-      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }));
+      acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }, false, 'dg'));
     } else {
-      acts.appendChild(mk('span', 'opacity:.65;font-size:10px', 'pilih Probe atau PERF'));
+      acts.appendChild(mk('span', 'dk-l', 'pilih Probe atau PERF'));
     }
-    if (acts.childNodes.length) panel.appendChild(acts);
+    panel.appendChild(A[0]);
 
-    /* Trace (PP-11): selalu tersedia, apa pun modenya */
-    var trRow = mk('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:6px');
-    trRow.appendChild(mk('span', 'opacity:.7;font-size:10px', 'trace:'));
-    trRow.appendChild(btn('Copy', traceCopy));
-    trRow.appendChild(btn('Save', traceSave));
-    /* muffdbg toggle (tanpa reload): nyalakan/matikan overlay #muff-dbg spatial audio */
-    var muffOn = !!(window.AV && window.AV._dbg);
-    var muffB = btn('muff: ' + (muffOn ? 'ON' : 'off'), function () {
-      try {
-        if (typeof AV === 'undefined' || !AV) return;
-        if (!AV._dbg) { installMuff(); AV._dbg = true; }
-        else { AV._dbg = false; var me = document.getElementById('muff-dbg'); if (me && me.parentNode) me.parentNode.removeChild(me); }
-        muffB.textContent = 'muff: ' + (AV._dbg ? 'ON' : 'off');
-      } catch (eMf) {}
-    }, muffOn);
-    trRow.appendChild(muffB);
-    panel.appendChild(trRow);
-
-    /* —— 2 tombol utama: Hasil + Export —— */
-    var main = mk('div', 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px');
+    /* hasil / export */
+    var R0 = grp(''), main = R0[1];
     var btnHasil = btn('Hasil', function () {
-      /* Probe: tampilkan laporan. PERF/Dive: tampilkan Log ringkas. */
-      if (MODE === 'probe' || probeStore.length) {
+      if (MODE === 'probe' || probeStore.length) {   /* Probe: laporan. PERF/Dive: log ringkas. */
         toggleProbeResult();
         if (ui.btnHasil) ui.btnHasil.textContent = probeUiShown ? 'Tutup' : 'Hasil';
         return;
@@ -1732,25 +1670,76 @@
       if (ui.btnHasil) ui.btnHasil.textContent = ui.logShown ? 'Tutup' : 'Hasil';
       if (ui.logShown && empty()) log('belum ada data — jalankan tes dulu');
     });
-    var btnExport = btn('Export', exportAll);
     main.appendChild(btnHasil);
-    main.appendChild(btnExport);
-    panel.appendChild(main);
+    main.appendChild(btn('Export', exportAll));
+    main.appendChild(btn('Clr', clearAll));
+    panel.appendChild(R0[0]);
 
-    var foot = mk('div', 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px');
-    foot.appendChild(btn('Clr', clearAll));
-    foot.appendChild(btn('Matikan', function () { go(urlFor(null)); }));
-    panel.appendChild(foot);
-
-    var list = mk('pre', 'margin:0;max-height:5.5em;overflow:auto;opacity:.88;white-space:pre-wrap;font-size:10px;pointer-events:auto;display:none', '(kosong)');
+    var list = mk('pre', 'dk-pre wa-ls', '(kosong)'); list.style.display = 'none';
     panel.appendChild(list);
-
-    var viewer = mk('pre',
-      'display:none;margin:6px 0 0;max-height:min(38vh,280px);overflow:auto;' +
-      'opacity:.95;white-space:pre-wrap;font-size:9px;line-height:1.35;' +
-      'padding:6px 7px;border-radius:6px;border:1px solid rgba(255,210,127,.35);' +
-      'background:rgba(2,8,14,.92);color:#ffd27f;pointer-events:auto', '');
+    var viewer = mk('pre', 'dk-pre wa-v', ''); viewer.style.display = 'none';
     panel.appendChild(viewer);
+
+    /* lanjutan (terlipat): trace, muff, A/B, seq, ABAB */
+    var more = mk('details', 'dk-d');
+    more.appendChild(mk('summary', '', 'lanjutan'));
+
+    var T = grp('trace', true), tr = T[1];
+    tr.appendChild(btn('Copy', traceCopy));
+    tr.appendChild(btn('Save', traceSave));
+    var muffOn = !!(window.AV && window.AV._dbg);
+    var muffB = btn('muff ' + (muffOn ? 'on' : 'off'), function () {
+      try {
+        if (typeof AV === 'undefined' || !AV) return;
+        if (!AV._dbg) { installMuff(); AV._dbg = true; }
+        else { AV._dbg = false; var me = document.getElementById('muff-dbg'); if (me && me.parentNode) me.parentNode.removeChild(me); }
+        muffB.textContent = 'muff ' + (AV._dbg ? 'on' : 'off');
+        muffB.classList.toggle('on', !!AV._dbg);
+      } catch (eMf) {}
+    }, muffOn);
+    tr.appendChild(muffB);
+    more.appendChild(T[0]);
+
+    var AB = grp('A/B q.big (bench + gpup)'), abCur = abCurrent();
+    pick(AB[1], AB_VARIANTS.map(function (v) { return [v.label, v]; }), (function () { for (var k = 0; k < AB_VARIANTS.length; k++) if (AB_VARIANTS[k].id === abCur) return k; return -1; })(), abCur ? 'aktif' : 'go', function (it) {
+      var v = it[1];
+      if (running) return log('tunggu tes selesai');
+      if (abCur === v.id) return log('varian ' + v.label + ' sudah aktif \u2014 jalankan overview + sektor, lalu dump bench');
+      go(abUrl(v));
+    });
+    more.appendChild(AB[0]);
+
+    if (/[?&]bench=1(&|$)/.test(Q)) {   /* v23: seq juga tanpa gpup=1 (baca dtAvg/fps + avgJs; q.* kosong) */
+      var SQ = grp('seq tanpa reload ±75 dtk' + (/[?&]gpup=1(&|$)/.test(Q) ? '' : ' · tanpa gpup=1: fps/dtAvg + avgJs')), seqRow = SQ[1];
+      pick(seqRow, [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2'], ['seq stars', 'stars', 'base, nama rasi, goresan garis, garis rasi, halo, inti, label, Pleiades, semua gambar bintang, bintang OFF, base2 (±90 dtk, WAJIB di dalam sektor)'], ['seq sizes', 'sizes', 'base, halo kecil/sedang/besar, inti kecil/sedang/besar, halo semua, inti semua, base2 (±80 dtk, di dalam sektor)'], ['seq plei', 'plei', 'base, nama, halo, inti, pulse Pleione, Pleiades semua, base2 (±56 dtk, di sektor winter)']].map(function (c) { return [c[0].replace('seq ', ''), c[1], c[2]]; }), 0, 'run', function (c) {
+        if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
+        if (c[1] === 'stars' || c[1] === 'sizes' || c[1] === 'plei') {
+          if (typeof window.__offSeqOn === 'function' && window.__offSeqOn()) return log('seq sedang jalan');
+          if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('seq stars: masuk SEKTOR dulu (di overview rasi/bintang tidak digambar), lalu tap lagi');
+          if (!window.__stSegOk || !window.__abOk) return log('seq ' + c[1] + ' butuh 21-bench v11.29h (?v=11.29h)');
+        }
+        if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
+        log('seq ' + c[1] + ' jalan: ' + c[2] + '. Timer di kiri bawah; selesai \u2192 salin dump bench.');
+        expand(false);
+      });
+      more.appendChild(SQ[0]);
+      /* ABAB tanpa reload (21-bench v11.29h): A=base, B=token mati; 3 pasang x 10 dtk (+ &abn=N). Hanya di sektor. 1 token ±60 dtk, 3 token ±4 mnt */
+      var AQ = grp('ABAB · di sektor'), abbRow = AQ[1];
+      pick(abbRow, [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo sgs+sgm', 'sgs+sgm'], ['halo sgl x3', 'sgl,sgl,sgl'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']], 0, 'run', function (c) {
+        if (!window.__abOk || typeof window.__offSeqStart !== 'function') return log('ABAB butuh 21-bench v11.29h (?v=11.29h)');
+        if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('ABAB: masuk SEKTOR dulu, lalu tap lagi');
+        if (!window.__offSeqStart('abab', c[1])) return log('seq sedang jalan');
+        log('ABAB ' + c[1] + ' jalan (label A1_<token>, B1_<token>, ...). Timer di kiri bawah; selesai \u2192 salin dump bench.');
+        expand(false);
+      });
+      more.appendChild(AQ[0]);
+    }
+
+    var F = grp(''), ft = F[1];
+    ft.style.justifyContent = 'flex-end';
+    ft.appendChild(btn('Matikan debug', function () { go(urlFor(null)); }, false, 'dg'));
+    more.appendChild(F[0]);
+    panel.appendChild(more);
 
     root.appendChild(panel);
     root.appendChild(fab);
@@ -1760,15 +1749,16 @@
     };
 
     function expand(on) {
-      panel.style.display = on ? 'block' : 'none';
-      fab.style.display = on ? 'none' : 'grid';
+      panel.style.display = on ? '' : 'none';
+      root.style.zIndex = on ? '100000' : '';   /* terbuka: di atas overlay PERF/whperf */
+      fab.style.display = on ? 'none' : '';
     }
     fab.onclick = function (e) { e.stopPropagation(); expand(true); };
     ui.expand = expand;
     window.__WH_AD && (window.__WH_AD.collapse = function () { expand(false); });
 
     document.body.appendChild(root);
-    expand(false);   /* v18: default terlipat (fab saja); buka dengan tap 🐞 */
+    expand(false);   /* default terlipat (fab saja); buka dengan tap dbg */
     updateList();
     installProbeSilence();
     if (MODE === 'probe') startProbeWatch();

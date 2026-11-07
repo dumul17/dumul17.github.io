@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29v: pmk.secP = probe PER DETIK 15 dtk pertama sektor (n, fps, dt, js, wait, ema, gpuSum, rata2 ms/frame tiap segmen pmk; dgn ?gpup=1 ikut .gpu per modul + q.big/q.small; hump = puncak vs late otomatis; maks 3 kunjungan). v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
+/* BENCH v11.29 (?bench=1) — v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
+    v11.29v: pmk.secP = probe PER DETIK 15 dtk pertama sektor (n, fps, dt, js, wait, ema, gpuSum, rata2 ms/frame tiap segmen pmk; dgn ?gpup=1 ikut .gpu per modul + q.big/q.small; hump = puncak vs late otomatis; maks 3 kunjungan). v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
    v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
    v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
@@ -31,7 +32,7 @@
   /* v11.29b: CSS lewat kelas di <html> supaya bisa di-toggle saat jalan (tanpa reload) */
   try {
     var offSt = document.createElement('style'); offSt.id = '__bench_off_css';
-    offSt.textContent = 'html.__bo-hud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not(#__bench_box):not(#__bench_phase):not(#__bench_copy_fallback):not([id^="wh-ad"]):not(script):not(style){visibility:hidden!important}html.__bo-skyhide #sky{visibility:hidden!important}';
+    offSt.textContent = 'html.__bo-hud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not(#__bench_box):not(#__bench_phase):not(#__bench_copy_fallback):not([id^="wh-ad"]):not(.dk):not(script):not(style){visibility:hidden!important}html.__bo-skyhide #sky{visibility:hidden!important}';
     (document.head || document.documentElement).appendChild(offSt);
   } catch (eOffC) {}
   var OFF_CUR = OFF_L.slice(), OFF_MANAGE = OFF_L.length > 0;   /* OFF_MANAGE: baru mengatur PX/kelas kalau ?off= ada atau runner jalan */
@@ -1133,21 +1134,63 @@
     plei: [['base', []], ['pname', ['pname']], ['pglow', ['pglow']], ['pcore', ['pcore']], ['pint', ['pint']], ['splei', ['splei']], ['base2', []]],   /* v11.29h: Pleiades: pname=kotak nama, pglow=halo, pcore=inti, pint=pulse+label Pleione (composite lighter), splei=semua */
     layer: [['base', []], ['sky', ['sky']], ['skyhide', ['skyhide']], ['hud', ['hud']], ['mw', ['mw']], ['neb', ['neb']], ['lines+stars', ['lines', 'stars']], ['base2', []]]
   };
+  /* kit gaya bersama (identik di 19-auto-debug.js; <style id="dk-css"> pertama yang masuk menang) + layout panel bench */
+var DK_CSS =
+  '.dk,.dk *{box-sizing:border-box}' +
+  '.dk{font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfe9ef;-webkit-text-size-adjust:none}' +
+  '.dk-p{background:rgba(6,11,17,.93);border:1px solid rgba(110,229,255,.16);border-radius:8px;padding:6px}' +
+  '.dk-b{appearance:none;-webkit-appearance:none;font:inherit;height:22px;padding:0 8px;margin:0;color:#bfeaf3;background:rgba(110,229,255,.06);border:1px solid rgba(110,229,255,.18);border-radius:5px;cursor:pointer;pointer-events:auto;touch-action:manipulation;white-space:nowrap}' +
+  '.dk-b:active{opacity:.55}' +
+  '.dk-b.on{color:#04202a;background:#6ee5ff;border-color:#6ee5ff;font-weight:600}' +
+  '.dk-b.dg{color:#ff9b9b;border-color:rgba(255,155,155,.28);background:none}' +
+  '.dk-r{display:flex;flex-wrap:wrap;align-items:center;gap:4px}' +
+  '.dk-g{display:flex;flex-direction:column;gap:4px;padding:6px 0;border-top:1px solid rgba(110,229,255,.1)}' +
+  '.dk-g:first-child{border-top:0;padding-top:0}' +
+  '.dk-l{font-size:9px;letter-spacing:.08em;text-transform:uppercase;opacity:.45}' +
+  '.dk-seg{display:flex;border:1px solid rgba(110,229,255,.18);border-radius:6px;overflow:hidden}' +
+  '.dk-seg .dk-b{flex:1;border:0;border-radius:0;background:none}' +
+  '.dk-seg .dk-b+.dk-b{border-left:1px solid rgba(110,229,255,.18)}' +
+  '.dk-seg .dk-b.on{background:#6ee5ff}' +
+  '.dk-pre{margin:0;white-space:pre-wrap;word-break:break-word;overflow:auto;-webkit-overflow-scrolling:touch}' +
+  '.dk-ov{position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:3px 6px;font:9px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#9fe8f5;background:rgba(6,11,17,.82);border:1px solid rgba(110,229,255,.14);border-radius:6px;white-space:pre;pointer-events:auto}' +
+  'html.dk-hb .dk-ov{top:calc(34px + env(safe-area-inset-top,0px))}' +
+  '.dk-d>summary{list-style:none;cursor:pointer;opacity:.7;padding:2px 0;touch-action:manipulation}' +
+  '.dk-d>summary::-webkit-details-marker{display:none}' +
+  '.dk-d>summary::before{content:"\\25B8  "}' +
+  '.dk-d[open]>summary::before{content:"\\25BE  "}' +
+  '.dk-d[open]>summary{opacity:1}' +
+  '.dk-d>.dk-g{border-top:0;padding-bottom:2px}' +
+  '.dk-g.in{flex-direction:row;align-items:center;gap:6px}' +
+  '.dk-g.in .dk-l{flex:none;width:4.2em}' +
+  'select.dk-b{background-color:#0b1219;color:#bfeaf3;padding:0 4px;max-width:100%;text-overflow:ellipsis}';
+  DK_CSS +=
+    '#__bench_box{position:fixed;top:4px;left:4px;z-index:2147483647;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;gap:6px;pointer-events:none;overflow:auto}' +
+    '#__bench_box.bc{padding:3px;background:rgba(6,11,17,.6)}#__bench_box.bc .bn-b{display:none}' +
+    '#__bench_box .bn-t{max-height:45vh;overflow:hidden;pointer-events:none;font-size:9px;line-height:1.3;color:#9fe8f5}' +
+    '#__bench_box .bn-t.sc{overflow:auto;pointer-events:auto;max-height:55vh}' +
+    '#__bench_box .bn-f{color:#9fe8f5;white-space:pre-wrap}#__bench_box .bn-f:empty{display:none}' +
+    '#__bench_phase{position:fixed;left:4px;bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:2147483647;display:flex;gap:6px;align-items:center;padding:3px 6px;pointer-events:none}' +
+    '#__bench_phase .dk-b{height:20px;padding:0 6px}';
+  function dkStyle() {
+    if (document.getElementById('dk-css')) return;
+    var st = document.createElement('style'); st.id = 'dk-css'; st.textContent = DK_CSS;
+    (document.head || document.documentElement).appendChild(st);
+  }
   function osBox(c) { try { var b = document.getElementById('__bench_box'); if (b) b.classList.toggle('bc', !!c); } catch (e) {} }
   function osLabel(txt, withStop) {
     try {
       var e = document.getElementById('__bench_phase');
       if (!e) {
-        e = document.createElement('div'); e.id = '__bench_phase';
-        e.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.8);color:#ffd27f;font:10px monospace;padding:3px 6px;border:1px solid #a82;display:flex;gap:6px;align-items:center;pointer-events:none';
+        dkStyle();
+        e = document.createElement('div'); e.id = '__bench_phase'; e.className = 'dk dk-p';
         var t = document.createElement('span'); e.appendChild(t);
-        var st = document.createElement('button'); st.textContent = 'STOP'; st.style.cssText = 'font:10px monospace;padding:1px 5px;pointer-events:auto;display:none';
+        var st = document.createElement('button'); st.type = 'button'; st.className = 'dk-b dg'; st.textContent = 'stop'; st.style.display = 'none';
         st.onclick = function (ev) { ev.stopPropagation(); offSeqStop(); };
         ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'mousedown', 'mouseup'].forEach(function (evn) { e.addEventListener(evn, function (ev) { ev.stopPropagation(); }, false); });
         e.appendChild(st); document.body.appendChild(e);
       }
       if (OS.lastTxt !== txt) { e.firstChild.textContent = txt; OS.lastTxt = txt; }
-      e.lastChild.style.display = withStop ? 'inline-block' : 'none';
+      e.lastChild.style.display = withStop ? '' : 'none';
     } catch (eL) {}
   }
   function osFmt(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60); }
@@ -1293,44 +1336,42 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    box = document.createElement('div'); box.id = '__bench_box';
-    box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:2147483647;background:rgba(0,0,0,.78);color:#7fffb0;font:10px/1.35 monospace;padding:5px 6px;border:1px solid #2a6;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;pointer-events:none;';
-    /* jangan tembus ke situs (06-interaction hit-test) */
-    /* bubble (false): biarkan event sampai ke tombol di dalam box, tapi jangan naik ke document/situs */
+    dkStyle();
+    box = document.createElement('div'); box.id = '__bench_box'; box.className = 'dk dk-p bc';
+    document.documentElement.classList.add('dk-hb');   /* overlay PERF (19) turun di bawah chip bench */
+    /* jangan tembus ke situs (06-interaction hit-test); bubble (false) supaya tombol di dalam tetap dapat event */
     ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'mousedown', 'mouseup'].forEach(function (evn) {
       box.addEventListener(evn, function (ev) { ev.stopPropagation(); }, false);
     });
 
-    /* tombol di atas supaya selalu terlihat di landscape */
-    var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'flex:0 0 auto;margin-bottom:4px;line-height:0;pointer-events:auto;';
-    box.appendChild(btnRow);
-    /* v11.29c: panel bisa dilipat (default terlipat jadi chip kecil). CSS: kelas .bc menyembunyikan teks/foot dan semua tombol selain .__bt */
-    try {
-      var bcSt = document.createElement('style'); bcSt.id = '__bench_bc_css';
-      bcSt.textContent = '#__bench_box.bc>div:nth-child(n+2){display:none!important}#__bench_box.bc>div:first-child>button:not(.__bt){display:none!important}#__bench_box.bc{padding:2px 3px!important}#__bench_box.bc>div:first-child{margin-bottom:0!important}';
-      document.head.appendChild(bcSt);
-    } catch (eBc) {}
-    box.classList.add('bc');
-    var bt = document.createElement('button'); bt.className = '__bt'; bt.textContent = 'BENCH \u25B8';
-    bt.style.cssText = 'pointer-events:auto;margin:2px 4px 2px 0;font:10px monospace;padding:3px 6px;display:inline-block;vertical-align:middle;';
-    bt.onclick = function (ev) { ev.stopPropagation(); var c = box.classList.toggle('bc'); bt.textContent = c ? 'BENCH \u25B8' : 'BENCH \u25BE lipat'; };
-    btnRow.appendChild(bt);
+    /* chip selalu terlihat; kelas .bc (terlipat, default) menyembunyikan badan panel */
+    var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'dk-b __bt'; bt.textContent = 'bench ▸';
+    bt.onclick = function (ev) { ev.stopPropagation(); var c = box.classList.toggle('bc'); bt.textContent = c ? 'bench ▸' : 'bench ▾'; bt.classList.toggle('on', !c); };
+    var head = document.createElement('div'); head.className = 'bn-h'; head.appendChild(bt); box.appendChild(head);
 
-    var txt = document.createElement('div');
-    /* default none: tidak nutupin situs; MAX mengaktifkan scroll */
-    txt.style.cssText = 'flex:1 1 auto;overflow:hidden;white-space:pre-wrap;word-break:break-word;max-height:45vh;pointer-events:none;-webkit-overflow-scrolling:touch;';
-    box.appendChild(txt);
+    var body = document.createElement('div'); body.className = 'bn-b'; box.appendChild(body);
+    var txt = document.createElement('div'); txt.className = 'dk-pre bn-t';   /* ringkasan; scroll hanya setelah 'scroll' dinyalakan */
+    body.appendChild(txt);
     box._txt = txt;
     var panelExpanded = false;
 
-    var foot = document.createElement('div');
-    foot.style.cssText = 'flex:0 0 auto;margin-top:2px;color:#9f8;white-space:pre-wrap;';
-    box.appendChild(foot);
+    var foot = document.createElement('div'); foot.className = 'bn-f';
+    body.appendChild(foot);
     box._foot = foot;
 
-    function btnStyle() {
-      return 'pointer-events:auto;margin:2px 4px 2px 0;font:10px monospace;padding:3px 6px;display:inline-block;vertical-align:middle;';
+    /* grup tombol: label kecil + baris */
+    function grp(label) {
+      var g = document.createElement('div'); g.className = 'dk-g in';
+      var l = document.createElement('div'); l.className = 'dk-l'; l.textContent = label;
+      var r = document.createElement('div'); r.className = 'dk-r';
+      g.appendChild(l); g.appendChild(r); body.insertBefore(g, foot);
+      return r;
+    }
+    function bb(row, label, fn) {   /* tombol + umpan balik singkat */
+      var x = document.createElement('button'); x.type = 'button'; x.className = 'dk-b'; x.textContent = label;
+      x.flash = function (m) { x.textContent = m; setTimeout(function () { x.textContent = label; }, 1500); };
+      x.onclick = function (ev) { ev.stopPropagation(); fn(x); };
+      row.appendChild(x); return x;
     }
     function stamp() {
       var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -1352,21 +1393,20 @@
         var old = document.getElementById('__bench_copy_fallback');
         if (old) old.remove();
         var wrap = document.createElement('div');
-        wrap.id = '__bench_copy_fallback';
-        wrap.style.cssText = 'position:fixed;inset:8px;z-index:2147483647;background:rgba(0,0,0,.92);color:#7fffb0;padding:8px;display:flex;flex-direction:column;font:12px monospace;pointer-events:auto;';
+        wrap.id = '__bench_copy_fallback'; wrap.className = 'dk dk-p';
+        wrap.style.cssText = 'position:fixed;inset:8px;z-index:2147483647;display:flex;flex-direction:column;gap:6px;pointer-events:auto;background:rgba(6,11,17,.97)';
         ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'mousedown', 'mouseup'].forEach(function (evn) {
           wrap.addEventListener(evn, function (ev) { ev.stopPropagation(); }, false);
         });
         var h = document.createElement('div');
+        h.className = 'dk-l'; h.style.flex = '0 0 auto';
         h.textContent = label + ' — long-press / Ctrl+C, lalu tutup';
-        h.style.cssText = 'margin-bottom:6px;flex:0 0 auto;';
         var ta = document.createElement('textarea');
         ta.readOnly = true;
         ta.value = text;
-        ta.style.cssText = 'flex:1 1 auto;width:100%;background:#111;color:#7fffb0;border:1px solid #2a6;font:11px monospace;padding:6px;';
+        ta.style.cssText = 'flex:1 1 auto;width:100%;resize:none;background:rgba(0,0,0,.4);color:#9fe8f5;border:1px solid rgba(110,229,255,.18);border-radius:6px;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;padding:6px';
         var close = document.createElement('button');
-        close.textContent = 'TUTUP';
-        close.style.cssText = 'margin-top:6px;font:12px monospace;padding:6px 10px;flex:0 0 auto;';
+        close.type = 'button'; close.className = 'dk-b'; close.style.flex = '0 0 auto'; close.textContent = 'tutup';
         close.onclick = function (ev) { ev.stopPropagation(); wrap.remove(); };
         wrap.appendChild(h); wrap.appendChild(ta); wrap.appendChild(close);
         document.body.appendChild(wrap);
@@ -1393,116 +1433,38 @@
         return navigator.share(data).then(function () { return true; }).catch(function () { return false; });
       } catch (e) { return Promise.resolve(false); }
     }
-
-    var b = document.createElement('button');
-    b.textContent = 'COPY JSON';
-    b.style.cssText = btnStyle();
-    b.onclick = function (ev) {
-      ev.stopPropagation();
-      var s = snapshot();
-      console.log('[bench]', s);
+    function copyOrFallback(x, label, s) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(s).then(function () {
-          b.textContent = 'COPIED';
-          setTimeout(function () { b.textContent = 'COPY JSON'; }, 1500);
-        }, function () {
-          showCopyFallback('COPY JSON', s);
-        });
-      } else {
-        showCopyFallback('COPY JSON', s);
-      }
-    };
-    btnRow.appendChild(b);
+        navigator.clipboard.writeText(s).then(function () { x.flash('ok'); }, function () { showCopyFallback(label, s); });
+      } else showCopyFallback(label, s);
+    }
+    function saveAs(x, label, name, t, mime) {
+      if (saveFile(name, t, mime)) x.flash('ok'); else showCopyFallback(label, t);
+    }
 
-    [['SAVE JSON', 'json', 'application/json'], ['SAVE TXT', 'txt', 'text/plain']].forEach(function (c) {
-      var x = document.createElement('button');
-      x.textContent = c[0];
-      x.style.cssText = btnStyle();
-      x.onclick = function (ev) {
-        ev.stopPropagation();
-        var s = snapshot(), t = c[1] === 'json' ? JSON.stringify(JSON.parse(s), null, 2) : toTxt(s);
-        var name = 'bench-' + stamp() + '.' + c[1];
-        if (saveFile(name, t, c[2])) {
-          x.textContent = 'SAVED';
-          setTimeout(function () { x.textContent = c[0]; }, 1500);
-        } else {
-          showCopyFallback(c[0], t);
-        }
-      };
-      btnRow.appendChild(x);
-    });
-
-    var sh = document.createElement('button');
-    sh.textContent = 'SHARE';
-    sh.style.cssText = btnStyle();
-    sh.onclick = function (ev) {
-      ev.stopPropagation();
-      var s = snapshot();
-      var pretty = JSON.stringify(JSON.parse(s), null, 2);
-      var name = 'bench-' + stamp() + '.json';
-      tryShare(name, pretty, 'application/json').then(function (ok) {
-        if (ok) {
-          sh.textContent = 'SHARED';
-          setTimeout(function () { sh.textContent = 'SHARE'; }, 1500);
-        } else {
-          /* fallback: copy path */
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(pretty).then(function () {
-              sh.textContent = 'COPIED';
-              setTimeout(function () { sh.textContent = 'SHARE'; }, 1500);
-            }, function () { showCopyFallback('SHARE / COPY', pretty); });
-          } else {
-            showCopyFallback('SHARE / COPY', pretty);
-          }
-        }
+    /* dump boot (snapshot) */
+    var rD = grp('dump');
+    bb(rD, 'copy', function (x) { var s = snapshot(); console.log('[bench]', s); copyOrFallback(x, 'COPY JSON', s); });
+    bb(rD, 'json', function (x) { var s = snapshot(); saveAs(x, 'SAVE JSON', 'bench-' + stamp() + '.json', JSON.stringify(JSON.parse(s), null, 2), 'application/json'); });
+    bb(rD, 'txt', function (x) { var s = snapshot(); saveAs(x, 'SAVE TXT', 'bench-' + stamp() + '.txt', toTxt(s), 'text/plain'); });
+    bb(rD, 'share', function (x) {
+      var pretty = JSON.stringify(JSON.parse(snapshot()), null, 2);
+      tryShare('bench-' + stamp() + '.json', pretty, 'application/json').then(function (ok) {
+        if (ok) x.flash('ok'); else copyOrFallback(x, 'SHARE / COPY', pretty);
       });
-    };
-    btnRow.appendChild(sh);
-
-    var mm = document.createElement('button');
-    mm.textContent = 'MAX';
-    mm.title = 'Expand/collapse text (scroll)';
-    mm.style.cssText = btnStyle();
-    mm.onclick = function (ev) {
-      ev.stopPropagation();
-      panelExpanded = !panelExpanded;
-      if (panelExpanded) {
-        txt.style.pointerEvents = 'auto';
-        txt.style.overflow = 'auto';
-        txt.style.maxHeight = '55vh';
-        mm.textContent = 'MIN';
-      } else {
-        txt.style.pointerEvents = 'none';
-        txt.style.overflow = 'hidden';
-        txt.style.maxHeight = '45vh';
-        txt.scrollTop = 0;
-        mm.textContent = 'MAX';
-      }
-    };
-    btnRow.appendChild(mm);
-
-    /* v11.19: dump TERPISAH pasca-boot (warm/bake) */
-    [['POST COPY', null], ['POST JSON', 'json'], ['POST TXT', 'txt']].forEach(function (c) {
-      var x = document.createElement('button');
-      x.textContent = c[0];
-      x.style.cssText = btnStyle();
-      x.onclick = function (ev) {
-        ev.stopPropagation();
-        var s = pbSnapshot();
-        console.log('[bench-post]', s);
-        if (c[1] == null) {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(s).then(function () { x.textContent = 'COPIED'; setTimeout(function () { x.textContent = c[0]; }, 1500); }, function () { showCopyFallback(c[0], s); });
-          } else showCopyFallback(c[0], s);
-          return;
-        }
-        var t = c[1] === 'json' ? JSON.stringify(JSON.parse(s), null, 2) : pbTxt(s), name = 'bench-post-' + stamp() + '.' + c[1];
-        if (saveFile(name, t, c[1] === 'json' ? 'application/json' : 'text/plain')) { x.textContent = 'SAVED'; setTimeout(function () { x.textContent = c[0]; }, 1500); }
-        else showCopyFallback(c[0], t);
-      };
-      btnRow.appendChild(x);
     });
-
+    /* v11.19: dump TERPISAH pasca-boot (warm/bake) */
+    var rP = grp('post');
+    bb(rP, 'copy', function (x) { var s = pbSnapshot(); console.log('[bench-post]', s); copyOrFallback(x, 'POST COPY', s); });
+    bb(rP, 'json', function (x) { var s = pbSnapshot(); saveAs(x, 'POST JSON', 'bench-post-' + stamp() + '.json', JSON.stringify(JSON.parse(s), null, 2), 'application/json'); });
+    bb(rP, 'txt', function (x) { var s = pbSnapshot(); saveAs(x, 'POST TXT', 'bench-post-' + stamp() + '.txt', pbTxt(s), 'text/plain'); });
+    /* scroll ringkasan */
+    var mm = bb(rP, 'scroll', function () {
+      panelExpanded = !panelExpanded;
+      txt.classList.toggle('sc', panelExpanded);
+      mm.classList.toggle('on', panelExpanded);
+      if (!panelExpanded) txt.scrollTop = 0;
+    });
     document.body.appendChild(box);
     mark('dcl');
     var blue = document.getElementById('boot-cap-blue');
