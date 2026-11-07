@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="dumul-css/index.css?v=102">
+<link rel="stylesheet" href="dumul-css/index.css?v=103">
 <!-- Three.js (ES module) diunduh + diparse lebih awal, paralel (three.module -> three.core tidak lagi berurutan). fetchpriority low: tidak nyaingin CSS/script utama. URL + ?v= HARUS sama persis dgn AST3D_CFG.lib, SHELL service-worker.js, dan import di dalam three.custom.r186.js -> kalau naikkan ?v=, ganti semuanya. -->
 <link rel="modulepreload" href="dumul-js/obs/lib/three.custom.r186.js?v=1" fetchpriority="low">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
@@ -312,15 +312,15 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=32"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=49"></script>
+<script defer src="dumul-js/obs/i18n.js?v=50"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
 <script defer src="dumul-js/obs/js/01-core.js?v=146"></script>
-<script defer src="dumul-js/obs/js/02-sky-logic.js?v=153"></script>
+<script defer src="dumul-js/obs/js/02-sky-logic.js?v=154"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=114"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=156"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=192"></script>
-<script defer src="dumul-js/obs/js/06-interaction.js?v=130"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=193"></script>
+<script defer src="dumul-js/obs/js/06-interaction.js?v=131"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=186"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=4"></scr'+'ipt>');})();
@@ -360,7 +360,7 @@
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=7"></script>
 <script defer src="dumul-js/obs/js/17-planet3d.js?v=58"></script>
 <script defer src="dumul-js/obs/js/18-tune3d.js?v=19"></script>
-<script defer src="dumul-js/obs/js/22-sky-now.js?v=2"></script>
+<script defer src="dumul-js/obs/js/22-sky-now.js?v=3"></script>
 <script>
 /* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
    (semua script defer sudah jalan, global SECT/WORMHOLE/PROBE ada). Sengaja TIDAK di SHELL service-worker.js dan bukan <script src> di atas;
