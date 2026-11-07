@@ -782,6 +782,7 @@ function sectJumpTo(s,carry,always){
     /* pusat + radius cincin overview: PT3D.ovR langsung (ptOvR() basi >1200 ms kalau sky sempat berhenti menggambar); cadangan = horizon BH x ovK */
     var bp=(typeof ptOvPos==='function')?ptOvPos():camBH(),R=(typeof PT3D!=='undefined'&&PT3D.ovR>2)?PT3D.ovR:0;   /* P4: mulut wormhole di titik portal yang sedang mengorbit (orbit dibekukan selama transisi) */
     if(!(R>2)){try{R=BH.R*ptOvK();}catch(eR){R=0;}}
+    if(typeof ptOvLiftArm==='function')bp=ptOvLiftArm(bp,R);   /* v435: portal di limb -> titik gate di atas limb (lihat 15-portal3d.js); ?ptlift=0 = mati */
     var okO=false;
     try{if(typeof WORMHOLE!=='undefined')okO=!!WORMHOLE.gate(s,[bp[0],bp[1]],R,function(){sectZoomIn(s);});}catch(eW){}
     if(!okO)sectZoomIn(s);

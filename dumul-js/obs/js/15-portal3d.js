@@ -72,6 +72,7 @@ var PT3D_CFG={
 try{
   if(/[?&]portal3d=0(&|$)/.test(location.search)||localStorage.getItem('dumul_portal3d')==='0')PT3D_CFG.on=false;
   if(/[?&]pt2d=1(&|#|$)/.test(location.search)||/[?&]portal3d=2d(&|#|$)/.test(location.search)||localStorage.getItem('dumul_pt2d')==='1'||localStorage.getItem('dumul_portal3d')==='2d')PT3D_CFG.force2d=true;   /* saklar pt2d */
+  PT3D_CFG.ovLift=/[?&]ptlift=0(&|#|$)/.test(location.search)?0:1;   /* v435 A/B: ?ptlift=0 = tanpa angkat portal dari limb saat charge dive (perilaku lama: portal loncat ke depan planet saat cincin pindah ke kanvas wormhole) */
   var _ob=/[?&]ovaltboot=([0-9]+)/.exec(location.search);if(_ob)PT3D_CFG.ovAltBoot=parseInt(_ob[1],10);
   var _oa=/[?&]ovalt=([0-9]+)/.exec(location.search);if(_oa)PT3D_CFG.ovAlt=parseInt(_oa[1],10);   /* A/B: ?ovalt=0 = perilaku lama (alt hanya FS.slow/heavy), ?ovalt=3 = periode 3 */
 }catch(ePT0){}
@@ -814,6 +815,20 @@ function ptOvDest(){
 /* posisi portal overview terakhir yang digambar (ruang stage). Dipakai tap/drag (06), jangkar wormhole (05), lampu planet (17). Tanpa data -> posisi BH. */
 function ptOvPos(){return(PT3D.ovX!=null)?[PT3D.ovX,PT3D.ovY]:camBH();}
 /* (P4 lama: portal hilang di balik planet) sekarang selalu false, orbit biasa tanpa terbit/tenggelam */
+/* v435: portal overview yang orbitnya sedang di limb digambar DI BALIK planet (kanvas sky), tapi saat dive cincin pindah ke kanvas wormhole (z 13, di atas planet) -> portal loncat ke depan planet.
+   Solusi: sebelum charge, hitung titik tujuan = posisi yang membuat tepi bawah cincin tepat di atas limb (planetObjClamp, sink 0). Titik itu dipakai sebagai pos gate (awal terowongan),
+   dan selama 'enter' (charge 0..1) portal digeser dari posisi orbit ke titik itu (ptSmooth) di portal3dOverview -> sampai travel sudah di atas limb, tidak ada lompatan.
+   Cuma hitungan angka (tanpa kanvas/render baru). Mengembalikan pos yang dipakai gate; PT3D.lift = {dx,dy} (stage) atau null kalau tidak perlu. */
+function ptOvLiftArm(bp,R){
+  PT3D.lift=null;
+  try{
+    if(!PT3D_CFG.ovLift||!(R>2)||typeof planetObjClamp!=='function'||(typeof reduce!=='undefined'&&reduce))return bp;
+    var q=planetObjClamp(bp[0],bp[1],R,0),dx=q[0]-bp[0],dy=q[1]-bp[1];
+    if(!(isFinite(dx)&&isFinite(dy))||(Math.abs(dx)<.5&&Math.abs(dy)<.5))return bp;
+    PT3D.lift={dx:dx,dy:dy};
+    return q;
+  }catch(e){PT3D.lift=null;return bp;}
+}
 function ptOvHidden(){return false;}
 
 /* Periode selang-seling GL cincin overview (0 = render tiap frame). Lokal portal: tidak menyentuh FS.*, PL3D_CFG, atau unit 3D lain.
@@ -837,7 +852,8 @@ function portal3dOverview(now,bp,R){
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringOwned&&WORMHOLE.ringOwned())return true;   /* zoom-in dari overview (F2): cincin digambar di kanvas wormhole; ovR/ovT sengaja tidak diperbarui (portal tidak bisa di-tap selama transisi) */
   var op=portalOrbit(now,bp,Rp),px=op.x,py=op.y,tk=PT3D_CFG.tiltOv||0;
   Rp*=op.s||1;   /* orbit ala drone: sedikit membesar di sisi dekat, mengecil di sisi jauh (PT3D_CFG.orb.depth); ovR (hit-test tap) ikut */
-  var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
+  var ch=ptWhCharge(),Rd=Rp*(1+PT_SWELL*ch*ch*(3-2*ch));
+  if(PT3D.lift){if(ch>0){var lu=ptSmooth(ch);px+=PT3D.lift.dx*lu;py+=PT3D.lift.dy*lu;}else if(!(typeof whBusy==='function'&&whBusy()))PT3D.lift=null;}   /* v435: angkat dari limb selama charge; basi (gate gagal / sudah selesai) dibuang */   /* muatan 12 plat + cincin membengkak, sama seperti portal sektor */
   var ova=ptOvAlt(now,ch),ovo=null;
   if(ch>0||tk>0||ova){ovo=PT3D.ovO||(PT3D.ovO={ch:0,tilt:0,alt2:0,ov:1});ovo.ch=ch;ovo.tilt=tk;ovo.alt2=ova;}   /* objek dipakai ulang (tanpa alokasi per frame); alt2/ov cuma diset dari sini -> menu sektor (16) dan zoom wormhole (09) tidak terpengaruh */
   if(!smenuHidesSky()&&!(typeof PX!=='undefined'&&PX.pt))portal3dDraw(g,px,py,Rd,now,1,ovo);   /* window menu sektor terbuka: kanvasnya yang memakai renderer 3D bersama */
