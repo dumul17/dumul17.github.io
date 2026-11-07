@@ -1715,6 +1715,7 @@ function bandDimDraw(){
 /* Mode kamera = sensor teleskop masa depan: TANPA halo (halo = kesan polusi cahaya), TANPA diffraction spike dan TANPA cincin Airy (lensa pembelok cahaya sudah membelokkannya menjauh dari inti).
    Bintang = titik inti berwarna; bintang bernama yang terang dapat lensa pembelok cahaya (camLens) saat zoom tinggi. */
 var CAM_LBL_Z=4.5;   /* zoom mulai munculnya label semua bintang bernama (mode kamera) */
+var LBL_LIMB_GAP=6;   /* jarak aman (px) label bintang SFX aktif ke limb planet (planetLblLimit di 17-planet3d.js); label di bawah garis ini digeser/dipindah kandidat. 0 = nempel limb, -999 = guard mati (A/B) */
 var RING_R=3.6;   /* ambang s.r bintang rasi yang dapat lensa pembelok cahaya (≈ bintang bernama paling terang: Sirius, Spica, Arcturus, Betelgeuse, Rigel, ...) — diturunkan lewat ringR() saat zoom */
 var _czV=-1,_czK=1;
 function camZK(){if(skyZoom!==_czV){_czV=skyZoom;_czK=skyZoom<=1?1:Math.min(3,Math.sqrt(skyZoom));}return _czK;}   /* inti bintang membesar ~akar zoom: x2 1.4×, x5 2.2×, x10 3.2× (dipotong 3×). Ubah rumus/batas di sini kalau kurang/kebanyakan. */
@@ -1913,7 +1914,8 @@ function drawStars(c,age,now){
       if(_spE){if(s._wSk!==_spE){g.font='500 8px "Space Grotesk",system-ui,sans-serif';s._wS=g.measureText(_spE).width;s._wSk=_spE;g.font='500 10px "Space Grotesk",system-ui,sans-serif';}_wS=s._wS;}
       var _pn=s.nx<0?-1:1,_dyP=(s.dy||0),_cd=[[_pn*gapH,3+_dyP,_pn<0?'r':'l'],[-_pn*gapH,3+_dyP,_pn<0?'l':'r']];
       if(!_sp){_cd.push([0,-(r*2.2+12),'c'],[0,r*2.2+16,'c']);}
-      var _ft=lblFit(now,x,y,Math.max(_wT,_wS)+_sp,_spE?21:12,_cd),_nx=_ft[2]==='r'?-1:1;
+      var _lm=(isPlaying&&typeof planetLblLimit==='function')?planetLblLimit(LBL_LIMB_GAP):null,   /* guard limb: label bintang SFX aktif tidak boleh tenggelam di balik planet */
+          _ft=lblFit(now,x,y,Math.max(_wT,_wS)+_sp,_spE?21:12,_cd,_lm),_nx=_ft[2]==='r'?-1:1;
       g.textAlign=_ft[2]==='r'?'right':(_ft[2]==='c'?'center':'left');
       var labelX=x+_ft[0], labelY=y+_ft[1];
       var labelAlpha=lblA*(isPlaying?.95:1);

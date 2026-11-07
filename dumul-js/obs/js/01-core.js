@@ -208,7 +208,7 @@ function lblUiSeed(){
   }
   for(i=0;i<_lblUi.r.length;i++){rr=_lblUi.r[i];LBLR.push([rr[0],rr[1],rr[2],rr[3],rr[4]]);}
 }
-function lblFit(now,x,y,w,h,cands){
+function lblFit(now,x,y,w,h,cands,lim){   /* lim (opsional) = fungsi (x0,x1)->y batas BAWAH kotak label (layar tegak), mis. limb planet (planetLblLimit); label yang melewatinya dipindah ke kandidat lain / digeser naik */
   var sx=x,sy=y,limW=W,limH=H,m=6,i,j,cd,x0,x1,y0,y1,ov,col,sc,r,best=null,bs=1e9,dx=0,dy=0;
   if(STG.rot){var pp=v2c(x,y);sx=pp[0];sy=pp[1];limW=STG.iw;limH=STG.ih;}
   if(LBLR.t!==now){LBLR.length=0;LBLR.t=now;lblUiSeed();}
@@ -217,6 +217,7 @@ function lblFit(now,x,y,w,h,cands){
     x0=cd[2]==='r'?sx+cd[0]-w:(cd[2]==='c'?sx+cd[0]-w/2:sx+cd[0]);x1=x0+w;
     y0=sy+cd[1]-9;y1=y0+h;
     ov=Math.max(0,m-x0)+Math.max(0,x1-(limW-m))+Math.max(0,8-y0)+Math.max(0,y1-(limH-m));
+    if(lim)ov+=Math.max(0,y1-lim(x0,x1));
     col=0;for(j=0;j<LBLR.length;j++){r=LBLR[j];if(x0<r[1]&&x1>r[0]&&y0<r[3]&&y1>r[2])col+=r[4]||1;}   /* kotak UI (r[4]=1.6) lebih 'terlarang' daripada label lain */
     sc=ov*10+col*40+i*.01;
     if(sc<bs){bs=sc;best=[cd,x0,x1,y0,y1];}
@@ -225,6 +226,7 @@ function lblFit(now,x,y,w,h,cands){
   x0=best[1];x1=best[2];y0=best[3];y1=best[4];
   if(x0<m)dx=m-x0;else if(x1>limW-m)dx=limW-m-x1;
   if(y0<8)dy=8-y0;else if(y1>limH-m)dy=limH-m-y1;
+  if(lim){var lmB=lim(x0+dx,x1+dx);if(y1+dy>lmB){dy=lmB-y1;if(y0+dy<8)dy=8-y0;}}   /* guard limb: geser naik sampai kotak label di atas limb (tetap tidak keluar atas layar) */
   LBLR.push([x0+dx,x1+dx,y0+dy,y1+dy,1]);
   return [best[0][0]+dx,best[0][1]+dy,best[0][2]];
 }

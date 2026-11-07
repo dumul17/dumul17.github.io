@@ -1431,6 +1431,15 @@ function planetSinkDepth(x,y,r,live){
   var q=pl3dScr(x,y),gm=pl3dGeom(!live,!live),dx=q[0]-gm.cx,limb=gm.cy-Math.sqrt(Math.max(0,gm.R*gm.R-dx*dx));
   return (q[1]+r-limb)/r;
 }
+/* Guard label bintang aktif (SFX bunyi): kembalikan fungsi lim(x0,x1) = y layar tegak TERBAWAH yang boleh ditempati kotak label (x0..x1) supaya tidak tenggelam di balik limb.
+   Limb tertinggi di rentang x ada di kolom terdekat ke cx. gap = jarak aman ke limb (px; aurora/glow ada di atas limb). null = planet tidak tampil / cam mode (tidak ada yang dijaga).
+   Geometri live (parallax/zoom ikut), sama dengan planetObjClamp. Dihitung sekali per panggilan, murah (1 label SFX per frame). */
+function planetLblLimit(gap){
+  if(!(PL3D_CFG.on&&PL3D.al>.5)||(typeof CAMERA_MODE!=='undefined'&&CAMERA_MODE))return null;
+  pl3dSync();if(!PW||!PH)return null;
+  var gm=pl3dGeom(false,false),g=gap==null?6:gap;
+  return function(x0,x1){var xc=gm.cx<x0?x0:(gm.cx>x1?x1:gm.cx);return pl3dLimbY(gm,xc)-g;};
+}
 function planetBhOk(x,y,r){
   if(!pl3dBhOn())return true;
   pl3dSync();if(!PW||!PH)return true;
