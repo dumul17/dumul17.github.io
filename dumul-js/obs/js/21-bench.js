@@ -650,6 +650,7 @@
     R.three = (window.THREE && window.THREE.REVISION) || null; R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
     R.off = window.__offL || null; R.pt2d = window.__pt2d != null ? window.__pt2d : null; try { R.pt3d = typeof PT3D !== 'undefined' ? { state: PT3D.state, err: PT3D.err || '' } : null; } catch (ePt) { R.pt3d = null; } R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {tqb:window.__tqb!=null?window.__tqb:null,tqp:window.__tqp!=null?window.__tqp:null,yp:q.yp,n:q.n,nb:q.nb,bj:q.bj,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null; R.rwPre = window.__rwPre || null; try { R.barG = window.__barG ? window.__barG() : null; } catch (eBg) { R.barG = null; } R.rw = window.__rw || null; R.enteredAt = window.__enteredAt != null ? Math.round(window.__enteredAt) : null; R.gpup = window.__gpuP ? 1 : 0;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
     try { R.sc = typeof scDumpObj === 'function' ? scDumpObj() : null; } catch (eSc) { R.sc = null; }   /* starcache (04-render.js): ?starcache=1 */
+    try { R.cfg = cfgOut(); } catch (eCf) { R.cfg = null; }
     R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
 
@@ -1155,6 +1156,13 @@
     var stc = null; try { if (typeof ST_C === 'object' && ST_C.f) stc = { frames: ST_C.f, stb: STB.slice(), '_cols': 'per frame: n = bintang digambar, haloPx2 = jumlah luas halo (pi*(5r)^2, px CSS) per ember s/m/l', n: ST_C.n.map(function (v) { return r1(v / ST_C.f); }), haloPx2: ST_C.a.map(function (v) { return Math.round(v * 25 * 3.1416 / ST_C.f); }) }; } catch (eSc) {}
     return { on: PM.on, stCnt: stc, abTok: OS.ab || null, perfHudActive: !!window.PERF, qOrder: PM.qo || null, off: window.__offL || null, offSeqRuns: OS.runs.length > 1 || (OS.runs[0] && OS.runs[0].kind === 'abab') ? OS.runs.map(function (q) { return { kind: q.kind, ab: q.ab, t0: q.t0, ms: q.ms, phases: q.log.map(function (p) { return p[0]; }) }; }) : null, offSeq: OS.log.length ? { cols: '[fase, lapisan mati, t ms]', kind: OS.kind, phases: OS.log, ms: OS.ms, selesai: !OS.on && OS.i >= OS.n } : null, firstFrames: PM.ff, '_cols': 'seg: [nama, rata2 ms/frame, max ms] (waktu sejak pmk sebelumnya); avgJs = rata2 total kerja JS frame', modes: modes, worst: PM.worst.slice().sort(function (a, b) { return b[2] - a[2]; }) };
   }
+  /* v11.29p: setelan aktif yang mempengaruhi rasa halus (planet bands/rate/q, portal spin/alt/res) + ukuran kanvas hasilnya, supaya dump antar HP bisa dibandingkan tanpa menebak. */
+  function cfgOut() {
+    var o = {}, P = typeof PL3D_CFG !== 'undefined' ? PL3D_CFG : null, T = typeof PT3D_CFG !== 'undefined' ? PT3D_CFG : null;
+    try { if (P) o.pl = { fps: P.fps, bands: P.bands, bandMin: P.bandMin, q: P.q, qSlow: P.qSlow, rwSlow: P.rwSlow, qEff: typeof pl3dQ === 'function' ? pl3dQ() : null, rw: typeof PL3D !== 'undefined' ? PL3D.rw : null, rh: typeof PL3D !== 'undefined' ? PL3D.rh : null, PW: typeof PW !== 'undefined' ? PW : null }; } catch (e1) {}
+    try { if (T) o.pt = { spin: T.spin, alt: T.alt, ovAlt: T.ovAlt, resMin: T.resMin, resMax: T.resMax, dpr: typeof DPR !== 'undefined' ? DPR : null }; } catch (e2) {}
+    return o;
+  }
   function fsOut() {
     var f = typeof FS !== 'undefined' ? FS : null;
     return f ? { slow: f.slow, heavy: f.heavy, ema: Math.round(f.ema * 10) / 10, mode: f.mode, why: f.why, hlog: f.hlog, '_hlog_cols': '[abs ms, 1=heavy ON/0=OFF, ema]' } : null;
@@ -1197,7 +1205,7 @@
       threeWarm: tw ? { total: tw.total, done: tw.done, busy: tw.busy, qlen: tw.q ? tw.q.length : null } : null,
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
-      pmk: pmOut(), fsState: fsOut(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
+      pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
     };

@@ -31,6 +31,7 @@ var PL3D_CFG={
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:Math.max(1.25,Math.min(2,(typeof devicePixelRatio==='number'&&devicePixelRatio>0)?devicePixelRatio:1)),   /* skala resolusi render (x px CSS) = DPR layar, dijepit 1,25..2 (v23: dulu fixed 2 = oversampling ±1,5x piksel di HP DPR 1,6; planet GPU-bound). Dulu 5 (25 sampel/px, mubazir). DPR >= 2 tetap 2 (sama seperti sebelumnya) */
+  rwSlow:450,        /* [v54] batas lebar kanvas render strip (px) saat governor FS.slow; 0 = mati. Lebar render = PW (px CSS) x q, jadi HP DPR rendah dgn layar CSS lebar (mis. 450 px @ DPR 1,6) dulu dapat kanvas ±1,56x lebih besar dari HP 360 px @ DPR 2 (563 vs 450 px; dump 7 Nov Redmi 8A vs itel) padahal sama-sama GPU-bound. q efektif = min(qSlow, max(1, rwSlow / PW)). ?plrw=N = A/B (0 = perilaku lama) */
   qSlow:1.25,        /* (v23: dulu 1,5) skala resolusi saat governor FS.slow (HP lambat): dipakai kalau 0 < qSlow < q. Probe: q 1,5 -> 1 hemat ±18 ms/frame di HP dpr 1,6 (GPU-bound), ±2 ms di HP dpr 2,0. 0 = mati (selalu pakai q) */
   fps:15,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
   slowAur:1,      /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe; jarak keyframe = PL3D_AUR_KF) */
@@ -114,6 +115,7 @@ PL3D_CFG.pal={lo:PL3D_CFG.ov.lo.slice(),mid:PL3D_CFG.ov.mid.slice(),hi:PL3D_CFG.
 try{
   var _pq=(location.search.match(/[?&]planet3d=(\w+)/)||[])[1]||localStorage.getItem('dumul_planet3d')||'';
   if(_pq==='0')PL3D_CFG.on=false;else if(_pq==='2d')PL3D_CFG.force2d=true;
+  var _prw=/[?&]plrw=(\d+)/.exec(location.search);if(_prw)PL3D_CFG.rwSlow=parseInt(_prw[1],10);   /* [v54] A/B: ?plrw=0 = tanpa batas lebar saat FS.slow (perilaku lama), ?plrw=563 dst */
 }catch(ePL0){}
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
   rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0,cv3:null,c3:null,cyc:null,full:true,bwR:null};
@@ -734,7 +736,7 @@ function pl3dBuild(){
 }
 
 /* ukuran strip + kanvas 2D penyimpan hasil (kanvas WebGL offscreen tidak dijamin menyimpan isinya antar-task) */
-function pl3dQ(){var q=PL3D_CFG.q,qs=PL3D_CFG.qSlow;return(qs>0&&qs<q&&typeof FS!=='undefined'&&FS.slow)?qs:q;}   /* q efektif: lebih kecil saat FS.slow */
+function pl3dQ(){var C=PL3D_CFG,q=C.q,qs=C.qSlow,w=C.rwSlow;if(typeof FS==='undefined'||!FS.slow)return q;if(qs>0&&qs<q)q=qs;if(w>0&&typeof PW!=='undefined'&&PW>0)q=Math.min(q,Math.max(1,w/PW));return q;}   /* [v54] + batas lebar absolut rwSlow saat FS.slow */   /* q efektif: lebih kecil saat FS.slow */
 function pl3dResize(){
   pl3dSync();
   var gm=pl3dGeom(true,false,true),q=pl3dQ(),rw=Math.max(8,Math.round(PW*q)),rh=Math.max(4,Math.round(gm.stripH*q));
