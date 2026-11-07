@@ -7,7 +7,7 @@
    - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
      Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v439'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v440'; /* naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v3';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -30,12 +30,12 @@ const SHELL = [
   /* harus sama persis dengan <script src> di index.html */
   'dumul-js/obs/sky-data.js?v=32',
   'dumul-js/obs/texts.js?v=1',
-  'dumul-js/obs/i18n.js?v=48',
+  'dumul-js/obs/i18n.js?v=49',
   'dumul-js/obs/i18n-sky.js?v=2',
   'dumul-js/obs/i18n-texts.js?v=1',
   'dumul-js/obs/js/00-rain.js?v=8',
   'dumul-js/obs/js/01-core.js?v=146',
-  'dumul-js/obs/js/02-sky-logic.js?v=152',
+  'dumul-js/obs/js/02-sky-logic.js?v=153',
   'dumul-js/obs/js/03-gargantua.js?v=114',
   'dumul-js/obs/js/04-render.js?v=156',
   'dumul-js/obs/js/05-sector-ui.js?v=192',
@@ -52,7 +52,7 @@ const SHELL = [
   'dumul-js/obs/js/16-sector-menu.js?v=7',
   'dumul-js/obs/js/17-planet3d.js?v=58',
   'dumul-js/obs/js/18-tune3d.js?v=19',
-  'dumul-js/obs/js/22-sky-now.js?v=1',
+  'dumul-js/obs/js/22-sky-now.js?v=2',
   'dumul-js/obs/lib/three.custom.r186.js?v=1',
   'img/nebula.webp?v=1',
   'img/milky-way.webp?v=3',
