@@ -191,9 +191,7 @@ function pt3dDrive(it,tm){
   try{tm.push(Math.round(performance.now()-t0));window.__pt3dT=tm;}catch(e){}
   if(r.done)return;
   if(typeof THREE_Q!=='undefined'){
-    var nx=function(){if(PT3D.state!==1)return;try{pt3dDrive(it,tm);}catch(e){pt3dFail(e&&e.message||e);}};
-    if(tm.length===4)nx.hv=1;   /* tahap 4 = setSize pra-ukur (±355-465 ms): selalu mulai sesudah yield (12-ast3d v34, THREE_QH) */
-    THREE_Q.q.unshift(nx);
+    THREE_Q.q.unshift(function(){if(PT3D.state!==1)return;try{pt3dDrive(it,tm);}catch(e){pt3dFail(e&&e.message||e);}});
   }else pt3dDrive(it,tm);
 }
 function pt3dBuild(){pt3dDrive(pt3dBuildG(),[]);}
