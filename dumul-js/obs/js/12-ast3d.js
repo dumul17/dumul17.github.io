@@ -9,6 +9,7 @@
 var AST3D_CFG={
   on:true,
   lib:'dumul-js/obs/lib/three.custom.r186.js?v=1',   /* ES module (r186, bundle tree-shaken: cuma class yang dipakai). Path + ?v= harus sama dgn SHELL service-worker */
+  rwSlow:450,    /* [v38] batas lebar kanvas GL batu (px perangkat) saat governor FS.slow; 0 = mati. pr efektif = min(pr, max(1, rwSlow / W)). Dulu Redmi 8A (W 450 CSS, DPR 1,6) dapat 562x965 vs itel (W 360) 450x792 = ±1,52x piksel padahal sama-sama GPU-bound; sama logikanya dgn PL3D_CFG.rwSlow. Tidak slow: tidak berubah. ?astrw=N = A/B (0 = perilaku lama) */
   dprMax:1.25,   /* resolusi render dibatasi: batu kecil (1-4 px) + lembut, nggak perlu DPR penuh. v23: dulu 1,5; kalau masih berat coba 1 */
   procVariants:6,
   reuse:true,    /* cache hasil render per pass: kalau pan/zoom/posisi BH/layout nggak berubah, GL + astStep cuma jalan ~fps (bawah), frame lain tinggal blit cache. false = render tiap frame seperti dulu */
@@ -424,8 +425,14 @@ function ast3dPick(a){
   return AST3D.vars[0];
 }
 
+var _arw=/[?&]astrw=(\d+)/.exec(location.search);if(_arw)AST3D_CFG.rwSlow=parseInt(_arw[1],10);   /* [v38] A/B: ?astrw=0 = tanpa batas lebar saat FS.slow (perilaku lama) */
+function ast3dPr(){
+  var pr=Math.min(DPR||1,AST3D_CFG.dprMax),w=AST3D_CFG.rwSlow;
+  if(w>0&&W>0&&typeof FS!=='undefined'&&FS.slow)pr=Math.min(pr,Math.max(1,w/W));   /* [v38] sama dgn pl3dQ: batas lebar absolut saat FS.slow */
+  return pr;
+}
 function ast3dResize(){
-  var pr=Math.min(DPR||1,AST3D_CFG.dprMax);
+  var pr=ast3dPr();
   if(AST3D.w===W&&AST3D.h===H&&AST3D.pr===pr)return;
   AST3D.w=W;AST3D.h=H;AST3D.pr=pr;
   AST3D.pw=Math.max(1,Math.floor(W*pr));AST3D.ph=Math.max(1,Math.floor(H*pr));   /* piksel perangkat (sama dgn kanvas lama: floor(W*pr)); pixelRatio renderer selalu 1 */
