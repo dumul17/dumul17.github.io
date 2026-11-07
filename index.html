@@ -326,7 +326,7 @@
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=3"></scr'+'ipt>');})();
 </script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=15"></script>
-<script defer src="dumul-js/obs/js/09-wormhole.js?v=44"></script>
+<script defer src="dumul-js/obs/js/09-wormhole.js?v=45"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=9"></script>
 <script>
 /* Live counter (Firebase): sekarang termasuk PRA-KAPSUL. 07-boot.js memanggil window.__liveLoad() begitu 3D + warm shader selesai (layar boot masih menutup, lihat blok PRA-KAPSUL di sana),
@@ -642,7 +642,7 @@ if ('serviceWorker' in navigator) {
 <script>/* Bench (21-bench.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau URL punya ?bench=1. document.write supaya jalan SINKRON di titik ini
    (sebelum semua script defer) — wrapper rIC / WebGLRenderer / observer harus terpasang sebelum modul jalan, jadi TIDAK bisa pindah ke 19-auto-debug.js (dimuat setelah window load).
    Sengaja TIDAK di SHELL service-worker (sama seperti 19/20). Naikkan ?v= kalau isi 21-bench.js berubah. */
-(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.29v"></scr'+'ipt>');}catch(e){}})();
+(function(){try{if(/[?&]bench=1(&|$)/.test(location.search))document.write('<scr'+'ipt src="dumul-js/obs/js/21-bench.js?v=11.29w"></scr'+'ipt>');}catch(e){}})();
 </script>
 </body>
 </html>
