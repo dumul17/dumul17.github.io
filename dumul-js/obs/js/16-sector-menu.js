@@ -40,6 +40,7 @@ var SMENU_CSS=
 '#sect-menu .sm-dot[aria-current=true]::before{background:rgba(110,229,255,1);box-shadow:0 0 8px rgba(110,229,255,.9);transform:scale(1.25)}'+
 '#sect-menu .sm-nm{font-size:17px;font-weight:600;letter-spacing:.22em;padding-left:.22em;text-transform:uppercase;text-align:center}'+
 '#sect-menu .sm-tt{font-size:12px;opacity:.7;text-align:center;min-height:1.3em}'+
+'#sect-menu .sm-tn{color:#ffe08a;font-size:10px;font-weight:600;letter-spacing:.14em;white-space:nowrap}#sect-menu .sm-tn[hidden]{display:none}'+
 '#sect-menu .sm-meta{display:flex;gap:12px;align-items:center;justify-content:center;font-size:11px;letter-spacing:.08em;opacity:.8;min-height:16px}'+
 '#sect-menu .sm-il{display:inline-flex;gap:6px}'+
 '#sect-menu .sm-il i{width:8px;height:8px;border-radius:50%;box-sizing:border-box;border:1px solid rgba(200,214,226,.3)}'+
@@ -100,7 +101,7 @@ function smenuBuild(){
       '<div class="sm-info">'+
         '<div class="sm-dots"></div>'+
         '<div class="sm-nm"></div><div class="sm-tt"></div>'+
-        '<div class="sm-meta"><span class="sm-cnt"></span><span class="sm-il"></span></div>'+
+        '<div class="sm-meta"><span class="sm-cnt"></span><span class="sm-tn" hidden></span><span class="sm-il"></span></div>'+
         '<div class="sm-st" aria-live="polite"></div>'+
         '<div class="sm-tele" hidden><button type="button" class="sm-tg" data-a="tele" role="switch" aria-checked="true"><span class="sm-tgk"></span><span class="sm-tgt"></span></button>'+
           '<label class="sm-al"><input type="checkbox" data-c="auto"><span class="sm-alt"></span></label></div>'+
@@ -167,6 +168,8 @@ function smenuRefresh(){
   a.querySelector('.sm-nm').textContent=st==='empty'?'???':String(s.name||s.k);
   a.querySelector('.sm-tt').textContent=st==='empty'?'':(s.title||'');
   a.querySelector('.sm-cnt').textContent=st==='empty'?'':smenuTx('smenu.count',s.ids.length+' rasi',{n:s.ids.length});
+  var tnEl=a.querySelector('.sm-tn'),tnOn=st!=='empty'&&typeof SKYNOW!=='undefined'&&SKYNOW.tonight()===s.k;   /* 22-sky-now.js: sektor tertinggi malam ini */
+  if(tnEl){tnEl.hidden=!tnOn;tnEl.textContent=tnOn?'\u2605 '+smenuTx('smenu.tonight','MALAM INI'):'';}
   il=a.querySelector('.sm-il');
   if(st!=='empty'&&typeof txInterlock==='function'){var x=txInterlock(s);il.innerHTML='<i class="y'+(x.y?' on':'')+'"></i><i class="p'+(x.p?' on':'')+'"></i>';}
   else il.innerHTML='';

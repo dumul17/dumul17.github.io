@@ -901,7 +901,7 @@ function drawShooting(now){
   if(now>nextSS&&!SW){
     /* BGM on: jarak acak tapi lebih sering; jumlah meteor aktif dibatasi (lebih ketat di HP kecil). */
     var ofxOn=OFX.p>.35,ofxCap=W<500?2:4;
-    nextSS=now+(ofxOn?(W<500?3300+Math.random()*3700:2000+Math.random()*3200):6000+Math.random()*7000);
+    nextSS=now+(ofxOn?(W<500?3300+Math.random()*3700:2000+Math.random()*3200):6000+Math.random()*7000)*(typeof SKYNOW!=='undefined'?SKYNOW.ssK():1);   /* 22-sky-now.js: hujan meteor asli = lebih sering */
     if(SS_MODE!==0&&!(ofxOn&&SS.length>=ofxCap)){
       var ang=(.14+Math.random()*.14)*Math.PI,sp=560+Math.random()*320,dir=Math.random()<.5?1:-1;
       var nm={x:dir>0?Math.random()*W*.6:W-Math.random()*W*.6,y:Math.random()*H*.35,vx:Math.cos(ang)*sp*dir,vy:Math.sin(ang)*sp,t:now,life:850};
