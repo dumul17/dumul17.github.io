@@ -224,8 +224,13 @@ var THREE_Q={q:[],run:false};
    - warm: antrean THREE_WARM (semua unit): items [objN, idleMs, preMs, cpuMs, slices, totalMs] per renderer (maks 24); idleMs = tunggu requestIdleCallback, preMs = pra-ukur kanvas,
      cpuMs = jumlah badan irisan (cstep/step) atau compile+render jalur lama, totalMs = dari threeWarmNext sampai selesai (sisanya = tunggu yield/compileAsync);
      gapMs = jeda 150 ms antar-item dijumlah. objN = jumlah objek scene (ciri modul: ±7-8 AST3D, ±43 SCP3D, ±12 DR3D, ±14 PT3D, 1 PL3D). */
-var THREE_QS={n:0,runMs:0,waitMs:0,waitMax:0,tmo:0,lw:0,lv:'',turns:[],warm:{n:0,idleMs:0,cpuMs:0,sl:0,gapMs:0,last:0,items:[]}};
+var THREE_QS={n:0,runMs:0,waitMs:0,waitMax:0,tmo:0,nb:0,bj:0,lw:0,lv:'',turns:[],warm:{n:0,idleMs:0,cpuMs:0,sl:0,gapMs:0,last:0,items:[]}};
 try{window.__threeQ=THREE_QS;}catch(eQ){}
+/* BATCH GILIRAN (v33): giliran kecil tidak perlu yield satu frame masing-masing (bench 7 Nov: 22 giliran < 60 ms menunggu 2,3-2,6 dtk, run-nya cuma ±0,3 dtk).
+   threeQNext menjalankan giliran berikutnya LANGSUNG (tanpa rAF + setTimeout 0) selama giliran sebelumnya < TQB_TURN ms DAN batch (sejak giliran pertamanya) < TQB_BATCH ms.
+   Giliran sebelumnya >= TQB_TURN ms -> yield seperti biasa. ?tqb=0 = perilaku lama (A/B). Bench: nb = jumlah batch (= jumlah yield), bj = giliran yang digabung (tanpa yield), waitMs = total tunggu. */
+var TQB_TURN=8,TQB_BATCH=24;
+var THREE_QB=(function(){var on=true;try{on=!/[?&]tqb=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__tqb=on?1:0;}catch(e2){}return on;})();
 var THREE_QN=['SCP3D','DR3D','PT3D','PL3D','AST3D'];
 function threeQLens(){try{return [(window.__scp3dT||[]).length,(window.__dr3dT||[]).length,(window.__pt3dT||[]).length,(window.__pl3dT||[]).length,(window.__ast3dT||[]).length];}catch(e){return [0,0,0,0,0];}}
 function threeQRec(a,l0,w,v){
@@ -237,12 +242,23 @@ function threeQRec(a,l0,w,v){
 function threeWarmRec0(){var W={t0:0,idle:0,pre:0,cpu:0,sl:0,n:0};try{W.t0=performance.now();var S=THREE_QS.warm;if(S.last>0)S.gapMs+=W.t0-S.last;}catch(e){}return W;}
 function threeWarmRec1(W){try{var S=THREE_QS.warm,t=performance.now();S.n++;S.idleMs+=W.idle;S.cpuMs+=W.cpu;S.sl+=W.sl;S.last=t;if(S.items.length<24)S.items.push([W.n,Math.round(W.idle),Math.round(W.pre),Math.round(W.cpu),W.sl,Math.round(t-W.t0)]);}catch(e){}}
 function threeQNext(){
-  var f=THREE_Q.q.shift();
-  if(!f){THREE_Q.run=false;return;}
-  var qa=0,ql=[0,0,0,0,0],qw=THREE_QS.lw,qv=THREE_QS.lv;
-  try{qa=performance.now();ql=threeQLens();}catch(eq){}
-  try{f();}catch(e){try{console.warn('[three] build modul gagal:',e&&e.message||e);}catch(e2){}}
-  try{threeQRec(qa,ql,qw,qv);}catch(eq2){}
+  var bt=0,f,qa,ql,qw,qv,tr;
+  try{bt=performance.now();THREE_QS.nb++;}catch(e0){}
+  for(;;){
+    f=THREE_Q.q.shift();
+    if(!f){THREE_Q.run=false;return;}
+    qa=0;ql=[0,0,0,0,0];qw=THREE_QS.lw;qv=THREE_QS.lv;
+    try{qa=performance.now();ql=threeQLens();}catch(eq){}
+    try{f();}catch(e){try{console.warn('[three] build modul gagal:',e&&e.message||e);}catch(e2){}}
+    try{threeQRec(qa,ql,qw,qv);}catch(eq2){}
+    /* batch: lanjut langsung kalau giliran barusan ringan, batch belum 24 ms, dan masih ada giliran di antrean */
+    if(!THREE_QB||!THREE_Q.q.length)break;
+    try{
+      var now=performance.now();
+      if(now-qa>=TQB_TURN||now-bt>=TQB_BATCH)break;
+      THREE_QS.lw=0;THREE_QS.lv='b';THREE_QS.bj++;
+    }catch(eq3){break;}
+  }
   threeQWait();
 }
 function threeQWait(){
