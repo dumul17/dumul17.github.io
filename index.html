@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="dumul-css/index.css?v=103">
+<link rel="stylesheet" href="dumul-css/index.css?v=104">
 <!-- Three.js (ES module) diunduh + diparse lebih awal, paralel (three.module -> three.core tidak lagi berurutan). fetchpriority low: tidak nyaingin CSS/script utama. URL + ?v= HARUS sama persis dgn AST3D_CFG.lib, SHELL service-worker.js, dan import di dalam three.custom.r186.js -> kalau naikkan ?v=, ganti semuanya. -->
 <link rel="modulepreload" href="dumul-js/obs/lib/three.custom.r186.js?v=1" fetchpriority="low">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
@@ -278,7 +278,7 @@
   <div id="cam-zrow"><span class="cz-label">CAM</span><div id="cam-zwrap"><input type="range" id="cam-zslider" min="0" max="1000" step="1" value="0" aria-label="Camera zoom" data-i18n-aria="cam.zoom.aria"></div><span class="cz-val" id="cam-zoom-val">1×</span></div>
   <span class="cz-hint" data-i18n="cam.hint">TAP ‹ › TO ZOOM TO A CONSTELLATION</span>
   <div id="cam-focus"><button type="button" id="cf-prev" aria-label="Previous constellation" data-i18n-aria="cam.prev.aria">‹</button><button type="button" id="cf-name" aria-pressed="false" data-off="1" aria-label="Toggle focus lock">FOCUS LOCK · OFF</button><button type="button" id="cf-next" aria-label="Next constellation" data-i18n-aria="cam.next.aria">›</button></div>
-  <div id="cam-band"><button type="button" id="cb-btn" data-band="vis" aria-pressed="false" aria-label="Spectral band filter: visible, ultraviolet, infrared">BAND · VIS</button><button type="button" id="cl-btn" data-off="0" aria-pressed="false" aria-label="Toggle constellation lines" data-i18n-aria="cam.lines.aria">LINES · ON</button><button type="button" id="ca-btn" aria-label="Constellation log" data-i18n="ach.btn" data-i18n-aria="ach.aria">LOG</button></div>
+  <div id="cam-band"><button type="button" id="cb-btn" data-band="vis" aria-pressed="false" aria-label="Spectral band filter: visible, ultraviolet, infrared">BAND · VIS</button><button type="button" id="cl-btn" data-off="0" aria-pressed="false" aria-label="Toggle constellation lines" data-i18n-aria="cam.lines.aria">LINES · ON</button><button type="button" id="ca-btn" aria-label="Constellation log" data-i18n="ach.btn" data-i18n-aria="ach.aria">LOG</button><button type="button" id="cs-btn" aria-label="Capture sky and share" title="Capture sky and share" data-i18n-aria="cam.snap.aria"><svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.3"/></svg></button></div>
 </div>
 <div id="cam-whisper" aria-live="polite"></div>
 <div id="cam-cat" aria-live="polite"></div>
@@ -312,10 +312,10 @@
 <script>/* pengaman: kalau i18n.js gagal dimuat (path salah / cache lama), T() tetap ada supaya boot tidak macet. i18n.js menimpanya kalau berhasil dimuat. */window.T=window.T||function(k,v){var s=k,i;if(v)for(i in v)s=s.split("{"+i+"}").join(v[i]);return s;};</script>
 <script defer src="dumul-js/obs/sky-data.js?v=32"></script>
 <script defer src="dumul-js/obs/texts.js?v=1"></script>
-<script defer src="dumul-js/obs/i18n.js?v=50"></script>
+<script defer src="dumul-js/obs/i18n.js?v=51"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=146"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=147"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=154"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=114"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=156"></script>
