@@ -363,7 +363,10 @@ var DUMUL_CHARS=(function(){
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
      [PATCH v175] Masuk LOG BOOT ("Persiapan akhir"). [PATCH v181] Sekarang juga masuk bobot bar (WT_PRE) dan baris status ke-7 (boot.pre.*): bar tidak lagi tertahan di 99% menunggu PRE. */
   var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
-  function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
+  /* [PATCH v186] sc (tampilan teleskop) cuma kerja kalau SCP3D_WF nyala (?scwf=1). Kalau mati, preFin('sc') selesai 0 ms tanpa kerja apa pun: jangan dicatat di log boot dan jangan ikut bobot bar. */
+  function scOff(){return typeof SCP3D_WF!=='undefined'&&!SCP3D_WF;}
+  function wtPre(k){return (k==='sc'&&scOff())?0:WT_PRE[k];}
+  function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO)&&!(k==='sc'&&scOff()))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
     try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
   function preStart(){
     if(pre.at>=0)return;
@@ -455,7 +458,7 @@ var DUMUL_CHARS=(function(){
   var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
   /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
   var WT_PRE={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300},WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1600},PRE_KEYS=['ui','ast','pl','fb','sc','rg'];
-  var WT_SUM=WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+WT_PRE.ui+WT_PRE.ast+WT_PRE.pl+WT_PRE.fb+WT_PRE.sc+WT_PRE.rg;
+  function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){
@@ -595,18 +598,20 @@ var DUMUL_CHARS=(function(){
       if(o.state===2)k=tot;
       else if(m[3])k=window[m[1]]?window[m[1]].length:0;
       else k=(m[1]&&window[m[1]]&&window[m[1]].length>=3)?1:0;
-      while(n<k&&n<tot){st=logStage(m,n);ev.push({k:'ok',g:'st',mod:i,s:st?nm+' \u00b7 '+st:nm+' '+T('bl.ready')});n++;}
+      while(n<k&&n<tot){st=logStage(m,n);ev.push({k:'ok',g:'st',mod:i,s:st?nm+' \u00b7 '+st+' \u00b7 '+(n+1)+'/'+tot:nm+' '+T('bl.ready')});n++;}   /* v186: + n/tot (tot = tahap bernama + 1 penutup) */
       logN[i]=n;
-      if(!cur&&thr&&n<tot)cur=nm+' \u00b7 '+(logStage(m,n)||T('bl.a.load'));
+      if(!cur&&thr&&n<tot)cur=nm+' \u00b7 '+(logStage(m,n)||T('bl.a.load'))+(m[3]?' \u00b7 '+(n+1)+'/'+tot:'');
     }
     /* [PATCH v175] LENSA = warm shader THREE_WARM (bobot bar WT_WARM, terbesar ke-2). Tiap unit selesai = 1 baris x/y (y = unit yang sudah antre + modul yang belum push, sama dgn bar), lalu "Lensa siap".
        Prioritas LIVE di bawah tahap modul (cur dari loop di atas), di atas BGM/bintang. */
     var wq=window.THREE_WARM,wx,pk,M2,tl,tt,li;
     if(thr&&bootTh&&wq&&wq.total>0){
       wx=Math.max(bootTh.exp,wq.total,wq.done);logN.wm=logN.wm|0;
-      while(logN.wm<wq.done){logN.wm++;ev.push({k:'ok',g:'wm',s:T('bl.warm')+' \u00b7 '+logN.wm+'/'+wx});}
+      /* [PATCH v186] y (= unit antre + modul yang belum push) naik selama masih ada modul yang belum antre, jadi "7/9" bisa berubah jadi "8/10". Selama pend>0 tampilkan x saja; x/y baru muncul kalau y sudah pasti. */
+      var wy=bootTh.pend>0?'':'/'+wx;
+      while(logN.wm<wq.done){logN.wm++;ev.push({k:'ok',g:'wm',s:T('bl.warm')+' \u00b7 '+logN.wm+wy});}
       if(bootTh.warmOk){if(!logN.wmOk){logN.wmOk=1;ev.push({k:'ok',s:T('bl.warm')+' '+T('bl.ready')});}}
-      else if(!cur)cur=T('bl.warm')+' \u00b7 '+T('bl.a.warm')+' \u00b7 '+wq.done+'/'+wx;
+      else if(!cur)cur=T('bl.warm')+' \u00b7 '+T('bl.a.warm')+' \u00b7 '+wq.done+wy;
     }
     /* [PATCH v175] PRA-KAPSUL (preEv diisi preFin): suara tombol, gambar batu, hitungan pengamat. Yang timeout / gagal tidak dicatat; "siap" hanya kalau ketiganya beres tanpa masalah. */
     while(preEv.length){pk=preEv.shift();ev.push({k:'ok',g:'pr',s:T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk)});}
@@ -624,7 +629,7 @@ var DUMUL_CHARS=(function(){
       e=warmEv.shift();
       if(e.k==='g'){
         if(e.w==='s')gargOn=true;
-        else if(gargOn){gargOn=false;ev.push({k:'dec',min:GL_MIN});ev.push({k:'ok',s:T('bl.glitch')+' '+T('bl.ready')});}
+        else if(gargOn){gargOn=false;ev.push({k:'dec',min:GL_MIN});ev.push({k:'ok',s:T('bl.glitch.ok')});}
       }else if(e.k==='b'){bgmN++;bgmNm=e.nm;ev.push({k:'ok',s:T('bl.bgm')+' \u00b7 '+e.nm+' \u00b7 '+bgmN+'/'+bgmTot});}
       else{starN++;sfxNm=e.nm;ev.push({k:'ok',g:'sfx',s:T('bl.sfx')+' \u00b7 '+e.nm+' \u00b7 '+starN+'/'+starTot});}
     }
@@ -641,7 +646,7 @@ var DUMUL_CHARS=(function(){
     }
     /* [PATCH v175] LIVE prioritas terbawah (kalau BGM / bintang masih nunggu jaringan, itu yang tampil): pra-kapsul yang masih jalan, lalu warm nyata batu + nebula */
     if(!cur&&pre.at>=0&&!preAll()){
-      for(i=0;i<PRE_KEYS.length;i++){pk=PRE_KEYS[i];if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)){cur=T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk);break;}}
+      for(i=0;i<PRE_KEYS.length;i++){pk=PRE_KEYS[i];if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)&&!(pk==='sc'&&scOff())){cur=T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk);break;}}
     }
     if(!cur&&M2&&!WR.entered){
       if(typeof AST3D!=='undefined'&&AST3D.warmReal&&!M2.ast)cur=T('bl.rock')+' \u00b7 '+T('bl.a.wast');
@@ -657,15 +662,16 @@ var DUMUL_CHARS=(function(){
   /* Jeda tiap baris antrean: makin menumpuk makin pendek; sesudah kapsul tampil dibatasi 50 ms. Baris decode punya jeda sendiri (min). */
   function logDwell(it){
     if(it.k==='dec')return it.min;
-    var L=logQ.length,d=L>14?45:(L>8?60:(L>4?80:110));
-    return logFin?Math.min(d,50):d;
+    var L=logQ.length,d=L>14?90:(L>8?110:(L>4?130:170));   /* [PATCH v186] dulu 45/60/80/110 ms: mata tidak sempat baca. Antrean sudah jauh lebih pendek sejak baris sejenis dilipat (logQNext). */
+    return logFin?Math.min(d,60):d;
   }
   function logQNext(){
     var it,j,dup;
     while(logQ.length){
       it=logQ.shift();
-      if(it.g==='st'&&logQ.length>5){   /* menumpuk: tahap modul yang sama cukup yang terakhir */
-        dup=false;for(j=0;j<logQ.length;j++){if(logQ[j].g==='st'&&logQ[j].mod===it.mod){dup=true;break;}}
+      if(it.g&&logQ.length>2){   /* [PATCH v186] menumpuk: baris sejenis (tahap modul yang sama / Lensa x / bintang x/16 / warna nebula) cukup yang terakhir, karena counter-nya sudah memuat yang sebelumnya. 'pr' (Persiapan akhir) tidak dilipat: tiap barisnya beda hal. */
+        dup=false;
+        if(it.g!=='pr')for(j=0;j<logQ.length;j++){if(logQ[j].g===it.g&&(it.g!=='st'||logQ[j].mod===it.mod)){dup=true;break;}}
         if(dup)continue;
       }
       return it;
@@ -821,7 +827,7 @@ var DUMUL_CHARS=(function(){
     var complete=vis&&au.ok&&sx.ok&&pr.ok;   /* PRE ikut gerbang (tiap langkah dibatasi PRE_MAX, jadi tidak bisa menggantung) */
     var wDone=(ready?WT_PAGE:0)+th.warmFrac*WT_WARM+(au.total?au.n/au.total:1)*WT_AUDIO+(sx.total?sx.n/sx.total:1)*WT_SFX,wi;
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])wDone+=WT_MODS[wi];
-    for(wi=0;wi<PRE_KEYS.length;wi++)if(pr[PRE_KEYS[wi]]===2)wDone+=WT_PRE[PRE_KEYS[wi]];   /* v181: langkah PRE selesai (sukses/gagal/timeout = gerbang kapsul juga lepas) */
+    for(wi=0;wi<PRE_KEYS.length;wi++)if(pr[PRE_KEYS[wi]]===2)wDone+=wtPre(PRE_KEYS[wi]);   /* v181: langkah PRE selesai (sukses/gagal/timeout = gerbang kapsul juga lepas) */
     var astF=0;   /* v177: AST3D beririsan -> tahap selesai ikut mengisi bar (jujur: hanya tahap nyata), rayapan di bawah cuma untuk sisanya */
     try{if(!th.fins[0]&&th.st[0]===1&&window.__ast3dT){astF=Math.min(.95,window.__ast3dT.length/(LOG_M[0][3].length+1));wDone+=WT_MODS[0]*astF;}}catch(eAf){}
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
@@ -833,14 +839,14 @@ var DUMUL_CHARS=(function(){
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi+(wi===0?'_'+((window.__ast3dT&&window.__ast3dT.length)|0):''),!th.fins[wi]&&th.st[wi]===1,wi===0?WT_MODS[0]*(1-astF):WT_MODS[wi],wi===0?WT_MODS[0]/6:WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
-    for(wi=0;wi<PRE_KEYS.length;wi++)wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,WT_PRE[PRE_KEYS[wi]],WT_PRE_EST[PRE_KEYS[wi]],elapsed);   /* v181 */
+    for(wi=0;wi<PRE_KEYS.length;wi++)wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),WT_PRE_EST[PRE_KEYS[wi]],elapsed);   /* v181 */
     if(!sx.ok&&sx.total>0){
       var per=WT_SFX/sx.total;
       wc+=crp('s'+sx.n,warmed,per,per,elapsed);   /* v151: per langkah metadata selesai */
       /* [PATCH v157] creep tipis selama ada slot aktif — bar tidak diam total di antara dua loadedmetadata; tetap di bawah CREEP_CAP */
       if(warmed&&warmActive>0)wc+=crp('sAct',true,per*0.35,per*1.2,elapsed);
     }
-    var p=Math.min(99,Math.floor((wDone+wc)/WT_SUM*100));
+    var p=Math.min(99,Math.floor((wDone+wc)/wtSum()*100));
     if(p<pLast)p=pLast;
     pLast=p;
     return {ready:ready,th:th,au:au,sx:sx,pre:pr,vis:vis,complete:complete,all:vis&&au.ok&&sx.ok&&pr.ok,p:p};
