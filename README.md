@@ -11,7 +11,7 @@ Live: [dumul17.github.io](https://dumul17.github.io/)
 
 | Page | HTML | Styles | Scripts | Description |
 |---|---|---|---|---|
-| **Observatory** | `index.html` | `dumul-css/index.css` | `dumul-js/obs/js/00-rain.js` … `18-tune3d.js` (`01`–`18` are the app, `19`–`21` are lazy dev tools), plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
+| **Observatory** | `index.html` | `dumul-css/index.css` | `dumul-js/obs/js/00-rain.js` … `18-tune3d.js` (`01`–`18` and `22` are the app, `19`–`21` are lazy dev tools), plus the data files `sky-data.js`, `texts.js` and the language layer `i18n.js`, `i18n-sky.js`, `i18n-texts.js` (all in `dumul-js/obs/`) | Full-screen interactive sky: 4 seasonal sectors, 23 constellations, Gargantua, 16 stellar SFX, music HUD, observation tools, wormhole gates, drone relay, EN/ID language switch, easter eggs, and the DUMUL portal |
 | **DUMUL** | `dumul.html` | `dumul-css/dumul.css` | `dumul-js/lmr/dumul.js`, `dumul-js/lmr/dumul-app.js` | DUMUL album page with five selectable transmissions, synced lyrics, track notes, spectrum/seek UI, and seamless Gargantua handoff |
 | **PWA / offline** | `manifest.json`, `icons/` | -- | `service-worker.js` | Installable app, offline shell, and opt-in offline audio archive |
 
@@ -62,6 +62,7 @@ Orion's belt, and the transition into DUMUL runs through that belt
     sector), `constellation` BGM, `collapsars` BGM, volume slider, shuffle /
     repeat buttons, a Portal Spectrum visualizer toggle, observed-state
     tracking, signal counter, and live spectrum indicators
+-   **Sky tonight** (`22-sky-now.js`, pure math from the visitor's own clock: no API, no location permission, works offline). A **moon phase icon + illumination %** sits at the end of the HUD clock. The **sector menu** marks the sector whose stars stand highest in the visitor's local sky tonight (sidereal time from the timezone offset; the sector names are only northern-hemisphere season labels, the stars are what is computed). During a real **meteor shower** (peak ±3 days, table in the file) random shooting stars come more often, and a one-time toast announces the shower or a full / new moon.
 -   **Observation Mode** and **Radio Silence**
 -   **BGM-reactive sky** (visual only, follows whichever BGM is playing):
     `constellation` makes the constellation lines and stars "breathe"
