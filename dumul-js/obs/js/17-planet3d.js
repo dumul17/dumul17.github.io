@@ -31,6 +31,7 @@ var PL3D_CFG={
                     lod 1 = seperti dulu; .5 = tekstur bertahan lebih dekat ke horizon (pita mulus menyempit); .25 = paling tajam (bisa berkilau/moire). Lebar pita juga ikut persp (makin besar persp = makin lebar) */
   fadeS:10,       /* tanah memudar jadi TRANSPARAN menuju horizon (px dari tepi bola; 0 = mati/opak seperti dulu). Mis. 40 = 40px terakhir ke horizon makin tembus, bintang di belakang kelihatan */
   q:Math.max(1.25,Math.min(2,(typeof devicePixelRatio==='number'&&devicePixelRatio>0)?devicePixelRatio:1)),   /* skala resolusi render (x px CSS) = DPR layar, dijepit 1,25..2 (v23: dulu fixed 2 = oversampling ±1,5x piksel di HP DPR 1,6; planet GPU-bound). Dulu 5 (25 sampel/px, mubazir). DPR >= 2 tetap 2 (sama seperti sebelumnya) */
+  bmAdapt:{on:1,ema:55,hold:15000},   /* [v55] bandMin EFEKTIF adaptif (hanya kalau bandMin < bands): kalau FS.slow dan FS.ema >= ema (ms) TERUS-MENERUS selama hold (ms), pita dikunci = bands (spt Min bands 6) sampai reload (LATCH satu arah: sesudah pita naik, ema turun ke ±45-58 jadi tidak bisa dibedakan lagi dari HP kuat, jadi tidak ada jalan balik). Dasar: Redmi 8A Min bands 1 sektor 7,6 fps / p50 137 ms vs Min bands 6 18,9 fps / p50 51 ms; itel Min bands 1 vs 6 sama (22,8 vs 21,6 fps), ema itel di sektor ±43-47 dgn lonjakan transisi <=10 dtk, Redmi bands 1 >=55 terus 30+ dtk. ?bmad=0 = nonaktif (A/B) */
   rwSlow:450,        /* [v54] batas lebar kanvas render strip (px) saat governor FS.slow; 0 = mati. Lebar render = PW (px CSS) x q, jadi HP DPR rendah dgn layar CSS lebar (mis. 450 px @ DPR 1,6) dulu dapat kanvas ±1,56x lebih besar dari HP 360 px @ DPR 2 (563 vs 450 px; dump 7 Nov Redmi 8A vs itel) padahal sama-sama GPU-bound. q efektif = min(qSlow, max(1, rwSlow / PW)). ?plrw=N = A/B (0 = perilaku lama) */
   qSlow:1.25,        /* (v23: dulu 1,5) skala resolusi saat governor FS.slow (HP lambat): dipakai kalau 0 < qSlow < q. Probe: q 1,5 -> 1 hemat ±18 ms/frame di HP dpr 1,6 (GPU-bound), ±2 ms di HP dpr 2,0. 0 = mati (selalu pakai q) */
   fps:15,          /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
@@ -115,6 +116,7 @@ PL3D_CFG.pal={lo:PL3D_CFG.ov.lo.slice(),mid:PL3D_CFG.ov.mid.slice(),hi:PL3D_CFG.
 try{
   var _pq=(location.search.match(/[?&]planet3d=(\w+)/)||[])[1]||localStorage.getItem('dumul_planet3d')||'';
   if(_pq==='0')PL3D_CFG.on=false;else if(_pq==='2d')PL3D_CFG.force2d=true;
+  try{if(/[?&]bmad=0(?:&|#|$)/.test(location.search))PL3D_CFG.bmAdapt.on=0;}catch(eBm){}   /* [v55] A/B: ?bmad=0 = tanpa latch bandMin adaptif */
   var _prw=/[?&]plrw=(\d+)/.exec(location.search);if(_prw)PL3D_CFG.rwSlow=parseInt(_prw[1],10);   /* [v54] A/B: ?plrw=0 = tanpa batas lebar saat FS.slow (perilaku lama), ?plrw=563 dst */
 }catch(ePL0){}
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
@@ -1297,6 +1299,15 @@ function planet3dDraw(now){
       var nb=Math.max(1,Math.min(8,PL3D_CFG.bands|0));
       if(nb>1&&typeof FS!=='undefined'&&FS.slow&&FS.ema>0){   /* pita adaptif (CUMA saat governor FS.slow; perangkat kuat / ?fs=0 = pita penuh): satu refresh harus selesai dalam ~1000/fps ms; frame lambat -> pita lebih sedikit (min bandMin) */
         var bmn=Math.max(1,Math.min(nb,(PL3D_CFG.bandMin|0)||nb)),bfit=Math.floor(1000/Math.max(1,PL3D_CFG.fps)/Math.max(16.7,FS.ema));
+        var BA=PL3D_CFG.bmAdapt;
+        if(BA&&BA.on&&bmn<nb){   /* [v55] latch bandMin efektif = bands (lihat PL3D_CFG.bmAdapt) */
+          if(PL3D.bmL&&now-PL3D.bmL>500)PL3D.bmT=0;PL3D.bmL=now;   /* planet tidak digambar >0,5 dtk (menu/zoom/wormhole): ukur ulang */
+          if(!PL3D.bmHi){
+            if(FS.ema>=BA.ema){if(!PL3D.bmT)PL3D.bmT=now;else if(now-PL3D.bmT>=BA.hold){PL3D.bmHi=1;PL3D.bmAt=Math.round(now);}}
+            else PL3D.bmT=0;
+          }
+          if(PL3D.bmHi)bmn=nb;
+        }
         nb=Math.max(bmn,Math.min(nb,bfit));
       }
       var perOnly=!PL3D.dirty&&!settle&&!palCh&&!parCh&&!(lMv>(rotMov?40:.5));   /* refresh murni periodik (kerlip/awan/rotasi): boleh cross-fade. Selain itu (palette, parallax, cahaya, dirty) tampil langsung */
