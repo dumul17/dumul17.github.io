@@ -239,6 +239,7 @@
     'toast.hud':{en:'HUD RESTORED',id:'HUD KEMBALI'},
     'toast.camon':{en:'CONSTELLATION CAMERA\nTAP ‹ › TO FOCUS',id:'KAMERA RASI\nKETUK ‹ › UNTUK FOKUS'},
     'toast.camoff':{en:'CAMERA OFF',id:'KAMERA MATI'},
+    'cam.snap.aria':{en:'Capture sky and share',id:'Tangkap langit dan bagikan'},'snap.saved':{en:'IMAGE SAVED',id:'GAMBAR TERSIMPAN'},'snap.fail':{en:'CAPTURE FAILED',id:'GAGAL MENANGKAP'},'snap.share.text':{en:"A sky captured with Dumul's Observatory",id:"Langit hasil tangkapan Dumul's Observatory"},
     'toast.camreq':{en:'CAMERA REQUIRES\nOBSERVATION MODE',id:'KAMERA BUTUH\nMODE PENGAMATAN'},
     'toast.silence':{en:'RADIO SILENCE\nAUDIO CHANNEL CLOSED',id:'RADIO HENING\nSALURAN AUDIO DITUTUP'},
     'toast.silence.on':{en:'RADIO SILENCE\n─────────────\nAUDIO FADING OUT',id:'RADIO HENING\n─────────────\nAUDIO MEMUDAR'},
