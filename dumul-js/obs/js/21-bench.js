@@ -1268,7 +1268,7 @@
       threeWarm: tw ? { total: tw.total, done: tw.done, busy: tw.busy, qlen: tw.q ? tw.q.length : null } : null,
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
-      pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
+      pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), whStats: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; } catch (eWs) { return null; } })(), whCfg: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWc) { return null; } })(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
     };

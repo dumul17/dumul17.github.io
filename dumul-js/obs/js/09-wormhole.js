@@ -186,10 +186,7 @@ var WH_RING=(function(){try{var m=/[?&]whring=([0-9]+)/.exec(location.search),v=
    ?whbloom=0 = lewati pass bloom aditif selama mulut portal masih lebih kecil dari layar (zoom). Keduanya mengubah tampilan terowongan sedikit. */
 var WH_STEP=(function(){try{var m=/[?&]whstep=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>1?v:0;}catch(e){return 2;}})();   /* v19: DEFAULT ON (2). ?whstep=0 = mati */
 var WH_NOBLOOM=(function(){try{return !/[?&]whbloom=1/.test(location.search);}catch(e){return true;}})();   /* v19: DEFAULT ON (bloom dilewati saat zoom). ?whbloom=1 = bloom normal */
-/* [v45] ?whxdpr=N (0.5-3; default 0 = MATI) = batas dpr kanvas wormhole HANYA selama fase 'exit' (T_EXIT 2,4 dtk + handoff). Latar (log 7 Nov, probe secP): punuk +-4 dtk pertama sektor = fase exit, js cuma 8-27 ms tapi wait 106-146 ms/frame
-   (kanvas layar-penuh x DPR 2 + sky di bawahnya, GPU/compositor-bound). Hanya mengganti ukuran bitmap kanvas (cv.width/height) tanpa resize()/clearBufs: drawFrame menggambar ulang seluruh kanvas tiap frame dan buffer terowongan tetap utuh,
-   jadi tidak ada kedip; durasi/urutan transisi TIDAK berubah. Konsekuensi: teleskop/mulut portal sedikit lebih lembut selama exit. Kembali normal otomatis di show()->resize() transisi berikutnya. A/B: ?whxdpr=1 vs default. */
-var WH_XDPR=(function(){try{var m=/[?&]whxdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
+/* [v46] ?whxdpr (dpr kanvas wormhole selama exit) DIBUANG: A/B ABABAB 7 Nov (itel) tidak berefek ke dt punuk sektor (133 vs 132 ms, selisih < noise) dan teleskop BURAM saat exit. JANGAN DIULANG; punuk bukan dari ukuran kanvas wormhole. */
 /* [v45] Statistik biaya per fase (zoom / tunnel / exit / close): frame, js drawFrame (ms), dt (ms), ukuran kanvas & dpr terakhir. Murah (satu objek, tanpa alokasi per frame). Dibaca bench: WORMHOLE.dbgStats(). */
 var WHS={};
 var WH_DPR=(function(){try{var m=/[?&]whdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
@@ -236,9 +233,6 @@ function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);
 function startExit(now){
   if(state!=='travel')return;
   S.r0=S.r;S.rate0=S.rate;S.e0=env;S.tx=now;S.u=0;state='exit';kick();warpFx('flash');
-  if(WH_XDPR&&cv&&dpr>WH_XDPR+.01){   /* v45: bitmap lebih kecil selama exit (tanpa resize()/clearBufs, lihat WH_XDPR) */
-    try{dpr=WH_XDPR;cv.width=Math.max(64,Math.round(W*dpr));cv.height=Math.max(64,Math.round(H*dpr));S.xd=dpr;}catch(eXd){}
-  }
 }
 function startClose(now,ms){
   if(state==='close'||state==='idle')return;
@@ -757,7 +751,7 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,xdpr:WH_XDPR};},
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG};},
   dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;}
 };
 
