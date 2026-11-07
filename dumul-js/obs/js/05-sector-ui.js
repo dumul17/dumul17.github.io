@@ -172,7 +172,7 @@ function bhScaleStep(){
 }
 /* ---- Penghalang HUD (koordinat layar): dipakai sumSpot supaya BH mini diparkir tidak menumpuk tombol HUD / teleskop ---- */
 function hudRects(){
-  var out=[],ids=['owl-source','mode-cluster','mp-now-playing','last-signal','cam-zoom','footer'],i,el,cs,r;
+  var out=[],ids=['owl-source','sky-pill','mode-cluster','mp-now-playing','last-signal','cam-zoom','footer'],i,el,cs,r;
   for(i=0;i<ids.length;i++){
     el=document.getElementById(ids[i]);if(!el)continue;
     try{

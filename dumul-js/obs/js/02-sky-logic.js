@@ -977,7 +977,6 @@ function tickClock(force){
   var day=days[now.getUTCDay()],date=now.getUTCDate(),mon=months[now.getUTCMonth()];
   var time=clockText();
   el.innerHTML='<span>'+day+' '+date+' '+mon+' UTC</span><span class="clock-sep">·</span><span class="clock-time">'+time+'</span>';
-  if(typeof SKYNOW!=='undefined')SKYNOW.moonAttach(el);   /* 22-sky-now.js: tombol fase bulan (child ke-4, ch[0..2] dilatasi jam tetap utuh) */
 }
 PORTALS.forEach(function(p){
   p.c=cons(p.cons);p.h=0;

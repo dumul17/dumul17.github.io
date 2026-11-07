@@ -38,7 +38,7 @@ function updateHover(px,py){
 }
 document.addEventListener('pointerdown',function(e){
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block'))return;
-  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#sector-scan'))return;
+  if(SECT.on||SW||drag.on||e.target.closest('#bh,.portal,.hit,#owl-source,#sky-pill,#bh-clock,#music-toggle,#music-player,#bh-panel,#mode-cluster,#mode-observe,#mode-silence,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#sector-scan'))return;
   var now=performance.now(),hit=null,best=40;
   var aligning=(typeof ALIGN!=='undefined'&&ALIGN.cid);
   /* Saat alignment aktif, Pleiades dilewatin biar nggak nyuri tap bintang urutan. */
@@ -336,7 +336,7 @@ function beginBHDrag(e){
   /* Explicit interactive star/portal layers always win over Gargantua's wide grab field.
      This is important when Rigel starts close to the black hole on the initial layout. */
   if(document.body.classList.contains('owl-open')||document.body.classList.contains('owl-block')||document.body.classList.contains('smenu-open'))return false;
-  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
+  if(e.target.closest && e.target.closest('.hit,.portal,#owl-source,#sky-pill,#bh-clock,#music-toggle,#music-player,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#bh-panel,#mode-cluster,#mode-observe,#mode-silence'))return false;
   /* Asteroid clicks get first refusal too, so a rock near Gargantua cannot start a BH drag. */
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   /* Star interactions always win over Gargantua's large invisible field. */
@@ -474,7 +474,7 @@ function beginSkyPan(e){
   /* FIX pinch zoom di cam fokus (dalam sektor): dulu SETIAP jari dicek ke hit-test bintang/asteroid/BH, dan di dalam sektor
      hampir seluruh layar = target bintang -> jari ke-2 ditolak -> pinch nggak pernah mulai. Sekarang semua kontak sentuh dicatat,
      dan jari ke-2 cuma ditolak kalau jatuh di UI (panel/tombol), bukan di bintang. */
-  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#title,#footer,#owl-source,#bh-clock,#music-toggle';
+  var UI_T='#terminal,#owl-panel,#owl-backdrop,#music-player,#bh-panel,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#title,#footer,#owl-source,#sky-pill,#bh-clock,#music-toggle';
   if(e.target.closest&&e.target.closest(UI_T))return false;
   if(!CAMERA_MODE)return false;   /* idle/mode biasa: geser + putar sky dimatikan; hanya cam constellation yang boleh */
   var multi=false;
@@ -490,7 +490,7 @@ function beginSkyPan(e){
       if(!skyPtrs[ids2[qi]])skyPtrs[ids2[qi]]={x:skyAll[ids2[qi]].x,y:skyAll[ids2[qi]].y};
     }
   }else{
-  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
+  if(e.target.closest&&e.target.closest('#terminal,.hit,.portal,#owl-source,#sky-pill,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#bh-panel,#music-toggle,#music-player,#title,#footer,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'))return false;
   if(asteroidScreenAt(e.clientX,e.clientY)>=0)return false;
   if(constellationTargetAt(e.clientX,e.clientY))return false;
   var bpSky=camBH();
@@ -862,7 +862,7 @@ window.addEventListener('keydown',function(e){
 var konamiSwipeStart=null;
 function konamiBlockedTarget(target){
   return !!(target&&target.closest&&target.closest(
-    '.hit,.portal,#owl-source,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
+    '.hit,.portal,#owl-source,#sky-pill,#owl-panel,#owl-backdrop,#bh-clock,#bh,#cam-zoom,#cg-btn,#cam-whisper,#cam-cat,#cam-ach,#lis-ask,#sect-menu,#bh-panel,#music-toggle,#music-player,#boot-screen,#signal-fragment,#cons-archive,#mode-cluster'
   ));
 }
 function konamiSwipeDirection(dx,dy){
