@@ -594,6 +594,7 @@
       try{localStorage.removeItem(LS_KEY);localStorage.removeItem(STAR_LS);}catch(e){}
       window.__layOV={};window.__scnBounds=null;location.reload();return;
     }
+    if(a.indexOf('tab-')===0){var cx=a.slice(4);hud.setAttribute('data-c',cx);['geser','nav'].forEach(function(n){var tb=hud.querySelector('[data-a=tab-'+n+']');if(tb)tb.classList.toggle('on',n===cx);});stPos();return;}
     if(a==='collapse'){collapsed=!collapsed;hud.classList.toggle('col',collapsed);stPos();return;}
     if(a==='step'){stepI=(stepI+1)%3;var sb=hud.querySelector('[data-a=step]');if(sb)sb.textContent='S'+(stepI+1);return;}
     if(a==='ovw'){if(SECT.cur&&!SECT.busy){sel=null;sectToggle();}else toast(SECT.cur?'TUNGGU ANIMASI':'SUDAH DI OVERVIEW');return;}
@@ -639,6 +640,13 @@
       '#lay-hud{position:fixed;left:0;right:0;margin:0 auto;bottom:calc(6px + env(safe-area-inset-bottom,0px));width:min(calc(100vw - 12px),348px);box-sizing:border-box;z-index:99999;font:10px/1.2 Courier New,monospace;color:#cfeffa;background:rgba(2,8,13,.8);border:1px solid rgba(110,229,255,.28);border-radius:8px;padding:3px;touch-action:manipulation}',
       '#lay-hud #lay-info{font-size:9px;height:12px;line-height:12px;color:rgba(207,239,250,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px 2px}',
       '#lay-hud .rw{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}',
+      /* konteks (tab): baris atas = tab + alat global; baris bawah = isi konteks aktif (geser | nav) */
+      '#lay-hud .rn{grid-template-columns:repeat(8,1fr)}',
+      '#lay-hud .rc[data-c=geser]{grid-template-columns:repeat(9,1fr)}',
+      '#lay-hud .rc[data-c=nav]{grid-template-columns:repeat(5,1fr)}',
+      '#lay-hud[data-c=geser] .rc[data-c=nav],#lay-hud[data-c=nav] .rc[data-c=geser]{display:none!important}',
+      '#lay-hud .t{border-color:rgba(110,229,255,.18);color:rgba(110,229,255,.6)}',
+      '#lay-hud .t.on{background:#6ee5ff;border-color:#6ee5ff;color:#04202a}',
       '#lay-hud .rw+.rw{margin-top:3px}',
       '#lay-hud button,#lay-fab{height:30px;min-width:0;padding:0;display:grid;place-items:center;border:1px solid rgba(110,229,255,.32);border-radius:5px;background:rgba(110,229,255,.07);color:#6ee5ff;font:700 10px Courier New,monospace;-webkit-tap-highlight-color:transparent}',
       '#lay-hud button svg,#lay-fab svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}',
@@ -653,11 +661,17 @@
       '#lay-hud #lay-menu button{height:28px;padding:0 14px;display:block;text-align:left;white-space:nowrap}',
       /* ciut: sisa ikon penting saja */
       '#lay-hud.col{width:fit-content;max-width:calc(100vw - 12px)}',
-      '#lay-hud.col #lay-info,#lay-hud.col .ra{display:none}',
+      '#lay-hud.col #lay-info,#lay-hud.col .rc{display:none!important}',
       '#lay-hud.col .rn{display:flex}',
       '#lay-hud.col .rn button:not(.k){display:none}',
       '#lay-hud.col .rn button.k{width:30px}',
-      '#lay-fab{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:60px;z-index:30;display:none;width:auto;padding:0 9px;line-height:28px;background:rgba(2,8,13,.85)}',
+      /* tombol EDIT (mode preview): pojok kanan-bawah, posisi sama dengan tombol dbg (19-auto-debug); kalau dbg ada, naik satu baris */
+      '#lay-fab{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:30;display:none;width:auto;height:24px;padding:0 8px;line-height:22px;background:rgba(6,11,17,.55)}',
+      '@media (max-width:520px){#lay-fab{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}}',
+      '@media (orientation:landscape) and (max-height:520px){#lay-fab{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}}',
+      'body.ls #lay-fab{translate:var(--gut,0px) 0}',
+      'body:has(#wh-autodive) #lay-fab{translate:0 -28px}',
+      'body.ls:has(#wh-autodive) #lay-fab{translate:var(--gut,0px) -28px}',
       'body.owl-open #lay-fab{display:none!important}',
       '#lay-sel{position:fixed;pointer-events:none;z-index:99990;border:1.5px dashed rgba(110,229,255,.85);border-radius:4px;box-shadow:0 0 10px rgba(110,229,255,.25);display:none}',
       '#lay-hdl{position:absolute;right:-14px;bottom:-14px;width:32px;height:32px;pointer-events:auto;touch-action:none;display:flex;align-items:flex-end;justify-content:flex-end;color:#6ee5ff;font-size:20px;line-height:1}',
@@ -701,21 +715,20 @@
     hud=document.createElement('div');hud.id='lay-hud';
     function ic(d,w){return '<svg viewBox="0 0 24 24" aria-hidden="true"'+(w?' style="stroke-width:'+w+'"':'')+'><path d="'+d+'"/></svg>';}
     function B(a,d,cls,title,w){return '<button type="button" data-a="'+a+'"'+(cls?' class="'+cls+'"':'')+' title="'+title+'" aria-label="'+title+'">'+ic(d,w)+'</button>';}
+    var IC_MOVE='M12 3 V21 M3 12 H21 M9 6 L12 3 L15 6 M9 18 L12 21 L15 18 M6 9 L3 12 L6 15 M18 9 L21 12 L18 15',IC_NAV='M12 3 a9 9 0 1 0 0 18 a9 9 0 1 0 0 -18 M15.5 8.5 L13.5 13.5 L8.5 15.5 L10.5 10.5 Z';
     hud.innerHTML=
       '<div id="lay-info"></div>'+
       '<div class="rw rn">'+
-        B('home','M3.5 11 L12 4 L20.5 11 M5.5 9.5 V20 H10 V14 H14 V20 H18.5 V9.5','','Home: keluar mode layout (draft tersimpan)')+
-        B('ovw','M8 12 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 M2 12 C2 9.5 6.5 7.5 12 7.5 S22 9.5 22 12 S17.5 16.5 12 16.5 S2 14.5 2 12','k','Overview (keluar sektor)')+
-        B('prev','M15 5 L8 12 L15 19','','Rasi sebelumnya')+
-        B('next','M9 5 L16 12 L9 19','','Rasi berikutnya')+
-        B('grp','M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z','','Edit grup: semua rasi di sektor')+
+        B('tab-geser',IC_MOVE,'t on','Geser / putar / zoom')+
+        B('tab-nav',IC_NAV,'t','Navigasi: home, overview, rasi, grup')+
         B('stars','M12 3.5 L14.6 9.3 L21 10 L16.2 14.3 L17.6 20.6 L12 17.4 L6.4 20.6 L7.8 14.3 L3 10 L9.4 9.3 Z','p','Editor bintang')+
         B('preview','M2 12 C5 6.5 8.5 5 12 5 s7 1.5 10 7 c-3 5.5 -6.5 7 -10 7 S5 17.5 2 12 Z M9.2 12 a2.8 2.8 0 1 0 5.6 0 a2.8 2.8 0 1 0 -5.6 0','p k','Preview tanpa panel')+
         B('undo','M9 14 L4 9 L9 4 M4 9 H15 a5 5 0 0 1 0 10 H8','k','Undo')+
         B('redo','M15 14 L20 9 L15 4 M20 9 H9 a5 5 0 0 0 0 10 H16','k','Redo')+
+        B('menu','M5 12 h.01 M12 12 h.01 M19 12 h.01','a','Menu: save / copy / fit / reset',3.4)+
         B('collapse','M6 9 L12 15 L18 9','k','Ciutkan / buka dock')+
       '</div>'+
-      '<div class="rw ra">'+
+      '<div class="rw rc" data-c="geser">'+
         B('l','M19 12 H5 M11 6 L5 12 L11 18','','Geser kiri')+
         B('u','M12 19 V5 M6 11 L12 5 L18 11','','Geser atas')+
         B('d','M12 5 V19 M6 13 L12 19 L18 13','','Geser bawah')+
@@ -725,9 +738,16 @@
         B('zoout','M5 12 H19','','Perkecil')+
         B('zoin','M5 12 H19 M12 5 V19','','Perbesar')+
         '<button type="button" data-a="step" title="Besar langkah (S1 kecil, S3 besar)">S2</button>'+
-        B('menu','M5 12 h.01 M12 12 h.01 M19 12 h.01','a','Menu: save / copy / fit / reset',3.4)+
+      '</div>'+
+      '<div class="rw rc" data-c="nav">'+
+        B('home','M3.5 11 L12 4 L20.5 11 M5.5 9.5 V20 H10 V14 H14 V20 H18.5 V9.5','','Home: keluar mode layout (draft tersimpan)')+
+        B('ovw','M8 12 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 M2 12 C2 9.5 6.5 7.5 12 7.5 S22 9.5 22 12 S17.5 16.5 12 16.5 S2 14.5 2 12','','Overview (keluar sektor)')+
+        B('prev','M15 5 L8 12 L15 19','','Rasi sebelumnya')+
+        B('next','M9 5 L16 12 L9 19','','Rasi berikutnya')+
+        B('grp','M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z','','Edit grup: semua rasi di sektor')+
       '</div>'+
       '<div id="lay-menu"><button type="button" data-a="save" class="a">SAVE</button><button type="button" data-a="copy" class="a">COPY</button><button type="button" data-a="tune">COPY TUNE</button><button type="button" data-a="fit">FIT ULANG</button><button type="button" data-a="rst">RESET DRAFT</button></div>';
+    hud.setAttribute('data-c','geser');
     document.body.appendChild(hud);
     info=document.getElementById('lay-info');
     var fab=document.createElement('button');fab.id='lay-fab';fab.type='button';fab.setAttribute('data-a','edit');fab.innerHTML='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M4 20 l1 -4.5 L16.5 4 a2 2 0 0 1 3 3 L8 18.5 Z"/><path d="M14.5 6 l3 3"/></svg>EDIT';document.body.appendChild(fab);
