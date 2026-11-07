@@ -186,6 +186,12 @@ var WH_RING=(function(){try{var m=/[?&]whring=([0-9]+)/.exec(location.search),v=
    ?whbloom=0 = lewati pass bloom aditif selama mulut portal masih lebih kecil dari layar (zoom). Keduanya mengubah tampilan terowongan sedikit. */
 var WH_STEP=(function(){try{var m=/[?&]whstep=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):2;return v>1?v:0;}catch(e){return 2;}})();   /* v19: DEFAULT ON (2). ?whstep=0 = mati */
 var WH_NOBLOOM=(function(){try{return !/[?&]whbloom=1/.test(location.search);}catch(e){return true;}})();   /* v19: DEFAULT ON (bloom dilewati saat zoom). ?whbloom=1 = bloom normal */
+/* [v45] ?whxdpr=N (0.5-3; default 0 = MATI) = batas dpr kanvas wormhole HANYA selama fase 'exit' (T_EXIT 2,4 dtk + handoff). Latar (log 7 Nov, probe secP): punuk +-4 dtk pertama sektor = fase exit, js cuma 8-27 ms tapi wait 106-146 ms/frame
+   (kanvas layar-penuh x DPR 2 + sky di bawahnya, GPU/compositor-bound). Hanya mengganti ukuran bitmap kanvas (cv.width/height) tanpa resize()/clearBufs: drawFrame menggambar ulang seluruh kanvas tiap frame dan buffer terowongan tetap utuh,
+   jadi tidak ada kedip; durasi/urutan transisi TIDAK berubah. Konsekuensi: teleskop/mulut portal sedikit lebih lembut selama exit. Kembali normal otomatis di show()->resize() transisi berikutnya. A/B: ?whxdpr=1 vs default. */
+var WH_XDPR=(function(){try{var m=/[?&]whxdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
+/* [v45] Statistik biaya per fase (zoom / tunnel / exit / close): frame, js drawFrame (ms), dt (ms), ukuran kanvas & dpr terakhir. Murah (satu objek, tanpa alokasi per frame). Dibaca bench: WORMHOLE.dbgStats(). */
+var WHS={};
 var WH_DPR=(function(){try{var m=/[?&]whdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
 function ringFade(){
   if(state!=='travel'||!S||!S.ring)return 0;
@@ -230,6 +236,9 @@ function kick(){if(!raf){last=performance.now();raf=requestAnimationFrame(tick);
 function startExit(now){
   if(state!=='travel')return;
   S.r0=S.r;S.rate0=S.rate;S.e0=env;S.tx=now;S.u=0;state='exit';kick();warpFx('flash');
+  if(WH_XDPR&&cv&&dpr>WH_XDPR+.01){   /* v45: bitmap lebih kecil selama exit (tanpa resize()/clearBufs, lihat WH_XDPR) */
+    try{dpr=WH_XDPR;cv.width=Math.max(64,Math.round(W*dpr));cv.height=Math.max(64,Math.round(H*dpr));S.xd=dpr;}catch(eXd){}
+  }
 }
 function startClose(now,ms){
   if(state==='close'||state==='idle')return;
@@ -713,7 +722,10 @@ function tick(now){
   cv.style.opacity=S.a>=.995?'1':S.a.toFixed(3);
   if(!(cvr>0))cvr=Math.hypot(W,H)*1.08;
   if(!isFinite(S.r)||!isFinite(S.cx)||!isFinite(S.cy)){S.r=Math.min(W,H)*.22;S.cx=W*.5;S.cy=H*.5;}
-  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs,leadMs);}
+  var _w0=performance.now();
+  try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);
+    try{var _k=state==='travel'?(S.cov?'tunnel':'zoom'):state,_o=WHS[_k]||(WHS[_k]={n:0,js:0,dt:0,max:0,cw:0,ch:0,dpr:0}),_j=performance.now()-_w0;_o.n++;_o.js+=_j;_o.dt+=dt*1000;if(_j>_o.max)_o.max=_j;_o.cw=cv.width;_o.ch=cv.height;_o.dpr=dpr;}catch(eWs){}
+    if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs,leadMs);}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
     hardStop();return;
@@ -745,7 +757,8 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG};}
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,xdpr:WH_XDPR};},
+  dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;}
 };
 
 window.addEventListener('resize',function(){if(state!=='idle'&&cv)resize();},{passive:true});
