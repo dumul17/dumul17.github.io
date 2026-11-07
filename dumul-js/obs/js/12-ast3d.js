@@ -224,17 +224,14 @@ var THREE_Q={q:[],run:false};
    - warm: antrean THREE_WARM (semua unit): items [objN, idleMs, preMs, cpuMs, slices, totalMs] per renderer (maks 24); idleMs = tunggu requestIdleCallback, preMs = pra-ukur kanvas,
      cpuMs = jumlah badan irisan (cstep/step) atau compile+render jalur lama, totalMs = dari threeWarmNext sampai selesai (sisanya = tunggu yield/compileAsync);
      gapMs = jeda 150 ms antar-item dijumlah. objN = jumlah objek scene (ciri modul: ±7-8 AST3D, ±43 SCP3D, ±12 DR3D, ±14 PT3D, 1 PL3D). */
-var THREE_QS={n:0,runMs:0,waitMs:0,waitMax:0,tmo:0,nb:0,bj:0,yp:0,py:0,lw:0,lv:'',turns:[],warm:{n:0,idleMs:0,cpuMs:0,sl:0,gapMs:0,last:0,items:[]}};
+var THREE_QS={n:0,runMs:0,waitMs:0,waitMax:0,tmo:0,nb:0,bj:0,lw:0,lv:'',turns:[],warm:{n:0,idleMs:0,cpuMs:0,sl:0,gapMs:0,last:0,items:[]}};
 try{window.__threeQ=THREE_QS;}catch(eQ){}
 /* BATCH GILIRAN (v33): giliran kecil tidak perlu yield satu frame masing-masing (bench 7 Nov: 22 giliran < 60 ms menunggu 2,3-2,6 dtk, run-nya cuma ±0,3 dtk).
    threeQNext menjalankan giliran berikutnya LANGSUNG (tanpa rAF + setTimeout 0) selama giliran sebelumnya < TQB_TURN ms DAN batch (sejak giliran pertamanya) < TQB_BATCH ms.
    Giliran sebelumnya >= TQB_TURN ms -> yield seperti biasa. ?tqb=0 = perilaku lama (A/B). Bench: nb = jumlah batch (= jumlah yield), bj = giliran yang digabung (tanpa yield), waitMs = total tunggu. */
+/* SUDAH DICOBA, JANGAN DIULANG (7 Nov): yield paksa sesudah tiap tahap PT3D (flag ?tqp) dan penanda .hv sebelum tahap berat tidak menurunkan PT3D tahap 4 (tetap 424-646 ms vs 514-626 ms tanpa yield) dan tidak mengubah waitMs/runMs/LT pre. Lihat log.txt. */
 var TQB_TURN=8,TQB_BATCH=24;
 var THREE_QB=(function(){var on=true;try{on=!/[?&]tqb=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__tqb=on?1:0;}catch(e2){}return on;})();
-/* YIELD ANTAR TAHAP PT3D (v36): batch v33 menggabung tahap 0-4 PT3D tanpa yield dan tahap 4 (setSize pra-ukur) naik 110-291 -> 570-670 ms.
-   pt3dDrive menandai THREE_QS.py=1 tiap selesai satu tahap (belum selesai semua); threeQNext lalu SELALU yield (rAF + setTimeout 0) sebelum giliran berikutnya.
-   Modul lain tetap dibatch. ?tqp=0 = matikan (A/B). Bench: threeQ.tqp (flag), threeQ.yp (jumlah yield paksa). */
-var THREE_QP=(function(){var on=true;try{on=!/[?&]tqp=0(?:&|#|$)/.test(location.search);}catch(e){}try{window.__tqp=on?1:0;}catch(e2){}return on;})();
 var THREE_QN=['SCP3D','DR3D','PT3D','PL3D','AST3D'];
 function threeQLens(){try{return [(window.__scp3dT||[]).length,(window.__dr3dT||[]).length,(window.__pt3dT||[]).length,(window.__pl3dT||[]).length,(window.__ast3dT||[]).length];}catch(e){return [0,0,0,0,0];}}
 function threeQRec(a,l0,w,v){
@@ -251,12 +248,11 @@ function threeQNext(){
   for(;;){
     f=THREE_Q.q.shift();
     if(!f){THREE_Q.run=false;return;}
-    qa=0;ql=[0,0,0,0,0];qw=THREE_QS.lw;qv=THREE_QS.lv;THREE_QS.py=0;
+    qa=0;ql=[0,0,0,0,0];qw=THREE_QS.lw;qv=THREE_QS.lv;
     try{qa=performance.now();ql=threeQLens();}catch(eq){}
     try{f();}catch(e){try{console.warn('[three] build modul gagal:',e&&e.message||e);}catch(e2){}}
     try{threeQRec(qa,ql,qw,qv);}catch(eq2){}
     /* batch: lanjut langsung kalau giliran barusan ringan, batch belum 24 ms, dan masih ada giliran di antrean */
-    if(THREE_QP&&THREE_QS.py){THREE_QS.py=0;THREE_QS.yp++;break;}   /* giliran PT3D barusan = satu tahap: yield dulu */
     if(!THREE_QB||!THREE_Q.q.length)break;
     try{
       var now=performance.now();

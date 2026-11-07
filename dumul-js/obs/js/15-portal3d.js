@@ -191,7 +191,6 @@ function pt3dDrive(it,tm){
   try{tm.push(Math.round(performance.now()-t0));window.__pt3dT=tm;}catch(e){}
   if(r.done)return;
   if(typeof THREE_Q!=='undefined'){
-    try{THREE_QS.py=1;}catch(eY){}   /* v46: tandai 'satu tahap selesai' -> threeQNext yield sebelum tahap berikut (?tqp=0 mematikan) */
     THREE_Q.q.unshift(function(){if(PT3D.state!==1)return;try{pt3dDrive(it,tm);}catch(e){pt3dFail(e&&e.message||e);}});
   }else pt3dDrive(it,tm);
 }
