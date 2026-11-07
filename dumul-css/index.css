@@ -891,6 +891,13 @@ body.game-on #ca-btn{display:block}
 #cl-btn,#ca-btn{font:600 10px/1 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase;min-width:96px;min-height:28px;padding:0 10px;border-radius:4px;cursor:pointer;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);-webkit-tap-highlight-color:transparent}
 #cl-btn[data-off="1"]{color:rgba(184,224,238,.5);background:rgba(110,229,255,.02);border-style:dashed}
 body.cam-compact #cb-btn,body.cam-compact #cl-btn,body.cam-compact #ca-btn{min-width:0;flex:1 1 auto;min-height:26px;padding:0 7px}
+/* SNAP: tangkap langit + share (tombol ikon di baris BAND/LINES) */
+#cs-btn{display:grid;place-items:center;flex:0 0 auto;width:34px;min-height:28px;padding:0;border-radius:4px;cursor:pointer;color:#8eeeff;background:rgba(110,229,255,.07);border:1px solid rgba(110,229,255,.28);-webkit-tap-highlight-color:transparent}
+#cs-btn .ico{display:block;pointer-events:none}
+#cs-btn:active{filter:brightness(1.4)}
+#cs-btn[aria-busy="true"]{opacity:.5;pointer-events:none}
+body.cam-compact #cs-btn{width:30px;min-height:26px}
+#cam-flash{position:fixed;inset:0;z-index:9;background:#eafcff;opacity:0;pointer-events:none}
 #cam-whisper,#cam-cat,#cam-ach{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));z-index:6;width:min(80vw,270px);box-sizing:border-box;transform:translateX(-50%) translateY(-8px);pointer-events:none;touch-action:manipulation;padding:7px 10px 8px;border:1px solid rgba(110,229,255,.2);border-left:2px solid var(--cc,#6ee5ff);border-radius:5px;background:rgba(2,7,12,.95);box-shadow:0 0 22px rgba(0,0,0,.5),0 0 14px color-mix(in srgb,var(--cc,#6ee5ff) 18%,transparent);opacity:0;visibility:hidden;transition:opacity .7s ease,transform .7s ease,visibility 0s linear .7s}
 #cam-whisper.on,#cam-cat.on,#cam-ach.on{opacity:1;transform:translateX(-50%) translateY(0);visibility:visible;pointer-events:auto;transition:opacity .7s ease,transform .7s ease,visibility 0s}
 body:not(.camera-mode) #cam-whisper,body:not(.camera-mode) #cam-cat,body:not(.camera-mode) #cam-ach{opacity:0!important;visibility:hidden!important;transition:none!important}
