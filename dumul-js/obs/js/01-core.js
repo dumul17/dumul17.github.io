@@ -2,7 +2,8 @@
 /* 01-core.js — setup, stage, sector scan, kamera, audio, spatial muffle, visualizer */
 'use strict';
 var $=function(s){return document.querySelector(s);};
-var cv=$('#sky'),g=cv.getContext('2d');
+/* TES KANVAS: ?cvx=alpha ({alpha:false}) | desync ({desynchronized:true}) | both. Tanpa parameter = getContext('2d') biasa (tidak berubah). */
+var cv=$('#sky'),CVX=(/[?&]cvx=(alpha|desync|both)(&|$)/.exec(location.search)||[])[1],g=cv.getContext('2d',CVX?{alpha:CVX==='desync',desynchronized:CVX!=='alpha'}:undefined);
 /* Canvas-state guard: count save()/restore() depth so frame() can always
    unwind a leak (an exception between save() and restore() used to leave
    globalCompositeOperation='lighter' stuck, making the whole sky additive,
