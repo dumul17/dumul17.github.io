@@ -476,6 +476,7 @@ function sectorScanUpdate(now){
   if(cullT!==SSC.cT){SSC.cT=cullT;if(SSC.cull)SSC.cull.textContent=cullT;}
 }
 var BHZ=1,BHK=0,BHSC=1;
+var BHPARK={on:/[?&]bhpark=(1|dbg)(&|#|$)/.test(location.search),dbg:/[?&]bhpark=dbg(&|#|$)/.test(location.search),act:0};   /* [bhpark] A/B: ?bhpark=1 = BH mini diparkir 50% terbenam di limb planet (pusat tepat di limb) dan lensing + dilatasi PASIF (act=0) sampai BH di-drag pertama kali (act=1, reset tiap parkir ulang di sumPlace). ?bhpark=dbg = sama + overlay status kiri-bawah. Tanpa flag = perilaku lama. */
 var RELAY={x0:0,y0:0,moved:false,pend:0};   /* F10: .on dihapus (relay/portal sektor pensiun); sisanya dipakai dilatasi audio BH mini (02-sky-logic.js) */
 /* OVSEL.seen = pengunjung sudah pernah membuka menu sektor -> petunjuk idle (cincin portal berdenyut, 15-portal3d.js) berhenti. (F6: .open/.t pensiun bersama ikon sektor.) */
 var OVSEL={seen:false};

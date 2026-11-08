@@ -206,9 +206,10 @@ function sumSpot(){
     PLEIADES.bright.forEach(function(z){q=skyXF(PLEIADES.x+z.x*PLEIADES.scale,PLEIADES.y+z.y*PLEIADES.scale);pts.push(q[0],q[1]);});
   }
   var rects=hudRects(),tgt=Math.max(.05,Math.min(1,BHU.size/BH_SECT_MAXSIZE)),Rv=Math.max(10,BH.R*tgt*2),
-      best=null,bs=-1e9,nx=22,ny=16;
+      best=null,bs=-1e9,nx=22,ny=16,park=BHPARK.on&&typeof planetBhPark==='function';
   for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
     var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/ny,md=320,d,sc;
+    if(park){var pk=planetBhPark(cx,cy,Rv*.5);if(pk){cx=pk[0];cy=pk[1];if(cx<x0||cx>x1||cy<0||cy>H)continue;}}   /* [bhpark] kandidat diproyeksikan ke limb: pusat BH tepat di limb = 50% terbenam (planet tidak aktif: pk null -> kandidat biasa) */
     if(typeof planetBhOk==='function'&&!planetBhOk(cx,cy,Rv*.5))continue;   /* planet (17-planet3d.js): BH boleh terbenam sedikit di balik limb, tidak lebih */
     for(k=0;k<pts.length;k+=2){d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
     sc=md-(hudHit(cx,cy,Rv+14,rects)?2000:0)-Math.hypot(cx-W*.5,cy-H*.5)*.02;   /* terjauh dari bintang; HUD bebas; seri → condong ke tengah */
@@ -220,7 +221,7 @@ function sumSpot(){
 function sumPlace(){
   var sp=sumSpot(),z=skyZoom||1,cx=W*.5,cy=H*.5;
   BH.x=cx+(sp[0]-cx)/z-skyPan.x*BHK;BH.y=cy+(sp[1]-cy)/z-skyPan.y*BHK;
-  RELAY.x0=BH.x;RELAY.y0=BH.y;RELAY.moved=false;
+  RELAY.x0=BH.x;RELAY.y0=BH.y;RELAY.moved=false;BHPARK.act=0;   /* [bhpark] parkir ulang = pasif lagi */
 }
 /* F10: summon/recall BH mini (sumSet), txAutoBH, dan stash posisi BH mini (s.bhs) dihapus. Portal/relay sektor pensiun: BH mini selalu ada & hanya bisa di-drag (dilatasi audio),
    diparkir ulang di titik kosong tiap masuk sektor (sectStep). Tombol HUD #mode-bh sekarang membuka window menu sektor. */
@@ -919,6 +920,10 @@ function frame(now){
       hoverDirty=false;lastHoverAt=now;
     }
     bhScaleStep();
+    if(BHPARK.on&&!BHPARK.act&&!drag.on&&SECT.cur&&!SECT.on&&(skyZoom||1)<=1.02&&typeof planetBhPark==='function'){   /* [bhpark] selama pasif: BH ikut limb (planet baru muncul / geometri crossfade / resize) tetap 50% terbenam; x tidak berubah */
+      var pkP=planetBhPark(BH.x,BH.y,BH.R*BHSC*Math.max(1,bhSizeMul()));
+      if(pkP&&(Math.abs(pkP[0]-BH.x)>.3||Math.abs(pkP[1]-BH.y)>.3)){BH.x+=(pkP[0]-BH.x)*.12;BH.y+=(pkP[1]-BH.y)*.12;RELAY.x0=BH.x;RELAY.y0=BH.y;}
+    }
     if(!drag.on&&SECT.cur&&!SECT.on&&(skyZoom||1)<=1.02&&typeof planetBhClamp==='function'){   /* planet: BH mini yang kebetulan di balik limb (parkir awal, resize, crossfade geometri) ditarik halus naik; sama dgn clamp drag */
       var bm0=BH.R*BHSC*Math.max(1,bhSizeMul()),pc0=planetBhClamp(BH.x,BH.y,bm0);
       if(pc0[0]!==BH.x||pc0[1]!==BH.y){BH.x+=(pc0[0]-BH.x)*.12;BH.y+=(pc0[1]-BH.y)*.12;}

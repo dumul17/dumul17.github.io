@@ -1420,9 +1420,10 @@ function planet3dDraw(now){
 function pl3dBhOn(){
   return !!(PL3D_CFG.on&&PL3D.al>.5&&typeof SECT!=='undefined'&&SECT.cur&&!(typeof CAMERA_MODE!=='undefined'&&CAMERA_MODE));
 }
+function planetBhSinkMax(){return (typeof BHPARK!=='undefined'&&BHPARK.on)?1:PL3D_CFG.bhSink*PL3D_CFG.sinkK;}   /* [bhpark] flag on = BH mini boleh terbenam sampai pusat tepat di limb (1 = 50%); off = bhSink x sinkK seperti biasa */
 function pl3dMaxY(sx,r,sink,live){   /* y layar tegak terbawah yang boleh ditempati PUSAT objek (BH / teleskop) di x=sx. live=true: limb ikut parallax/zoom yang sedang tampil */
   var gm=pl3dGeom(!live,!live),dx=sx-gm.cx,limb=gm.cy-Math.sqrt(Math.max(0,gm.R*gm.R-dx*dx));
-  return limb-r+r*(sink==null?PL3D_CFG.bhSink*PL3D_CFG.sinkK:sink);
+  return limb-r+r*(sink==null?planetBhSinkMax():sink);
 }
 /* Clamp objek bebas (teleskop, 04-render.js): sama seperti BH mini tapi aktif juga di overview, dan memakai limb yang SEDANG tampil (parallax/zoom ikut).
    x,y = koordinat STAGE, r = radius visual (px), sink = berapa x r boleh terbenam. Hasil [x,y] stage; planet tidak kelihatan -> input apa adanya. */
@@ -1450,6 +1451,26 @@ function planetLblLimit(gap){
   pl3dSync();if(!PW||!PH)return null;
   var gm=pl3dGeom(false,false),g=gap==null?6:gap;
   return function(x0,x1){var xc=gm.cx<x0?x0:(gm.cx>x1?x1:gm.cx);return pl3dLimbY(gm,xc)-g;};
+}
+/* [bhpark] titik parkir: (x,y) STAGE digeser tegak lurus limb sampai PUSAT BH (radius r) tepat di limb = 50% terbenam. null = planet tidak aktif / cam mode. */
+function planetBhPark(x,y,r){
+  if(!pl3dBhOn())return null;
+  pl3dSync();if(!PW||!PH)return null;
+  var q=pl3dScr(x,y);q[1]=pl3dMaxY(q[0],r,1);
+  return PL3D.rot<0?[STG.ih-q[1],q[0]]:(PL3D.rot>0?[q[1],STG.iw-q[0]]:[q[0],q[1]]);
+}
+/* [bhpark] cek: window.__bhpark() di konsol, atau ?bhpark=dbg = overlay kiri-bawah. sink 1.00 = pusat di limb (50% terbenam). */
+window.__bhpark=function(){
+  var r=BH.R*BHSC*Math.max(1,bhSizeMul()),sd=null;
+  try{sd=planetSinkDepth(BH.x,BH.y,r,false);}catch(e){}
+  return {flag:BHPARK.on?1:0,act:BHPARK.act,lensing:(BHPARK.on&&!BHPARK.act)?'PASIF':'AKTIF',sektor:SECT.cur||'overview',sink:sd==null?null:+sd.toFixed(3),sinkMax:planetBhSinkMax(),clockK:+(CLKD.k||0).toFixed(3),clockLagMs:Math.round(CLKD.lag||0),audioRate:+((typeof TD!=='undefined'&&TD.ar!=null)?TD.ar:1).toFixed(3)};
+};
+if(typeof BHPARK!=='undefined'&&BHPARK.dbg){
+  setInterval(function(){
+    var el=document.getElementById('bhpark-dbg'),o=window.__bhpark();
+    if(!el){el=document.createElement('div');el.id='bhpark-dbg';el.style.cssText='position:fixed;left:6px;bottom:6px;z-index:99999;pointer-events:none;font:11px/1.35 monospace;color:#7ff;background:rgba(0,0,0,.55);padding:3px 6px;border-radius:4px;white-space:pre';document.body.appendChild(el);}
+    el.textContent='bhpark '+o.sektor+' | lensing '+o.lensing+' | sink '+o.sink+'/'+o.sinkMax+'\nclock k '+o.clockK+' lag '+o.clockLagMs+'ms | audio x'+o.audioRate;
+  },250);
 }
 function planetBhOk(x,y,r){
   if(!pl3dBhOn())return true;

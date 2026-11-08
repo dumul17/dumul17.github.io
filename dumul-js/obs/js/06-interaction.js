@@ -362,6 +362,7 @@ function moveBHDrag(e){
   var mv=Math.hypot(dx,dy);
   if(mv>7)drag.moved=true;
   if(drag.moved){
+    if(SECT.cur&&BHPARK.on)BHPARK.act=1;   /* [bhpark] interaksi pertama: lensing + dilatasi aktif */
     var dz=SECT.cur?Math.max(1,skyZoom):1;dx/=dz;dy/=dz;
     var limX=Math.max(90,W*.90),limY=Math.max(90,H*.90);
     BH.x=drag.bx+Math.max(-limX,Math.min(limX,dx));
@@ -1259,7 +1260,7 @@ function updateClockDilation(now){
        Posisi jam tidak dipakai lagi. Planet tidak tampil (cam mode, menu, belum siap) -> 0. */
     var sd=null,smx=0;
     if(!document.hidden&&BHSC>.05){
-      if(SECT.cur){smx=PL3D_CFG.bhSink*PL3D_CFG.sinkK;if(smx>0)sd=planetSinkDepth(BH.x,BH.y,BH.R*BHSC*Math.max(1,bhSizeMul()),false);}
+      if(SECT.cur){smx=planetBhSinkMax();if(smx>0&&!(BHPARK.on&&!BHPARK.act))sd=planetSinkDepth(BH.x,BH.y,BH.R*BHSC*Math.max(1,bhSizeMul()),false);}
       else{var sr=ptOvR();smx=PL3D_CFG.ptSink;if(sr>0&&smx>0){var sp=ptOvPos();sd=planetSinkDepth(sp[0],sp[1],sr,true);}}
     }
     if(sd!=null&&smx>0){var su=Math.max(0,Math.min(1,sd/smx));t=su*su*(3-2*su);}

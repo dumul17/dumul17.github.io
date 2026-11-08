@@ -4,6 +4,7 @@
 function ease(u){return u*u*(3-2*u);}
 function lens(x,y){                       /* smooth gravitational lens: bounded, continuous, no visual explosions */
   if(!SECT.cur)return [x,y];     /* di overview BH tidak digambar (portal), jadi lensing galaksinya mati (disengaja) */
+  if(BHPARK.on&&!BHPARK.act)return [x,y];   /* [bhpark] BH mini parkir pasif: belum ada interaksi -> tidak ada lensing sama sekali (bintang di dalam horizon juga tidak ditelan) */
   var R=BH.Rr*(BHZ||1);if(R<1)return [x,y];
   var bp=camBH(),bx=bp[0],by=bp[1];
   var dx=x-bx,dy=y-by,d2=dx*dx+dy*dy;

@@ -971,7 +971,7 @@ function astRingFrame(){
         bet=(typeof PT3D_CFG!=='undefined'&&PT3D_CFG.orb&&PT3D_CFG.orb.bet)||1,
         beta=Math.atan(dd/sq)*bet,cb=Math.cos(beta),sb=Math.sin(beta),cyo=gm.cy-sq,
         C=ptUp2Stage(cxo,cyo),Us=ptUp2Stage(cxo+cb,cyo+sb),Vs=ptUp2Stage(cxo-sb,cyo+cb),
-        lensOn=(typeof SECT!=='undefined'&&SECT.cur)?1:0,R=BH.Rr*(BHZ||1),lz=R*9.5+8;
+        lensOn=(typeof SECT!=='undefined'&&SECT.cur&&!(BHPARK.on&&!BHPARK.act))?1:0,R=BH.Rr*(BHZ||1),lz=R*9.5+8;   /* [bhpark] pasif = batu tidak terlensa */
     return {cx:cxo,cy:cyo,ux:cb,uy:sb,vx:-sb,vy:cb,
       sx:C[0],sy:C[1],sux:Us[0]-C[0],suy:Us[1]-C[1],svx:Vs[0]-C[0],svy:Vs[1]-C[1],
       gcx:gm.cx,gcy:gm.cy,R:gm.R,R2:R2,apex:Math.max(20,cyo-PH*AST_CFG.tp),   /* apex = tinggi maks busur di atas pusat (tidak lewat tepi atas layar) */
@@ -1155,7 +1155,7 @@ function astRk(a){return a.rb?a.rb*Math.max(.06,.63+(a.k-.63)*AST_CFG.t):a.r;}
    1 = normal (jauh dari BH), AST_SLOW_MIN = hampir diam di dekat horizon. Zona: 1.6R .. 9.5R. */
 var AST_SLOW_MIN=.08;
 function astSlow(rk,R){
-  if(R<1)return 1;
+  if(R<1||(BHPARK.on&&!BHPARK.act&&SECT.cur))return 1;   /* [bhpark] pasif: orbit tidak melambat dekat horizon */
   var u=Math.max(0,Math.min(1,(rk*AST_K*AST_CFG.w*skyZoom/R-1.6)/7.9));
   return AST_SLOW_MIN+(1-AST_SLOW_MIN)*u*u*(3-2*u);
 }
@@ -2009,7 +2009,7 @@ function starCacheBegin(now,age){
   S.idleF=0;
   try{
     R=BH.Rr*(BHZ||1);bp=(SECT.cur&&R>=1)?camBH():null;
-    G[0]=DPR;G[1]=W;G[2]=H;G[3]=skyZoom;G[4]=skyRot;G[5]=bp?R:0;G[6]=bp?bp[0]:0;G[7]=bp?bp[1]:0;G[8]=BHU.str;
+    G[0]=DPR;G[1]=W;G[2]=H;G[3]=skyZoom;G[4]=skyRot;G[5]=(bp&&!(BHPARK.on&&!BHPARK.act))?R:0;   /* [bhpark] pasif = foto rasi tanpa lensa */G[6]=bp?bp[0]:0;G[7]=bp?bp[1]:0;G[8]=BHU.str;
     audio=potatoAudioFocus()?1:0;
     iv=1000/S.hz*((typeof FS!=='undefined'&&FS.heavy)?2:1);
     for(i=0;i<CONS.length;i++){
