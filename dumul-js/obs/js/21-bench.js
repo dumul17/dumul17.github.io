@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+/* BENCH v11.29 (?bench=1) — v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
     v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (ABABAB, kotak timer, Export 1 berkas); lihat blok [autoab] di akhir file. Tidak mengubah apa pun tanpa ?autoab.
     v11.29zb: dump cfg.pl memuat aurDelay/aurS0/aurRel (A/B ?aurdelay=N di 17-planet3d v59); isi lain tidak berubah.
@@ -26,7 +26,7 @@
   try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
   try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* v11.29: ?off=a,b,c = matikan lapisan untuk tes q.big (otomatis dari URL, tercatat di dump) */
-  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'sghalf', 'sgquart', 'schalf', 'scquart', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'hudA', 'hudB', 'hudC', 'hudD', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
+  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'sghalf', 'sgquart', 'schalf', 'scquart', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'hudA', 'hudB', 'hudC', 'hudD', 'dstage', 'dcl', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
   try {
     var offM = /[?&]off=([A-Za-z,]+)/.exec(location.search);
     if (offM) offM[1].split(',').forEach(function (t) { if (OFF_ALL.indexOf(t) >= 0 && OFF_L.indexOf(t) < 0) OFF_L.push(t); });
@@ -45,7 +45,7 @@
     var exc = HUD_EXC.map(function (x) { return ':not(' + x + ')'; }).join(''), hid = '{visibility:hidden!important}', css = 'html.__bo-hud body>*' + exc + hid;
     HUD_K.forEach(function (k) { css += HUD_G[k].map(function (x) { return 'html.__bo-' + k + ' body>' + x; }).join(',') + hid; });
     css += 'html.__bo-hudD body>*' + exc + HUD_K.map(function (k) { return HUD_G[k].map(function (x) { return ':not(' + x + ')'; }).join(''); }).join('') + hid;
-    return css + 'html.__bo-skyhide #sky' + hid;
+    return css + 'html.__bo-dstage #stage' + hid + 'html.__bo-dcl #cat-lock::before{animation:none!important}html.__bo-skyhide #sky' + hid;
   }
   function hudGrp(el) {
     try {
@@ -134,7 +134,7 @@
     try {
       document.documentElement.classList.toggle('__bo-hud', OFF_CUR.indexOf('hud') >= 0);
       document.documentElement.classList.toggle('__bo-skyhide', OFF_CUR.indexOf('skyhide') >= 0);
-      ['hudA', 'hudB', 'hudC', 'hudD'].forEach(function (k) { document.documentElement.classList.toggle('__bo-' + k, OFF_CUR.indexOf(k) >= 0); });
+      ['hudA', 'hudB', 'hudC', 'hudD', 'dstage', 'dcl'].forEach(function (k) { document.documentElement.classList.toggle('__bo-' + k, OFF_CUR.indexOf(k) >= 0); });
       if (typeof PX === 'object' && PX) { var sd = OFF_CUR.indexOf('sdraw') >= 0; OFF_PX.forEach(function (k) { PX[k] = (OFF_CUR.indexOf(k) >= 0 || (sd && (k === 'sglow' || k === 'score' || k === 'smark' || k === 'slbl'))) ? 1 : 0; }); }   /* sdraw = semua gambar bintang mati (halo+inti+tanda+label), loop hitung tetap jalan */
       var all = OFF_CUR.indexOf('blit') >= 0, ob = {}; Object.keys(OFF_B).forEach(function (k) { ob[OFF_B[k]] = ((all && k !== 'plfx') || OFF_CUR.indexOf(k) >= 0) ? 1 : 0; });   /* 'blit' = 5 blit GL->#sky, TIDAK termasuk plfx */
       window.__offB = ob;   /* dibaca guard `g.drawImage` di 12/13/14/15/17: lewati blit GL->#sky saja, render GL tetap jalan */
