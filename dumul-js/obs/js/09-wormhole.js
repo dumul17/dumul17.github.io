@@ -751,7 +751,7 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,tc:(typeof SCP3D_WHTC!=='undefined'?SCP3D_WHTC:0),tcH:(typeof SCP3D!=='undefined'?SCP3D.tcHit|0:0),tcM:(typeof SCP3D!=='undefined'?SCP3D.tcMiss|0:0),smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:'')};},
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:'')};},
   dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;}
 };
 
