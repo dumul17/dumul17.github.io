@@ -376,5 +376,5 @@ var SKYNOW=(function(){
     },1000);
   })();
   mkPill();
-  return {moonAttach:function(){},tonight:tonight,shower:shower,ssK:ssK,phase:cur,phaseMs:phaseMs,planets:plAll,planetsOk:plOk};
+  return {moonAttach:function(){},isOpen:function(){return P.open;},close:closePanel,tonight:tonight,shower:shower,ssK:ssK,phase:cur,phaseMs:phaseMs,planets:plAll,planetsOk:plOk};
 })();

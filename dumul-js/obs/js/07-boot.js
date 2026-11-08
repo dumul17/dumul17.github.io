@@ -1161,6 +1161,7 @@ var EXITP=(function(){
     }
     try{
       if(EXITP.isOpen())L.push({f:EXITP.stay,w:0});   /* panel pamitan: back = tutup (tinggal); guard-nya milik layer root di bawah */
+      if(typeof SKYNOW!=='undefined'&&SKYNOW.isOpen&&SKYNOW.isOpen())L.push({f:SKYNOW.close,w:1});   /* panel Fase Astronomi (22-sky-now): back = tutup panel */
       if(LIS&&LIS.ui&&!LIS.ui.hidden)L.push({f:lisCancel,w:(SECT.cur||SECT.busy)?0:1});   /* kartu ajak/tinggal: di dalam sektor muncul DARI back (sektor→overview) jadi nggak punya guard sendiri (guard sektor dipakai ulang); di overview (tap portal) dia lapisan sendiri */
       if(typeof SMENU!=='undefined'&&SMENU.open)L.push({f:function(){smenuClose();},w:1});   /* menu sektor (16): back = tutup menu dulu */
       if(has('owl-panel','on'))L.push({f:function(){var b=el('owl-backdrop');if(b)b.click();},w:1});
