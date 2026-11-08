@@ -15,7 +15,7 @@
  *     PERF  → ?perf=1    : snapshot overlay PERF; "Sweep PERF" menyapu semua PX_MODES otomatis (1 snapshot per mode)
  *               (PERF yang menyala dari localStorage dumul_perf=1 juga dikenali sebagai mode PERF)
  *     muffdbg → ?muffdbg : overlay #muff-dbg spatial audio (installMuff)
- *   (8 Nov: baris A/B q.big, seq, ABAB dan saklar pt2d dibuang dari panel; tes lewat URL: ?off=, ?offseq=, ?whdbg=, ?plhint=, ?pbms=.)
+ *   (8 Nov: baris A/B q.big dan saklar pt2d dibuang dari panel; tombol seq + ABAB ada di 'runner token' (butuh ?bench=1).)
  *   Matikan lapisan (butuh 21-bench v11.29): ?off=sky|skyhide|hud|mw|neb|lines,stars (bisa digabung koma), tercatat di dump R.off + pmk.off.
  *     Untuk membandingkan q.big (backlog GPU grup 'big') per mode ov / ov+H / sec+S. Dump tetap lewat bench (21-bench.js), BUKAN lewat PERF
  *     (mode PERF mematikan akumulator bench, jadi q.* tidak terekam). Varian dibaca saat load (01-core / 12-ast3d), makanya reload.
@@ -1485,6 +1485,13 @@ var DK_CSS =
     b.onclick = function (e) { e.stopPropagation(); onclick(); };
     return b;
   }
+  function pick(row, items, cur, label, fn) {   /* select ringkas + tombol aksi; items[i][0] = teks */
+    var s = mk('select', 'dk-b'); s.style.cssText = 'flex:1 1 0;min-width:0';
+    items.forEach(function (it, i) { var o = document.createElement('option'); o.value = i; o.textContent = it[0]; s.appendChild(o); });
+    if (cur >= 0) s.selectedIndex = cur;
+    row.appendChild(s);
+    row.appendChild(btn(label, function () { fn(items[s.selectedIndex], s.selectedIndex); }));
+  }
   function grp(label, inl) {   /* grup: label kecil + baris tombol (inl = label sebaris); kembalikan [grup, baris] */
     var g = mk('div', 'dk-g' + (inl ? ' in' : '')), r = mk('div', 'dk-r');
     if (label) g.appendChild(mk('div', 'dk-l', label));
@@ -1639,6 +1646,36 @@ var DK_CSS =
     panel.appendChild(list);
     var viewer = mk('pre', 'dk-pre wa-v', ''); viewer.style.display = 'none';
     panel.appendChild(viewer);
+
+    /* runner token (butuh ?bench=1): seq + ABAB tanpa reload, terlipat */
+    var run = mk('details', 'dk-d');
+    run.appendChild(mk('summary', '', 'runner token'));
+    if (/[?&]bench=1(&|$)/.test(Q)) {   /* v23: seq juga tanpa gpup=1 (baca dtAvg/fps + avgJs; q.* kosong) */
+      var SQ = grp('seq ±75 dtk' + (/[?&]gpup=1(&|$)/.test(Q) ? '' : ' · tanpa gpup')), seqRow = SQ[1];
+      pick(seqRow, [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2'], ['seq stars', 'stars', 'base, nama rasi, goresan garis, garis rasi, halo, inti, label, Pleiades, semua gambar bintang, bintang OFF, base2 (±90 dtk, WAJIB di dalam sektor)'], ['seq sizes', 'sizes', 'base, halo kecil/sedang/besar, inti kecil/sedang/besar, halo semua, inti semua, base2 (±80 dtk, di dalam sektor)'], ['seq plei', 'plei', 'base, nama, halo, inti, pulse Pleione, Pleiades semua, base2 (±56 dtk, di sektor winter)']].map(function (c) { return [c[0].replace('seq ', ''), c[1], c[2]]; }), 0, 'run', function (c) {
+        if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
+        if (c[1] === 'stars' || c[1] === 'sizes' || c[1] === 'plei') {
+          if (typeof window.__offSeqOn === 'function' && window.__offSeqOn()) return log('seq sedang jalan');
+          if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('seq stars: masuk SEKTOR dulu (di overview rasi/bintang tidak digambar), lalu tap lagi');
+          if (!window.__stSegOk || !window.__abOk) return log('seq ' + c[1] + ' butuh 21-bench v11.29h (?v=11.29h)');
+        }
+        if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
+        log('seq ' + c[1] + ' jalan: ' + c[2] + '. Timer di kiri bawah; selesai \u2192 salin dump bench.');
+        expand(false);
+      });
+      run.appendChild(SQ[0]);
+      /* ABAB tanpa reload (21-bench v11.29h): A=base, B=token mati; 3 pasang x 10 dtk (+ &abn=N). Hanya di sektor. 1 token ±60 dtk, 3 token ±4 mnt */
+      var AQ = grp('ABAB · di sektor'), abbRow = AQ[1];
+      pick(abbRow, [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo sgs+sgm', 'sgs+sgm'], ['halo sgl x3', 'sgl,sgl,sgl'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']], 0, 'run', function (c) {
+        if (!window.__abOk || typeof window.__offSeqStart !== 'function') return log('ABAB butuh 21-bench v11.29h (?v=11.29h)');
+        if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('ABAB: masuk SEKTOR dulu, lalu tap lagi');
+        if (!window.__offSeqStart('abab', c[1])) return log('seq sedang jalan');
+        log('ABAB ' + c[1] + ' jalan (label A1_<token>, B1_<token>, ...). Timer di kiri bawah; selesai \u2192 salin dump bench.');
+        expand(false);
+      });
+      run.appendChild(AQ[0]);
+    }
+    if (run.children.length > 1) panel.appendChild(run);
 
     /* trace + matikan debug */
     var T = grp('trace', true), tr = T[1]; tr.classList.add('eq');
