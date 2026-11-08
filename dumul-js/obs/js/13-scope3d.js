@@ -451,8 +451,8 @@ function scp3dWarmSync(stop){
   }catch(e){return false;}
 }
 /* Dipanggil dari teleDrawBody() (04-render.js). true = badan 3D sudah digambar (2D dilewati); false = pakai badan 2D. */
-/* [v29] ?scsmq=low|medium = kualitas smoothing blit teleskop HANYA saat wormhole aktif (default mati = 'high' seperti biasa). A/B ongkos blit di exit wormhole; hipotesis, belum ada bukti. */
-var SCP3D_SMQ=(function(){try{var m=/[?&]scsmq=(low|medium)(?:&|#|$)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
+/* [v33] smoothing blit teleskop HANYA saat wormhole aktif: DEFAULT 'low' (A/B 8 Nov: dt detik 0-3 sektor -8 s/d -14 ms vs 'high', visual dicek aman di HP). ?scsmq=high = kembali ke perilaku lama; ?scsmq=medium = tengah. Di luar wormhole.busy selalu 'high'. */
+var SCP3D_SMQ=(function(){try{var m=/[?&]scsmq=(low|medium|high)(?:&|#|$)/.exec(location.search);return m?(m[1]==='high'?'':m[1]):'low';}catch(e){return 'low';}})();
 function tele3dBody(g,now){
   if(SCP3D.state===0){scp3dLoad();return false;}
   if(SCP3D.state!==2)return false;
