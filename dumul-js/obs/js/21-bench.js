@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+/* BENCH v11.29 (?bench=1) — v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29zh: ?autoabboot=1 = autoab MODE BOOT (reload -> boot -> obs-entered -> diam ±12 dtk -> snapshot() full-boot, bukan __benchPost; metrik CPU pra-kapsul per run: longtask, preMs, threeQ, LoAF, frame1). Dipasangkan dgn ?autoabq=gs=0 dst.
     v11.29zg: ?autoabov=1 = autoab MODE OVERVIEW (tanpa masuk sektor; rekam ov saja, metrik fps/dt/teleTop/pt.copy/sc.sub per run) + ?autoabq=a=1,b=2 (param tambahan khusus sisi B; ?autoab=none = tanpa ?off=). Tanpa ?autoab tidak mengubah apa pun.
     v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
@@ -35,6 +35,16 @@
     window.__stSeg = /[?&]stseg=1(&|$)/.test(location.search) ? 1 : 0;   /* v11.29g: ?stseg=1 = penanda pmk s.cons/s.pulse/s.stars/s.plei di loop sektor (05-sector-ui) */
     window.__offL = OFF_L.length ? OFF_L.slice() : null;
   } catch (eOff) {}
+  /* v11.29zi: riwayat rincian blok akhir fase-in sectStep. 05-sector-ui hanya menimpa string window.__whMk tiap masuk sektor (kunjungan lama hilang); accessor ini menyimpan tiap nilai + waktu (abs ms) ke window.__whMkH dan tetap mengembalikan string yang sama (19-auto-debug membaca typeof === 'string'). */
+  try {
+    var _mkV = window.__whMk;
+    window.__whMkH = [];
+    Object.defineProperty(window, '__whMk', {
+      configurable: true, enumerable: true,
+      get: function () { return _mkV; },
+      set: function (v) { _mkV = v; try { window.__whMkH.push([Math.round(performance.now()), String(v)]); if (window.__whMkH.length > 12) window.__whMkH.shift(); } catch (eMkP) {} }
+    });
+  } catch (eMk) {}
   /* v11.29zd: kelompok elemen HUD (semua anak langsung <body>). hudD = SISANYA (termasuk elemen yang dibuat JS belakangan: exit-panel, sect-menu, dst), jadi A+B+C+D = hud. */
   var HUD_EXC = ['#sky', '#wh-canvas', '#whperf', '#boot-screen', '#bh', '#cap-bh', '#muff-dbg', '#__bench_box', '#__bench_phase', '#__bench_copy_fallback', '[id^="wh-ad"]', '.dk', 'script', 'style'];
   var HUD_K = ['hudA', 'hudB', 'hudC'];
@@ -1469,7 +1479,7 @@ var DK_CSS =
       threeWarm: tw ? { total: tw.total, done: tw.done, busy: tw.busy, qlen: tw.q ? tw.q.length : null } : null,
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
-      pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), whStats: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; } catch (eWs) { return null; } })(), whCfg: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWc) { return null; } })(), nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
+      pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), whStats: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; } catch (eWs) { return null; } })(), whCfg: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWc) { return null; } })(), whMk: (typeof window.__whMk === 'string') ? window.__whMk : null, whMkH: window.__whMkH || null, '_whMkH_cols': 'abs ms (performance.now, sama basis dgn pmk.worst / byFn), rincian: warm(max/langkah) N | restore+ui N | sectSet N | focus N | panHits N | lisArrive N (ms)', nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
     };
