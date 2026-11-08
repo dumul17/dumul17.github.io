@@ -453,6 +453,7 @@ function scp3dWarmSync(stop){
 /* Dipanggil dari teleDrawBody() (04-render.js). true = badan 3D sudah digambar (2D dilewati); false = pakai badan 2D. */
 /* [v33] smoothing blit teleskop HANYA saat wormhole aktif: DEFAULT 'low' (A/B 8 Nov: dt detik 0-3 sektor -8 s/d -14 ms vs 'high', visual dicek aman di HP). ?scsmq=high = kembali ke perilaku lama; ?scsmq=medium = tengah. Di luar wormhole.busy selalu 'high'. */
 var SCP3D_SMQ=(function(){try{var m=/[?&]scsmq=(low|medium|high)(?:&|#|$)/.exec(location.search);return m?(m[1]==='high'?'':m[1]):'low';}catch(e){return 'low';}})();
+var SCP3D_SMQI=(function(){try{return /[?&]scsmqi=1(?:&|#|$)/.test(location.search);}catch(e){return false;}})();   /* [v34] ALAT LIHAT: ?scsmqi=1 = smoothing SCP3D_SMQ juga dipakai di idle overview/sektor (bukan cuma saat WORMHOLE.busy). Default MATI. Pasangkan ?scsmq=low|medium. */
 function tele3dBody(g,now){
   if(SCP3D.state===0){scp3dLoad();return false;}
   if(SCP3D.state!==2)return false;
@@ -479,7 +480,7 @@ function tele3dBody(g,now){
         if(wh||bf||sa){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;SCP3D.ccSc=scl;if(bf)SCP3D.bz=true;if(sa)cache=cc;}   /* sa: gambar dari cc (satu baca GL saja per frame render) */
       }
     }
-    var smq=(SCP3D_SMQ&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy)?SCP3D_SMQ:null;   /* v29 */
+    var smq=(SCP3D_SMQ&&(SCP3D_SMQI||(typeof WORMHOLE!=='undefined'&&WORMHOLE.busy)))?SCP3D_SMQ:null;   /* v29 */
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality=smq||'high';
     var H=SCP3D_CFG.half;
     if(!(window.__offB&&window.__offB.sc))g.drawImage(cache||threeGLSrc(SCP3D.gl),-H,-H,H*2,H*2);   /* ?off=scb (21-bench): lewati blit saja, GL tetap dirender */
