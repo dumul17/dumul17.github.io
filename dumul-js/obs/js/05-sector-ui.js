@@ -29,6 +29,17 @@ function sectApply(s,u){
 var _warmCv=null;
 /* v12b: dicicil 1 plate per frame (bukan sekaligus) dan TANPA getImageData (itu membekukan main thread menunggu GPU). Kanvas 1x1 dipasang di DOM (hampir transparan)
    supaya compositor mengeksekusi gambarnya async di frame berjalan. Dipanggil tiap frame fase masuk mulai u>=.3; waktu main-thread terbesar per langkah -> 'warm N' di panel. */
+var SWARM={on:/[?&]swarm=1(&|#|$)/.test(location.search),q:null,key:''};   /* [swarm] A/B: ?swarm=1 = bikin sprite halo bintang (getStarSprite, ±1 ms per warna) sektor tujuan saat terowongan masih menutup layar, bukan di frame pertama sektor (cons+stars) */
+function skyWarmStars(s){
+  try{
+    if(!SWARM.q||SWARM.key!==s.k){
+      var seen=Object.create(null),L=[];
+      CONS.forEach(function(cc){var k,c;if(s.ids.indexOf(cc.id)<0)return;for(k in cc.stars){c=cc.stars[k].rgb;if(c&&!seen[c]&&!STAR_SPRITE_CACHE[c]){seen[c]=1;L.push(c);}}});
+      SWARM.q=L;SWARM.key=s.k;
+    }
+    var n=2;while(n-->0&&SWARM.q.length)getStarSprite(SWARM.q.shift());
+  }catch(eSw){SWARM.q=[];}
+}
 function skyWarmStep(){
   try{
     if(typeof WH_DBG!=='string'||!/(^|,)warm(,|$)/.test(WH_DBG)){SECT.warmQ=[];return;}   /* v12c: warm terbukti tidak mengubah spike -> opt-in saja (?whdbg=warm) */
@@ -206,13 +217,18 @@ function sumSpot(){
     PLEIADES.bright.forEach(function(z){q=skyXF(PLEIADES.x+z.x*PLEIADES.scale,PLEIADES.y+z.y*PLEIADES.scale);pts.push(q[0],q[1]);});
   }
   var rects=hudRects(),tgt=Math.max(.05,Math.min(1,BHU.size/BH_SECT_MAXSIZE)),Rv=Math.max(10,BH.R*tgt*2),
-      best=null,bs=-1e9,nx=22,ny=16,park=BHPARK.on&&typeof planetBhPark==='function';
+      best=null,bs=-1e9,nx=22,ny=16,park=BHPARK.on&&typeof planetBhPark==='function',pk,base,m2,dx,dy,d2,Rp=Rv*.5,hw=W*.5,hh=H*.5;
   for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
-    var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/ny,md=320,d,sc;
-    if(park){var pk=planetBhPark(cx,cy,Rv*.5);if(pk){cx=pk[0];cy=pk[1];if(cx<x0||cx>x1||cy<0||cy>H)continue;}}   /* [bhpark] kandidat diproyeksikan ke limb: pusat BH tepat di limb = 50% terbenam (planet tidak aktif: pk null -> kandidat biasa) */
-    if(typeof planetBhOk==='function'&&!planetBhOk(cx,cy,Rv*.5))continue;   /* planet (17-planet3d.js): BH boleh terbenam sedikit di balik limb, tidak lebih */
-    for(k=0;k<pts.length;k+=2){d=Math.hypot(cx-pts[k],cy-pts[k+1]);if(d<md)md=d;}
-    sc=md-(hudHit(cx,cy,Rv+14,rects)?2000:0)-Math.hypot(cx-W*.5,cy-H*.5)*.02;   /* terjauh dari bintang; HUD bebas; seri → condong ke tengah */
+    var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/ny,md=320,sc;
+    pk=null;
+    if(park){pk=planetBhPark(cx,cy,Rp);if(pk){cx=pk[0];cy=pk[1];if(cx<x0||cx>x1||cy<0||cy>H)continue;}}   /* [bhpark] kandidat diproyeksikan ke limb: pusat BH tepat di limb = 50% terbenam (planet tidak aktif: pk null -> kandidat biasa) */
+    base=-(hudHit(cx,cy,Rv+14,rects)?2000:0)-Math.sqrt((cx-hw)*(cx-hw)+(cy-hh)*(cy-hh))*.02;   /* HUD bebas; seri → condong ke tengah */
+    if(base+md<=bs)continue;   /* v-perf: skor maksimum kandidat (jarak ke bintang maks 320) sudah tidak bisa mengalahkan best -> lewati sebelum loop bintang & planetBhOk */
+    if(!pk&&typeof planetBhOk==='function'&&!planetBhOk(cx,cy,Rp))continue;   /* planet (17-planet3d.js): BH boleh terbenam sedikit di balik limb, tidak lebih (bhpark: titik sudah di limb, dilewati) */
+    m2=md*md;   /* terjauh dari bintang: jarak kuadrat (tanpa Math.hypot/sqrt per bintang), berhenti begitu kandidat pasti kalah */
+    for(k=0;k<pts.length;k+=2){dx=cx-pts[k];dy=cy-pts[k+1];d2=dx*dx+dy*dy;if(d2<m2){m2=d2;if(base+Math.sqrt(m2)<=bs){m2=-1;break;}}}
+    if(m2<0)continue;
+    sc=base+Math.sqrt(m2);
     if(sc>bs){bs=sc;best=[cx,cy];}
   }
   return best||[W*.5,H*.5];
@@ -235,6 +251,7 @@ function sectStep(now){
   if(SECT.phase==='in'){
     sectApply(s,sectEase(u));
     if(u>=.3&&u<.95&&(SECT.warmQ==null||SECT.warmQ.length))skyWarmStep();
+    if(SWARM.on&&u>=.25&&u<.95)skyWarmStars(s);
     if(u>=1){
       /* whperf: pecah biaya blok akhir phase-in (tunnel@~3.6s) — window.__whMk dibaca 09-wormhole panel */
       var _mk=[],_t=performance.now(),_m=function(n){var t=performance.now();_mk.push(n+' '+(t-_t).toFixed(0));_t=t;};
@@ -920,7 +937,7 @@ function frame(now){
       hoverDirty=false;lastHoverAt=now;
     }
     bhScaleStep();
-    if(BHPARK.on&&!BHPARK.act&&!drag.on&&SECT.cur&&!SECT.on&&(skyZoom||1)<=1.02&&typeof planetBhPark==='function'){   /* [bhpark] selama pasif: BH ikut limb (planet baru muncul / geometri crossfade / resize) tetap 50% terbenam; x tidak berubah */
+    if(BHPARK.on&&!BHPARK.act&&!drag.on&&SECT.cur&&!SECT.on&&(skyZoom||1)<=1.02&&typeof planetBhPark==='function'&&((BHPARK.f=(BHPARK.f||0)+1)%6===0)){   /* tiap 6 frame cukup (limb jarang berubah; dump: 738 panggilan/run) */   /* [bhpark] selama pasif: BH ikut limb (planet baru muncul / geometri crossfade / resize) tetap 50% terbenam; x tidak berubah */
       var pkP=planetBhPark(BH.x,BH.y,BH.R*BHSC*Math.max(1,bhSizeMul()));
       if(pkP&&(Math.abs(pkP[0]-BH.x)>.3||Math.abs(pkP[1]-BH.y)>.3)){BH.x+=(pkP[0]-BH.x)*.12;BH.y+=(pkP[1]-BH.y)*.12;RELAY.x0=BH.x;RELAY.y0=BH.y;}
     }
