@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
+/* BENCH v11.29 (?bench=1) — v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+    v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
     v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (ABABAB, kotak timer, Export 1 berkas); lihat blok [autoab] di akhir file. Tidak mengubah apa pun tanpa ?autoab.
     v11.29zb: dump cfg.pl memuat aurDelay/aurS0/aurRel (A/B ?aurdelay=N di 17-planet3d v59); isi lain tidak berubah.
     v11.29za: probe rAF independen (pmk.secP.visits[i].raf): hitung callback rAF per bin 250 ms (watcher sendiri) vs frame utama (pmEnd) di jendela t0-6 dtk .. t0+15 dtk; cek apakah secP.dt (periode antar frame utama) = periode rAF asli atau frame utama dilewati. Tidak mengubah perilaku, hanya bench.
@@ -25,17 +26,106 @@
   try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
   try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* v11.29: ?off=a,b,c = matikan lapisan untuk tes q.big (otomatis dari URL, tercatat di dump) */
-  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'sghalf', 'sgquart', 'schalf', 'scquart', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
+  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'sghalf', 'sgquart', 'schalf', 'scquart', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'hudA', 'hudB', 'hudC', 'hudD', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
   try {
-    var offM = /[?&]off=([a-z,]+)/.exec(location.search);
+    var offM = /[?&]off=([A-Za-z,]+)/.exec(location.search);
     if (offM) offM[1].split(',').forEach(function (t) { if (OFF_ALL.indexOf(t) >= 0 && OFF_L.indexOf(t) < 0) OFF_L.push(t); });
     window.__stSeg = /[?&]stseg=1(&|$)/.test(location.search) ? 1 : 0;   /* v11.29g: ?stseg=1 = penanda pmk s.cons/s.pulse/s.stars/s.plei di loop sektor (05-sector-ui) */
     window.__offL = OFF_L.length ? OFF_L.slice() : null;
   } catch (eOff) {}
+  /* v11.29zd: kelompok elemen HUD (semua anak langsung <body>). hudD = SISANYA (termasuk elemen yang dibuat JS belakangan: exit-panel, sect-menu, dst), jadi A+B+C+D = hud. */
+  var HUD_EXC = ['#sky', '#wh-canvas', '#whperf', '#boot-screen', '#bh', '#cap-bh', '#muff-dbg', '#__bench_box', '#__bench_phase', '#__bench_copy_fallback', '[id^="wh-ad"]', '.dk', 'script', 'style'];
+  var HUD_K = ['hudA', 'hudB', 'hudC'];
+  var HUD_G = {
+    hudA: ['.scan', '#lis-fx', '#lis-hud', '#sn-flash', '#cat-lock', '#veil', '#tesseract-warp', '#exit-backdrop', '#owl-backdrop'],
+    hudB: ['#terminal', '#tele-greet', '#secret-msg', '#signal-fragment', '#cons-archive', '#last-signal', '#cam-zoom', '#cam-whisper', '#cam-cat', '#cam-ach', '#mode-toast', '#lis-ask'],
+    hudC: ['#header', '#mode-cluster', '#music-player', '#music-toggle', '#live-count', '#cg-btn', '#sector-scan', '#owl-source', '#owl-panel', '#bh-panel']
+  };
+  function hudCss() {
+    var exc = HUD_EXC.map(function (x) { return ':not(' + x + ')'; }).join(''), hid = '{visibility:hidden!important}', css = 'html.__bo-hud body>*' + exc + hid;
+    HUD_K.forEach(function (k) { css += HUD_G[k].map(function (x) { return 'html.__bo-' + k + ' body>' + x; }).join(',') + hid; });
+    css += 'html.__bo-hudD body>*' + exc + HUD_K.map(function (k) { return HUD_G[k].map(function (x) { return ':not(' + x + ')'; }).join(''); }).join('') + hid;
+    return css + 'html.__bo-skyhide #sky' + hid;
+  }
+  function hudGrp(el) {
+    try {
+      if (el.matches(HUD_EXC.join(','))) return '-';
+      for (var i = 0; i < HUD_K.length; i++) if (el.matches(HUD_G[HUD_K[i]].join(','))) return HUD_K[i];
+    } catch (e) {}
+    return 'hudD';
+  }
+  /* INVENTARIS HUD read-only (dipanggil runner autoab di akhir fase diam sektor): tiap anak <body> yang tampil + properti mahal + animasi yang masih jalan */
+  function hudInventory() {
+    var d = document, b = d.body, VA = Math.max(1, innerWidth * innerHeight), out = { vw: innerWidth, vh: innerHeight, dpr: window.devicePixelRatio, htmlCls: d.documentElement.className, els: [], hid: [], grp: {}, anims: { running: 0, paused: 0, list: [] } };
+    function cls(el) { var c = ''; try { c = String(el.getAttribute && el.getAttribute('class') || ''); } catch (e) {} return c.trim().split(/\s+/).filter(Boolean).slice(0, 2); }
+    function nm(el) { if (!el) return '?'; var c = cls(el); return String(el.tagName || '').toLowerCase() + (el.id ? '#' + el.id : '') + (c.length ? '.' + c.join('.') : ''); }
+    function props(cs) {
+      var o = {}, v = cs.mixBlendMode; if (v && v !== 'normal') o.bm = v;
+      v = cs.backdropFilter || cs.webkitBackdropFilter; if (v && v !== 'none') o.bf = v;
+      v = cs.filter; if (v && v !== 'none') o.fl = v;
+      v = cs.willChange; if (v && v !== 'auto') o.wc = v;
+      return o;
+    }
+    function has(o) { for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) return true; return false; }
+    function pseudo(el, ps) {
+      try {
+        var cs = getComputedStyle(el, ps), c = cs.content;
+        if (!c || c === 'none' || c === 'normal') return null;
+        var o = props(cs); if (cs.animationName && cs.animationName !== 'none') o.an = cs.animationName;
+        var v = cs.position; if (v === 'fixed' || v === 'absolute') o.pos = v;
+        return has(o) ? o : null;
+      } catch (e) { return null; }
+    }
+    function gsum(g) { return out.grp[g] || (out.grp[g] = { n: 0, area: 0, bm: 0, bf: 0, fl: 0, wc: 0, anim: 0 }); }
+    var kids = b.children;
+    for (var i = 0; i < kids.length; i++) {
+      var el = kids[i], tg = String(el.tagName || '').toLowerCase();
+      if (tg === 'script' || tg === 'style') continue;
+      try {
+        var cs = getComputedStyle(el), g = hudGrp(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') { if (out.hid.length < 60) out.hid.push(nm(el) + (g === '-' ? '' : ' [' + g + ']')); continue; }
+        var r = el.getBoundingClientRect(), ix = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)), iy = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)), a = Math.round(ix * iy / VA * 1000) / 10;
+        var rec = props(cs); rec.n = nm(el); rec.g = g; rec.a = a; rec.r = [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; rec.pos = cs.position; rec.z = cs.zIndex;
+        if (cs.opacity !== '1') rec.op = cs.opacity;
+        if (cs.contain && cs.contain !== 'none') rec.ct = cs.contain;
+        if (cs.boxShadow && cs.boxShadow !== 'none') rec.bs = cs.boxShadow.slice(0, 70);
+        var pb = pseudo(el, '::before'), pa = pseudo(el, '::after'); if (pb) rec.pb = pb; if (pa) rec.pa = pa;
+        var ds = el.querySelectorAll('*'), nt = [], dn = ds.length;
+        for (var j = 0; j < ds.length && j < 800; j++) {
+          var dc = getComputedStyle(ds[j]); if (dc.display === 'none') continue;
+          var dp = props(dc); if (has(dp) && nt.length < 12) { dp.n = nm(ds[j]); nt.push(dp); }
+        }
+        rec.dn = dn; if (nt.length) rec.dh = nt;
+        out.els.push(rec);
+        var gs = gsum(g); gs.n++; gs.area += a; if (rec.bm) gs.bm++; if (rec.bf) gs.bf++; if (rec.fl) gs.fl++; if (rec.wc) gs.wc++;
+      } catch (eE) { out.els.push({ n: nm(el), err: String(eE && eE.message || eE) }); }
+    }
+    try {
+      var all = d.getAnimations ? d.getAnimations() : [], agg = {};
+      for (var k = 0; k < all.length; k++) {
+        var an = all[k], ps = an.playState; if (ps === 'running') out.anims.running++; else if (ps === 'paused') out.anims.paused++; else continue;
+        var ef = an.effect, tgt = ef && ef.target, root = tgt;
+        while (root && root.parentNode && root.parentNode !== b) root = root.parentNode;
+        if (!root || root.parentNode !== b) root = null;
+        var rg = root ? hudGrp(root) : '?', name = an.animationName || an.transitionProperty || an.id || (an.constructor && an.constructor.name) || '?', pr = [], tm = null;
+        try { var kf = ef.getKeyframes(); for (var q = 0; q < kf.length; q++) for (var kk in kf[q]) if (kk !== 'offset' && kk !== 'computedOffset' && kk !== 'easing' && kk !== 'composite' && pr.indexOf(kk) < 0 && pr.length < 6) pr.push(kk); } catch (e1) {}
+        try { tm = ef.getComputedTiming(); } catch (e2) {}
+        var key = [root ? nm(root) : '?', nm(tgt), ef && ef.pseudoElement || '', name, ps].join('|');
+        if (!agg[key]) { agg[key] = { root: root ? nm(root) : '?', g: rg, tg: nm(tgt), ps: ef && ef.pseudoElement || '', an: name, st: ps, pr: pr, dur: tm ? tm.duration : null, it: tm ? (tm.iterations === Infinity ? 'inf' : tm.iterations) : null, n: 0 }; }
+        agg[key].n++;
+        if (ps === 'running') gsum(rg).anim++;
+      }
+      for (var ak in agg) if (out.anims.list.length < 80) out.anims.list.push(agg[ak]);
+    } catch (eA) { out.anims.err = String(eA && eA.message || eA); }
+    try { out.sect = (typeof SECT !== 'undefined' && SECT.cur) ? (SECT.cur.k || SECT.cur.name || '?') : null; } catch (eS) {}
+    var parts = []; ['hudA', 'hudB', 'hudC', 'hudD', '-'].forEach(function (g) { var x = out.grp[g]; if (!x) return; x.area = Math.round(x.area * 10) / 10; parts.push((g === '-' ? 'ex' : g.slice(3)) + ' n' + x.n + ' ' + x.area + '% bm' + x.bm + ' bf' + x.bf + ' fl' + x.fl + ' wc' + x.wc + ' an' + x.anim); });
+    out.short = parts.join(' | ');
+    return out;
+  }
   /* v11.29b: CSS lewat kelas di <html> supaya bisa di-toggle saat jalan (tanpa reload) */
   try {
     var offSt = document.createElement('style'); offSt.id = '__bench_off_css';
-    offSt.textContent = 'html.__bo-hud body>*:not(#sky):not(#wh-canvas):not(#whperf):not(#boot-screen):not(#bh):not(#cap-bh):not(#muff-dbg):not(#__bench_box):not(#__bench_phase):not(#__bench_copy_fallback):not([id^="wh-ad"]):not(.dk):not(script):not(style){visibility:hidden!important}html.__bo-skyhide #sky{visibility:hidden!important}';
+    offSt.textContent = hudCss();
     (document.head || document.documentElement).appendChild(offSt);
   } catch (eOffC) {}
   var OFF_CUR = OFF_L.slice(), OFF_MANAGE = OFF_L.length > 0;   /* OFF_MANAGE: baru mengatur PX/kelas kalau ?off= ada atau runner jalan */
@@ -44,6 +134,7 @@
     try {
       document.documentElement.classList.toggle('__bo-hud', OFF_CUR.indexOf('hud') >= 0);
       document.documentElement.classList.toggle('__bo-skyhide', OFF_CUR.indexOf('skyhide') >= 0);
+      ['hudA', 'hudB', 'hudC', 'hudD'].forEach(function (k) { document.documentElement.classList.toggle('__bo-' + k, OFF_CUR.indexOf(k) >= 0); });
       if (typeof PX === 'object' && PX) { var sd = OFF_CUR.indexOf('sdraw') >= 0; OFF_PX.forEach(function (k) { PX[k] = (OFF_CUR.indexOf(k) >= 0 || (sd && (k === 'sglow' || k === 'score' || k === 'smark' || k === 'slbl'))) ? 1 : 0; }); }   /* sdraw = semua gambar bintang mati (halo+inti+tanda+label), loop hitung tetap jalan */
       var all = OFF_CUR.indexOf('blit') >= 0, ob = {}; Object.keys(OFF_B).forEach(function (k) { ob[OFF_B[k]] = ((all && k !== 'plfx') || OFF_CUR.indexOf(k) >= 0) ? 1 : 0; });   /* 'blit' = 5 blit GL->#sky, TIDAK termasuk plfx */
       window.__offB = ob;   /* dibaca guard `g.drawImage` di 12/13/14/15/17: lewati blit GL->#sky saja, render GL tetap jalan */
@@ -1738,7 +1829,7 @@ var DK_CSS =
   /* [autoab:begin] ===== v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (A = tanpa off, B = ?off=TOKEN), diulang N pasang (ABABAB), dgn kotak timer di kiri-atas.
      Param: autoab=hud|skyhide|... (token ?off=), autoabn=3 (pasang, 1-6), autoabms=30000 (diam di sektor, 10-120 dtk), autoabset=5000 (diam di overview sebelum masuk), autoabsec=0 (indeks sektor, sama dgn Dive),
      autoabreset=1 (mulai dari awal). Alur tiap run: boot -> kapsul (ketuk BIRU atau tunggu auto-masuk ±10 dtk kunjungan ulang) -> obs-entered -> diam SETTLE -> sectJumpTo (jalur Dive/wormhole) -> diam HOLD -> window.__benchPost() disimpan
-     (IndexedDB, cadangan localStorage) -> reload ke varian berikutnya. Selesai: ringkasan dt k0-3 + raFps s4_8 per pasang, tombol Export = SATU berkas autoab-*.json (semua dump di dalamnya).
+     (IndexedDB, cadangan localStorage) -> reload ke varian berikutnya. Selesai: ringkasan raFps s9_14 + dt k>=9 per pasang (v11.29zd; dt03/ra4_8 tetap tersimpan di runs), inventaris HUD per run di dumps[i].inv, tombol Export = SATU berkas autoab-*.json (semua dump di dalamnya).
      Kotak pakai class 'dk' (tetap tampil di ?off=hud). Tidak menyentuh layar/DOM lain; teks diperbarui 1x/dtk saja. Catatan: masuk kapsul tanpa ketuk = tanpa user-activation (audio); semua 6 run diperlakukan sama. */
   (function () {
     var qa = /[?&]autoab=([A-Za-z0-9_,]+)/.exec(location.search);
@@ -1817,6 +1908,13 @@ var DK_CSS =
       try { var o = d.pmk.secP.visits[0].raf; if (o && o.sum && o.sum.s4_8 && o.sum.s4_8.raFps != null) return o.sum.s4_8.raFps; } catch (e) {}
       return null;
     }
+    function ra914(d) {
+      try { var o = d.pmk.secP.visits[0].raf; if (o && o.sum && o.sum.s9_14 && o.sum.s9_14.raFps != null) return o.sum.s9_14.raFps; } catch (e) {}
+      return null;
+    }
+    function dt9(d) {   /* rata-rata dt (berbobot n) detik k >= 9 */
+      try { var rows = d.pmk.secP.visits[0].rows, n = 0, s = 0; for (var i = 0; i < rows.length; i++) if (rows[i][0] >= 9) { n += rows[i][1]; s += rows[i][3] * rows[i][1]; } return n ? Math.round(s / n * 10) / 10 : null; } catch (e) { return null; }
+    }
     function fmt(ms) { var t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60), s = t % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
     function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()); }
     /* ---- kotak timer ---- */
@@ -1861,21 +1959,23 @@ var DK_CSS =
       if (!S.done && S.runs.length) { var a = 0; for (var k = 0; k < S.runs.length; k++) a += S.runs[k].ms + 4000; est = '  sisa ±' + fmt((TOT - S.i) * (a / S.runs.length) - (now - runT0)); }
       l.push('total T+' + fmt((S.done && S.tEnd ? S.tEnd : now) - S.t0) + est);
       if (!S.done) l.push(phaseLine());
-      for (var j = 0; j < S.runs.length; j++) { var r = S.runs[j]; l.push((r.v) + (Math.floor(r.i / 2) + 1) + ' ' + (r.ok ? '' : 'GAGAL ') + 'dt03=' + (r.dt03 != null ? r.dt03 : '-') + ' ra4_8=' + (r.ra48 != null ? r.ra48 : '-') + (r.note ? ' [' + r.note + ']' : '')); }
+      for (var j = 0; j < S.runs.length; j++) { var r = S.runs[j]; l.push((r.v) + (Math.floor(r.i / 2) + 1) + ' ' + (r.ok ? '' : 'GAGAL ') + 'ra9_14=' + (r.ra914 != null ? r.ra914 : '-') + ' dt9=' + (r.dt9 != null ? r.dt9 : '-') + (r.note ? ' [' + r.note + ']' : '')); }
       if (S.done) l.push(summary());
       txt.textContent = l.join('\n');
       var frac = 0; if (!S.done && P.until) { var dur = Math.max(1, P.until - P.t0); frac = Math.min(1, (now - P.t0) / dur); }
       bar.style.width = (Math.min(100, ((S.done ? TOT : S.i) + (S.done ? 0 : frac * 0.5)) / TOT * 100)) + '%';
     }
     function summary() {
-      var out = [], dA = [], dB = [], rd = [], dd = [];
+      var out = [], rd = [], dd = [], ok = true, any = false;
       for (var p = 0; p < N; p++) {
         var a = S.runs[p * 2], b = S.runs[p * 2 + 1];
-        if (a && b && a.dt03 != null && b.dt03 != null) { dd.push(Math.round((b.dt03 - a.dt03) * 10) / 10); }
-        if (a && b && a.ra48 != null && b.ra48 != null) { rd.push(Math.round((b.ra48 - a.ra48) * 10) / 10); }
+        if (a && b && a.dt9 != null && b.dt9 != null) dd.push(Math.round((b.dt9 - a.dt9) * 10) / 10);
+        if (a && b && a.ra914 != null && b.ra914 != null) { var df = Math.round((b.ra914 - a.ra914) * 10) / 10; rd.push(df); any = true; if (df < 3) ok = false; }
       }
-      out.push('B-A dt03 per pasang: ' + (dd.length ? dd.join(' / ') : '-'));
-      out.push('B-A raFps s4_8 per pasang: ' + (rd.length ? rd.join(' / ') : '-') + '  (lulus: B naik >= 2 di SEMUA pasang)');
+      out.push('B-A raFps s9_14 per pasang: ' + (rd.length ? rd.join(' / ') : '-'));
+      out.push('B-A dt k>=9 (ms) per pasang: ' + (dd.length ? dd.join(' / ') : '-'));
+      out.push(any ? (ok ? 'TERBUKTI: kelompok ' + TOK + ' menahan frame (B naik >= 3 fps di SEMUA pasang)' : 'BELUM: B tidak naik >= 3 fps di semua pasang') : 'data kurang');
+      if (S.runs[0] && S.runs[0].invS) out.push('INV A1: ' + S.runs[0].invS);
       return out.join('\n');
     }
     function setPhase(name, durMs) { P.name = name; P.t0 = Date.now(); P.until = durMs ? P.t0 + durMs : 0; draw(); }
@@ -1917,10 +2017,11 @@ var DK_CSS =
     function saveRun() {
       if (finished) return; finished = true;
       setPhase('save');
-      var s = null, d = null, ok = true, note = '';
+      var s = null, d = null, ok = true, note = '', inv = null;
+      try { inv = hudInventory(); } catch (eI) { inv = { err: String(eI && eI.message || eI) }; }   /* read-only, di akhir fase diam (jendela rekam 15 dtk sudah lewat) */
       try { s = window.__benchPost(); d = JSON.parse(s); } catch (e) { ok = false; note = 'snapshot gagal'; }
-      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null };
-      idbPut(S.i, { meta: r, dump: s }, function (okp, kind) {
+      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null, ra914: d ? ra914(d) : null, dt9: d ? dt9(d) : null, invS: inv && inv.short ? String(inv.short).slice(0, 400) : '' };
+      idbPut(S.i, { meta: r, dump: s, inv: inv }, function (okp, kind) {
         if (!okp) { r.ok = false; r.note = (r.note ? r.note + ' ' : '') + 'simpan gagal'; }
         r.store = kind; S.runs.push(r); S.i++; saveS(); nextOrDone();
       });
@@ -1938,7 +2039,8 @@ var DK_CSS =
     function exportAll() {
       idbAll(function (arr) {
         arr.sort(function (a, b) { return a.meta.i - b.meta.i; });
-        var out = { kind: 'autoab', tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, dump: d }; }) };
+        var out = { kind: 'autoab', tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, inv: x.inv || null, dump: d }; }) };
+        out.hudGroups = { hudA: HUD_G.hudA, hudB: HUD_G.hudB, hudC: HUD_G.hudC, hudD: 'sisanya (anak <body> di luar A-C dan di luar HUD_EXC)', exclude: HUD_EXC };
         try {
           var blob = new Blob([JSON.stringify(out)], { type: 'application/json' }), a = document.createElement('a');
           a.href = URL.createObjectURL(blob); a.download = 'autoab-' + TOK + '-' + stamp() + '.json'; a.style.display = 'none'; document.body.appendChild(a); a.click();
