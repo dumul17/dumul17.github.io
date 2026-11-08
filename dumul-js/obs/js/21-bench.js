@@ -1,5 +1,6 @@
 'use strict';
 /* BENCH v11.29 (?bench=1) — v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
+    v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (ABABAB, kotak timer, Export 1 berkas); lihat blok [autoab] di akhir file. Tidak mengubah apa pun tanpa ?autoab.
     v11.29zb: dump cfg.pl memuat aurDelay/aurS0/aurRel (A/B ?aurdelay=N di 17-planet3d v59); isi lain tidak berubah.
     v11.29za: probe rAF independen (pmk.secP.visits[i].raf): hitung callback rAF per bin 250 ms (watcher sendiri) vs frame utama (pmEnd) di jendela t0-6 dtk .. t0+15 dtk; cek apakah secP.dt (periode antar frame utama) = periode rAF asli atau frame utama dilewati. Tidak mengubah perilaku, hanya bench.
     v11.29z: UI saja: chip 'bench' pindah ke dock kanan-bawah (kiri tombol dbg, #dk-dock bersama 19-auto-debug), badan panel buka ke atas (header: scroll + tutup; grup boot/post), panel bench dan dbg saling melipat, kelas html.dk-hb dibuang; R.pt2d dibuang (saklar pt2d dibuang). v11.29v: pmk.secP = probe PER DETIK 15 dtk pertama sektor (n, fps, dt, js, wait, ema, gpuSum, rata2 ms/frame tiap segmen pmk; dgn ?gpup=1 ikut .gpu per modul + q.big/q.small; hump = puncak vs late otomatis; maks 3 kunjungan). v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
@@ -1734,4 +1735,220 @@ var DK_CSS =
       setTimeout(function () { maybeFinish(); }, 0);
     }, { once: true });
   })();
+  /* [autoab:begin] ===== v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (A = tanpa off, B = ?off=TOKEN), diulang N pasang (ABABAB), dgn kotak timer di kiri-atas.
+     Param: autoab=hud|skyhide|... (token ?off=), autoabn=3 (pasang, 1-6), autoabms=30000 (diam di sektor, 10-120 dtk), autoabset=5000 (diam di overview sebelum masuk), autoabsec=0 (indeks sektor, sama dgn Dive),
+     autoabreset=1 (mulai dari awal). Alur tiap run: boot -> kapsul (ketuk BIRU atau tunggu auto-masuk ±10 dtk kunjungan ulang) -> obs-entered -> diam SETTLE -> sectJumpTo (jalur Dive/wormhole) -> diam HOLD -> window.__benchPost() disimpan
+     (IndexedDB, cadangan localStorage) -> reload ke varian berikutnya. Selesai: ringkasan dt k0-3 + raFps s4_8 per pasang, tombol Export = SATU berkas autoab-*.json (semua dump di dalamnya).
+     Kotak pakai class 'dk' (tetap tampil di ?off=hud). Tidak menyentuh layar/DOM lain; teks diperbarui 1x/dtk saja. Catatan: masuk kapsul tanpa ketuk = tanpa user-activation (audio); semua 6 run diperlakukan sama. */
+  (function () {
+    var qa = /[?&]autoab=([A-Za-z0-9_,]+)/.exec(location.search);
+    if (!qa) return;
+    var TOK = qa[1];
+    function qn(name, def, lo, hi) { var m = new RegExp('[?&]' + name + '=(\\d+)').exec(location.search), v = m ? parseInt(m[1], 10) : def; return Math.max(lo, Math.min(hi, v)); }
+    var N = qn('autoabn', 3, 1, 6), HOLD = qn('autoabms', 30000, 10000, 120000), SETTLE = qn('autoabset', 5000, 1000, 30000), SECI = qn('autoabsec', 0, 0, 30);
+    var KEY = '__autoab_state', DB = '__autoab_db', TOT = N * 2;
+    var plan = []; for (var pi = 0; pi < TOT; pi++) plan.push(pi % 2 ? 'B' : 'A');
+    var S = null;
+    try { S = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e0) { S = null; }
+    var RESET = /[?&]autoabreset=1(&|$)/.test(location.search);
+    function saveS() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+    /* ---- penyimpanan dump: IndexedDB, cadangan localStorage ---- */
+    function idb(cb) {
+      try {
+        var rq = indexedDB.open(DB, 1);
+        rq.onupgradeneeded = function () { try { rq.result.createObjectStore('r'); } catch (e) {} };
+        rq.onsuccess = function () { cb(rq.result); };
+        rq.onerror = function () { cb(null); };
+      } catch (e) { cb(null); }
+    }
+    function idbPut(i, v, cb) {
+      idb(function (db) {
+        if (!db) { try { localStorage.setItem('__autoab_r' + i, JSON.stringify(v)); cb(true, 'ls'); } catch (e) { cb(false, 'ls'); } return; }
+        try {
+          var tx = db.transaction('r', 'readwrite'); tx.objectStore('r').put(v, i);
+          tx.oncomplete = function () { try { db.close(); } catch (e) {} cb(true, 'idb'); };
+          tx.onerror = tx.onabort = function () { try { db.close(); } catch (e) {} cb(false, 'idb'); };
+        } catch (e) { try { db.close(); } catch (e2) {} cb(false, 'idb'); }
+      });
+    }
+    function idbAll(cb) {
+      idb(function (db) {
+        var out = [];
+        if (!db) { for (var i = 0; i < 12; i++) { try { var s = localStorage.getItem('__autoab_r' + i); if (s) out.push(JSON.parse(s)); } catch (e) {} } cb(out); return; }
+        try {
+          var rq = db.transaction('r', 'readonly').objectStore('r').openCursor();
+          rq.onsuccess = function () { var c = rq.result; if (c) { out.push(c.value); c['continue'](); } else { try { db.close(); } catch (e) {} cb(out); } };
+          rq.onerror = function () { try { db.close(); } catch (e) {} cb(out); };
+        } catch (e) { try { db.close(); } catch (e2) {} cb(out); }
+      });
+    }
+    function idbClear() {
+      idb(function (db) {
+        for (var i = 0; i < 12; i++) { try { localStorage.removeItem('__autoab_r' + i); } catch (e) {} }
+        if (!db) return;
+        try { var tx = db.transaction('r', 'readwrite'); tx.objectStore('r').clear(); tx.oncomplete = function () { try { db.close(); } catch (e) {} }; } catch (e) { try { db.close(); } catch (e2) {} }
+      });
+    }
+    if (RESET || !S || S.tok !== TOK || S.n !== N) {
+      S = { tok: TOK, n: N, i: 0, t0: Date.now(), runs: [], done: false };
+      idbClear(); saveS();
+    }
+    if (RESET) { try { history.replaceState(null, '', urlClean(false, true)); } catch (e1) {} }
+    /* ---- URL ---- */
+    function urlClean(dropAll, keepAutoab) {
+      var parts = location.search.replace(/^\?/, '').split('&').filter(function (p) {
+        if (!p || /^off=/.test(p) || /^autoabreset=/.test(p)) return false;
+        if (dropAll && /^autoab/.test(p)) return false;
+        return true;
+      });
+      return location.pathname + (parts.length ? '?' + parts.join('&') : '') + location.hash;
+    }
+    function urlFor(i) {
+      var u = urlClean(false, true), sep = u.indexOf('?') >= 0 ? '&' : '?';
+      if (plan[i] !== 'B') return u;
+      var h = u.indexOf('#'); var base = h >= 0 ? u.slice(0, h) : u, hash = h >= 0 ? u.slice(h) : '';
+      return base + sep + 'off=' + TOK + hash;
+    }
+    /* ---- metrik ringkas utk layar ---- */
+    function dt03(d) {
+      try { var rows = d.pmk.secP.visits[0].rows, n = 0, s = 0; for (var i = 0; i < rows.length; i++) if (rows[i][0] <= 3) { n += rows[i][1]; s += rows[i][3] * rows[i][1]; } return n ? Math.round(s / n * 10) / 10 : null; } catch (e) { return null; }
+    }
+    function ra48(d) {
+      try { var o = d.pmk.secP.visits[0].raf; if (o && o.sum && o.sum.s4_8 && o.sum.s4_8.raFps != null) return o.sum.s4_8.raFps; } catch (e) {}
+      return null;
+    }
+    function fmt(ms) { var t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60), s = t % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+    function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()); }
+    /* ---- kotak timer ---- */
+    var box = null, txt = null, bar = null, btns = null, P = { name: 'boot', t0: Date.now(), until: 0 }, runT0 = Date.now(), finished = false;
+    function mount() {
+      if (box || !document.body) return;
+      box = document.createElement('div'); box.id = '__autoab'; box.className = 'dk';
+      box.style.cssText = 'position:fixed;left:6px;top:calc(env(safe-area-inset-top,0px) + 6px);width:min(92vw,330px);box-sizing:border-box;z-index:100001;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#bfeaf2;background:rgba(2,10,16,.9);border:1px solid rgba(80,200,230,.4);border-radius:6px;padding:6px 8px;pointer-events:none;contain:layout paint';
+      txt = document.createElement('div'); txt.style.cssText = 'white-space:pre-wrap'; box.appendChild(txt);
+      var bw = document.createElement('div'); bw.style.cssText = 'height:4px;margin:5px 0;background:rgba(80,200,230,.18);border-radius:2px;overflow:hidden';
+      bar = document.createElement('div'); bar.style.cssText = 'height:4px;width:0;background:#4fd3e8'; bw.appendChild(bar); box.appendChild(bw);
+      btns = document.createElement('div'); btns.style.cssText = 'display:flex;gap:6px;pointer-events:auto'; box.appendChild(btns);
+      document.body.appendChild(box); drawBtns(); draw();
+    }
+    function mkBtn(label, fn) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+      b.style.cssText = 'font:inherit;color:#bfeaf2;background:rgba(80,200,230,.12);border:1px solid rgba(80,200,230,.45);border-radius:4px;padding:2px 8px;pointer-events:auto';
+      b.addEventListener('click', fn); return b;
+    }
+    function drawBtns() {
+      if (!btns) return; btns.textContent = '';
+      if (S.done) { btns.appendChild(mkBtn('Export', exportAll)); btns.appendChild(mkBtn('Reset', function () { try { localStorage.removeItem(KEY); } catch (e) {} idbClear(); location.replace(urlClean(true)); })); btns.appendChild(mkBtn('Tutup', function () { location.replace(urlClean(true)); })); }
+      else btns.appendChild(mkBtn('Stop', function () { try { localStorage.removeItem(KEY); } catch (e) {} location.replace(urlClean(true)); }));
+    }
+    function phaseLine() {
+      var now = Date.now(), left = P.until ? P.until - now : 0;
+      switch (P.name) {
+        case 'boot': return 'BOOT ' + fmt(now - runT0) + '  (kapsul: ketuk BIRU, atau tunggu auto-masuk)';
+        case 'settle': return 'OVERVIEW diam, masuk sektor dlm ' + fmt(left);
+        case 'enter': return 'MASUK SEKTOR (wormhole) ' + fmt(now - P.t0);
+        case 'hold': return 'DIAM di sektor, simpan dlm ' + fmt(left) + '  (JANGAN sentuh layar)';
+        case 'save': return 'MENYIMPAN dump...';
+        case 'next': return 'RELOAD ke run berikut dlm ' + fmt(left);
+        default: return 'SELESAI';
+      }
+    }
+    function draw() {
+      if (!txt) return;
+      var now = Date.now(), i = Math.min(S.i, TOT - 1), v = plan[i], l = [];
+      l.push('AUTOAB ' + TOK + '  run ' + (S.done ? TOT : i + 1) + '/' + TOT + '  ' + (S.done ? 'SELESAI' : v + (v === 'B' ? ' (off=' + TOK + ')' : ' (tanpa off)')));
+      var est = '';
+      if (!S.done && S.runs.length) { var a = 0; for (var k = 0; k < S.runs.length; k++) a += S.runs[k].ms + 4000; est = '  sisa ±' + fmt((TOT - S.i) * (a / S.runs.length) - (now - runT0)); }
+      l.push('total T+' + fmt((S.done && S.tEnd ? S.tEnd : now) - S.t0) + est);
+      if (!S.done) l.push(phaseLine());
+      for (var j = 0; j < S.runs.length; j++) { var r = S.runs[j]; l.push((r.v) + (Math.floor(r.i / 2) + 1) + ' ' + (r.ok ? '' : 'GAGAL ') + 'dt03=' + (r.dt03 != null ? r.dt03 : '-') + ' ra4_8=' + (r.ra48 != null ? r.ra48 : '-') + (r.note ? ' [' + r.note + ']' : '')); }
+      if (S.done) l.push(summary());
+      txt.textContent = l.join('\n');
+      var frac = 0; if (!S.done && P.until) { var dur = Math.max(1, P.until - P.t0); frac = Math.min(1, (now - P.t0) / dur); }
+      bar.style.width = (Math.min(100, ((S.done ? TOT : S.i) + (S.done ? 0 : frac * 0.5)) / TOT * 100)) + '%';
+    }
+    function summary() {
+      var out = [], dA = [], dB = [], rd = [], dd = [];
+      for (var p = 0; p < N; p++) {
+        var a = S.runs[p * 2], b = S.runs[p * 2 + 1];
+        if (a && b && a.dt03 != null && b.dt03 != null) { dd.push(Math.round((b.dt03 - a.dt03) * 10) / 10); }
+        if (a && b && a.ra48 != null && b.ra48 != null) { rd.push(Math.round((b.ra48 - a.ra48) * 10) / 10); }
+      }
+      out.push('B-A dt03 per pasang: ' + (dd.length ? dd.join(' / ') : '-'));
+      out.push('B-A raFps s4_8 per pasang: ' + (rd.length ? rd.join(' / ') : '-') + '  (lulus: B naik >= 2 di SEMUA pasang)');
+      return out.join('\n');
+    }
+    function setPhase(name, durMs) { P.name = name; P.t0 = Date.now(); P.until = durMs ? P.t0 + durMs : 0; draw(); }
+    function poll(cond, every, timeout, ok, fail) {
+      var t0 = Date.now();
+      (function tick() { var r = false; try { r = cond(); } catch (e) { r = false; } if (r) return ok(); if (Date.now() - t0 > timeout) return fail(); setTimeout(tick, every); })();
+    }
+    function isBusy() { var w = typeof WORMHOLE !== 'undefined' && WORMHOLE.busy, s = typeof SECT !== 'undefined' && SECT.busy; return !!(w || s); }
+    /* ---- alur satu run ---- */
+    function startRun() {
+      if (S.done) { P.name = 'done'; mount(); return; }
+      runT0 = Date.now(); setPhase('boot');
+      var thisI = S.i;
+      setTimeout(function () { if (!finished && S.i === thisI) finishRun(false, 'watchdog 6 mnt'); }, 360000);
+      poll(function () { return typeof window.__enteredAt === 'number'; }, 250, 150000, function () {
+        setPhase('settle', SETTLE); setTimeout(doEnter, SETTLE);
+      }, function () { finishRun(false, 'obs-entered tdk muncul 150 dtk'); });
+    }
+    function doEnter() {
+      if (finished) return;
+      setPhase('enter');
+      var err = '';
+      try {
+        var list = (typeof SECT !== 'undefined' && SECT.list) ? SECT.list.filter(function (s) { return s && s.ids && s.ids.length; }) : [];
+        if (!list.length) throw new Error('SECT.list kosong');
+        var s = list[SECI % list.length];
+        S.sec = s.k || s.name || '?';
+        try { if (!SECT.cur && typeof drawSectorOverview === 'function') drawSectorOverview(performance.now(), 0); } catch (e0) {}
+        if (typeof sectJumpTo !== 'function') throw new Error('sectJumpTo tidak ada');
+        if (sectJumpTo(s, true, true) === false) throw new Error('sectJumpTo ditolak');
+      } catch (e) { err = String(e && e.message || e); }
+      if (err) return finishRun(false, err);
+      var t0 = Date.now(), seen = false;
+      poll(function () { var b = isBusy(); if (b) seen = true; return seen ? !b : (Date.now() - t0 > 4000 && !b && !!(typeof SECT !== 'undefined' && SECT.cur)); }, 120, 70000, function () {
+        if (!(typeof SECT !== 'undefined' && SECT.cur)) return finishRun(false, 'SECT.cur kosong sesudah masuk');
+        setPhase('hold', HOLD); setTimeout(saveRun, HOLD);
+      }, function () { finishRun(false, 'timeout masuk sektor 70 dtk'); });
+    }
+    function saveRun() {
+      if (finished) return; finished = true;
+      setPhase('save');
+      var s = null, d = null, ok = true, note = '';
+      try { s = window.__benchPost(); d = JSON.parse(s); } catch (e) { ok = false; note = 'snapshot gagal'; }
+      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null };
+      idbPut(S.i, { meta: r, dump: s }, function (okp, kind) {
+        if (!okp) { r.ok = false; r.note = (r.note ? r.note + ' ' : '') + 'simpan gagal'; }
+        r.store = kind; S.runs.push(r); S.i++; saveS(); nextOrDone();
+      });
+    }
+    function finishRun(ok, note) {
+      if (finished) return; finished = true;
+      var r = { i: S.i, v: plan[S.i], url: location.href, ok: false, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: null, ra48: null };
+      S.runs.push(r); S.i++; saveS(); nextOrDone();
+    }
+    function nextOrDone() {
+      if (S.i >= TOT) { S.done = true; S.tEnd = Date.now(); saveS(); P.name = 'done'; drawBtns(); draw(); return; }
+      setPhase('next', 4000);
+      setTimeout(function () { location.replace(urlFor(S.i)); }, 4000);
+    }
+    function exportAll() {
+      idbAll(function (arr) {
+        arr.sort(function (a, b) { return a.meta.i - b.meta.i; });
+        var out = { kind: 'autoab', tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, dump: d }; }) };
+        try {
+          var blob = new Blob([JSON.stringify(out)], { type: 'application/json' }), a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = 'autoab-' + TOK + '-' + stamp() + '.json'; a.style.display = 'none'; document.body.appendChild(a); a.click();
+          setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(a.href); } catch (e) {} }, 4000);
+        } catch (e) {}
+      });
+    }
+    if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+    setInterval(draw, 1000);
+    startRun();
+  })();
+  /* [autoab:end] */
 })();
