@@ -120,6 +120,7 @@ try{
   PL3D_CFG.slowHint={on:1,force:0,key:'dumul_pl_slow',ttl:2592000000};   /* [v57] petunjuk slow: perangkat yang pernah FS.slow langsung memakai q slow sejak awal (tanpa resize + 10 dtk q penuh di sektor pertama). ?plhint=0 = mati (A/B, tidak baca/tulis), ?plhint=1 = paksa nyala tanpa tulis storage */
   try{var _phm=/[?&]plhint=([01])(?:&|#|$)/.exec(location.search);if(_phm){if(_phm[1]==='0')PL3D_CFG.slowHint.on=0;else PL3D_CFG.slowHint.force=1;}}catch(ePh){}   /* [v55] A/B: ?bmad=0 = tanpa latch bandMin adaptif */
   var _prw=/[?&]plrw=(\d+)/.exec(location.search);if(_prw)PL3D_CFG.rwSlow=parseInt(_prw[1],10);   /* [v54] A/B: ?plrw=0 = tanpa batas lebar saat FS.slow (perilaku lama), ?plrw=563 dst */
+  PL3D_CFG.aurDelay=0;try{var _pad=/[?&]aurdelay=(\d+)/.exec(location.search);if(_pad)PL3D_CFG.aurDelay=Math.min(30000,parseInt(_pad[1],10)||0);}catch(eAd){}   /* [v59] ALAT UKUR A/B (default 0 = mati): ?aurdelay=N = bake + blit aurora planet DITUNDA N ms sesudah entri sektor (SECT.cur && !SECT.busy); selama tunda F.aur=0 (fade-in .6 dtk sesudahnya). Hipotesis: bake aurora (pl.aur/pl.bake/pl.copy, detik 3-6) memicu q.big di punuk detik 4-6. Dump: cfg.pl.aurDelay/aurS0/aurRel. */
 }catch(ePL0){}
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
   rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0,cv3:null,c3:null,cyc:null,full:true,bwR:null};
@@ -982,6 +983,16 @@ function pl3dAurBake(F,A,S,tms){   /* bake satu keyframe ke slot S untuk waktu a
 function pl3dAurBakeMk(F,A,S,tms){pl3dMk('pl.pre');pl3dAurBake(F,A,S,tms);pl3dMk('pl.bake');}
 function pl3dFxAurora(g,F){
   var C=PL3D_CFG,P0=F.pal,gm=F.gm,ba=g.globalAlpha,SC=PL3D_AUR_SC;
+  if(C.aurDelay>0){   /* [v59] ?aurdelay=N: lihat PL3D_CFG.aurDelay */
+    try{
+      var _sc=typeof SECT!=='undefined'&&SECT.cur&&!SECT.busy,_pn=performance.now();
+      if(_sc){
+        if(!PL3D.aurS0){PL3D.aurS0=Math.round(_pn);PL3D.aurRel=null;}
+        if(_pn-PL3D.aurS0<C.aurDelay){F.aur=0;return;}
+        if(!PL3D.aurRel)PL3D.aurRel=Math.round(_pn);
+      }else PL3D.aurS0=0;
+    }catch(eAh){}
+  }
   F.aur=Math.max(0,Math.min(1,F.aur+(C.auroraOn?1:-1)*F.dt/.6));   /* fade-in/out 0.6 dtk (diterapkan saat blit, bukan saat bake) */
   if(F.aur<=.001){F.aur=0;return;}
   var A=Math.min(.5,P0.atmA*C.atmK*2.2);   /* kecerahan ikut slider Atmosfer */
