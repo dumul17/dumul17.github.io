@@ -326,7 +326,7 @@
 (function(){var e=false;try{e=/[?&]layout=1\b/.test(location.search)||localStorage.getItem('obs_layout_on')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/20-layout-editor.js?v=4"></scr'+'ipt>');})();
 </script>
 <script defer src="dumul-js/obs/js/08-tx-drone.js?v=15"></script>
-<script defer src="dumul-js/obs/js/09-wormhole.js?v=49"></script>
+<script defer src="dumul-js/obs/js/09-wormhole.js?v=50"></script>
 <script defer src="dumul-js/obs/js/10-ui-sound.js?v=9"></script>
 <script>
 /* Live counter (Firebase): sekarang termasuk PRA-KAPSUL. 07-boot.js memanggil window.__liveLoad() begitu 3D + warm shader selesai (layar boot masih menutup, lihat blok PRA-KAPSUL di sana),
@@ -354,7 +354,7 @@
 })();
 </script>
 <script defer src="dumul-js/obs/js/12-ast3d.js?v=41"></script>
-<script defer src="dumul-js/obs/js/13-scope3d.js?v=30"></script>
+<script defer src="dumul-js/obs/js/13-scope3d.js?v=31"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=19"></script>
 <script defer src="dumul-js/obs/js/15-portal3d.js?v=50"></script>
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=7"></script>
@@ -367,7 +367,7 @@
    check-sky.js mengecualikan file ini. Naikkan ?v= kalau file-nya diubah. */
 (function () {
   if (!/[?&]debug=1(&|$)/.test(location.search)) return;
-  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=28'; s.async = true; document.body.appendChild(s); }
+  function go() { var s = document.createElement('script'); s.src = 'dumul-js/obs/js/19-auto-debug.js?v=29'; s.async = true; document.body.appendChild(s); }
   if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
 })();
 </script>
