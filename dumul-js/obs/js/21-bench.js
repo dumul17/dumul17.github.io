@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+/* BENCH v11.29 (?bench=1) — v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
     v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (ABABAB, kotak timer, Export 1 berkas); lihat blok [autoab] di akhir file. Tidak mengubah apa pun tanpa ?autoab.
     v11.29zb: dump cfg.pl memuat aurDelay/aurS0/aurRel (A/B ?aurdelay=N di 17-planet3d v59); isi lain tidak berubah.
@@ -26,7 +26,7 @@
   try { window.__gpuP = /[?&]gpup=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpu) {}
   try { window.__gpuO = /[?&]gpuo=1(&|$)/.test(location.search) ? 1 : 0; } catch (eGpo) {}   /* v11.28: ?gpuo=1 = urutan sinkron q.* dibalik */   /* v11.26: ?gpup=1 = probe GPU (finish() per unit GL + backlog di awal frame) */
   /* v11.29: ?off=a,b,c = matikan lapisan untuk tes q.big (otomatis dari URL, tercatat di dump) */
-  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'sghalf', 'sgquart', 'schalf', 'scquart', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'hudA', 'hudB', 'hudC', 'hudD', 'dstage', 'dcl', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
+  var OFF_PX = ['sky', 'mw', 'neb', 'lines', 'stars', 'pulse', 'hole', 'ast', 'all', 'cname', 'lstroke', 'sglow', 'score', 'smark', 'slbl', 'splei', 'sgs', 'sgm', 'sgl', 'scs', 'scm', 'scl', 'sghalf', 'sgquart', 'schalf', 'scquart', 'pglow', 'pcore', 'pint', 'pname'], OFF_B = { plb: 'pl', astb: 'ast', ptb: 'pt', scb: 'sc', drb: 'dr', plfx: 'plfx' }, OFF_ALL = OFF_PX.concat(['sdraw', 'hud', 'hudA', 'hudB', 'hudC', 'hudD', 'dstage', 'dcl', 'dstx', 'skyhide', 'blit', 'plb', 'astb', 'ptb', 'scb', 'drb', 'plfx']), OFF_L = [];
   try {
     var offM = /[?&]off=([A-Za-z,]+)/.exec(location.search);
     if (offM) offM[1].split(',').forEach(function (t) { if (OFF_ALL.indexOf(t) >= 0 && OFF_L.indexOf(t) < 0) OFF_L.push(t); });
@@ -45,7 +45,7 @@
     var exc = HUD_EXC.map(function (x) { return ':not(' + x + ')'; }).join(''), hid = '{visibility:hidden!important}', css = 'html.__bo-hud body>*' + exc + hid;
     HUD_K.forEach(function (k) { css += HUD_G[k].map(function (x) { return 'html.__bo-' + k + ' body>' + x; }).join(',') + hid; });
     css += 'html.__bo-hudD body>*' + exc + HUD_K.map(function (k) { return HUD_G[k].map(function (x) { return ':not(' + x + ')'; }).join(''); }).join('') + hid;
-    return css + 'html.__bo-dstage #stage' + hid + 'html.__bo-dcl #cat-lock::before{animation:none!important}html.__bo-skyhide #sky' + hid;
+    return css + 'html.__bo-dstage #stage' + hid + 'html.__bo-dstx #stage>*:not(#sky)' + hid + 'html.__bo-dcl #cat-lock::before{animation:none!important}html.__bo-skyhide #sky' + hid;
   }
   function hudGrp(el) {
     try {
@@ -77,15 +77,16 @@
       } catch (e) { return null; }
     }
     function gsum(g) { return out.grp[g] || (out.grp[g] = { n: 0, area: 0, bm: 0, bf: 0, fl: 0, wc: 0, anim: 0 }); }
-    var kids = b.children;
+    var kids = [].slice.call(b.children), stg = d.getElementById('stage');
+    if (stg) kids = kids.concat([].slice.call(stg.children));
     for (var i = 0; i < kids.length; i++) {
       var el = kids[i], tg = String(el.tagName || '').toLowerCase();
       if (tg === 'script' || tg === 'style') continue;
       try {
-        var cs = getComputedStyle(el), g = hudGrp(el);
+        var cs = getComputedStyle(el), g = el.parentNode === b ? hudGrp(el) : 'st';
         if (cs.display === 'none' || cs.visibility === 'hidden') { if (out.hid.length < 60) out.hid.push(nm(el) + (g === '-' ? '' : ' [' + g + ']')); continue; }
         var r = el.getBoundingClientRect(), ix = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)), iy = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)), a = Math.round(ix * iy / VA * 1000) / 10;
-        var rec = props(cs); rec.n = nm(el); rec.g = g; rec.a = a; rec.r = [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; rec.pos = cs.position; rec.z = cs.zIndex;
+        var rec = props(cs); rec.n = nm(el); rec.g = g; rec.a = a; rec.r = [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; rec.pos = cs.position; rec.z = cs.zIndex; if (tg === 'canvas') rec.cv = [el.width, el.height];
         if (cs.opacity !== '1') rec.op = cs.opacity;
         if (cs.contain && cs.contain !== 'none') rec.ct = cs.contain;
         if (cs.boxShadow && cs.boxShadow !== 'none') rec.bs = cs.boxShadow.slice(0, 70);
@@ -118,7 +119,7 @@
       for (var ak in agg) if (out.anims.list.length < 80) out.anims.list.push(agg[ak]);
     } catch (eA) { out.anims.err = String(eA && eA.message || eA); }
     try { out.sect = (typeof SECT !== 'undefined' && SECT.cur) ? (SECT.cur.k || SECT.cur.name || '?') : null; } catch (eS) {}
-    var parts = []; ['hudA', 'hudB', 'hudC', 'hudD', '-'].forEach(function (g) { var x = out.grp[g]; if (!x) return; x.area = Math.round(x.area * 10) / 10; parts.push((g === '-' ? 'ex' : g.slice(3)) + ' n' + x.n + ' ' + x.area + '% bm' + x.bm + ' bf' + x.bf + ' fl' + x.fl + ' wc' + x.wc + ' an' + x.anim); });
+    var parts = []; ['hudA', 'hudB', 'hudC', 'hudD', 'st', '-'].forEach(function (g) { var x = out.grp[g]; if (!x) return; x.area = Math.round(x.area * 10) / 10; parts.push((g === '-' ? 'ex' : g === 'st' ? 'st' : g.slice(3)) + ' n' + x.n + ' ' + x.area + '% bm' + x.bm + ' bf' + x.bf + ' fl' + x.fl + ' wc' + x.wc + ' an' + x.anim); });
     out.short = parts.join(' | ');
     return out;
   }
@@ -134,7 +135,7 @@
     try {
       document.documentElement.classList.toggle('__bo-hud', OFF_CUR.indexOf('hud') >= 0);
       document.documentElement.classList.toggle('__bo-skyhide', OFF_CUR.indexOf('skyhide') >= 0);
-      ['hudA', 'hudB', 'hudC', 'hudD', 'dstage', 'dcl'].forEach(function (k) { document.documentElement.classList.toggle('__bo-' + k, OFF_CUR.indexOf(k) >= 0); });
+      ['hudA', 'hudB', 'hudC', 'hudD', 'dstage', 'dcl', 'dstx'].forEach(function (k) { document.documentElement.classList.toggle('__bo-' + k, OFF_CUR.indexOf(k) >= 0); });
       if (typeof PX === 'object' && PX) { var sd = OFF_CUR.indexOf('sdraw') >= 0; OFF_PX.forEach(function (k) { PX[k] = (OFF_CUR.indexOf(k) >= 0 || (sd && (k === 'sglow' || k === 'score' || k === 'smark' || k === 'slbl'))) ? 1 : 0; }); }   /* sdraw = semua gambar bintang mati (halo+inti+tanda+label), loop hitung tetap jalan */
       var all = OFF_CUR.indexOf('blit') >= 0, ob = {}; Object.keys(OFF_B).forEach(function (k) { ob[OFF_B[k]] = ((all && k !== 'plfx') || OFF_CUR.indexOf(k) >= 0) ? 1 : 0; });   /* 'blit' = 5 blit GL->#sky, TIDAK termasuk plfx */
       window.__offB = ob;   /* dibaca guard `g.drawImage` di 12/13/14/15/17: lewati blit GL->#sky saja, render GL tetap jalan */
