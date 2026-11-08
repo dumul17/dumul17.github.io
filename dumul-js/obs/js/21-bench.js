@@ -1,5 +1,6 @@
 'use strict';
 /* BENCH v11.29 (?bench=1) — v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+    v11.29zh: ?autoabboot=1 = autoab MODE BOOT (reload -> boot -> obs-entered -> diam ±12 dtk -> snapshot() full-boot, bukan __benchPost; metrik CPU pra-kapsul per run: longtask, preMs, threeQ, LoAF, frame1). Dipasangkan dgn ?autoabq=gs=0 dst.
     v11.29zg: ?autoabov=1 = autoab MODE OVERVIEW (tanpa masuk sektor; rekam ov saja, metrik fps/dt/teleTop/pt.copy/sc.sub per run) + ?autoabq=a=1,b=2 (param tambahan khusus sisi B; ?autoab=none = tanpa ?off=). Tanpa ?autoab tidak mengubah apa pun.
     v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
     v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (ABABAB, kotak timer, Export 1 berkas); lihat blok [autoab] di akhir file. Tidak mengubah apa pun tanpa ?autoab.
@@ -1839,9 +1840,11 @@ var DK_CSS =
     var TOK = qa[1];
     function qn(name, def, lo, hi) { var m = new RegExp('[?&]' + name + '=(\\d+)').exec(location.search), v = m ? parseInt(m[1], 10) : def; return Math.max(lo, Math.min(hi, v)); }
     var N = qn('autoabn', 3, 1, 6), HOLD = qn('autoabms', 30000, 10000, 120000), SETTLE = qn('autoabset', 5000, 1000, 30000), SECI = qn('autoabsec', 0, 0, 30);
-    var OVM = /[?&]autoabov=1(&|$)/.test(location.search);   /* v11.29zg: mode overview */
+    var BTM = /[?&]autoabboot=1(&|$)/.test(location.search);   /* v11.29zh: mode boot (menang atas autoabov) */
+    var OVM = !BTM && /[?&]autoabov=1(&|$)/.test(location.search);   /* v11.29zg: mode overview */
     if (OVM && !/[?&]autoabset=/.test(location.search)) SETTLE = 10000;   /* beri waktu governor FS menetap sebelum merekam */
     if (OVM && !/[?&]autoabms=/.test(location.search)) HOLD = 40000;
+    if (BTM && !/[?&]autoabms=/.test(location.search)) HOLD = 12000;   /* diam sesudah obs-entered: tangkap blue2f1 + LoAF 'after' */
     var qq = /[?&]autoabq=([A-Za-z0-9_=.,\-]+)/.exec(location.search), QS = qq ? qq[1] : '', QX = QS ? QS.split(',').filter(Boolean).join('&') : '';
     var QN = QX ? QX.split('&').map(function (p) { return p.split('=')[0]; }) : [];
     var BDESC = (TOK !== 'none' ? 'off=' + TOK : '') + (QX ? (TOK !== 'none' ? ' ' : '') + '+' + QX : '');
@@ -1888,8 +1891,8 @@ var DK_CSS =
         try { var tx = db.transaction('r', 'readwrite'); tx.objectStore('r').clear(); tx.oncomplete = function () { try { db.close(); } catch (e) {} }; } catch (e) { try { db.close(); } catch (e2) {} }
       });
     }
-    if (RESET || !S || S.tok !== TOK || S.n !== N || S.q !== QS || S.ov !== OVM) {
-      S = { tok: TOK, q: QS, ov: OVM, n: N, i: 0, t0: Date.now(), runs: [], done: false };
+    if (RESET || !S || S.tok !== TOK || S.n !== N || S.q !== QS || S.ov !== OVM || S.bt !== BTM) {
+      S = { tok: TOK, q: QS, ov: OVM, bt: BTM, n: N, i: 0, t0: Date.now(), runs: [], done: false };
       idbClear(); saveS();
     }
     if (RESET) { try { history.replaceState(null, '', urlClean(false, true)); } catch (e1) {} }
@@ -1940,6 +1943,16 @@ var DK_CSS =
         return { n: n, dt: r1(a), fps: r1(1000 / a), tele: r1(sg.teleTop / n), ptc: r1(sg['pt.copy'] / n), scs: r1(sg['sc.sub'] / n), mix: mix.join(' ') };
       } catch (e) { return null; }
     }
+    function btMetrics(d) {   /* v11.29zh: metrik CPU pra-kapsul dari dump full-boot (snapshot()); bootToCapsule ikut dicatat tapi tercemar jaringan */
+      try {
+        var t = d.t || {}, pm = d.preMs || {}, pre = 0, k, lb = d.longtaskBeforeCapsule || {}, tq = d.threeQ || {}, gl = 0, lm = 0, tc = t.capsule, lp = d.ltPhase || {};
+        for (k in pm) if (typeof pm[k] === 'number') pre += pm[k];
+        (d.glNew || []).forEach(function (x) { gl += x[1] || 0; });
+        (d.loaf || []).forEach(function (x) { if (tc != null && x[0] < tc && x[1] > lm) lm = x[1]; });
+        return { bc: d.bootToCapsule != null ? r1(d.bootToCapsule / 1000) : null, ltN: lb.n != null ? lb.n : null, lt: lb.ms != null ? lb.ms : null, pre: r1(pre), tq: tq.runMs != null ? tq.runMs : null, tqw: tq.waitMs != null ? tq.waitMs : null, loaf: r1(lm), f1: (t.frame1 != null && t.entered != null) ? r1(t.frame1 - t.entered) : null, gl: r1(gl), aft: lp.after ? lp.after.ms : null, rv: d.isRepeatVisit ? 1 : 0 };
+      } catch (e) { return null; }
+    }
+    function btLine(r) { var o = r.bt; return o ? 'bc=' + o.bc + ' lt=' + o.lt + ' pre=' + o.pre + ' tq=' + o.tq + ' f1=' + o.f1 + ' rv=' + o.rv : '-'; }
     function ovLine(r) { var o = r.ov; return o ? 'fps=' + o.fps + ' dt=' + o.dt + ' tele=' + o.tele + ' ptc=' + o.ptc + ' n=' + o.n : '-'; }
     function fmt(ms) { var t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60), s = t % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
     function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()); }
@@ -1971,7 +1984,7 @@ var DK_CSS =
         case 'boot': return 'BOOT ' + fmt(now - runT0) + '  (kapsul: ketuk BIRU, atau tunggu auto-masuk)';
         case 'settle': return OVM ? 'OVERVIEW diam, mulai rekam dlm ' + fmt(left) : 'OVERVIEW diam, masuk sektor dlm ' + fmt(left);
         case 'enter': return 'MASUK SEKTOR (wormhole) ' + fmt(now - P.t0);
-        case 'hold': return (OVM ? 'REKAM overview, simpan dlm ' : 'DIAM di sektor, simpan dlm ') + fmt(left) + '  (JANGAN sentuh layar)';
+        case 'hold': return (OVM ? 'REKAM overview, simpan dlm ' : BTM ? 'DIAM sesudah masuk, simpan dlm ' : 'DIAM di sektor, simpan dlm ') + fmt(left) + '  (JANGAN sentuh layar)';
         case 'save': return 'MENYIMPAN dump...';
         case 'next': return 'RELOAD ke run berikut dlm ' + fmt(left);
         default: return 'SELESAI';
@@ -1980,12 +1993,12 @@ var DK_CSS =
     function draw() {
       if (!txt) return;
       var now = Date.now(), i = Math.min(S.i, TOT - 1), v = plan[i], l = [];
-      l.push('AUTOAB' + (OVM ? ' OV ' : ' ') + TOK + '  run ' + (S.done ? TOT : i + 1) + '/' + TOT + '  ' + (S.done ? 'SELESAI' : v + (v === 'B' ? ' (' + BDESC + ')' : ' (A)')));
+      l.push('AUTOAB' + (OVM ? ' OV ' : BTM ? ' BOOT ' : ' ') + TOK + '  run ' + (S.done ? TOT : i + 1) + '/' + TOT + '  ' + (S.done ? 'SELESAI' : v + (v === 'B' ? ' (' + BDESC + ')' : ' (A)')));
       var est = '';
       if (!S.done && S.runs.length) { var a = 0; for (var k = 0; k < S.runs.length; k++) a += S.runs[k].ms + 4000; est = '  sisa ±' + fmt((TOT - S.i) * (a / S.runs.length) - (now - runT0)); }
       l.push('total T+' + fmt((S.done && S.tEnd ? S.tEnd : now) - S.t0) + est);
       if (!S.done) l.push(phaseLine());
-      for (var j = 0; j < S.runs.length; j++) { var r = S.runs[j]; l.push((r.v) + (Math.floor(r.i / 2) + 1) + ' ' + (r.ok ? '' : 'GAGAL ') + (OVM ? ovLine(r) : 'ra9_14=' + (r.ra914 != null ? r.ra914 : '-') + ' dt9=' + (r.dt9 != null ? r.dt9 : '-')) + (r.note ? ' [' + r.note + ']' : '')); }
+      for (var j = 0; j < S.runs.length; j++) { var r = S.runs[j]; l.push((r.v) + (Math.floor(r.i / 2) + 1) + ' ' + (r.ok ? '' : 'GAGAL ') + (OVM ? ovLine(r) : BTM ? btLine(r) : 'ra9_14=' + (r.ra914 != null ? r.ra914 : '-') + ' dt9=' + (r.dt9 != null ? r.dt9 : '-')) + (r.note ? ' [' + r.note + ']' : '')); }
       if (S.done) l.push(summary());
       txt.textContent = l.join('\n');
       var frac = 0; if (!S.done && P.until) { var dur = Math.max(1, P.until - P.t0); frac = Math.min(1, (now - P.t0) / dur); }
@@ -2005,7 +2018,27 @@ var DK_CSS =
       if (S.runs[1] && S.runs[1].ov) out.push('mix B1: ' + S.runs[1].ov.mix);
       return out.join('\n');
     }
+    function summaryBt() {
+      var out = [], ks = ['lt', 'pre', 'tq', 'loaf', 'f1'], nm = { lt: 'longtask pra-kapsul', pre: 'preMs total', tq: 'threeQ run', loaf: 'LoAF maks pra', f1: 'frame1-entered' }, ds = {}, av = [], any = false, ok = true;
+      ks.forEach(function (k) { ds[k] = []; });
+      for (var p = 0; p < N; p++) {
+        var a = S.runs[p * 2], b = S.runs[p * 2 + 1];
+        if (a && b && a.bt && b.bt) {
+          any = true; if (a.bt.lt != null) av.push(a.bt.lt);
+          ks.forEach(function (k) { ds[k].push(a.bt[k] != null && b.bt[k] != null ? r1(b.bt[k] - a.bt[k]) : null); });
+        }
+      }
+      var spread = av.length > 1 ? Math.max.apply(null, av) - Math.min.apply(null, av) : 0, thr = Math.max(200, spread);
+      ks.forEach(function (k) { out.push('B-A ' + nm[k] + ' (ms): ' + (ds[k].length ? ds[k].join(' / ') : '-')); });
+      ds.lt.forEach(function (v) { if (v == null || v > -thr) ok = false; });
+      out.push('sebaran A (lt): ' + Math.round(spread) + ' ms, ambang: ' + Math.round(thr) + ' ms');
+      out.push(any ? (ok ? 'B lebih ringan di SEMUA pasang (longtask turun > ambang)' : 'BELUM: longtask B tidak turun > ambang di semua pasang') : 'data kurang');
+      var rv = S.runs.map(function (r) { return r.bt ? r.bt.rv : '-'; }).join('');
+      out.push('rv per run: ' + rv + ' (0 = bukan kunjungan ulang/cache dingin; curigai outlier)');
+      return out.join('\n');
+    }
     function summary() {
+      if (BTM) return summaryBt();
       if (OVM) return summaryOv();
       var out = [], rd = [], dd = [], ok = true, any = false;
       for (var p = 0; p < N; p++) {
@@ -2032,6 +2065,7 @@ var DK_CSS =
       var thisI = S.i;
       setTimeout(function () { if (!finished && S.i === thisI) finishRun(false, 'watchdog 6 mnt'); }, 360000);
       poll(function () { return typeof window.__enteredAt === 'number'; }, 250, 150000, function () {
+        if (BTM) { setPhase('hold', HOLD); setTimeout(saveRun, HOLD); return; }
         setPhase('settle', SETTLE); setTimeout(OVM ? doOvHold : doEnter, SETTLE);
       }, function () { finishRun(false, 'obs-entered tdk muncul 150 dtk'); });
     }
@@ -2066,9 +2100,9 @@ var DK_CSS =
       if (finished) return; finished = true;
       setPhase('save');
       var s = null, d = null, ok = true, note = '', inv = null;
-      if (!OVM) try { inv = hudInventory(); } catch (eI) { inv = { err: String(eI && eI.message || eI) }; }   /* read-only, di akhir fase diam (jendela rekam 15 dtk sudah lewat) */
-      try { s = window.__benchPost(); d = JSON.parse(s); } catch (e) { ok = false; note = 'snapshot gagal'; }
-      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null, ra914: d ? ra914(d) : null, dt9: d ? dt9(d) : null, invS: inv && inv.short ? String(inv.short).slice(0, 400) : '', ov: (OVM && d) ? ovMetrics(d) : null };
+      if (!OVM && !BTM) try { inv = hudInventory(); } catch (eI) { inv = { err: String(eI && eI.message || eI) }; }   /* read-only, di akhir fase diam (jendela rekam 15 dtk sudah lewat) */
+      try { if (BTM) { s = snapshot(); if (typeof s !== 'string') s = JSON.stringify(s); } else s = window.__benchPost(); d = JSON.parse(s); } catch (e) { ok = false; note = 'snapshot gagal'; }
+      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null, ra914: d ? ra914(d) : null, dt9: d ? dt9(d) : null, invS: inv && inv.short ? String(inv.short).slice(0, 400) : '', ov: (OVM && d) ? ovMetrics(d) : null, bt: (BTM && d) ? btMetrics(d) : null };
       idbPut(S.i, { meta: r, dump: s, inv: inv }, function (okp, kind) {
         if (!okp) { r.ok = false; r.note = (r.note ? r.note + ' ' : '') + 'simpan gagal'; }
         r.store = kind; S.runs.push(r); S.i++; saveS(); nextOrDone();
@@ -2087,11 +2121,11 @@ var DK_CSS =
     function exportAll() {
       idbAll(function (arr) {
         arr.sort(function (a, b) { return a.meta.i - b.meta.i; });
-        var out = { kind: 'autoab', ov: OVM, q: QS, tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, inv: x.inv || null, dump: d }; }) };
+        var out = { kind: 'autoab', ov: OVM, bt: BTM, q: QS, tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, inv: x.inv || null, dump: d }; }) };
         out.hudGroups = { hudA: HUD_G.hudA, hudB: HUD_G.hudB, hudC: HUD_G.hudC, hudD: 'sisanya (anak <body> di luar A-C dan di luar HUD_EXC)', exclude: HUD_EXC };
         try {
           var blob = new Blob([JSON.stringify(out)], { type: 'application/json' }), a = document.createElement('a');
-          a.href = URL.createObjectURL(blob); a.download = 'autoab-' + (OVM ? 'ov-' : '') + TOK + (QS ? '-q' : '') + '-' + stamp() + '.json'; a.style.display = 'none'; document.body.appendChild(a); a.click();
+          a.href = URL.createObjectURL(blob); a.download = 'autoab-' + (OVM ? 'ov-' : BTM ? 'boot-' : '') + TOK + (QS ? '-q' : '') + '-' + stamp() + '.json'; a.style.display = 'none'; document.body.appendChild(a); a.click();
           setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(a.href); } catch (e) {} }, 4000);
         } catch (e) {}
       });
