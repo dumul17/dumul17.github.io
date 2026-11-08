@@ -1452,6 +1452,25 @@ function planetLblLimit(gap){
   var gm=pl3dGeom(false,false),g=gap==null?6:gap;
   return function(x0,x1){var xc=gm.cx<x0?x0:(gm.cx>x1?x1:gm.cx);return pl3dLimbY(gm,xc)-g;};
 }
+/* [v-perf] sumSpot: geometri limb (pl3dGeom ±0,02-0,03 ms) dihitung SEKALI lalu dipakai ratusan kandidat (dump 9 Nov: planetBhOk x320 ±10 ms, 23-ms pecahan grid). Hasil sama dgn planetBhOk / planetBhPark; null = planet tidak aktif (planetBhOk -> true). */
+function planetBhGeo(r){
+  if(!pl3dBhOn())return null;
+  pl3dSync();if(!PW||!PH)return null;
+  var gm=pl3dGeom(true,true);
+  return {cx:gm.cx,cy:gm.cy,R2:gm.R*gm.R,r:r,rot:PL3D.rot,ih:STG.ih,iw:STG.iw};
+}
+function planetBhOkFn(r){
+  var G=planetBhGeo(r);if(!G)return null;
+  var add=-r+r*planetBhSinkMax()+.5;
+  return function(x,y){var q=G.rot?v2c(x,y):null,qx=q?q[0]:x,qy=q?q[1]:y,dx=qx-G.cx,t=G.R2-dx*dx;return qy<=G.cy-Math.sqrt(t>0?t:0)+add;};
+}
+function planetBhParkFn(r){
+  var G=planetBhGeo(r);if(!G)return null;
+  return function(x,y){
+    var q=G.rot?v2c(x,y):null,qx=q?q[0]:x,dx=qx-G.cx,t=G.R2-dx*dx,qy=G.cy-Math.sqrt(t>0?t:0);   /* pusat tepat di limb (sink 1: limb-r+r) */
+    return G.rot<0?[G.ih-qy,qx]:(G.rot>0?[qy,G.iw-qx]:[qx,qy]);
+  };
+}
 /* [bhpark] titik parkir: (x,y) STAGE digeser tegak lurus limb sampai PUSAT BH (radius r) tepat di limb = 50% terbenam. null = planet tidak aktif / cam mode. */
 function planetBhPark(x,y,r){
   if(!pl3dBhOn())return null;

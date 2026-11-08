@@ -35,6 +35,7 @@ function skyWarmStars(s){
     if(!SWARM.q||SWARM.key!==s.k){
       var seen=Object.create(null),L=[];
       CONS.forEach(function(cc){var k,c;if(s.ids.indexOf(cc.id)<0)return;for(k in cc.stars){c=cc.stars[k].rgb;if(c&&!seen[c]&&!STAR_SPRITE_CACHE[c]){seen[c]=1;L.push(c);}}});
+      if(s.ids.indexOf('pleiades')>=0)['145,170,255','110,145,205','190,218,255'].forEach(function(c){if(!seen[c]&&!STAR_SPRITE_CACHE[c]){seen[c]=1;L.push(c);}});   /* Pleiades (drawPleiades) pakai 3 warna tetap, bukan s.rgb */
       SWARM.q=L;SWARM.key=s.k;
     }
     var n=2;while(n-->0&&SWARM.q.length)getStarSprite(SWARM.q.shift());
@@ -206,8 +207,9 @@ function hudHit(x,y,R,rects){
 /* Titik parkir BH mini waktu masuk sektor: titik terjauh dari bintang/rasi di sektor (lingkaran kosong terbesar) yang bebas dari tombol HUD & teleskop.
    F11: layout portal shortcut (sgPoints) dan SPOT_AVOID (portal sektor) sudah pensiun, jadi cuma bintang + HUD yang dihindari. */
 function sumSpot(){
-  var hb=0,ft=H;
+  var hb=0,ft=H,_s0=performance.now();
   try{hb=vrect($('#header')).bottom;ft=vrect($('#footer')).top;}catch(e){}
+  var _s1=performance.now();   /* mark: hdr = baca layout header/footer (bisa memaksa reflow) */
   var x0=Math.max(30,W*.06),x1=W-x0,y0=Math.max(hb+24,H*.12),y1=Math.min(ft-24,H*.9),pts=[],k,s2,q,i,j;
   CONS.forEach(function(cc){
     if(!sectShow(cc.id))return;
@@ -216,21 +218,24 @@ function sumSpot(){
   if(sectShow('pleiades')&&PLEIADES.ready){
     PLEIADES.bright.forEach(function(z){q=skyXF(PLEIADES.x+z.x*PLEIADES.scale,PLEIADES.y+z.y*PLEIADES.scale);pts.push(q[0],q[1]);});
   }
-  var rects=hudRects(),tgt=Math.max(.05,Math.min(1,BHU.size/BH_SECT_MAXSIZE)),Rv=Math.max(10,BH.R*tgt*2),
-      best=null,bs=-1e9,nx=22,ny=16,park=BHPARK.on&&typeof planetBhPark==='function',pk,base,m2,dx,dy,d2,Rp=Rv*.5,hw=W*.5,hh=H*.5;
+  var _s2=performance.now(),rects=hudRects(),_s3=performance.now(),tgt=Math.max(.05,Math.min(1,BHU.size/BH_SECT_MAXSIZE)),Rv=Math.max(10,BH.R*tgt*2),
+      best=null,bs=-1e9,nx=22,ny=16,park=BHPARK.on&&typeof planetBhParkFn==='function',pk,base,m2,dx,dy,d2,Rp=Rv*.5,hw=W*.5,hh=H*.5,
+      okf=(typeof planetBhOkFn==='function')?planetBhOkFn(Rp):null,pkf=park?planetBhParkFn(Rp):null;   /* geometri limb sekali, bukan per kandidat */
+  if(!pkf)park=false;
   for(i=0;i<=nx;i++)for(j=0;j<=ny;j++){
     var cx=x0+(x1-x0)*i/nx,cy=y0+(y1-y0)*j/ny,md=320,sc;
     pk=null;
-    if(park){pk=planetBhPark(cx,cy,Rp);if(pk){cx=pk[0];cy=pk[1];if(cx<x0||cx>x1||cy<0||cy>H)continue;}}   /* [bhpark] kandidat diproyeksikan ke limb: pusat BH tepat di limb = 50% terbenam (planet tidak aktif: pk null -> kandidat biasa) */
+    if(park){pk=pkf(cx,cy);if(pk){cx=pk[0];cy=pk[1];if(cx<x0||cx>x1||cy<0||cy>H)continue;}}   /* [bhpark] kandidat diproyeksikan ke limb: pusat BH tepat di limb = 50% terbenam (planet tidak aktif: pk null -> kandidat biasa) */
     base=-(hudHit(cx,cy,Rv+14,rects)?2000:0)-Math.sqrt((cx-hw)*(cx-hw)+(cy-hh)*(cy-hh))*.02;   /* HUD bebas; seri → condong ke tengah */
     if(base+md<=bs)continue;   /* v-perf: skor maksimum kandidat (jarak ke bintang maks 320) sudah tidak bisa mengalahkan best -> lewati sebelum loop bintang & planetBhOk */
-    if(!pk&&typeof planetBhOk==='function'&&!planetBhOk(cx,cy,Rp))continue;   /* planet (17-planet3d.js): BH boleh terbenam sedikit di balik limb, tidak lebih (bhpark: titik sudah di limb, dilewati) */
+    if(!pk&&okf&&!okf(cx,cy))continue;   /* planet (17-planet3d.js): BH boleh terbenam sedikit di balik limb, tidak lebih (bhpark: titik sudah di limb, dilewati) */
     m2=md*md;   /* terjauh dari bintang: jarak kuadrat (tanpa Math.hypot/sqrt per bintang), berhenti begitu kandidat pasti kalah */
     for(k=0;k<pts.length;k+=2){dx=cx-pts[k];dy=cy-pts[k+1];d2=dx*dx+dy*dy;if(d2<m2){m2=d2;if(base+Math.sqrt(m2)<=bs){m2=-1;break;}}}
     if(m2<0)continue;
     sc=base+Math.sqrt(m2);
     if(sc>bs){bs=sc;best=[cx,cy];}
   }
+  var _s4=performance.now();window.__spMk='hdr '+(_s1-_s0).toFixed(1)+' pts '+(_s2-_s1).toFixed(1)+' hud '+(_s3-_s2).toFixed(1)+' grid '+(_s4-_s3).toFixed(1);   /* pecahan sumSpot (ms): dibaca whMk di dump bench */
   return best||[W*.5,H*.5];
 }
 /* Taruh BH mini di titik parkir (sumSpot), dikonversi ke ruang BH. */
@@ -260,7 +265,7 @@ function sectStep(now){
       try{sumUI();}catch(eU2){}
       skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;_m('restore+ui');
       RELAY.pend=0;try{sumPlace();}catch(ePl){}   /* BH mini selalu ada -> diparkir di titik kosong saat masuk sektor */
-      sectSet(false);_m('sectSet');
+      sectSet(false);_m('sectSet');if(window.__spMk)_mk.push('sumSpot['+window.__spMk+']');
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
       _m('focus');
       try{syncSkyPanHits();}catch(e){}_m('panHits');
