@@ -179,7 +179,7 @@ var WH_HANDOFF=260;
 /* diagnosa cincin ganda (URL ?whdbg=noring,nosky): noring = cincin di kanvas wormhole TIDAK digambar; nosky = #sky disembunyikan selama zoom-in. Bandingkan mana yang membuat cincin kedua hilang. */
 var WH_DBG=(function(){try{var m=/[?&]whdbg=([a-z,]+)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
 /* A/B diagnosa performa (hanya via URL, tanpa URL = perilaku normal). ?whdpr=1.25 = batas dpr kanvas wormhole (default 2). Flag whdbg tambahan:
-   notele = teleskop tidak digambar; nostep = buffer terowongan tidak di-update (komposit tetap jalan); nobloom = lewati drawImage bloom kedua. */
+   notele = teleskop tidak digambar; nostep = buffer terowongan tidak di-update (komposit tetap jalan); nobloom = lewati drawImage bloom kedua; telenoclip = lewati clip setengah-bidang teleskop (v48). */
 /* v15: ?whring=N = cincin GL dirender tiap N frame (default 4; 0/1 = tiap frame). Hasil di-cache ke kanvas 2D dan digambar ulang dgn skala terkini tiap frame. (whdbg cuma menerima huruf, jadi pakai param sendiri) */
 var WH_RING=(function(){try{var m=/[?&]whring=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):4;return v>1?v:0;}catch(e){return 4;}})();
 /* v18->v19 (sekarang default AKTIF, hasil ukur HP: step 4.6->3.0ms, comp 4.1->2.7ms, js zoom 31->26, tak kentara di mata): ?whstep=2 = selama ZOOM (sebelum layar tertutup) buffer terowongan di-update tiap 2 frame dgn dt/adv terakumulasi (hemat ~2-3ms JS/frame);
@@ -443,7 +443,7 @@ function drawTele(ov){
   sc=b.sc*(ov.s!=null?ov.s:1+.10*wob);al=b.al*(ov.a!=null?ov.a:1);
   if(sc<.01||al<.01)return;
   g.save();
-  if(ov.clip){   /* muncul dari mulut portal: hanya bagian di depan bidang portal yang terlihat (hidung duluan); setengah-bidang tegak lurus arah keluar */
+  if(ov.clip&&WH_DBG.indexOf('telenoclip')<0){   /* [v48] ?whdbg=telenoclip = lewati clip setengah-bidang (ALAT UKUR A/B: teleskop terlihat di kedua sisi bidang portal; tanpa flag = perilaku normal) */   /* muncul dari mulut portal: hanya bagian di depan bidang portal yang terlihat (hidung duluan); setengah-bidang tegak lurus arah keluar */
     var Cp=ov.clip,Rc=Math.hypot(W,H)*2,nx=-Cp.dy*Rc,ny=Cp.dx*Rc,fx=Cp.dx*Rc,fy=Cp.dy*Rc;
     g.beginPath();g.moveTo(Cp.x+nx,Cp.y+ny);g.lineTo(Cp.x-nx,Cp.y-ny);g.lineTo(Cp.x-nx+fx,Cp.y-ny+fy);g.lineTo(Cp.x+nx+fx,Cp.y+ny+fy);g.closePath();g.clip();
   }
@@ -751,7 +751,7 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,tc:(typeof SCP3D_WHTC!=='undefined'?SCP3D_WHTC:0),tcH:(typeof SCP3D!=='undefined'?SCP3D.tcHit|0:0),tcM:(typeof SCP3D!=='undefined'?SCP3D.tcMiss|0:0)};},
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,tc:(typeof SCP3D_WHTC!=='undefined'?SCP3D_WHTC:0),tcH:(typeof SCP3D!=='undefined'?SCP3D.tcHit|0:0),tcM:(typeof SCP3D!=='undefined'?SCP3D.tcMiss|0:0),smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:'')};},
   dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;}
 };
 

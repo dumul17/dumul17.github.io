@@ -455,6 +455,8 @@ function scp3dWarmSync(stop){
    (altOK), jadi di enter/exit drawTele memaksa render GL penuh + salinan GL->2D TIAP frame (SCP3D.last=-1e9). Di sini: kalau pose 3D (tilt x/y/z/k/ty/tr/tp/th/glow) beda < N/100 rad dari render terakhir, skala masih dalam 8% (res sama), dan umur cache < 300 ms,
    gambar ulang salinan terakhir (kanvas sendiri SCP3D.tcv; posisi/skala/rotasi tetap dari transform frame ini, jadi hanya pose 3D + cahaya yang telat); selain itu render penuh seperti biasa. TIDAK menyentuh resolusi/ukuran bitmap (bukan whxdpr), tidak menyentuh jalur travel/slow-alt/belt (kanvas cc).
    Statistik: SCP3D.tcHit / SCP3D.tcMiss (dibaca bench lewat WORMHOLE.dbgInfo -> whCfg.tcH/tcM). Mulai coba ?whtc=4 (0,04 rad = 2,3 derajat), lalu 8. */
+/* [v29] ?scsmq=low|medium = kualitas smoothing blit teleskop HANYA saat wormhole aktif (default mati = 'high' seperti biasa). A/B ongkos blit di exit wormhole; hipotesis, belum ada bukti. */
+var SCP3D_SMQ=(function(){try{var m=/[?&]scsmq=(low|medium)(?:&|#|$)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
 var SCP3D_WHTC=(function(){try{var m=/[?&]whtc=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):0;return v>=1&&v<=30?v/100:0;}catch(e){return 0;}})();
 function scp3dTlNear(a,b,e){
   return Math.abs((a.x||0)-(b.x||0))<e&&Math.abs((a.y||0)-(b.y||0))<e&&Math.abs((a.z||0)-(b.z||0))<e&&Math.abs((a.k||0)-(b.k||0))<e&&Math.abs((a.tr||0)-(b.tr||0))<e&&Math.abs((a.ty||0)-(b.ty||0))<e&&Math.abs((a.tp||0)-(b.tp||0))<e&&Math.abs((a.th||0)-(b.th||0))<e&&Math.abs((a.glow||0)-(b.glow||0))<e;
@@ -488,9 +490,11 @@ function tele3dBody(g,now){
         if(wh||bf||sa){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;SCP3D.ccSc=scl;if(bf)SCP3D.bz=true;if(sa)cache=cc;}   /* sa: gambar dari cc (satu baca GL saja per frame render) */
       }
     }
-    g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+    var smq=(SCP3D_SMQ&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy)?SCP3D_SMQ:null;   /* v29 */
+    g.imageSmoothingEnabled=true;g.imageSmoothingQuality=smq||'high';
     var H=SCP3D_CFG.half;
     if(!(window.__offB&&window.__offB.sc))g.drawImage(cache||threeGLSrc(SCP3D.gl),-H,-H,H*2,H*2);   /* ?off=scb (21-bench): lewati blit saja, GL tetap dirender */
+    if(smq)g.imageSmoothingQuality='high';   /* v29: kembalikan supaya gambar lain di kanvas yang sama tidak ikut berubah */
     return true;
   }catch(e){
     scp3dFail(e&&e.message||e);
