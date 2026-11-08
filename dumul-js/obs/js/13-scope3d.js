@@ -451,16 +451,8 @@ function scp3dWarmSync(stop){
   }catch(e){return false;}
 }
 /* Dipanggil dari teleDrawBody() (04-render.js). true = badan 3D sudah digambar (2D dilewati); false = pakai badan 2D. */
-/* [v28] ?whtc=N (1-30; default 0 = MATI) = cache render 3D teleskop di enter/exit wormhole. Latar (A/B whdbg 7 Nov, itel): `notele` menurunkan dt 3 dtk pertama sektor 133 -> 102 ms; whtele (v16, selang-seling) hanya berlaku di fase travel
-   (altOK), jadi di enter/exit drawTele memaksa render GL penuh + salinan GL->2D TIAP frame (SCP3D.last=-1e9). Di sini: kalau pose 3D (tilt x/y/z/k/ty/tr/tp/th/glow) beda < N/100 rad dari render terakhir, skala masih dalam 8% (res sama), dan umur cache < 300 ms,
-   gambar ulang salinan terakhir (kanvas sendiri SCP3D.tcv; posisi/skala/rotasi tetap dari transform frame ini, jadi hanya pose 3D + cahaya yang telat); selain itu render penuh seperti biasa. TIDAK menyentuh resolusi/ukuran bitmap (bukan whxdpr), tidak menyentuh jalur travel/slow-alt/belt (kanvas cc).
-   Statistik: SCP3D.tcHit / SCP3D.tcMiss (dibaca bench lewat WORMHOLE.dbgInfo -> whCfg.tcH/tcM). Mulai coba ?whtc=4 (0,04 rad = 2,3 derajat), lalu 8. */
 /* [v29] ?scsmq=low|medium = kualitas smoothing blit teleskop HANYA saat wormhole aktif (default mati = 'high' seperti biasa). A/B ongkos blit di exit wormhole; hipotesis, belum ada bukti. */
 var SCP3D_SMQ=(function(){try{var m=/[?&]scsmq=(low|medium)(?:&|#|$)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
-var SCP3D_WHTC=(function(){try{var m=/[?&]whtc=([0-9]+)/.exec(location.search),v=m?parseInt(m[1],10):0;return v>=1&&v<=30?v/100:0;}catch(e){return 0;}})();
-function scp3dTlNear(a,b,e){
-  return Math.abs((a.x||0)-(b.x||0))<e&&Math.abs((a.y||0)-(b.y||0))<e&&Math.abs((a.z||0)-(b.z||0))<e&&Math.abs((a.k||0)-(b.k||0))<e&&Math.abs((a.tr||0)-(b.tr||0))<e&&Math.abs((a.ty||0)-(b.ty||0))<e&&Math.abs((a.tp||0)-(b.tp||0))<e&&Math.abs((a.th||0)-(b.th||0))<e&&Math.abs((a.glow||0)-(b.glow||0))<e;
-}
 function tele3dBody(g,now){
   if(SCP3D.state===0){scp3dLoad();return false;}
   if(SCP3D.state!==2)return false;
@@ -471,7 +463,6 @@ function tele3dBody(g,now){
     /* kapal di dalam transisi wormhole (tilt dipaksa dari 09): render GL selang-seling, frame ganjil pakai salinan 2D frame sebelumnya (posisi/skala tetap per frame, hanya pose+cahaya 3D yang 1 frame telat). SCP3D_CFG.whAlt=0 untuk mematikan. */
     var wh=SCP3D_CFG.whAlt=(SCP3D_WHALT>0)&&SCP3D.tilt&&SCP3D.altOK&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy,cache=null;   /* altOK: hanya dari fase travel (pose berubah pelan); enter/exit pose berubah cepat -> selalu render penuh */
     var bf=(typeof BELT!=='undefined'&&BELT);
-    var tcOn=SCP3D_WHTC>0&&!wh&&!bf&&!!SCP3D.tilt&&typeof WORMHOLE!=='undefined'&&WORMHOLE.busy;   /* v28: enter/exit (bukan travel-altOK) */
     if(!bf)SCP3D.bz=false;
     if(bf&&SCP3D.bz&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res)cache=SCP3D.cc;   /* zoom masuk dumul.html: pose kapal dibekukan (salinan 2D), tanpa update/GL */
     else if(now-SCP3D.last>3||now<SCP3D.last){   /* ghost copy di frame yang sama memakai hasil render yang sama */
@@ -482,11 +473,9 @@ function tele3dBody(g,now){
         if(okC&&(FS.n%SCP3D_SLOWALT)!==1%SCP3D_SLOWALT){cache=SCP3D.cc;SCP3D.altSk=(SCP3D.altSk|0)+1;}
       }
       if(cache){}
-      else if(tcOn&&SCP3D.tcv&&SCP3D.tcRes===SCP3D.res&&SCP3D.tcTl&&now>=SCP3D.tcT&&now-SCP3D.tcT<300&&SCP3D.tcSc>0&&Math.abs(scl/SCP3D.tcSc-1)<.08&&scp3dTlNear(SCP3D.tilt,SCP3D.tcTl,SCP3D_WHTC)){cache=SCP3D.tcv;SCP3D.tcHit=(SCP3D.tcHit|0)+1;}   /* v28: pose hampir sama -> pakai salinan terakhir */
       else if(wh&&((SCP3D.whN=(SCP3D.whN||0)+1)%SCP3D_WHALT!==0)&&SCP3D.cc&&SCP3D.ccRes===SCP3D.res&&now-SCP3D.ccT<130*SCP3D_WHALT)cache=SCP3D.cc;
       else{
         SCP3D.last=now;scp3dUpdate(now,mm);
-        if(tcOn){var rt=SCP3D.res,tv=SCP3D.tcv||(SCP3D.tcv=document.createElement('canvas'));if(tv.width!==rt||tv.height!==rt){tv.width=rt;tv.height=rt;}var tx=tv.getContext('2d');tx.globalCompositeOperation='copy';tx.drawImage(threeGLSrc(SCP3D.gl),0,0,rt,rt);tx.globalCompositeOperation='source-over';SCP3D.tcRes=rt;SCP3D.tcT=now;SCP3D.tcSc=scl;SCP3D.tcTl=SCP3D.tilt;SCP3D.tcMiss=(SCP3D.tcMiss|0)+1;}   /* v28: simpan render penuh utk frame berikutnya */
         if(wh||bf||sa){var rs=SCP3D.res,cc=SCP3D.cc||(SCP3D.cc=document.createElement('canvas'));if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}var cx=cc.getContext('2d');cx.globalCompositeOperation='copy';cx.drawImage(threeGLSrc(SCP3D.gl),0,0,rs,rs);cx.globalCompositeOperation='source-over';SCP3D.ccRes=rs;SCP3D.ccT=now;SCP3D.ccSc=scl;if(bf)SCP3D.bz=true;if(sa)cache=cc;}   /* sa: gambar dari cc (satu baca GL saja per frame render) */
       }
     }

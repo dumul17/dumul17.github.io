@@ -1,6 +1,6 @@
 'use strict';
 /* BENCH v11.29 (?bench=1) — v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
-    v11.29v: pmk.secP = probe PER DETIK 15 dtk pertama sektor (n, fps, dt, js, wait, ema, gpuSum, rata2 ms/frame tiap segmen pmk; dgn ?gpup=1 ikut .gpu per modul + q.big/q.small; hump = puncak vs late otomatis; maks 3 kunjungan). v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
+    v11.29z: UI saja: chip 'bench' pindah ke dock kanan-bawah (kiri tombol dbg, #dk-dock bersama 19-auto-debug), badan panel buka ke atas (header: scroll + tutup; grup boot/post), panel bench dan dbg saling melipat, kelas html.dk-hb dibuang; R.pt2d dibuang (saklar pt2d dibuang). v11.29v: pmk.secP = probe PER DETIK 15 dtk pertama sektor (n, fps, dt, js, wait, ema, gpuSum, rata2 ms/frame tiap segmen pmk; dgn ?gpup=1 ikut .gpu per modul + q.big/q.small; hump = puncak vs late otomatis; maks 3 kunjungan). v11.29u: cfg.pl.hint/hintAt/rsl/plSt (petunjuk slow + log resize planet, 17-planet3d v57; ?plhint=0 = mati, ?plhint=1 = paksa nyala). v11.29t: cfg.ast.sm (anti-kilau batu kecil, 12-ast3d v39; ?astsm=0 = A/B). v11.29s: cfg.pl.bmHi/bmAt/bmAd (latch bandMin adaptif, 17-planet3d v55). v11.29r: fsState memuat js/wait/wlog (pengukur pasif waktu tunggu render, 05-sector-ui v191). v11.29q: cfg.ast = {rwSlow, dprMax, pr, pw, ph, W, H} (ukuran kanvas GL batu; ?astrw=0 = A/B). v11.29i: label fase ABAB unik per token (A1_sglow, B1_sglow; run ulang token sama diberi #2), banyak token dalam satu run (?ab=sgs,sgm,sgl atau tombol), riwayat semua run di pmk.offSeqRuns (urutan token), jendela rekam otomatis diperpanjang sampai seq selesai, token jumlah sghalf/sgquart/schalf/scquart (tinggal 50%/25% bintang yang digambar halo/inti), tiap mode mencatat haloN/coreN/haloPx2 yang benar-benar digambar per frame (+ stCnt per ember). v11.29h: seq `sizes` (halo/inti per ukuran s.r: sgs sgm sgl scs scm scl, batas ?stb=2.4,3.0, hitungan stCnt), seq `plei` (pname pglow pcore pint), runner ABAB tanpa reload `?offseq=abab&ab=sglow` (+ &abn=3 pasang, default 10 dtk/fase), dump mode kini punya dtAvg/dtP50/dtP95/fps (periode antar frame, berlaku tanpa gpup=1); jendela rekam default 300 dtk kalau ?debug=1. v11.29g: seq `stars` (pecah rasi+bintang sektor: token cname lstroke sglow score smark slbl splei sdraw, penanda pmk s.cons/s.pulse/s.stars/s.plei; ?offseq=stars, ?stseg=1). v11.29f: dump mencatat saklar pt2d (R.pt2d = window.__pt2d dari 15-portal3d, R.pt3d = {state, err} PT3D saat snapshot). v11.29d: token `all` (tidak menggambar apa pun, pBegin/q.* tetap jalan = LANTAI backlog) dan `plfx` (efek 2D planet, guard di 17-planet3d); set seq ketiga 'floor' (base, all, hole, pulse, plfx, combo, combo+, base2; tombol 'seq floor', ?offseq=floor). Saat fase 'all' layar kosong. v11.29c: token blit (?off=plb,astb,ptb,scb,drb | blit = semua; lewati hanya g.drawImage GL->#sky, GL tetap dirender; guard di 12/13/14/15/17), runner 2 set (tombol 'seq blit' / 'seq layer', ?offseq=blit|layer), timer fase+sisa + STOP, panel bench terlipat default (tombol BENCH ▸), panel lain dilipat otomatis selama seq, ?pbms default 200000 bila gpup=1. v11.29b: runner tanpa reload (?offseq=1 atau tombol 'seq' di panel A/B, ?offms=N): label mode jadi 'ov+S|sky' dst, urutan base,sky,skyhide,hud,mw,neb,lines+stars,base2; pmk.offSeq. v11.29: ?off=a,b,c = matikan lapisan otomatis lewat URL (token: sky mw neb lines stars pulse hole ast = PX.* di 05-sector-ui; hud = semua DOM HUD visibility:hidden; skyhide = elemen #sky disembunyikan lewat CSS tapi kanvasnya tetap digambar). Pembeda raster vs kompositor: kalau q.big turun di 'sky' tapi tidak di 'skyhide' = raster 2D; turun di 'skyhide'/'hud' = kompositor. Daftar terpakai tercatat di R.off dan pmk.off (ikut ringkasan ?runs=N). Catatan: 'ast' juga melewati render GL batu (bukan murni 2D).
    v11.28: ?gpuo=1 (bersama ?gpup=1) = BALIK urutan sinkron q.* di awal frame (small dulu, baru big; default big dulu). Tes: kalau q.small jadi besar dan q.big kecil, angkanya milik sinkron PERTAMA (menyerap antrean GPU dari kerja non-GL: raster 2D / kompositor), bukan milik konteks 'big'. Urutan terpakai tercatat di pmk.qOrder.
    v11.27: probe GPU pakai readPixels 1x1 (glSync) bukan finish() (Chrome: finish = flush saja, marker .gpu v11.26 selalu ±0).
    v11.26: ?gpup=1 = probe GPU: finish() setelah render tiap unit GL (marker as/sc/dr/pt/pl .sub = CPU kirim, .gpu = tunggu GPU) + q.big/q.small = backlog di awal frame; R.gpup. Segmen modes.seg jadi 28 teratas saat probe.
@@ -649,7 +649,7 @@
     } catch (e) {}
 
     R.three = (window.THREE && window.THREE.REVISION) || null; R.qs = location.search; R.ws = window.__ws != null ? window.__ws : null; R.envsz = window.__envsz != null ? window.__envsz : null;   /* v11: dump self-describing (flag URL + status irisan) */
-    R.off = window.__offL || null; R.pt2d = window.__pt2d != null ? window.__pt2d : null; try { R.pt3d = typeof PT3D !== 'undefined' ? { state: PT3D.state, err: PT3D.err || '' } : null; } catch (ePt) { R.pt3d = null; } R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {tqb:window.__tqb!=null?window.__tqb:null,tqp:window.__tqp!=null?window.__tqp:null,yp:q.yp,n:q.n,nb:q.nb,bj:q.bj,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null; R.rwPre = window.__rwPre || null; try { R.whStats = (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; R.whCfg = (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWh) { R.whStats = null; R.whCfg = null; } try { R.barG = window.__barG ? window.__barG() : null; } catch (eBg) { R.barG = null; } R.rw = window.__rw || null; R.enteredAt = window.__enteredAt != null ? Math.round(window.__enteredAt) : null; R.gpup = window.__gpuP ? 1 : 0;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
+    R.off = window.__offL || null; try { R.pt3d = typeof PT3D !== 'undefined' ? { state: PT3D.state, err: PT3D.err || '' } : null; } catch (ePt) { R.pt3d = null; } R.ds = window.__ds != null ? window.__ds : null; R.denv = window.__denv != null ? window.__denv : null; R.dmf = window.__dmf != null ? window.__dmf : null; R.senv = window.__senv != null ? window.__senv : null; R.threeQ = window.__threeQ ? (function(q){var w=q.warm;return {tqb:window.__tqb!=null?window.__tqb:null,tqp:window.__tqp!=null?window.__tqp:null,yp:q.yp,n:q.n,nb:q.nb,bj:q.bj,runMs:Math.round(q.runMs),waitMs:Math.round(q.waitMs),waitMax:Math.round(q.waitMax),tmo:q.tmo,turns:q.turns,warm:{n:w.n,idleMs:Math.round(w.idleMs),cpuMs:Math.round(w.cpuMs),sl:w.sl,gapMs:Math.round(w.gapMs),items:w.items}};})(window.__threeQ) : null;   /* v11.11: pencatat giliran THREE_Q + THREE_WARM (12-ast3d v20) */ R.smf = window.__smf != null ? window.__smf : null; R.bm = window.__bm != null ? window.__bm : null;   /* v11.13: ?bm=0 (07-boot v155) */ R.wi = window.__wi != null ? window.__wi : null;   /* v11.12: ?wi=0 (12-ast3d v21) */ R.dr3dT = window.__dr3dT || null; R.ss = window.__ss != null ? window.__ss : null; R.scp3dT = window.__scp3dT || null; R.ps = window.__ps != null ? window.__ps : null; R.pt3dT = window.__pt3dT || null; R.pl3dT = window.__pl3dT || null; R.warmReal = window.__warmReal || null; R.rwPre = window.__rwPre || null; try { R.whStats = (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; R.whCfg = (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWh) { R.whStats = null; R.whCfg = null; } try { R.barG = window.__barG ? window.__barG() : null; } catch (eBg) { R.barG = null; } R.rw = window.__rw || null; R.enteredAt = window.__enteredAt != null ? Math.round(window.__enteredAt) : null; R.gpup = window.__gpuP ? 1 : 0;   /* v11.24: warm nyata pra-kapsul (07-boot v172) */
     try { R.sc = typeof scDumpObj === 'function' ? scDumpObj() : null; } catch (eSc) { R.sc = null; }   /* starcache (04-render.js): ?starcache=1 */
     try { R.cfg = cfgOut(); } catch (eCf) { R.cfg = null; }
     R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
@@ -1153,7 +1153,6 @@ var DK_CSS =
   '.dk-seg .dk-b.on{background:#6ee5ff}' +
   '.dk-pre{margin:0;white-space:pre-wrap;word-break:break-word;overflow:auto;-webkit-overflow-scrolling:touch}' +
   '.dk-ov{position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:3px 6px;font:9px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#9fe8f5;background:rgba(6,11,17,.82);border:1px solid rgba(110,229,255,.14);border-radius:6px;white-space:pre;pointer-events:auto}' +
-  'html.dk-hb .dk-ov{top:calc(34px + env(safe-area-inset-top,0px))}' +
   '.dk-d>summary{list-style:none;cursor:pointer;opacity:.7;padding:2px 0;touch-action:manipulation}' +
   '.dk-d>summary::-webkit-details-marker{display:none}' +
   '.dk-d>summary::before{content:"\\25B8  "}' +
@@ -1164,19 +1163,51 @@ var DK_CSS =
   '.dk-g.in .dk-l{flex:none;width:4.2em}' +
   'select.dk-b{background-color:#0b1219;color:#bfeaf3;padding:0 4px;max-width:100%;text-overflow:ellipsis}';
   DK_CSS +=
-    '#__bench_box{position:fixed;top:4px;left:4px;z-index:2147483647;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;gap:6px;pointer-events:none;overflow:auto}' +
-    '#__bench_box.bc{padding:3px;background:rgba(6,11,17,.6)}#__bench_box.bc .bn-b{display:none}' +
+    '#__bench_box{order:0;display:flex;flex-direction:column;align-items:flex-end;pointer-events:auto}' +
+    '#__bench_box.dk-p{background:none;border:0;padding:0;border-radius:0}' +
+    '#__bench_box .__bt{background:rgba(6,11,17,.55);opacity:.75}#__bench_box .__bt.on{background:rgba(6,11,17,.8);color:#6ee5ff;border-color:#6ee5ff;opacity:1;font-weight:400}' +
+    '#__bench_box .bn-b{position:absolute;right:0;bottom:calc(100% + 4px);width:min(340px,calc(100vw - 20px));max-height:min(70vh,calc(100vh - 110px));overflow:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:6px;padding:6px;background:rgba(6,11,17,.93);border:1px solid rgba(110,229,255,.16);border-radius:8px}' +
+    '#__bench_box.bc .bn-b{display:none}' +
+    '#__bench_box .bn-h{display:flex;align-items:center;justify-content:space-between;gap:4px}' +
+    '#__bench_box .bn-h b{font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:9px;opacity:.7}' +
+    '#__bench_box .bn-h .dk-b{height:20px;padding:0 6px;border-color:transparent;background:none}#__bench_box .bn-h .dk-b.on{background:#6ee5ff;border-color:#6ee5ff}' +
     '#__bench_box .bn-t{max-height:45vh;overflow:hidden;pointer-events:none;font-size:9px;line-height:1.3;color:#9fe8f5}' +
     '#__bench_box .bn-t.sc{overflow:auto;pointer-events:auto;max-height:55vh}' +
     '#__bench_box .bn-f{color:#9fe8f5;white-space:pre-wrap}#__bench_box .bn-f:empty{display:none}' +
+    '#__bench_box .dk-g.in .dk-l{width:3.6em}' +
+    '#__bench_box .dk-r>.dk-b{flex:1 1 0}' +
     '#__bench_phase{position:fixed;left:4px;bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:2147483647;display:flex;gap:6px;align-items:center;padding:3px 6px;pointer-events:none}' +
     '#__bench_phase .dk-b{height:20px;padding:0 6px}';
+
+  /* Dock kanan-bawah bersama (blok identik di 19-auto-debug.js dan 21-bench.js; <style id="dk-dock-css"> pertama menang):
+     chip 'bench' (kiri) + tombol 'dbg' (kanan) sebaris; panel terbuka ke atas, hanya satu yang terbuka (saling melipat). */
+  var DK_DOCK_CSS =
+    '#dk-dock{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:4px;max-width:calc(100vw - 20px);pointer-events:none;user-select:none;-webkit-user-select:none}' +
+    '#dk-dock>*{pointer-events:auto}' +
+    '#dk-dock.dbg-open,#dk-dock.bn-open{z-index:100000}' +
+    'html.dk-bn #dk-dock{z-index:2147483000}' +   /* mode bench: chip harus terlihat di atas layar boot (z 100) */
+    '#dk-dock.dbg-open>#__bench_box{display:none}' +
+    '@media (max-width:520px){#dk-dock{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}}' +
+    '@media (orientation:landscape) and (max-height:520px){#dk-dock{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}}' +
+    'body.ls #dk-dock{translate:var(--gut,0px) 0}' +
+    'body.layout-edit #dk-dock{display:none}';
+  function dkDock() {
+    var d = document.getElementById('dk-dock');
+    if (d) return d;
+    if (!document.getElementById('dk-dock-css')) {
+      var st = document.createElement('style'); st.id = 'dk-dock-css'; st.textContent = DK_DOCK_CSS;
+      (document.head || document.documentElement).appendChild(st);
+    }
+    d = document.createElement('div'); d.id = 'dk-dock'; d.className = 'dk';
+    document.body.appendChild(d);
+    return d;
+  }
   function dkStyle() {
     if (document.getElementById('dk-css')) return;
     var st = document.createElement('style'); st.id = 'dk-css'; st.textContent = DK_CSS;
     (document.head || document.documentElement).appendChild(st);
   }
-  function osBox(c) { try { var b = document.getElementById('__bench_box'); if (b) b.classList.toggle('bc', !!c); } catch (e) {} }
+  function osBox(c) { try { if (window.__benchSet) window.__benchSet(!c); } catch (e) {} }   /* seq jalan = panel dilipat; selesai = terbuka */
   function osLabel(txt, withStop) {
     try {
       var e = document.getElementById('__bench_phase');
@@ -1338,18 +1369,26 @@ var DK_CSS =
   document.addEventListener('DOMContentLoaded', function () {
     dkStyle();
     box = document.createElement('div'); box.id = '__bench_box'; box.className = 'dk dk-p bc';
-    document.documentElement.classList.add('dk-hb');   /* overlay PERF (19) turun di bawah chip bench */
     /* jangan tembus ke situs (06-interaction hit-test); bubble (false) supaya tombol di dalam tetap dapat event */
     ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'mousedown', 'mouseup'].forEach(function (evn) {
       box.addEventListener(evn, function (ev) { ev.stopPropagation(); }, false);
     });
 
-    /* chip selalu terlihat; kelas .bc (terlipat, default) menyembunyikan badan panel */
-    var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'dk-b __bt'; bt.textContent = 'bench ▸';
-    bt.onclick = function (ev) { ev.stopPropagation(); var c = box.classList.toggle('bc'); bt.textContent = c ? 'bench ▸' : 'bench ▾'; bt.classList.toggle('on', !c); };
-    var head = document.createElement('div'); head.className = 'bn-h'; head.appendChild(bt); box.appendChild(head);
+    /* chip 'bench' di dock kanan-bawah (kiri tombol dbg); kelas .bc (terlipat, default) menyembunyikan badan panel */
+    var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'dk-b __bt'; bt.textContent = 'bench'; bt.title = 'bench';
+    function setOpen(on) {   /* satu panel terbuka saja: buka bench = lipat dbg */
+      if (on) { try { if (window.__WH_AD && window.__WH_AD.collapse) window.__WH_AD.collapse(); } catch (eC) {} }
+      box.classList.toggle('bc', !on); bt.classList.toggle('on', !!on);
+      var dk = document.getElementById('dk-dock'); if (dk) dk.classList.toggle('bn-open', !!on);
+    }
+    window.__benchSet = setOpen; window.__benchCollapse = function () { setOpen(false); };
+    bt.onclick = function (ev) { ev.stopPropagation(); setOpen(box.classList.contains('bc')); };
+    box.appendChild(bt);
 
     var body = document.createElement('div'); body.className = 'bn-b'; box.appendChild(body);
+    var head = document.createElement('div'); head.className = 'bn-h'; body.appendChild(head);
+    var ht = document.createElement('b'); ht.textContent = 'bench'; head.appendChild(ht);
+    var hr = document.createElement('div'); hr.className = 'dk-r'; head.appendChild(hr);
     var txt = document.createElement('div'); txt.className = 'dk-pre bn-t';   /* ringkasan; scroll hanya setelah 'scroll' dinyalakan */
     body.appendChild(txt);
     box._txt = txt;
@@ -1443,7 +1482,7 @@ var DK_CSS =
     }
 
     /* dump boot (snapshot) */
-    var rD = grp('dump');
+    var rD = grp('boot');
     bb(rD, 'copy', function (x) { var s = snapshot(); console.log('[bench]', s); copyOrFallback(x, 'COPY JSON', s); });
     bb(rD, 'json', function (x) { var s = snapshot(); saveAs(x, 'SAVE JSON', 'bench-' + stamp() + '.json', JSON.stringify(JSON.parse(s), null, 2), 'application/json'); });
     bb(rD, 'txt', function (x) { var s = snapshot(); saveAs(x, 'SAVE TXT', 'bench-' + stamp() + '.txt', toTxt(s), 'text/plain'); });
@@ -1458,14 +1497,16 @@ var DK_CSS =
     bb(rP, 'copy', function (x) { var s = pbSnapshot(); console.log('[bench-post]', s); copyOrFallback(x, 'POST COPY', s); });
     bb(rP, 'json', function (x) { var s = pbSnapshot(); saveAs(x, 'POST JSON', 'bench-post-' + stamp() + '.json', JSON.stringify(JSON.parse(s), null, 2), 'application/json'); });
     bb(rP, 'txt', function (x) { var s = pbSnapshot(); saveAs(x, 'POST TXT', 'bench-post-' + stamp() + '.txt', pbTxt(s), 'text/plain'); });
-    /* scroll ringkasan */
-    var mm = bb(rP, 'scroll', function () {
+    /* scroll ringkasan + tutup (header panel) */
+    var mm = bb(hr, 'scroll', function () {
       panelExpanded = !panelExpanded;
       txt.classList.toggle('sc', panelExpanded);
       mm.classList.toggle('on', panelExpanded);
       if (!panelExpanded) txt.scrollTop = 0;
     });
-    document.body.appendChild(box);
+    bb(hr, '\u2715', function () { setOpen(false); });
+    document.documentElement.classList.add('dk-bn');   /* dock di atas layar boot selama mode bench */
+    dkDock().insertBefore(box, dkDock().firstChild);
     mark('dcl');
     var blue = document.getElementById('boot-cap-blue');
     if (blue) blue.addEventListener('click', function () {

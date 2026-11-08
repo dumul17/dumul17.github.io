@@ -15,8 +15,7 @@
  *     PERF  → ?perf=1    : snapshot overlay PERF; "Sweep PERF" menyapu semua PX_MODES otomatis (1 snapshot per mode)
  *               (PERF yang menyala dari localStorage dumul_perf=1 juga dikenali sebagai mode PERF)
  *     muffdbg → ?muffdbg : overlay #muff-dbg spatial audio (installMuff)
- *   A/B q.big (baris di panel, tanpa mode): 5 tombol reload ke ?bench=1&gpup=1 + varian (base / ?perf=low / ?ast3d=0 / ?dpr=0.5 / ?gpuo=1 = urutan sinkron q.* dibalik, butuh 21-bench v11.28).
- *   Portal 2D (saklar pt2d, 15-portal3d v40+; dump butuh 21-bench v11.29e): ?pt2d=1 atau localStorage dumul_pt2d=1 = cincin portal 2D tanpa three.js; tercatat di dump R.pt2d + R.pt3d. Ada tombol A/B 'pt2d'.
+ *   (8 Nov: baris A/B q.big, seq, ABAB dan saklar pt2d dibuang dari panel; tes lewat URL: ?off=, ?offseq=, ?whdbg=, ?plhint=, ?pbms=.)
  *   Matikan lapisan (butuh 21-bench v11.29): ?off=sky|skyhide|hud|mw|neb|lines,stars (bisa digabung koma), tercatat di dump R.off + pmk.off.
  *     Untuk membandingkan q.big (backlog GPU grup 'big') per mode ov / ov+H / sec+S. Dump tetap lewat bench (21-bench.js), BUKAN lewat PERF
  *     (mode PERF mematikan akumulator bench, jadi q.* tidak terekam). Varian dibaca saat load (01-core / 12-ast3d), makanya reload.
@@ -856,57 +855,6 @@
   }
   function go(url) { try { location.href = url; } catch (e) { log('gagal pindah: ' + e.message); } }
 
-  /* ---------- A/B q.big (bench + probe GPU) ----------
-     Tiap varian = reload ke ?debug=1&bench=1&gpup=1 + SATU override. Param lain (envsz, wi, gs, dst.) dipertahankan; yang dibersihkan hanya
-     mode debug (whperf/probe/pset/pin), perf (overlay 1 DAN override kualitas) dan dua param uji (ast3d, dpr), supaya varian tidak menumpuk.
-     Catatan: ?dpr hanya terbaca 0.4–1 (01-core.js) dan kanvas GL batu di-cap min(DPR, 1.25), jadi di HP DPR 1.6 baru di bawah ±0.78 ada efeknya. */
-  var AB_VARIANTS = [
-    { id: 'base',  label: 'base',     set: {} },
-    { id: 'low',   label: 'perf=low', set: { perf: 'low' } },
-    { id: 'noast', label: 'ast3d=0',  set: { ast3d: '0' } },
-    { id: 'dpr5',  label: 'dpr=0.5',  set: { dpr: '0.5' } },
-    { id: 'pt2d',  label: 'portal 2D', set: { pt2d: '1' } },   /* 15-portal3d: cincin 2D tanpa three.js (dump R.pt2d / R.pt3d) */
-    { id: 'rev',   label: 'q.* balik', set: { gpuo: '1' } },   /* 21-bench v11.28: urutan sinkron q.* dibalik (small dulu) */
-    /* 21-bench v11.29: ?off= = matikan lapisan (tercatat di R.off / pmk.off). sky = lewati blit/raster #sky; skyhide = #sky disembunyikan CSS tapi tetap digambar (beda raster vs kompositor) */
-    { id: 'o-sky',  label: 'off sky',        set: { off: 'sky' } },
-    { id: 'o-hide', label: 'off #sky hide',  set: { off: 'skyhide' } },
-    { id: 'o-hud',  label: 'off HUD',        set: { off: 'hud' } },
-    { id: 'o-mw',   label: 'off milkyway',   set: { off: 'mw' } },
-    { id: 'o-neb',  label: 'off nebula',     set: { off: 'neb' } },
-    { id: 'o-cs',   label: 'off rasi+bintang', set: { off: 'lines,stars' } }
-  ];
-  function abUrl(v) {
-    var u = new URL(location.href);
-    ['whperf', 'probe', 'perf', 'pset', 'pin', 'ast3d', 'dpr', 'gpuo', 'off', 'pt2d', 'portal3d'].forEach(function (k) { u.searchParams.delete(k); });
-    u.searchParams.set('debug', '1');
-    u.searchParams.set('bench', '1');
-    u.searchParams.set('gpup', '1');
-    Object.keys(v.set).forEach(function (k) { u.searchParams.set(k, v.set[k]); });
-    return u.toString();
-  }
-  /* varian yang sedang jalan; null = bukan sesi A/B (tanpa bench+gpup) atau kombinasi manual lebih dari satu override */
-  function abCurrent() {
-    if (!/[?&]bench=1(&|$)/.test(Q) || !/[?&]gpup=1(&|$)/.test(Q)) return null;
-    var hit = [];
-    if (/[?&]perf=low(&|$)/.test(Q)) hit.push('low');
-    if (/[?&]ast3d=0(&|$)/.test(Q)) hit.push('noast');
-    if (/[?&]dpr=0\.5(&|$)/.test(Q)) hit.push('dpr5');
-    if (/[?&]gpuo=1(&|$)/.test(Q)) hit.push('rev');
-    if (/[?&]pt2d=1(&|#|$)/.test(Q) || /[?&]portal3d=2d(&|#|$)/.test(Q)) hit.push('pt2d');
-    var offQ = /[?&]off=([a-z,]+)/.exec(Q);
-    if (offQ) { var offId = 'custom'; AB_VARIANTS.forEach(function (v) { if (v.set.off === offQ[1]) offId = v.id; }); hit.push(offId); }
-    if (!hit.length) return 'base';
-    return hit.length === 1 ? hit[0] : null;
-  }
-  /* override yang diam-diam menang atas URL: ?ast3d=0 hanya mematikan, tapi localStorage dumul_ast3d=0 membuat 'base' tetap tanpa batu 3D */
-  function abWarn() {
-    var w = [];
-    try { if (localStorage.getItem('dumul_ast3d') === '0') w.push('localStorage dumul_ast3d=0 (batu 3D mati di SEMUA varian)'); } catch (e) {}
-    try { if (localStorage.getItem('dumul_pt2d') === '1' || localStorage.getItem('dumul_portal3d') === '2d') w.push('localStorage pt2d aktif (dumul_pt2d=1 / dumul_portal3d=2d): portal 2D di SEMUA varian'); } catch (ePt) {}
-    try { if (localStorage.getItem('dumul_quality')) w.push('localStorage dumul_quality=' + localStorage.getItem('dumul_quality') + ' (base ikut itu)'); } catch (e2) {}
-    return w;
-  }
-
   /* ---------- sektor / dive ---------- */
   function validSectors() {
     if (typeof SECT === 'undefined' || !SECT.list) return [];
@@ -1511,7 +1459,6 @@ var DK_CSS =
   '.dk-seg .dk-b.on{background:#6ee5ff}' +
   '.dk-pre{margin:0;white-space:pre-wrap;word-break:break-word;overflow:auto;-webkit-overflow-scrolling:touch}' +
   '.dk-ov{position:fixed;left:4px;top:calc(4px + env(safe-area-inset-top,0px));z-index:99999;margin:0;padding:3px 6px;font:9px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#9fe8f5;background:rgba(6,11,17,.82);border:1px solid rgba(110,229,255,.14);border-radius:6px;white-space:pre;pointer-events:auto}' +
-  'html.dk-hb .dk-ov{top:calc(34px + env(safe-area-inset-top,0px))}' +
   '.dk-d>summary{list-style:none;cursor:pointer;opacity:.7;padding:2px 0;touch-action:manipulation}' +
   '.dk-d>summary::-webkit-details-marker{display:none}' +
   '.dk-d>summary::before{content:"\\25B8  "}' +
@@ -1538,13 +1485,6 @@ var DK_CSS =
     b.onclick = function (e) { e.stopPropagation(); onclick(); };
     return b;
   }
-  function pick(row, items, cur, label, fn) {   /* select ringkas + tombol aksi; items[i][0] = teks */
-    var s = mk('select', 'dk-b'); s.style.cssText = 'flex:1 1 0;min-width:0';
-    items.forEach(function (it, i) { var o = document.createElement('option'); o.value = i; o.textContent = it[0]; s.appendChild(o); });
-    if (cur >= 0) s.selectedIndex = cur;
-    row.appendChild(s);
-    row.appendChild(btn(label, function () { fn(items[s.selectedIndex], s.selectedIndex); }));
-  }
   function grp(label, inl) {   /* grup: label kecil + baris tombol (inl = label sebaris); kembalikan [grup, baris] */
     var g = mk('div', 'dk-g' + (inl ? ' in' : '')), r = mk('div', 'dk-r');
     if (label) g.appendChild(mk('div', 'dk-l', label));
@@ -1552,16 +1492,41 @@ var DK_CSS =
     return [g, r];
   }
 
-  /* Posisi lewat stylesheet (bukan inline) supaya bisa pakai media query; angka dari index.css:
-     #music-toggle = right 12 / bottom 12 / 32px; #mode-cluster = bottom 12. Kita satu baris di ATAS keduanya
-     (bottom = 12 + 32 + 6). #music-player (z 12) menutupi kita saat dibuka; kita z 11 jadi tidak pernah menutupinya. */
+
+  /* Dock kanan-bawah bersama (blok identik di 19-auto-debug.js dan 21-bench.js; <style id="dk-dock-css"> pertama menang):
+     chip 'bench' (kiri) + tombol 'dbg' (kanan) sebaris; panel terbuka ke atas, hanya satu yang terbuka (saling melipat). */
+  var DK_DOCK_CSS =
+    '#dk-dock{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:4px;max-width:calc(100vw - 20px);pointer-events:none;user-select:none;-webkit-user-select:none}' +
+    '#dk-dock>*{pointer-events:auto}' +
+    '#dk-dock.dbg-open,#dk-dock.bn-open{z-index:100000}' +
+    'html.dk-bn #dk-dock{z-index:2147483000}' +   /* mode bench: chip harus terlihat di atas layar boot (z 100) */
+    '#dk-dock.dbg-open>#__bench_box{display:none}' +
+    '@media (max-width:520px){#dk-dock{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}}' +
+    '@media (orientation:landscape) and (max-height:520px){#dk-dock{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}}' +
+    'body.ls #dk-dock{translate:var(--gut,0px) 0}' +
+    'body.layout-edit #dk-dock{display:none}';
+  function dkDock() {
+    var d = document.getElementById('dk-dock');
+    if (d) return d;
+    if (!document.getElementById('dk-dock-css')) {
+      var st = document.createElement('style'); st.id = 'dk-dock-css'; st.textContent = DK_DOCK_CSS;
+      (document.head || document.documentElement).appendChild(st);
+    }
+    d = document.createElement('div'); d.id = 'dk-dock'; d.className = 'dk';
+    document.body.appendChild(d);
+    return d;
+  }
+
+  /* Posisi dock (#dk-dock) lewat stylesheet; angka dari index.css: #music-toggle = right 12 / bottom 12 / 32px; #mode-cluster = bottom 12.
+     Dock satu baris di ATAS keduanya. #music-player (z 12) menutupi dock saat dibuka; dock z 11 jadi tidak pernah menutupinya. */
   function addStyle() {
     dkStyle();
+    dkDock();
     if (document.getElementById('wh-ad-css')) return;
     var st = document.createElement('style');
     st.id = 'wh-ad-css';
     st.textContent =
-      '#wh-autodive{position:fixed;right:12px;bottom:calc(50px + env(safe-area-inset-bottom,0px));z-index:11;display:flex;flex-direction:column;align-items:flex-end;gap:4px;user-select:none;-webkit-user-select:none}' +
+      '#wh-autodive{order:1;display:flex;flex-direction:column;align-items:flex-end;gap:4px}' +
       '#wh-autodive .wa-p{width:min(268px,88vw);max-height:min(72vh,calc(100vh - 110px));overflow-y:auto;-webkit-overflow-scrolling:touch}' +
       '#wh-ad-fab{background:rgba(6,11,17,.55);opacity:.75}#wh-ad-fab.on{background:rgba(6,11,17,.8);color:#6ee5ff;border-color:#6ee5ff;opacity:1;font-weight:400}' +
       '.wa-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}' +
@@ -1571,10 +1536,7 @@ var DK_CSS =
       '.wa-n{min-width:1.6em;text-align:center;opacity:.9}' +
       '.wa-v{margin-top:6px;padding:5px 6px;max-height:min(38vh,280px);font-size:9px;line-height:1.35;border:1px solid rgba(110,229,255,.16);border-radius:6px;background:rgba(0,0,0,.35);color:#9fe8f5}' +
       '.wa-ls{max-height:5.5em;margin-top:4px;opacity:.8}' +
-      '@media (max-width:520px){#wh-autodive{right:10px;bottom:calc(49px + env(safe-area-inset-bottom,0px))}}' +
-      '@media (orientation:landscape) and (max-height:520px){#wh-autodive{right:8px;bottom:calc(39px + env(safe-area-inset-bottom,0px))}}' +
-      'body.ls #wh-autodive{translate:var(--gut,0px) 0}' +
-      'body.layout-edit #wh-autodive{display:none}';
+      '.dk-r.eq>.dk-b{flex:1 1 0}';
     (document.head || document.documentElement).appendChild(st);
   }
 
@@ -1652,13 +1614,11 @@ var DK_CSS =
       acts.appendChild(btn('Snap', function () { snapshotPerf(); }));
       acts.appendChild(btn('Sweep', sweepPerf));
       acts.appendChild(btn('Stop', function () { if (running) { stopReq = true; log('stop…'); } }, false, 'dg'));
-    } else {
-      acts.appendChild(mk('span', 'dk-l', 'pilih Probe atau PERF'));
     }
-    panel.appendChild(A[0]);
+    if (MODE) panel.appendChild(A[0]);   /* tanpa mode: status sudah bilang 'pilih ...' */
 
     /* hasil / export */
-    var R0 = grp(''), main = R0[1];
+    var R0 = grp(''), main = R0[1]; main.classList.add('eq');
     var btnHasil = btn('Hasil', function () {
       if (MODE === 'probe' || probeStore.length) {   /* Probe: laporan. PERF/Dive: log ringkas. */
         toggleProbeResult();
@@ -1680,11 +1640,8 @@ var DK_CSS =
     var viewer = mk('pre', 'dk-pre wa-v', ''); viewer.style.display = 'none';
     panel.appendChild(viewer);
 
-    /* lanjutan (terlipat): trace, muff, A/B, seq, ABAB */
-    var more = mk('details', 'dk-d');
-    more.appendChild(mk('summary', '', 'lanjutan'));
-
-    var T = grp('trace', true), tr = T[1];
+    /* trace + matikan debug */
+    var T = grp('trace', true), tr = T[1]; tr.classList.add('eq');
     tr.appendChild(btn('Copy', traceCopy));
     tr.appendChild(btn('Save', traceSave));
     var muffOn = !!(window.AV && window.AV._dbg);
@@ -1698,48 +1655,12 @@ var DK_CSS =
       } catch (eMf) {}
     }, muffOn);
     tr.appendChild(muffB);
-    more.appendChild(T[0]);
-
-    var AB = grp('A/B q.big (bench + gpup)'), abCur = abCurrent();
-    pick(AB[1], AB_VARIANTS.map(function (v) { return [v.label, v]; }), (function () { for (var k = 0; k < AB_VARIANTS.length; k++) if (AB_VARIANTS[k].id === abCur) return k; return -1; })(), abCur ? 'aktif' : 'go', function (it) {
-      var v = it[1];
-      if (running) return log('tunggu tes selesai');
-      if (abCur === v.id) return log('varian ' + v.label + ' sudah aktif \u2014 jalankan overview + sektor, lalu dump bench');
-      go(abUrl(v));
-    });
-    more.appendChild(AB[0]);
-
-    if (/[?&]bench=1(&|$)/.test(Q)) {   /* v23: seq juga tanpa gpup=1 (baca dtAvg/fps + avgJs; q.* kosong) */
-      var SQ = grp('seq tanpa reload ±75 dtk' + (/[?&]gpup=1(&|$)/.test(Q) ? '' : ' · tanpa gpup=1: fps/dtAvg + avgJs')), seqRow = SQ[1];
-      pick(seqRow, [['seq blit', 'blit', 'base, plb, astb, ptb, scb, drb, blit, ast, base2'], ['seq layer', 'layer', 'base, sky, skyhide, hud, mw, neb, rasi+bintang, base2'], ['seq floor', 'floor', 'base, all (layar kosong), hole, pulse, plfx, combo, combo+, base2'], ['seq stars', 'stars', 'base, nama rasi, goresan garis, garis rasi, halo, inti, label, Pleiades, semua gambar bintang, bintang OFF, base2 (±90 dtk, WAJIB di dalam sektor)'], ['seq sizes', 'sizes', 'base, halo kecil/sedang/besar, inti kecil/sedang/besar, halo semua, inti semua, base2 (±80 dtk, di dalam sektor)'], ['seq plei', 'plei', 'base, nama, halo, inti, pulse Pleione, Pleiades semua, base2 (±56 dtk, di sektor winter)']].map(function (c) { return [c[0].replace('seq ', ''), c[1], c[2]]; }), 0, 'run', function (c) {
-        if (typeof window.__offSeqStart !== 'function') return log('butuh 21-bench v11.29c');
-        if (c[1] === 'stars' || c[1] === 'sizes' || c[1] === 'plei') {
-          if (typeof window.__offSeqOn === 'function' && window.__offSeqOn()) return log('seq sedang jalan');
-          if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('seq stars: masuk SEKTOR dulu (di overview rasi/bintang tidak digambar), lalu tap lagi');
-          if (!window.__stSegOk || !window.__abOk) return log('seq ' + c[1] + ' butuh 21-bench v11.29h (?v=11.29h)');
-        }
-        if (!window.__offSeqStart(c[1])) return log('seq sedang jalan');
-        log('seq ' + c[1] + ' jalan: ' + c[2] + '. Timer di kiri bawah; selesai \u2192 salin dump bench.');
-        expand(false);
-      });
-      more.appendChild(SQ[0]);
-      /* ABAB tanpa reload (21-bench v11.29h): A=base, B=token mati; 3 pasang x 10 dtk (+ &abn=N). Hanya di sektor. 1 token ±60 dtk, 3 token ±4 mnt */
-      var AQ = grp('ABAB · di sektor'), abbRow = AQ[1];
-      pick(abbRow, [['sglow', 'sglow'], ['score', 'score'], ['sdraw', 'sdraw'], ['splei', 'splei'], ['stars', 'stars'], ['halo sgs+sgm', 'sgs+sgm'], ['halo sgl x3', 'sgl,sgl,sgl'], ['halo ukuran', 'sgs,sgm,sgl'], ['inti ukuran', 'scs,scm,scl'], ['halo jumlah', 'sghalf,sgquart'], ['inti jumlah', 'schalf,scquart']], 0, 'run', function (c) {
-        if (!window.__abOk || typeof window.__offSeqStart !== 'function') return log('ABAB butuh 21-bench v11.29h (?v=11.29h)');
-        if (typeof SECT !== 'undefined' && SECT && SECT.on) return log('ABAB: masuk SEKTOR dulu, lalu tap lagi');
-        if (!window.__offSeqStart('abab', c[1])) return log('seq sedang jalan');
-        log('ABAB ' + c[1] + ' jalan (label A1_<token>, B1_<token>, ...). Timer di kiri bawah; selesai \u2192 salin dump bench.');
-        expand(false);
-      });
-      more.appendChild(AQ[0]);
-    }
+    panel.appendChild(T[0]);
 
     var F = grp(''), ft = F[1];
     ft.style.justifyContent = 'flex-end';
     ft.appendChild(btn('Matikan debug', function () { go(urlFor(null)); }, false, 'dg'));
-    more.appendChild(F[0]);
-    panel.appendChild(more);
+    panel.appendChild(F[0]);
 
     root.appendChild(panel);
     root.appendChild(fab);
@@ -1750,14 +1671,15 @@ var DK_CSS =
 
     function expand(on) {
       panel.style.display = on ? '' : 'none';
-      root.style.zIndex = on ? '100000' : '';   /* terbuka: di atas overlay PERF/whperf */
+      if (on) { try { if (window.__benchCollapse) window.__benchCollapse(); } catch (eBc) {} }   /* satu panel terbuka saja */
+      var dk = document.getElementById('dk-dock'); if (dk) dk.classList.toggle('dbg-open', !!on);   /* dock z 100000 = di atas overlay PERF/whperf; chip bench disembunyikan */
       fab.style.display = on ? 'none' : '';
     }
     fab.onclick = function (e) { e.stopPropagation(); expand(true); };
     ui.expand = expand;
     window.__WH_AD && (window.__WH_AD.collapse = function () { expand(false); });
 
-    document.body.appendChild(root);
+    dkDock().appendChild(root);
     expand(false);   /* default terlipat (fab saja); buka dengan tap dbg */
     updateList();
     installProbeSilence();
@@ -1771,10 +1693,7 @@ var DK_CSS =
       probe: 'PROBE silent — diam sampai selesai → Hasil / Export',
       perf: 'Snap sekali atau Sweep semua mode → Export'
     };
-    if (abCur) {
-      var abw = abWarn();
-      log('A/B q.big: varian ' + abCur + ' — tunggu post-boot, diam di overview, masuk sektor, lalu dump bench' + (abw.length ? '  ⚠ ' + abw.join('; ') : ''));
-    } else log(MODE ? boot[MODE] : 'pilih Probe, PERF, atau varian A/B');
+    log(MODE ? boot[MODE] : 'pilih Probe, PERF, atau Dive');
   }
 
   window.__WH_AD = {
@@ -1798,8 +1717,6 @@ var DK_CSS =
     traceSave: traceSave,
     cfg: CFG,
     mode: MODE,
-    abUrl: function (id) { for (var i = 0; i < AB_VARIANTS.length; i++) if (AB_VARIANTS[i].id === id) return abUrl(AB_VARIANTS[i]); return ''; },
-    abCurrent: abCurrent,
     get store() { return store.slice(); },
     get probes() { return probeStore.slice(); },
     get perfs() { return perfStore.slice(); },
