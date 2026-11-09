@@ -284,10 +284,12 @@ function sectStep(now){
       var _mk=[],_t=performance.now(),_m=function(n){var t=performance.now();_mk.push(n+' '+(t-_t).toFixed(0));_t=t;};
       var _lp0=0,_lp1=0;if(LAYPR){var _la=performance.now();try{void document.body.offsetHeight;}catch(eLa){}_lp0=performance.now()-_la;_t=performance.now();}   /* pre: baca layout SEBELUM tulis DOM blok ini */
       SECT.flash=now;SECT.cur=s;SECT.phase='sec';SECT.busy=false;
+      var _r0=LAYPR?performance.now():0,_r1=0,_lm=0;
       try{sumRestore(s);}catch(eSR){}
+      if(LAYPR){_r1=performance.now()-_r0;var _lc=performance.now();try{void document.body.offsetHeight;}catch(eLc){}_lm=performance.now()-_lc;}   /* mid: baca layout tepat sesudah sumRestore (BH.x/y + sumUI) */
       try{sumUI();}catch(eU2){}
       skyZoom=1;skyPan.x=0;skyPan.y=0;SECT.z=0;_m('restore+ui');
-      if(LAYPR){var _lb=performance.now();try{void document.body.offsetHeight;}catch(eLb){}_lp1=performance.now()-_lb;_mk.push('lay[pre '+_lp0.toFixed(1)+' post '+_lp1.toFixed(1)+']');_t=performance.now();}   /* post: baca layout SESUDAH sumRestore/sumUI (tulis DOM) */
+      if(LAYPR){var _lb=performance.now();try{void document.body.offsetHeight;}catch(eLb){}_lp1=performance.now()-_lb;_mk.push('lay[pre '+_lp0.toFixed(1)+' mid '+_lm.toFixed(1)+' post '+_lp1.toFixed(1)+' rs '+_r1.toFixed(1)+']');try{var _ts=window.__tsg;if(_ts)_mk.push('tsg[on '+(_ts.on?1:0)+' pon '+_ts.pon+' calls '+_ts.calls+' skip '+_ts.skip+' run '+_ts.run+']');}catch(eTg){}_t=performance.now();}   /* post: baca layout SESUDAH sumRestore/sumUI (tulis DOM) */
       RELAY.pend=0;try{sumPlace();}catch(ePl){}   /* BH mini selalu ada -> diparkir di titik kosong saat masuk sektor */
       sectSet(false);_m('sectSet');if(window.__spMk)_mk.push('sumSpot['+window.__spMk+']');
       try{FOCUS.list=null;FOCUS.i=0;FOCUS.anim=false;if(CAMERA_MODE){FOCUS.list=focusList();focusUI();}}catch(eF){}
@@ -455,7 +457,7 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
      Panel tertutup -> lewati. Dua jalur buka panel (open(true) dan __bhTuneShow(true)) menambah kelas 'on' LALU memanggil refresh(), jadi isi panel tetap disegarkan saat dibuka. Panggilan pertama (init) selalu lolos. ?tsg=0 = perilaku lama (A/B). */
   var TSG=!/[?&]tsg=0(&|#|$)/.test(location.search),RF_DONE=0;
   try{window.__tsg={on:TSG,skip:0,run:0};}catch(eTs){}
-  function refresh(){if(TSG&&RF_DONE&&!panel.classList.contains('on')){try{window.__tsg.skip++;}catch(eS){}return;}var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
+  function refresh(){try{window.__tsg.pon=panel.classList.contains('on')?1:0;window.__tsg.calls=(window.__tsg.calls||0)+1;}catch(eP){}if(TSG&&RF_DONE&&!panel.classList.contains('on')){try{window.__tsg.skip++;}catch(eS){}return;}var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
   function refreshNow(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     RF_DONE=1;try{window.__tsg.run++;}catch(eR){}
     var a=avail();
