@@ -345,9 +345,10 @@ var PTT={ok:0,fail:0,N:80,A:null,B:null,gA:null,gB:null,spr:null,last:0,acc:0,w:
    - pttInit() (dipanggil pttDraw / pttDrawAlt kalau PTT belum ok) = pttFin: menyelesaikan SISA langkah secara sinkron, jadi mulut yang dibangunkan sebelum warm selesai tidak pernah menunggu lebih lama dari perilaku lama.
    - Hasil akhir identik dgn perilaku lama (26 pttStep(.04) di kanvas yang sama); yang berubah hanya KAPAN dikerjakan. Potato / reduce motion: tidak di-warm (mulut statis memakai ptMouth, tidak butuh PTT).
    - Dump: window.__pttw (1/0) dan window.__pttwStat() = {on, w, n, ok, sl irisan, ms total kerja init, by 'idle'|'sync'|'sync-rest'|'', syncMs (waktu pttInit sinkron di draw), pre (PTT.w saat dipanggil sinkron), delay, bud}; bench: cfg.pt.ptw dan R.pttw. Tes A/B: ?autoab=none&autoabq=pttw=0&autoabn=3 (B = lama). */
+/* [v52] DEFAULT BARU delay 0 / bud 8 (sebelumnya 1500 / 4). A/B 9 Nov (itel + Redmi 8A, ABABAB n=4, A = 1500/4, B = 0/8): `pt.mouth` max di ov+H itel 25-53 -> 9-25 ms (pasang 2-4: 8,8-11,3), Redmi 28-41 -> 11-17 ms; B `by:'idle'` 7 dari 8 run (warm selesai ±3,7-4,1 dtk sesudah entered), A `sync-rest` 8 dari 8. Total kerja sama (±36-43 ms), dtAvg tidak berubah konsisten. Alasan: rIC {timeout:600} di overview yang tak pernah idle = ±650 ms per irisan, jadi budget 4 ms + delay 1500 hanya sempat 5-6 irisan sebelum mulut bangun (±5,4 dtk di autoab). Flag ?pttwd=N / ?pttwb=N tetap ada (A/B: ?pttwd=1500&pttwb=4 = setelan v51). */
 var PTT_N0=26;
 var PTTW=(function(){
-  var o={on:true,delay:1500,bud:4,gap:60,sl:0,ms:0,by:'',syncMs:0,pre:-1,skip:'',sched:0,tm:0,doneAt:0};
+  var o={on:true,delay:0,bud:8,gap:60,sl:0,ms:0,by:'',syncMs:0,pre:-1,skip:'',sched:0,tm:0,doneAt:0};
   try{
     o.on=!/[?&]pttw=0(?:&|#|$)/.test(location.search);
     var m=/[?&]pttwd=([0-9]+)/.exec(location.search);if(m)o.delay=parseInt(m[1],10);
