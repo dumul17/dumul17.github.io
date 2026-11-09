@@ -227,9 +227,23 @@ function hudHit(x,y,R,rects){
 }
 /* Titik parkir BH mini waktu masuk sektor: titik terjauh dari bintang/rasi di sektor (lingkaran kosong terbesar) yang bebas dari tombol HUD & teleskop.
    F11: layout portal shortcut (sgPoints) dan SPOT_AVOID (portal sektor) sudah pensiun, jadi cuma bintang + HUD yang dihindari. */
+/* [hfc] v456: cache rect header/footer buat sumSpot. Dump 9 Nov: `hdr` (dua getBoundingClientRect = reflow paksa karena DOM sektor baru berubah) 14-34 ms = ±80% sumSpot di frame pertama sektor.
+   Dibaca SEKALI di akhir fase-in (u>=.9, layar masih tertutup terowongan, sesudah antrean skyWarmStars habis), dipakai sumSpot di frame pertama sektor (sekali pakai, TTL 4 dtk).
+   Basi? kunci geometri (W,H,STG) + resize/orientationchange membuang cache; cache kosong/basi = baca langsung seperti dulu. ?hfc=0 = perilaku lama (A/B). */
+var HFC={on:!/[?&]hfc=0(&|#|$)/.test(location.search),hb:0,ft:0,key:'',t:0,hit:0,miss:0};
+try{window.__hfc=HFC;}catch(eHf){}
+function hfcKey(){return W+'x'+H+'|'+(STG.k||1)+','+(STG.x||0)+','+(STG.y||0)+','+(STG.rot||0);}
+function hfcInval(){HFC.t=0;}
+function hfcFill(){
+  try{HFC.hb=vrect($('#header')).bottom;HFC.ft=vrect($('#footer')).top;HFC.key=hfcKey();HFC.t=performance.now();}
+  catch(eHF){HFC.t=0;}
+}
+try{window.addEventListener('resize',hfcInval,{passive:true});window.addEventListener('orientationchange',hfcInval,{passive:true});}catch(eHL){}
 function sumSpot(){
-  var hb=0,ft=H,_s0=performance.now();
-  try{hb=vrect($('#header')).bottom;ft=vrect($('#footer')).top;}catch(e){}
+  var hb=0,ft=H,_s0=performance.now(),_hc=0;
+  if(HFC.on&&HFC.t&&_s0-HFC.t<4000&&HFC.key===hfcKey()){hb=HFC.hb;ft=HFC.ft;_hc=1;HFC.hit++;}
+  else{HFC.miss++;try{hb=vrect($('#header')).bottom;ft=vrect($('#footer')).top;}catch(e){}}
+  HFC.t=0;   /* sekali pakai */
   var _s1=performance.now();   /* mark: hdr = baca layout header/footer (bisa memaksa reflow) */
   var x0=Math.max(30,W*.06),x1=W-x0,y0=Math.max(hb+24,H*.12),y1=Math.min(ft-24,H*.9),pts=[],k,s2,q,i,j;
   CONS.forEach(function(cc){
@@ -256,7 +270,7 @@ function sumSpot(){
     sc=base+Math.sqrt(m2);
     if(sc>bs){bs=sc;best=[cx,cy];}
   }
-  var _s4=performance.now();window.__spMk='hdr '+(_s1-_s0).toFixed(1)+' pts '+(_s2-_s1).toFixed(1)+' hud '+(_s3-_s2).toFixed(1)+' grid '+(_s4-_s3).toFixed(1);   /* pecahan sumSpot (ms): dibaca whMk di dump bench */
+  var _s4=performance.now();window.__spMk='hdr '+(_s1-_s0).toFixed(1)+(_hc?' hc':'')+' pts '+(_s2-_s1).toFixed(1)+' hud '+(_s3-_s2).toFixed(1)+' grid '+(_s4-_s3).toFixed(1);   /* pecahan sumSpot (ms): dibaca whMk di dump bench */
   return best||[W*.5,H*.5];
 }
 /* Taruh BH mini di titik parkir (sumSpot), dikonversi ke ruang BH. */
@@ -278,6 +292,7 @@ function sectStep(now){
     sectApply(s,sectEase(u));
     if(u>=.3&&u<.95&&(SECT.warmQ==null||SECT.warmQ.length))skyWarmStep();
     if(u>=.25&&u<.95){swMark(s,u);if(SWARM.on)skyWarmStars(s);}   /* swMark selalu (A/B); skyWarmStars hanya kalau swarm aktif */
+    if(HFC.on&&u>=.9&&!HFC.t&&(!SWARM.on||!SWARM.q||!SWARM.q.length||u>=.93))hfcFill();   /* [hfc] reflow header/footer dibayar di terowongan, bukan di frame pertama sektor */
     if(u>=1){
       /* whperf: pecah biaya blok akhir phase-in (tunnel@~3.6s) — window.__whMk dibaca 09-wormhole panel */
       var _mk=[],_t=performance.now(),_m=function(n){var t=performance.now();_mk.push(n+' '+(t-_t).toFixed(0));_t=t;};
