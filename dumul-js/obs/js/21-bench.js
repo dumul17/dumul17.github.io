@@ -1,5 +1,6 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29zn: dump.swarm = probe dt rAF per frame di jendela fase-in sektor (ring timestamp rAF di watcher za) + stat antrean skyWarmStars (q0 / left / sp / ms / calls; swarm jadi default ON di v455, ?swarm=0 = A) . v11.29zm: byFn juga membungkus planetBhOkFn / planetBhParkFn (geometri limb sekali per sumSpot; planetBhOk / planetBhPark tidak dipanggil lagi dari sumSpot); whMk memuat sumSpot[hdr pts hud grid] (ms). Bench-only. v11.29zl: byFn juga membungkus drawCons, drawPulses, drawStars, drawPleiades, drawTxLines, skyWarmStars (pecah cons+stars). Bench-only. v11.29zk: byFn (dump post) juga membungkus sumSpot, sumPlace, hudRects, planetBhOk, planetBhPark (05-sector-ui / 17-planet3d): total ms + jumlah panggilan masing-masing, supaya kelihatan berat di grid Math.hypot, planetBhOk, atau pembacaan layout hudRects. Bench-only. v11.29zj: byFn (dump post) juga membungkus sectSet, fxSectSync, applyObserveIcon (05-sector-ui / 06-interaction / 02-sky-logic) untuk memecah biaya sectSet ±32 ms saat masuk sektor; selisih sectSet - fxSectSync - applyObserveIcon = toggle kelas body. Bench-only. v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+/* BENCH v11.29 (?bench=1) — v11.29zo: ?autoabrev=1 = urutan A/B dibalik (BABABA) utk kontrol bias urutan; ringkasan mencocokkan pasangan lewat label A/B; export memuat rev + plan; tanpa param = ABABAB seperti biasa.
+    v11.29zn: dump.swarm = probe dt rAF per frame di jendela fase-in sektor (ring timestamp rAF di watcher za) + stat antrean skyWarmStars (q0 / left / sp / ms / calls; swarm jadi default ON di v455, ?swarm=0 = A) . v11.29zm: byFn juga membungkus planetBhOkFn / planetBhParkFn (geometri limb sekali per sumSpot; planetBhOk / planetBhPark tidak dipanggil lagi dari sumSpot); whMk memuat sumSpot[hdr pts hud grid] (ms). Bench-only. v11.29zl: byFn juga membungkus drawCons, drawPulses, drawStars, drawPleiades, drawTxLines, skyWarmStars (pecah cons+stars). Bench-only. v11.29zk: byFn (dump post) juga membungkus sumSpot, sumPlace, hudRects, planetBhOk, planetBhPark (05-sector-ui / 17-planet3d): total ms + jumlah panggilan masing-masing, supaya kelihatan berat di grid Math.hypot, planetBhOk, atau pembacaan layout hudRects. Bench-only. v11.29zj: byFn (dump post) juga membungkus sectSet, fxSectSync, applyObserveIcon (05-sector-ui / 06-interaction / 02-sky-logic) untuk memecah biaya sectSet ±32 ms saat masuk sektor; selisih sectSet - fxSectSync - applyObserveIcon = toggle kelas body. Bench-only. v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29zh: ?autoabboot=1 = autoab MODE BOOT (reload -> boot -> obs-entered -> diam ±12 dtk -> snapshot() full-boot, bukan __benchPost; metrik CPU pra-kapsul per run: longtask, preMs, threeQ, LoAF, frame1). Dipasangkan dgn ?autoabq=gs=0 dst.
     v11.29zg: ?autoabov=1 = autoab MODE OVERVIEW (tanpa masuk sektor; rekam ov saja, metrik fps/dt/teleTop/pt.copy/sc.sub per run) + ?autoabq=a=1,b=2 (param tambahan khusus sisi B; ?autoab=none = tanpa ?off=). Tanpa ?autoab tidak mengubah apa pun.
     v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
@@ -1881,7 +1882,7 @@ var DK_CSS =
   })();
   /* [autoab:begin] ===== v11.29zc: ?autoab=TOKEN = A/B OTOMATIS lintas reload (A = tanpa off, B = ?off=TOKEN), diulang N pasang (ABABAB), dgn kotak timer di kiri-atas.
      Param: autoab=hud|skyhide|... (token ?off=), autoabn=3 (pasang, 1-6), autoabms=30000 (diam di sektor, 10-120 dtk), autoabset=5000 (diam di overview sebelum masuk), autoabsec=0 (indeks sektor, sama dgn Dive),
-     autoabreset=1 (mulai dari awal). Alur tiap run: boot -> kapsul (ketuk BIRU atau tunggu auto-masuk ±10 dtk kunjungan ulang) -> obs-entered -> diam SETTLE -> sectJumpTo (jalur Dive/wormhole) -> diam HOLD -> window.__benchPost() disimpan
+     autoabreset=1 (mulai dari awal), autoabrev=1 (urutan dibalik: BABABA, v11.29zo; pasangan selalu dihitung B-A lewat label). Alur tiap run: boot -> kapsul (ketuk BIRU atau tunggu auto-masuk ±10 dtk kunjungan ulang) -> obs-entered -> diam SETTLE -> sectJumpTo (jalur Dive/wormhole) -> diam HOLD -> window.__benchPost() disimpan
      (IndexedDB, cadangan localStorage) -> reload ke varian berikutnya. Selesai: ringkasan raFps s9_14 + dt k>=9 per pasang (v11.29zd; dt03/ra4_8 tetap tersimpan di runs), inventaris HUD per run di dumps[i].inv, tombol Export = SATU berkas autoab-*.json (semua dump di dalamnya).
      Kotak pakai class 'dk' (tetap tampil di ?off=hud). Tidak menyentuh layar/DOM lain; teks diperbarui 1x/dtk saja. Catatan: masuk kapsul tanpa ketuk = tanpa user-activation (audio); semua 6 run diperlakukan sama. */
   (function () {
@@ -1890,6 +1891,7 @@ var DK_CSS =
     var TOK = qa[1];
     function qn(name, def, lo, hi) { var m = new RegExp('[?&]' + name + '=(\\d+)').exec(location.search), v = m ? parseInt(m[1], 10) : def; return Math.max(lo, Math.min(hi, v)); }
     var N = qn('autoabn', 3, 1, 6), HOLD = qn('autoabms', 30000, 10000, 120000), SETTLE = qn('autoabset', 5000, 1000, 30000), SECI = qn('autoabsec', 0, 0, 30);
+    var REV = /[?&]autoabrev=1(&|$)/.test(location.search);   /* v11.29zo: urutan dibalik (BABABA): kontrol bias urutan (run pertama sesi paling lambat), jalankan 1x ABABAB + 1x BABABA lalu gabung */
     var BTM = /[?&]autoabboot=1(&|$)/.test(location.search);   /* v11.29zh: mode boot (menang atas autoabov) */
     var OVM = !BTM && /[?&]autoabov=1(&|$)/.test(location.search);   /* v11.29zg: mode overview */
     if (OVM && !/[?&]autoabset=/.test(location.search)) SETTLE = 10000;   /* beri waktu governor FS menetap sebelum merekam */
@@ -1899,7 +1901,7 @@ var DK_CSS =
     var QN = QX ? QX.split('&').map(function (p) { return p.split('=')[0]; }) : [];
     var BDESC = (TOK !== 'none' ? 'off=' + TOK : '') + (QX ? (TOK !== 'none' ? ' ' : '') + '+' + QX : '');
     var KEY = '__autoab_state', DB = '__autoab_db', TOT = N * 2;
-    var plan = []; for (var pi = 0; pi < TOT; pi++) plan.push(pi % 2 ? 'B' : 'A');
+    var plan = []; for (var pi = 0; pi < TOT; pi++) plan.push((pi % 2 === 0) === REV ? 'B' : 'A');   /* REV: B dulu */
     var S = null;
     try { S = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e0) { S = null; }
     var RESET = /[?&]autoabreset=1(&|$)/.test(location.search);
@@ -1941,8 +1943,8 @@ var DK_CSS =
         try { var tx = db.transaction('r', 'readwrite'); tx.objectStore('r').clear(); tx.oncomplete = function () { try { db.close(); } catch (e) {} }; } catch (e) { try { db.close(); } catch (e2) {} }
       });
     }
-    if (RESET || !S || S.tok !== TOK || S.n !== N || S.q !== QS || S.ov !== OVM || S.bt !== BTM) {
-      S = { tok: TOK, q: QS, ov: OVM, bt: BTM, n: N, i: 0, t0: Date.now(), runs: [], done: false };
+    if (RESET || !S || S.tok !== TOK || S.n !== N || S.q !== QS || S.ov !== OVM || S.bt !== BTM || !!S.rev !== REV) {
+      S = { tok: TOK, q: QS, ov: OVM, bt: BTM, rev: REV, n: N, i: 0, t0: Date.now(), runs: [], done: false };
       idbClear(); saveS();
     }
     if (RESET) { try { history.replaceState(null, '', urlClean(false, true)); } catch (e1) {} }
@@ -2043,7 +2045,7 @@ var DK_CSS =
     function draw() {
       if (!txt) return;
       var now = Date.now(), i = Math.min(S.i, TOT - 1), v = plan[i], l = [];
-      l.push('AUTOAB' + (OVM ? ' OV ' : BTM ? ' BOOT ' : ' ') + TOK + '  run ' + (S.done ? TOT : i + 1) + '/' + TOT + '  ' + (S.done ? 'SELESAI' : v + (v === 'B' ? ' (' + BDESC + ')' : ' (A)')));
+      l.push('AUTOAB' + (OVM ? ' OV ' : BTM ? ' BOOT ' : ' ') + TOK + (REV ? ' REV' : '') + '  run ' + (S.done ? TOT : i + 1) + '/' + TOT + '  ' + (S.done ? 'SELESAI' : v + (v === 'B' ? ' (' + BDESC + ')' : ' (A)')));
       var est = '';
       if (!S.done && S.runs.length) { var a = 0; for (var k = 0; k < S.runs.length; k++) a += S.runs[k].ms + 4000; est = '  sisa ±' + fmt((TOT - S.i) * (a / S.runs.length) - (now - runT0)); }
       l.push('total T+' + fmt((S.done && S.tEnd ? S.tEnd : now) - S.t0) + est);
@@ -2054,25 +2056,29 @@ var DK_CSS =
       var frac = 0; if (!S.done && P.until) { var dur = Math.max(1, P.until - P.t0); frac = Math.min(1, (now - P.t0) / dur); }
       bar.style.width = (Math.min(100, ((S.done ? TOT : S.i) + (S.done ? 0 : frac * 0.5)) / TOT * 100)) + '%';
     }
+    /* v11.29zo: pasangan dicocokkan lewat label (A/B), bukan posisi, supaya benar juga utk ?autoabrev=1 (BABABA) */
+    function pairAB(p) { var x = S.runs[p * 2], y = S.runs[p * 2 + 1]; if (!x || !y) return { a: null, b: null }; return x.v === 'A' ? { a: x, b: y } : { a: y, b: x }; }
+    function firstOf(v) { for (var i = 0; i < S.runs.length; i++) if (S.runs[i].v === v) return S.runs[i]; return null; }
     function summaryOv() {
       var out = [], dd = [], tt = [], pp = [], ok = true, any = false;
       for (var p = 0; p < N; p++) {
-        var a = S.runs[p * 2], b = S.runs[p * 2 + 1];
+        var ab = pairAB(p), a = ab.a, b = ab.b;
         if (a && b && a.ov && b.ov) { any = true; dd.push(r1(b.ov.dt - a.ov.dt)); tt.push(r1(b.ov.tele - a.ov.tele)); pp.push(r1(b.ov.ptc - a.ov.ptc)); if (b.ov.dt - a.ov.dt > -2) ok = false; }
       }
       out.push('B-A dt ms/pasang: ' + (dd.length ? dd.join(' / ') : '-'));
       out.push('B-A teleTop ms: ' + (tt.length ? tt.join(' / ') : '-'));
       out.push('B-A pt.copy ms: ' + (pp.length ? pp.join(' / ') : '-'));
       out.push(any ? (ok ? 'B lebih ringan di SEMUA pasang (dt turun >= 2 ms)' : 'BELUM: dt B tidak turun >= 2 ms di semua pasang (noise ±1)') : 'data kurang');
-      if (S.runs[0] && S.runs[0].ov) out.push('mix A1: ' + S.runs[0].ov.mix);
-      if (S.runs[1] && S.runs[1].ov) out.push('mix B1: ' + S.runs[1].ov.mix);
+      var fa = firstOf('A'), fb = firstOf('B');
+      if (fa && fa.ov) out.push('mix A1: ' + fa.ov.mix);
+      if (fb && fb.ov) out.push('mix B1: ' + fb.ov.mix);
       return out.join('\n');
     }
     function summaryBt() {
       var out = [], ks = ['lt', 'pre', 'tq', 'loaf', 'f1'], nm = { lt: 'longtask pra-kapsul', pre: 'preMs total', tq: 'threeQ run', loaf: 'LoAF maks pra', f1: 'frame1-entered' }, ds = {}, av = [], any = false, ok = true;
       ks.forEach(function (k) { ds[k] = []; });
       for (var p = 0; p < N; p++) {
-        var a = S.runs[p * 2], b = S.runs[p * 2 + 1];
+        var ab = pairAB(p), a = ab.a, b = ab.b;
         if (a && b && a.bt && b.bt) {
           any = true; if (a.bt.lt != null) av.push(a.bt.lt);
           ks.forEach(function (k) { ds[k].push(a.bt[k] != null && b.bt[k] != null ? r1(b.bt[k] - a.bt[k]) : null); });
@@ -2092,14 +2098,14 @@ var DK_CSS =
       if (OVM) return summaryOv();
       var out = [], rd = [], dd = [], ok = true, any = false;
       for (var p = 0; p < N; p++) {
-        var a = S.runs[p * 2], b = S.runs[p * 2 + 1];
+        var ab = pairAB(p), a = ab.a, b = ab.b;
         if (a && b && a.dt9 != null && b.dt9 != null) dd.push(Math.round((b.dt9 - a.dt9) * 10) / 10);
         if (a && b && a.ra914 != null && b.ra914 != null) { var df = Math.round((b.ra914 - a.ra914) * 10) / 10; rd.push(df); any = true; if (df < 3) ok = false; }
       }
       out.push('B-A raFps s9_14 per pasang: ' + (rd.length ? rd.join(' / ') : '-'));
       out.push('B-A dt k>=9 (ms) per pasang: ' + (dd.length ? dd.join(' / ') : '-'));
       out.push(any ? (ok ? 'TERBUKTI: kelompok ' + TOK + ' menahan frame (B naik >= 3 fps di SEMUA pasang)' : 'BELUM: B tidak naik >= 3 fps di semua pasang') : 'data kurang');
-      if (S.runs[0] && S.runs[0].invS) out.push('INV A1: ' + S.runs[0].invS);
+      var fa1 = firstOf('A'); if (fa1 && fa1.invS) out.push('INV A1: ' + fa1.invS);
       return out.join('\n');
     }
     function setPhase(name, durMs) { P.name = name; P.t0 = Date.now(); P.until = durMs ? P.t0 + durMs : 0; draw(); }
@@ -2109,7 +2115,20 @@ var DK_CSS =
     }
     function isBusy() { var w = typeof WORMHOLE !== 'undefined' && WORMHOLE.busy, s = typeof SECT !== 'undefined' && SECT.busy; return !!(w || s); }
     /* ---- alur satu run ---- */
+    /* v11.29zo: halaman pertama dibuka dari URL tanpa param B; kalau urutan run ke-S.i meminta varian lain (mis. ?autoabrev=1 -> B dulu, atau URL dibuka dgn off= padahal run A), alihkan SEKALI ke URL varian yang benar sebelum run mulai */
+    function curIsB() {
+      var ob = TOK !== 'none' && /[?&]off=/.test(location.search), qb = false;
+      for (var k = 0; k < QN.length; k++) if (new RegExp('[?&]' + QN[k] + '=').test(location.search)) qb = true;
+      return ob || qb;
+    }
+    function wrongVariantRedirect() {
+      if (!(TOK !== 'none' || QX)) return false;   /* A == B (konfigurasi kosong): tidak ada yang dialihkan */
+      if ((plan[S.i] === 'B') === curIsB()) return false;
+      try { if (sessionStorage.getItem('__autoab_rd') === String(S.i)) return false; sessionStorage.setItem('__autoab_rd', String(S.i)); } catch (e) {}
+      location.replace(urlFor(S.i)); return true;
+    }
     function startRun() {
+      if (!S.done && wrongVariantRedirect()) return;
       if (S.done) { P.name = 'done'; mount(); return; }
       runT0 = Date.now(); setPhase('boot');
       var thisI = S.i;
@@ -2171,7 +2190,7 @@ var DK_CSS =
     function exportAll() {
       idbAll(function (arr) {
         arr.sort(function (a, b) { return a.meta.i - b.meta.i; });
-        var out = { kind: 'autoab', ov: OVM, bt: BTM, q: QS, tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, inv: x.inv || null, dump: d }; }) };
+        var out = { kind: 'autoab', rev: REV, plan: plan.join(''), ov: OVM, bt: BTM, q: QS, tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, inv: x.inv || null, dump: d }; }) };
         out.hudGroups = { hudA: HUD_G.hudA, hudB: HUD_G.hudB, hudC: HUD_G.hudC, hudD: 'sisanya (anak <body> di luar A-C dan di luar HUD_EXC)', exclude: HUD_EXC };
         try {
           var blob = new Blob([JSON.stringify(out)], { type: 'application/json' }), a = document.createElement('a');
