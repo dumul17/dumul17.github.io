@@ -2084,6 +2084,19 @@ function scDumpLine(){
 /* Pleiades: klaster muda, bintangnya panas tipe B (~12-14 ribu K) -> terang di UV, meredup di IR. Pleione pakai STAR_PHYS (pleiades.pleione);
    bintang klaster lain tidak punya data per bintang, jadi memakai Teff klaster (PL_TEFF) dan tanpa label tipe spektral. Cache per bintang per pita. */
 var PL_TEFF=13000;
+/* [plpr] probe SEMENTARA (default MATI, aktif dgn ?plpr=1): pecah biaya drawPleiades per segmen. Hasil: window.__plPr (dump post 21-bench, kunci plPr).
+   Kolom baris c: n, abs ms, total, pre, nf, nb, ln, dm, br, xf, bd, gl, co, in, lb, vis, cam. Segmen dlm drawOne (xf..lb) dijumlah semua bintang; dm/br = total loop dim/bright. */
+var PLPR=/[?&]plpr=1(&|#|$)/.test(location.search),PLPR_D=null,PLPR_K=['pre','nf','nb','ln','dm','br','xf','bd','gl','co','in','lb'];
+function plPrRec(P){
+  var tot=performance.now()-P.t0,D=PLPR_D||(PLPR_D=window.__plPr={n:0,mx:0,sum:{},c:[],cols:'n, abs ms, total, '+PLPR_K.join(', ')+', vis, cam'}),i,r,k;
+  D.n++;if(tot>D.mx)D.mx=tot;
+  for(i=0;i<PLPR_K.length;i++){k=PLPR_K[i];D.sum[k]=Math.round(((D.sum[k]||0)+(P[k]||0))*10)/10;}
+  if(D.c.length<6||(tot>=2&&D.c.length<24)){
+    r=[D.n,Math.round(P.t0),Math.round(tot*10)/10];
+    for(i=0;i<PLPR_K.length;i++)r.push(Math.round((P[PLPR_K[i]]||0)*10)/10);
+    r.push(PLEIADES._vis,CAMERA_MODE?1:0);D.c.push(r);
+  }
+}
 function plBand(st){
   if(st._bb!==BAND){
     var ph=st.interactive?SKY.physOf('pleiades','pleione'):{teff:PL_TEFF,spt:null,known:false},bk=bandBucket(BAND,ph.teff);
@@ -2094,6 +2107,8 @@ function plBand(st){
 function drawPleiades(age,now){
   var tn=now-(TD.lag.pleiades||0);
   if(!PLEIADES.ready)return;
+  var _P=PLPR?{t0:performance.now(),t:0}:null;if(_P)_P.t=_P.t0;
+  function plM(k){var n=performance.now();_P[k]=(_P[k]||0)+n-_P.t;_P.t=n;}
   PLEIADES._vis=0;
   PLEIADES._ax=PLEIADES._ay=PLEIADES._an=0;   /* akumulasi pusat klaster di layar (dipakai frame berikutnya buat arah garis penghubung label) */
   var linesOffP=CAMERA_MODE&&!CAM_LINES,gFP=clamp((skyZoom-CAM_LBL_Z)/1);
@@ -2102,13 +2117,16 @@ function drawPleiades(age,now){
   var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y;
   var selected=activeSfx===SFX.pleione&&!SFX.pleione.paused&&!SFX.pleione.ended;
   var pFK=consFullK(PLEIADES,now),pAP=(selected&&!reduce)?(AV.beat*.45+AV.bass*.35):0,pDK=(CAMERA_MODE||clusterSfxOn())?0:AT.pK;
+  if(_P)plM('pre');
   var pNA=nameFadeStep(PLEIADES,(CAMERA_MODE||selected)?1:0,now);   /* nama cluster: cam ON atau Pleione bunyi, fade halus */
+  if(_P)plM('nf');
   if(!PX.pname&&!consLocked('pleiades')){ /* teks nama cluster: lapisan paling bawah, di bawah bintang */
     var pS=PLEIADES.scale,pA=clamp((age-1.6)/1.6)*pNA;
     var pq1=skyXF(PLEIADES.x+.22*pS+ox,PLEIADES.y+.22*pS+oy),pt1=[pq1[0],pq1[1]];
     var pq2=skyXF(PLEIADES.x+.84*pS+ox,PLEIADES.y+.62*pS+oy),pt2=[pq2[0],pq2[1]];
     drawNameBox('pleiades',pt1,pt2,(CAMERA_MODE&&camFocusId()==='pleiades'?NAME_ALF:NAME_AL)*pA,now);
   }
+  if(_P)plM('nb');
   /* Full cluster when Pleione plays (or focus still on pleiades); otherwise dim.
      Sweep-driven _tw gives the same sequential twinkle language as Orion/Virgo/Canis. */
   var clusterFade=selected?1:.30;
@@ -2124,7 +2142,9 @@ function drawPleiades(age,now){
     pit.forEach(function(m){m.s._lg=m.g||null;});
     plLens=true;
   }
+  if(_P)plM('ln');
   function drawOne(star,dim){
+    if(_P)_P.t=performance.now();
     var x=PLEIADES.x+star.x*PLEIADES.scale+ox;
     var y=PLEIADES.y+star.y*PLEIADES.scale+oy;
     var twBoost=selected?(star._tw||0):0;
@@ -2138,6 +2158,7 @@ function drawPleiades(age,now){
     if(pAP>0){a*=1+.5*pAP;r*=1+.25*pAP;}
     if(pDK>0)a*=1-.4*pDK;
     var q=gSkyC(x,y,72);
+    if(_P)plM('xf');
     if(!q||q[2]>=1)return;
     PLEIADES._vis++;
     x=q[0];y=q[1];if(!dim){PLEIADES._ax+=x;PLEIADES._ay+=y;PLEIADES._an++;}a*=(1-.75*q[2]);r*=1-.45*q[2];
@@ -2148,13 +2169,16 @@ function drawPleiades(age,now){
       a*=Math.max(.1,Math.min(1.5,Math.sqrt(bf)));
       bandCol=star._bg;bandCore=star._bk;
     }
+    if(_P)plM('bd');
     /* Reuse constellation star sprite; scale so extent ≈ r*(dim?4.5:5.8).
        drawStarGlow uses extent=r*5, so pass rAdj = r * factor/5. */
     var rAdj=r*((dim?4.5:5.8)/5);
     var pHK=CAMERA_MODE?clamp(1-(skyZoom-CAM_HALO_Z0)/CAM_HALO_Z1):1,pHF=CAMERA_MODE?0:pFK;   /* halo: sama dengan drawStars (idle / cam free ~1x tipis, FULL penuh, fokus cam tanpa halo) */
     if(pHK>.02&&!PX.pglow)drawStarGlow(x,y,rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),rgbc,a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK);   /* mode kamera: tanpa halo, sama dengan drawStars */
+    if(_P)plM('gl');
     if(CAMERA_MODE&&!dim){var plg=plLens&&star._lg;if(plg){if(!plg.drawn){plg.drawn=true;camLensR(plg.x,plg.y,plg.R,bandCore||'238,246,255',a,now);}}else camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);}   /* bintang terang klaster (non-dim): lensa pembelok cahaya di bawah inti */
     if(!PX.pcore){g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94*(CAMERA_MODE?(1+.1*(1-pHK)):1))+')';g.beginPath();g.arc(x,y,CAMERA_MODE?(Math.max(.7,r*.58)*pHK+Math.max(.9,r*.7*camZK())*(1-pHK)):Math.max(.7,r*.58),0,6.283);g.fill();}
+    if(_P)plM('co');
     if(star.interactive&&!PX.pint){
       var hotP=(hot==='pleione'),tr=TRIGGERS.pleione;
       /* Exact same compact pulse geometry as Betelgeuse/Rigel/Spica/Sirius (TRIGGER_PULSE_BASE). */
@@ -2210,6 +2234,7 @@ function drawPleiades(age,now){
         uprEnd(_upP);
       }
     }
+    if(_P)plM('in');
     /* Label VIS lewat gerbang zoom (garis OFF): klaster rapat, jadi label digeser keluar dari pusat klaster dan disambung garis putus-putus.
        Nama diambil dari star.name di data PLEIADES (Pleione otomatis). Selang-seling 2 jarak biar label tetangga nggak tumpuk. */
     var nmL=star.name||(star.interactive?'Pleione':null);
@@ -2236,10 +2261,15 @@ function drawPleiades(age,now){
       if(spL){g.font='500 8px "Space Grotesk",system-ui,sans-serif';g.fillStyle='rgba('+(bandOn?bandCol:'150,170,196')+','+(ala*.85)+')';g.fillText(spL,tx,ty+10);}
       uprEnd(_upD);
     }
+    if(_P)plM('lb');
   }
+  var _d0=_P?performance.now():0;
   PLEIADES.dim.forEach(function(st){drawOne(st,true);});
+  if(_P){_P.dm=performance.now()-_d0;_d0=performance.now();}
   PLEIADES.bright.forEach(function(st,i){st._li=i;drawOne(st,false);});
+  if(_P)_P.br=performance.now()-_d0;
   if(PLEIADES._an){PLEIADES._cx=PLEIADES._ax/PLEIADES._an;PLEIADES._cy=PLEIADES._ay/PLEIADES._an;}
+  if(_P)plPrRec(_P);
 }
 function pleiadesHitAt(px,py){
   if(!PLEIADES.ready)return null;
