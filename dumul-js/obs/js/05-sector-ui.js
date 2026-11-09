@@ -454,10 +454,11 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   var RF_T=0,RF_Q=0;   /* buka panel = __bhTuneShow + MutationObserver body.class -> refresh() 2x (paint semua slider) di frame yang sama: yg kedua digabung ke 1 rAF */
   /* [tsg] v458: gerbang refresh panel Tune. sumUI() (sumRestore + blok u>=1 sectStep) memanggil bhTuneSync=refresh walau panel TERTUTUP: refreshNow menyentuh hidden semua tab/halaman/[data-ctx|ov|sc] + paint() semua slider,
      lalu panggilan kedua diantre ke rAF berikut. Probe laypr (dump 134130, itel): layout bersih di awal blok (pre 0,2-0,6 ms) tapi kotor setelah sumRestore/sumUI (post 14,6-16,5 ms) = pelaku reflow 15-20 ms yg dulu terbaca sbg `hdr`/`hud` di sumSpot.
-     Panel tertutup -> lewati. Dua jalur buka panel (open(true) dan __bhTuneShow(true)) menambah kelas 'on' LALU memanggil refresh(), jadi isi panel tetap disegarkan saat dibuka. Panggilan pertama (init) selalu lolos. ?tsg=0 = perilaku lama (A/B). */
+     v460: probe v459 (dump 144723) = `pon` 1 di 6 dari 6 run: kelas 'on' panel Tune sudah menyala sejak init (owlTabs: setTab('tune') -> __bhTuneShow(true)) walau owl TERTUTUP, jadi gerbang v458 tidak pernah berlaku; reflow ada di `sumRestore` (mid 8,8-11,8 ms, rs 4-5 ms). Gerbang kini juga butuh body.owl-open.
+     Panel tertutup (atau owl tertutup) -> lewati. Dua jalur buka panel (open(true) dan __bhTuneShow(true)) menambah kelas 'on' LALU memanggil refresh(), jadi isi panel tetap disegarkan saat dibuka. Panggilan pertama (init) selalu lolos. ?tsg=0 = perilaku lama (A/B). */
   var TSG=!/[?&]tsg=0(&|#|$)/.test(location.search),RF_DONE=0;
   try{window.__tsg={on:TSG,skip:0,run:0};}catch(eTs){}
-  function refresh(){try{window.__tsg.pon=panel.classList.contains('on')?1:0;window.__tsg.calls=(window.__tsg.calls||0)+1;}catch(eP){}if(TSG&&RF_DONE&&!panel.classList.contains('on')){try{window.__tsg.skip++;}catch(eS){}return;}var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
+  function refresh(){try{window.__tsg.pon=panel.classList.contains('on')?1:0;window.__tsg.calls=(window.__tsg.calls||0)+1;}catch(eP){}if(TSG&&RF_DONE&&(!panel.classList.contains('on')||!document.body.classList.contains('owl-open'))){try{window.__tsg.skip++;}catch(eS){}return;}var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
   function refreshNow(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
     RF_DONE=1;try{window.__tsg.run++;}catch(eR){}
     var a=avail();
