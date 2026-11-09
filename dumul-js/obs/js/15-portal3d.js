@@ -337,23 +337,81 @@ function ptRing2D(g,Rp,now,playing){   /* cadangan tanpa WebGL: 12 busur gelap +
 }
 
 /* ---------- mulut wormhole IDLE di dalam cincin: terowongan warp mini (feedback zoom+putar, sama gaya dengan 09-wormhole.js tapi buffer 80px) ---------- */
-var PTT={ok:0,fail:0,N:80,A:null,B:null,gA:null,gB:null,spr:null,last:0,acc:0},PTT_PAL=[[70,95,255],[150,65,240],[255,75,175],[255,125,70],[90,190,255],[175,205,255],[255,255,255]];
-function pttInit(){
+var PTT={ok:0,fail:0,N:80,A:null,B:null,gA:null,gB:null,spr:null,last:0,acc:0,w:0,n:0},PTT_PAL=[[70,95,255],[150,65,240],[255,75,175],[255,125,70],[90,190,255],[175,205,255],[255,255,255]];
+/* [v51] PRE-WARM pttInit (?pttw=0 = mati = perilaku lama: init sinkron saat mulut pertama kali digambar).
+   Dump 9 Nov (18 dump, itel + Redmi): `pt.mouth` max SATU frame per run 39-72 ms di overview, rata-rata 1,4-3,1 ms. Dugaan: init malas `pttInit` (3 kanvas + 7 gradien + 26x pttStep) di draw pertama sesudah `wake`.
+   Sekarang init dipecah jadi state machine PTT.w: 0 belum | 1 kanvas+sprite jadi (pttBuild) | 2 sedang melangkah (PTT.n dari PTT_N0 pttStep) | 3 selesai (PTT.ok=1) | 4 gagal (PTT.fail=1).
+   - pttWarmSlice(budget ms): satu irisan kerja (build, atau beberapa pttStep sampai budget habis); dijalankan dari rIC (jeda PTTW.gap ms antar irisan) mulai PTTW.delay ms sesudah 'obs-entered'.
+   - pttInit() (dipanggil pttDraw / pttDrawAlt kalau PTT belum ok) = pttFin: menyelesaikan SISA langkah secara sinkron, jadi mulut yang dibangunkan sebelum warm selesai tidak pernah menunggu lebih lama dari perilaku lama.
+   - Hasil akhir identik dgn perilaku lama (26 pttStep(.04) di kanvas yang sama); yang berubah hanya KAPAN dikerjakan. Potato / reduce motion: tidak di-warm (mulut statis memakai ptMouth, tidak butuh PTT).
+   - Dump: window.__pttw (1/0) dan window.__pttwStat() = {on, w, n, ok, sl irisan, ms total kerja init, by 'idle'|'sync'|'sync-rest'|'', syncMs (waktu pttInit sinkron di draw), pre (PTT.w saat dipanggil sinkron), delay, bud}; bench: cfg.pt.ptw dan R.pttw. Tes A/B: ?autoab=none&autoabq=pttw=0&autoabn=3 (B = lama). */
+var PTT_N0=26;
+var PTTW=(function(){
+  var o={on:true,delay:1500,bud:4,gap:60,sl:0,ms:0,by:'',syncMs:0,pre:-1,skip:'',sched:0,tm:0,doneAt:0};
   try{
-    var N=PTT.N,mk=function(){var c=document.createElement('canvas');c.width=c.height=N;return c;},S=24,sp=document.createElement('canvas'),x,i,gr,col;
-    PTT.A=mk();PTT.B=mk();PTT.gA=PTT.A.getContext('2d');PTT.gB=PTT.B.getContext('2d');
-    sp.width=S;sp.height=S*PTT_PAL.length;x=sp.getContext('2d');
-    for(i=0;i<PTT_PAL.length;i++){
-      col=PTT_PAL[i];gr=x.createRadialGradient(S/2,i*S+S/2,0,S/2,i*S+S/2,S/2);
-      gr.addColorStop(0,'rgba('+col+',1)');gr.addColorStop(.3,'rgba('+col+',.5)');gr.addColorStop(1,'rgba('+col+',0)');
-      x.fillStyle=gr;x.fillRect(0,i*S,S,S);
-    }
-    PTT.spr=sp;
-    PTT.gA.fillStyle='#02050d';PTT.gA.fillRect(0,0,N,N);PTT.gB.fillStyle='#02050d';PTT.gB.fillRect(0,0,N,N);
-    PTT.ok=1;
-    for(i=0;i<26;i++)pttStep(.04);   /* isi awal: langsung "penuh" */
-  }catch(e){PTT.ok=0;PTT.fail=1;}
+    o.on=!/[?&]pttw=0(?:&|#|$)/.test(location.search);
+    var m=/[?&]pttwd=([0-9]+)/.exec(location.search);if(m)o.delay=parseInt(m[1],10);
+    m=/[?&]pttwb=([0-9]+)/.exec(location.search);if(m)o.bud=Math.max(1,parseInt(m[1],10));
+    window.__pttw=o.on?1:0;
+  }catch(e){}
+  return o;
+})();
+function pttBuild(){
+  var N=PTT.N,mk=function(){var c=document.createElement('canvas');c.width=c.height=N;return c;},S=24,sp=document.createElement('canvas'),x,i,gr,col;
+  PTT.A=mk();PTT.B=mk();PTT.gA=PTT.A.getContext('2d');PTT.gB=PTT.B.getContext('2d');
+  sp.width=S;sp.height=S*PTT_PAL.length;x=sp.getContext('2d');
+  for(i=0;i<PTT_PAL.length;i++){
+    col=PTT_PAL[i];gr=x.createRadialGradient(S/2,i*S+S/2,0,S/2,i*S+S/2,S/2);
+    gr.addColorStop(0,'rgba('+col+',1)');gr.addColorStop(.3,'rgba('+col+',.5)');gr.addColorStop(1,'rgba('+col+',0)');
+    x.fillStyle=gr;x.fillRect(0,i*S,S,S);
+  }
+  PTT.spr=sp;
+  PTT.gA.fillStyle='#02050d';PTT.gA.fillRect(0,0,N,N);PTT.gB.fillStyle='#02050d';PTT.gB.fillRect(0,0,N,N);
+  PTT.w=1;PTT.n=0;
 }
+/* satu irisan warm; true = masih ada sisa. Selalu maju minimal satu unit kerja (build, atau >= 1 langkah) */
+function pttWarmSlice(budget){
+  if(PTT.ok||PTT.fail)return false;
+  var t0=performance.now();
+  try{
+    if(PTT.w<1)pttBuild();
+    while(PTT.n<PTT_N0&&performance.now()-t0<budget){pttStep(.04);PTT.n++;}
+    if(PTT.n>=PTT_N0){PTT.ok=1;PTT.w=3;PTTW.by='idle';PTTW.doneAt=Math.round(performance.now());}
+    else PTT.w=2;
+  }catch(e){PTT.ok=0;PTT.fail=1;PTT.w=4;}
+  PTTW.ms+=performance.now()-t0;PTTW.sl++;
+  return !(PTT.ok||PTT.fail);
+}
+/* init sinkron = selesaikan sisa langkah (dipanggil pttDraw / pttDrawAlt; juga jalur ?pttw=0 = seluruh init sekaligus seperti dulu) */
+function pttInit(){
+  var t0=performance.now();
+  if(PTT.ok||PTT.fail)return;
+  PTTW.pre=PTT.w|0;
+  try{
+    if(PTT.w<1)pttBuild();
+    while(PTT.n<PTT_N0){pttStep(.04);PTT.n++;}
+    PTT.ok=1;PTT.w=3;
+  }catch(e){PTT.ok=0;PTT.fail=1;PTT.w=4;}
+  PTTW.syncMs=performance.now()-t0;PTTW.ms+=PTTW.syncMs;PTTW.by=PTTW.pre===0?'sync':'sync-rest';PTTW.doneAt=Math.round(performance.now());
+}
+function pttWarmGo(){
+  if(!PTTW.on||PTTW.sched||PTT.ok||PTT.fail)return;
+  try{if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce)){PTTW.skip='potato';return;}}catch(e){}
+  PTTW.sched=1;
+  var run=function(){
+    PTTW.tm=0;
+    if(PTT.ok||PTT.fail){PTTW.sched=0;return;}
+    if(pttWarmSlice(PTTW.bud))PTTW.tm=setTimeout(tick,PTTW.gap);else PTTW.sched=0;
+  },tick=function(){
+    PTTW.tm=0;
+    if(PTT.ok||PTT.fail){PTTW.sched=0;return;}
+    if(document.hidden){PTTW.tm=setTimeout(tick,1000);return;}   /* tab di latar: tunggu */
+    if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:600});else run();
+  };
+  PTTW.tm=setTimeout(tick,PTTW.delay);
+}
+window.__pttwStat=function(){var r=function(v){return Math.round(v*10)/10;};return{on:PTTW.on?1:0,w:PTT.w|0,n:PTT.n|0,ok:PTT.ok|0,fail:PTT.fail|0,sl:PTTW.sl,ms:r(PTTW.ms),by:PTTW.by,syncMs:r(PTTW.syncMs),pre:PTTW.pre,delay:PTTW.delay,bud:PTTW.bud,skip:PTTW.skip,doneAt:PTTW.doneAt};};
+try{if(window.__enteredAt>0)pttWarmGo();else window.addEventListener('obs-entered',pttWarmGo,{once:true});}catch(ePw){}
 function pttStep(dt){
   var N=PTT.N,c=N/2,sc=Math.exp(1.7*dt),rot=.22*dt,co=Math.cos(rot)*sc,si=Math.sin(rot)*sc,g2=PTT.gB,i,n,ang,rr,d,ci,t;
   g2.globalCompositeOperation='source-over';g2.globalAlpha=1;g2.setTransform(1,0,0,1,0,0);
