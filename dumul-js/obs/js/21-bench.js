@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29zq: dump memuat cfg.pt.ptw + R.pttw (window.__pttwStat dari 15-portal3d ?v=51: prewarm pttInit, ?pttw=0 = lama) = {on, w, n, ok, sl, ms, by, syncMs, pre, delay, bud, skip, doneAt}. v11.29zp: dump post memuat plPr (window.__plPr dari 04-render, hanya kalau ?plpr=1) = rincian ms drawPleiades per segmen (6 panggilan pertama + panggilan >= 2 ms); tanpa ?plpr=1 nilainya null. v11.29zo: ?autoabrev=1 = urutan A/B dibalik (BABABA) utk kontrol bias urutan; ringkasan mencocokkan pasangan lewat label A/B; export memuat rev + plan; tanpa param = ABABAB seperti biasa.
+/* BENCH v11.29 (?bench=1) — v11.29zr: FASE 0 plan "Static bg bake" (?skyp=1, bench-only, TANPA ubah file produksi): dump memuat skyP (R.skyP + post.skyP) = hitung PER FRAME STEADY sektor (!SECT.on, SECT.cur, !SECT.busy): (a) stack plate murni = fillRect dasar(1, dari kode) + plateDeep + plateDust[i] + bgCanvas yang benar-benar di-blit; (b) isi sectDrawSky = fillRect layar penuh + blit nebula tint + sprite 'lighter' + ms sectDrawSky; plus status bgEmpty / plateDust.length / SKY_DRIFT / NEB.DRIFT / NEB.on / NEB.base / SKYT[cur].v dan verdict otomatis sesuai ambang plan ((a)<=2 tutup A1, (a)>=4 lanjut A1). Tanpa ?skyp=1 nilainya null dan tidak ada yang dibungkus. v11.29zq: dump memuat cfg.pt.ptw + R.pttw (window.__pttwStat dari 15-portal3d ?v=51: prewarm pttInit, ?pttw=0 = lama) = {on, w, n, ok, sl, ms, by, syncMs, pre, delay, bud, skip, doneAt}. v11.29zp: dump post memuat plPr (window.__plPr dari 04-render, hanya kalau ?plpr=1) = rincian ms drawPleiades per segmen (6 panggilan pertama + panggilan >= 2 ms); tanpa ?plpr=1 nilainya null. v11.29zo: ?autoabrev=1 = urutan A/B dibalik (BABABA) utk kontrol bias urutan; ringkasan mencocokkan pasangan lewat label A/B; export memuat rev + plan; tanpa param = ABABAB seperti biasa.
     v11.29zn: dump.swarm = probe dt rAF per frame di jendela fase-in sektor (ring timestamp rAF di watcher za) + stat antrean skyWarmStars (q0 / left / sp / ms / calls; swarm jadi default ON di v455, ?swarm=0 = A) . v11.29zm: byFn juga membungkus planetBhOkFn / planetBhParkFn (geometri limb sekali per sumSpot; planetBhOk / planetBhPark tidak dipanggil lagi dari sumSpot); whMk memuat sumSpot[hdr pts hud grid] (ms). Bench-only. v11.29zl: byFn juga membungkus drawCons, drawPulses, drawStars, drawPleiades, drawTxLines, skyWarmStars (pecah cons+stars). Bench-only. v11.29zk: byFn (dump post) juga membungkus sumSpot, sumPlace, hudRects, planetBhOk, planetBhPark (05-sector-ui / 17-planet3d): total ms + jumlah panggilan masing-masing, supaya kelihatan berat di grid Math.hypot, planetBhOk, atau pembacaan layout hudRects. Bench-only. v11.29zj: byFn (dump post) juga membungkus sectSet, fxSectSync, applyObserveIcon (05-sector-ui / 06-interaction / 02-sky-logic) untuk memecah biaya sectSet ±32 ms saat masuk sektor; selisih sectSet - fxSectSync - applyObserveIcon = toggle kelas body. Bench-only. v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29zh: ?autoabboot=1 = autoab MODE BOOT (reload -> boot -> obs-entered -> diam ±12 dtk -> snapshot() full-boot, bukan __benchPost; metrik CPU pra-kapsul per run: longtask, preMs, threeQ, LoAF, frame1). Dipasangkan dgn ?autoabq=gs=0 dst.
     v11.29zg: ?autoabov=1 = autoab MODE OVERVIEW (tanpa masuk sektor; rekam ov saja, metrik fps/dt/teleTop/pt.copy/sc.sub per run) + ?autoabq=a=1,b=2 (param tambahan khusus sisi B; ?autoab=none = tanpa ?off=). Tanpa ?autoab tidak mengubah apa pun.
@@ -761,6 +761,7 @@
     try { R.sc = typeof scDumpObj === 'function' ? scDumpObj() : null; } catch (eSc) { R.sc = null; }   /* starcache (04-render.js): ?starcache=1 */
     try { R.cfg = cfgOut(); } catch (eCf) { R.cfg = null; }
     try { R.pttw = typeof window.__pttwStat === 'function' ? window.__pttwStat() : null; } catch (ePw) { R.pttw = null; }
+    try { R.skyP = skpOut(); } catch (eSkP) { R.skyP = null; }   /* v11.29zr: Fase 0 plan bg bake (?skyp=1) */
     R.gs = window.__gs != null ? window.__gs : null; try { R.glG = typeof window.__glG === 'function' ? window.__glG() : null; } catch (eG) { R.glG = null; }   /* v11.13: renderer GL dibagi (12-ast3d v22): ?gs=0 mati; glG = ukuran kanvas + unit per grup */
     R.ua = navigator.userAgent; R.potato = typeof IS_POTATO !== 'undefined' ? IS_POTATO : null; R.reduce = typeof reduce !== 'undefined' ? reduce : null;
 
@@ -1482,7 +1483,86 @@ var DK_CSS =
     var f = typeof FS !== 'undefined' ? FS : null;
     return f ? { slow: f.slow, heavy: f.heavy, ema: Math.round(f.ema * 10) / 10, js: f.js == null ? null : Math.round(f.js * 10) / 10, wait: f.wait == null ? null : Math.round(f.wait * 10) / 10, wlog: f.wlog || null, '_wlog_cols': '[abs ms, wait ms (ema dt - ema js), js ms, ema dt ms] tiap ~2 dtk', mode: f.mode, why: f.why, hlog: f.hlog, '_hlog_cols': '[abs ms, 1=heavy ON/0=OFF, ema]' } : null;
   }
-  document.addEventListener('DOMContentLoaded', function () { PB_FN.forEach(pbWrap); pmInstall(); });
+  /* v11.29zr: FASE 0 plan "Static bg bake" (?skyp=1). Murni pengukur: plateBlit + sectDrawSky dibungkus, g.fillRect/g.drawImage dipasang HANYA selama sectDrawSky jalan (dilepas lagi di finally). Hitung hanya frame steady sektor (!SECT.on && SECT.cur && !SECT.busy); frame lain masuk ns. */
+  var SKP = { on: /[?&]skyp=1(&|$)/.test(location.search), fr: 0, ns: 0, sec: {}, blit: { deep: 0, dust: 0, bg: 0, grid: 0, neb: 0, other: 0 }, blitMs: { deep: 0, dust: 0, bg: 0, grid: 0, neb: 0, other: 0 }, sds: { ms: 0, max: 0, fillF: 0, fillA: 0, img: 0 }, inSDS: false, wrapped: false, st0: null };
+  function skpSteady() { try { return !SECT.on && !!SECT.cur && !SECT.busy; } catch (e) { return false; } }
+  function skpKind(c) {
+    try {
+      if (SKP.inSDS) return 'neb';
+      if (typeof plateDeep !== 'undefined' && c === plateDeep) return 'deep';
+      if (typeof bgCanvas !== 'undefined' && c === bgCanvas) return 'bg';
+      if (typeof gridCanvas !== 'undefined' && c === gridCanvas) return 'grid';
+      if (typeof plateDust !== 'undefined') for (var i = 0; i < plateDust.length; i++) if (plateDust[i] && plateDust[i].c === c) return 'dust';
+    } catch (e) {}
+    return 'other';
+  }
+  function skpInstall() {
+    if (!SKP.on || SKP.wrapped) return;
+    try {
+      var oBlit = window.plateBlit, oSky = window.sectDrawSky;
+      if (typeof oBlit !== 'function' || typeof oSky !== 'function') { SKP.err = 'fn hilang: ' + (typeof oBlit) + '/' + (typeof oSky); return; }
+      var hasFR = Object.prototype.hasOwnProperty.call(g, 'fillRect'), hasDI = Object.prototype.hasOwnProperty.call(g, 'drawImage');
+      var sFR = hasFR ? g.fillRect : null, sDI = hasDI ? g.drawImage : null;
+      var pFR = g.fillRect, pDI = g.drawImage;   /* metode efektif saat ini (milik instance atau prototipe) */
+      var tFR = function (x, y, w, h) { if (w >= W * .9 && h >= H * .9) SKP.sds.fillF++; SKP.sds.fillA++; return pFR.apply(this, arguments); };
+      var tDI = function () { SKP.sds.img++; return pDI.apply(this, arguments); };
+      window.plateBlit = function (c) {
+        if (!skpSteady()) return oBlit.apply(this, arguments);
+        var k = skpKind(c), t = performance.now();
+        try { return oBlit.apply(this, arguments); }
+        finally { SKP.blit[k]++; SKP.blitMs[k] += performance.now() - t; }
+      };
+      window.sectDrawSky = function () {
+        if (!skpSteady()) { SKP.ns++; return oSky.apply(this, arguments); }
+        var t = performance.now(), k = '?';
+        try { k = SECT.cur.k || SECT.cur.name || '?'; } catch (e) {}
+        if (!SKP.st0) { try { SKP.st0 = skpStatic(); } catch (e2) {} }
+        SKP.inSDS = true; g.fillRect = tFR; g.drawImage = tDI;
+        try { return oSky.apply(this, arguments); }
+        finally {
+          SKP.inSDS = false;
+          if (hasFR) g.fillRect = sFR; else delete g.fillRect;
+          if (hasDI) g.drawImage = sDI; else delete g.drawImage;
+          var d = performance.now() - t;
+          SKP.fr++; SKP.sds.ms += d; if (d > SKP.sds.max) SKP.sds.max = d; SKP.sec[k] = (SKP.sec[k] || 0) + 1;
+        }
+      };
+      SKP.wrapped = true;
+    } catch (eSk) { SKP.err = String(eSk && eSk.message || eSk); }
+  }
+  function skpStatic() {
+    var o = {}, cur = null;
+    try { cur = SECT.cur && (SECT.cur.k || SECT.cur.name) || null; } catch (e) {}
+    o.sector = cur;
+    try { o.bgEmpty = !!bgEmpty; } catch (e1) {}
+    try { o.plateDust = plateDust.length; } catch (e2) {}
+    try { o.SKY_DRIFT = SKY_DRIFT; } catch (e3) {}
+    try { o.NEB = { on: !!NEB.on, DRIFT: NEB.DRIFT, base: !!NEB.base, ZF: NEB.ZF, A_SEC: NEB.A_SEC }; } catch (e4) {}
+    try { o.SKYTv = cur && SKYT[cur] ? SKYT[cur].v : null; } catch (e5) {}
+    try { o.reduce = !!reduce; o.potato = !!IS_POTATO; o.camera = !!CAMERA_MODE; o.skyZoom = skyZoom; o.rot = STG.rot; } catch (e6) {}
+    try { o.W = W; o.H = H; o.DPR = DPR; o.plateM = plateM; o.plateDPR = plateDPR; o.plateDeepWH = plateDeep ? [plateDeep.width, plateDeep.height] : null; o.bgCanvasWH = (bgCanvas && !bgEmpty) ? [bgCanvas.width, bgCanvas.height] : null; } catch (e7) {}
+    return o;
+  }
+  function skpOut() {
+    if (!SKP.on) return null;
+    var r2 = function (x) { return Math.round(x * 100) / 100; }, f = SKP.fr, o = { on: true, wrapped: SKP.wrapped, err: SKP.err || null, frames: f, nonSteadyCalls: SKP.ns, sectors: SKP.sec };
+    try { o.st = skpStatic(); o.st0 = SKP.st0; } catch (e) {}
+    if (!f) { o.verdict = 'data kurang: belum ada frame steady sektor (masuk sektor, diam ±20 dtk, lalu dump)'; return o; }
+    var B = SKP.blit, M = SKP.blitMs, S = SKP.sds, k, pf = {}, pm = {};
+    for (k in B) { pf[k] = r2(B[k] / f); pm[k] = r2(M[k] / f); }
+    var aBlit = (B.deep + B.dust + B.bg) / f, a = 1 + aBlit;   /* 1 = fillRect dasar #050b12 (dari kode: selalu di blok sky) */
+    var sprN = Math.max(0, S.img - B.neb) / f, bOps = S.fillF / f + B.neb / f + sprN;
+    o.perFrame = pf; o.blitMsPerFrame = pm;
+    o.a = { fill: 1, plateBlit: r2(aBlit), total: r2(a), '_note': 'a = fillRect dasar (1, dari kode) + plateDeep + plateDust[i] + bgCanvas yang benar2 di-blit per frame steady' };
+    o.b = { fillFull: r2(S.fillF / f), fillAny: r2(S.fillA / f), nebBlit: r2(B.neb / f), sprite: r2(sprN), fullScreenOps: r2(bOps), ms: r2(S.ms / f), maxMs: r2(S.max), '_note': 'b = isi sectDrawSky; ms = waktu CPU sisi JS (bukan GPU) per panggilan; bandingkan dgn pmk segmen sky di dump yang sama' };
+    if (f < 120) o.verdict = 'data kurang (' + f + ' frame steady < 120): tunggu lebih lama di sektor';
+    else if (a <= 2) o.verdict = 'TUTUP A1 (a=' + r2(a) + ' <= 2): stack plate sudah 1 blit + fill. Catat di log: gabung pass plate ditutup';
+    else if (a >= 4) o.verdict = 'LANJUT A1 (a=' + r2(a) + ' >= 4)';
+    else o.verdict = 'abu-abu (a=' + r2(a) + ', antara 2 dan 4): cek apakah b besar -> hanya A2';
+    if (f >= 120 && a < 4 && bOps >= 3) o.verdict += ' | b besar (' + r2(bOps) + ' op layar penuh) sedangkan a kecil: bukan kerja A1, hanya A2 (eksperimen terpisah) atau tutup';
+    return o;
+  }
+  document.addEventListener('DOMContentLoaded', function () { PB_FN.forEach(pbWrap); pmInstall(); skpInstall(); });
   function pbSnapshot() {
     var tc = R.t.capsule, te = R.t.entered, tb = tc != null ? tc : (te != null ? te : 0), end = PB.tEnd != null ? PB.tEnd : Infinity;
     var inW = function (t) { return t >= tb && t <= end; };
@@ -1522,6 +1602,7 @@ var DK_CSS =
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
       pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), whStats: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; } catch (eWs) { return null; } })(), whCfg: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWc) { return null; } })(), whMk: (typeof window.__whMk === 'string') ? window.__whMk : null, whMkH: window.__whMkH || null, '_whMkH_cols': 'abs ms (performance.now, sama basis dgn pmk.worst / byFn), rincian: warm(max/langkah) N | restore+ui N | sectSet N | focus N | panHits N | lisArrive N (ms)', nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
+      skyP: (function () { try { return skpOut(); } catch (eSkO) { return null; } })(), '_skyP_cols': 'v11.29zr: Fase 0 plan bg bake (?skyp=1): a = stack plate murni per frame steady, b = isi sectDrawSky, verdict otomatis; null tanpa ?skyp=1',
       swarm: (function () { try { return swOut(); } catch (eSwO) { return null; } })(), '_swarm_cols': 'v11.29zn: probe dt rAF per frame di jendela fase-in sektor + stat antrean skyWarmStars; lihat swOut',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
