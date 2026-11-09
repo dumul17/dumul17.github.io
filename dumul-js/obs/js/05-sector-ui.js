@@ -450,8 +450,14 @@ var IL_COL=[null,'255,214,102','255,154,217'];   /* warna per LEVEL: dipakai gar
   function mwOn(){return typeof mwReady==='function'&&mwReady();}   /* overview memakai Milky Way (bukan nebula lama) */
   function avail(){var c=body.classList,ov=c.contains('sect-ov'),sc=c.contains('sect-in'),any=ov||sc;return{bh:sc,sky:(ov&&(NEB.on||mwOn()))||(sc&&NEB.on),ast:any,tele:any,pl:any&&t3('pl'),dr:sc&&t3('dr'),pt:ov&&t3('pt')};}   /* Drone: cuma di sektor (di overview drone tidak bisa di-drop). Portal: cuma overview (di sektor portal sudah pensiun, drone jadi pusatnya) */   /* Langit: overview (kabut/nebula/vinyet/halo portal) + di dalam sektor (setelan langit sektor) */
   var RF_T=0,RF_Q=0;   /* buka panel = __bhTuneShow + MutationObserver body.class -> refresh() 2x (paint semua slider) di frame yang sama: yg kedua digabung ke 1 rAF */
-  function refresh(){var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
+  /* [tsg] v458: gerbang refresh panel Tune. sumUI() (sumRestore + blok u>=1 sectStep) memanggil bhTuneSync=refresh walau panel TERTUTUP: refreshNow menyentuh hidden semua tab/halaman/[data-ctx|ov|sc] + paint() semua slider,
+     lalu panggilan kedua diantre ke rAF berikut. Probe laypr (dump 134130, itel): layout bersih di awal blok (pre 0,2-0,6 ms) tapi kotor setelah sumRestore/sumUI (post 14,6-16,5 ms) = pelaku reflow 15-20 ms yg dulu terbaca sbg `hdr`/`hud` di sumSpot.
+     Panel tertutup -> lewati. Dua jalur buka panel (open(true) dan __bhTuneShow(true)) menambah kelas 'on' LALU memanggil refresh(), jadi isi panel tetap disegarkan saat dibuka. Panggilan pertama (init) selalu lolos. ?tsg=0 = perilaku lama (A/B). */
+  var TSG=!/[?&]tsg=0(&|#|$)/.test(location.search),RF_DONE=0;
+  try{window.__tsg={on:TSG,skip:0,run:0};}catch(eTs){}
+  function refresh(){if(TSG&&RF_DONE&&!panel.classList.contains('on')){try{window.__tsg.skip++;}catch(eS){}return;}var n=performance.now();if(n-RF_T>80){RF_T=n;refreshNow();return;}if(RF_Q)return;RF_Q=1;requestAnimationFrame(function(){RF_Q=0;RF_T=performance.now();refreshNow();});}
   function refreshNow(){   /* tab yang tersedia tergantung konteks: Gargantua = BH sedang tampil, Langit = overview */
+    RF_DONE=1;try{window.__tsg.run++;}catch(eR){}
     var a=avail();
     tabs.forEach(function(tb){tb.hidden=!a[tb.getAttribute('data-tab')];});
     if(!a[cur])cur=a.bh?'bh':(a.sky?'sky':(a.ast?'ast':(a.tele?'tele':cur)));
