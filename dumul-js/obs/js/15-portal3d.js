@@ -74,6 +74,7 @@ try{
   PT3D_CFG.ovLift=/[?&]ptlift=0(&|#|$)/.test(location.search)?0:1;   /* v435 A/B: ?ptlift=0 = tanpa angkat portal dari limb saat charge dive (perilaku lama: portal loncat ke depan planet saat cincin pindah ke kanvas wormhole) */
   var _ob=/[?&]ovaltboot=([0-9]+)/.exec(location.search);if(_ob)PT3D_CFG.ovAltBoot=parseInt(_ob[1],10);
   var _oa=/[?&]ovalt=([0-9]+)/.exec(location.search);if(_oa)PT3D_CFG.ovAlt=parseInt(_oa[1],10);   /* A/B: ?ovalt=0 = perilaku lama (alt hanya FS.slow/heavy), ?ovalt=3 = periode 3 */
+  PT3D_CFG.ptcc=/[?&]ptcc=0(&|#|$)/.test(location.search)?0:1;   /* [v53] A/B: ?ptcc=0 = perilaku lama (salinan 2D ganda `cc` selalu dibuat di jalur alt). Default 1: grup GL dibagi -> frame reuse menggambar PT3D.gl.sn langsung, tanpa cc */
 }catch(ePT0){}
 var PT_IN=PT3D_CFG.inR-.015;   /* rasio radius mulut terhadap Rp (dulu hard-code .745); dipakai juga 09-wormhole.js */
 var PT3D={state:0,/* 0 belum, 1 memuat, 2 siap, 3 gagal/nonaktif */r:null,sc:null,cam:null,grp:null,mats:[],glow:[],tex:null,res:0,err:'',lastCol:'',cr:.21,cg:.95,cb:1,xr:.63,xg:.47,xb:1,lv:[],lastNow:-1,bolts:[],nb:0,lastBolt:0,nextIdle:0,prevBeat:0,mn:null,cf:null,fl:null,lastBT:0,lastBS:0,lastTk:0,rim:0,spkT:-1e9,pt:null,df:null,avgF:0,lastHit:0,lastSpk:0,sparks:[],cl:[],cOn:[],cFull:0,cTt:0,cB:0,cS:0,rz:0,big:0,tilt:null,lastTilt:-1,ovX:null,ovY:null,ovHid:0,orb:null,orbPhi:null,orbLast:0,orbInSect:0,cc:null,ccOK:0,ccRes:0,ccT:0};
@@ -291,7 +292,7 @@ function pt3dRender(now,Rp,playing,tk){
   threeGLBegin(PT3D.gl);
   r.render(PT3D.sc,PT3D.cam);
   if(window.__gpuP)glProbe(PT3D.gl,'pt.sub','pt.gpu');   /* [v37] probe GPU (?bench=1&gpup=1) */
-  threeGLSnap(PT3D.gl);   /* dibagi: salinan 2D milik cincin; frame yang sama bisa menggambar ulang tanpa render */
+  threeGLSnap(PT3D.gl);PT3D.snN=(PT3D.snN|0)+1;   /* [v53] snN = nomor render; dipakai jalur alt utk memastikan sn masih milik render yg sama. dibagi: salinan 2D milik cincin; frame yang sama bisa menggambar ulang tanpa render */
 }
 function pt3dUsable(){
   if(PT3D.state===0){pt3dLoad();return false;}
@@ -779,19 +780,26 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       /* selang-seling (FS.slow): genap = render GL + salin ke cache 2D, ganjil = pakai cache. preserveDrawingBuffer=false jadi kanvas GL tidak bisa dipakai ulang di frame berikut. */
       var want=pt3dRes(Rp);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
       var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!opts.noMouth&&!opts.big&&!(ch>0))||!!opts.alt2;   /* alt2 (v11, dari 09 via ?whdbg=ringalt): selang-seling GL dgn paritas sendiri */
-      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?(opts.ov?(((typeof FS!=='undefined'?FS.n|0:0)%(opts.alt2>1?opts.alt2:2))!==0):   /* fase dari FS.n (bukan counter sendiri): gantian pasti dgn teleskop (render di FS.n ganjil) */((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0)):(FS.n&1)===1)   /* opts.ov (overview) = counter oN sendiri, terpisah dari wN milik zoom wormhole (09) */   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&PT3D.cc;
+      var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(opts.alt2?(opts.ov?(((typeof FS!=='undefined'?FS.n|0:0)%(opts.alt2>1?opts.alt2:2))!==0):   /* fase dari FS.n (bukan counter sendiri): gantian pasti dgn teleskop (render di FS.n ganjil) */((PT3D.wN=(PT3D.wN||0)+1)%(opts.alt2>1?opts.alt2:2)!==0)):(FS.n&1)===1)   /* opts.ov (overview) = counter oN sendiri, terpisah dari wN milik zoom wormhole (09) */   /* v14: alt2 = periode (2 = GL tiap 2 frame, 3 = tiap 3) */&&now-PT3D.ccT<(opts.alt2?900:140)&&(PT3D.ccSn?(PT3D.ccSnN===PT3D.snN&&threeGLSrc(PT3D.gl)===PT3D.gl.sn):PT3D.cc);
       if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
         PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rp,playing,tk);pmk('pt.gl');
         if(alt){
-          var cc=PT3D.cc||(PT3D.cc=document.createElement('canvas')),rs=PT3D.res;
-          if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}
-          var cx2=cc.getContext('2d');cx2.globalCompositeOperation='copy';cx2.drawImage(threeGLSrc(PT3D.gl),0,0,rs,rs);cx2.globalCompositeOperation='source-over';
+          var rs=PT3D.res;
+          /* [v53] grup GL dibagi: threeGLSrc = PT3D.gl.sn (kanvas 2D milik cincin, ditulis HANYA oleh pt3dRender) -> sudah salinan 2D berisi render terakhir; `cc` cuma menduplikasinya. Lewati salinan, frame reuse menggambar sn langsung (piksel identik). Tidak dibagi (sumber = kanvas GL, preserveDrawingBuffer=false) -> jalur lama. */
+          if(PT3D_CFG.ptcc&&PT3D.gl.sn&&threeGLSrc(PT3D.gl)===PT3D.gl.sn){PT3D.ccSn=1;PT3D.ccSnN=PT3D.snN;}
+          else{
+            PT3D.ccSn=0;
+            var cc=PT3D.cc||(PT3D.cc=document.createElement('canvas'));
+            if(cc.width!==rs||cc.height!==rs){cc.width=rs;cc.height=rs;}
+            var cx2=cc.getContext('2d');cx2.globalCompositeOperation='copy';cx2.drawImage(threeGLSrc(PT3D.gl),0,0,rs,rs);cx2.globalCompositeOperation='source-over';
+          }
           PT3D.ccOK=1;PT3D.ccRes=rs;PT3D.ccT=now;pmk('pt.copy');
         }else PT3D.ccOK=0;
       }
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality=opts.lq?'low':'high';   /* v11: opts.lq (wormhole zoom): tekstur 256px di-upscale sampai layar penuh; filter 'high' mahal di GPU sesuai area -> 'low' */
-      if(!(window.__offB&&window.__offB.pt))g.drawImage((reuse||(opts.alt2&&PT3D.ccOK&&PT3D.cc))?PT3D.cc:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);pmk('pt.blit');   /* ?off=ptb (21-bench) */
+      var _cs=PT3D.ccSn?((PT3D.ccSnN===PT3D.snN&&threeGLSrc(PT3D.gl)===PT3D.gl.sn)?PT3D.gl.sn:null):PT3D.cc;   /* [v53] sumber cache: sn (dibagi) atau cc */
+      if(!(window.__offB&&window.__offB.pt))g.drawImage(((reuse||(opts.alt2&&PT3D.ccOK))&&_cs)?_cs:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);pmk('pt.blit');   /* ?off=ptb (21-bench) */
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
