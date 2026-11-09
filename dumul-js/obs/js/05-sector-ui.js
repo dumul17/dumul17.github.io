@@ -29,16 +29,37 @@ function sectApply(s,u){
 var _warmCv=null;
 /* v12b: dicicil 1 plate per frame (bukan sekaligus) dan TANPA getImageData (itu membekukan main thread menunggu GPU). Kanvas 1x1 dipasang di DOM (hampir transparan)
    supaya compositor mengeksekusi gambarnya async di frame berjalan. Dipanggil tiap frame fase masuk mulai u>=.3; waktu main-thread terbesar per langkah -> 'warm N' di panel. */
-var SWARM={on:/[?&]swarm=1(&|#|$)/.test(location.search),q:null,key:''};   /* [swarm] A/B: ?swarm=1 = bikin sprite halo bintang (getStarSprite, ±1 ms per warna) sektor tujuan saat terowongan masih menutup layar, bukan di frame pertama sektor (cons+stars) */
+var SWARM={on:!/[?&]swarm=0(&|#|$)/.test(location.search),bud:3,q:null,key:'',v:[],cur:null};   /* [swarm] v455: DEFAULT ON (?swarm=0 = perilaku lama, buat A/B). Bikin sprite halo bintang (getStarSprite, ±1 ms per warna) sektor tujuan saat terowongan masih menutup layar (fase-in u .25-.95), bukan di frame pertama sektor (cons+stars). Antrean berbasis anggaran waktu (bud ms per panggilan, minimal 1 sprite; ?swbud=N untuk A/B) dan warna Pleiades di DEPAN. */
+try{var _swb=/[?&]swbud=(\d+(?:\.\d+)?)(&|#|$)/.exec(location.search);if(_swb&&+_swb[1]>=.5&&+_swb[1]<=20)SWARM.bud=+_swb[1];}catch(eSwB){}
+try{window.__swarm=SWARM;}catch(eSwW){}   /* dibaca 21-bench (swOut): jendela fase-in per kunjungan + panggilan skyWarmStars */
+var SWARM_PL=['145,170,255','110,145,205','190,218,255'];   /* Pleiades (drawPleiades) pakai 3 warna tetap, bukan s.rgb */
+function swMark(s,u){   /* catat jendela fase-in (u .25-.95) per kunjungan, di A (swarm=0) DAN B, supaya probe dt rAF bisa membandingkan jendela yang sama */
+  try{
+    var t=performance.now(),v=SWARM.cur,uu=+u.toFixed(2);
+    if(!v||v.k!==s.k||t-v.t1>2500){
+      v={k:s.k,t0:t,t1:t,u0:uu,u1:uu,q0:null,left:null,n:0,sp:0,ms:0,mx:0,calls:[]};
+      SWARM.cur=v;SWARM.v.push(v);if(SWARM.v.length>6)SWARM.v.shift();
+    }
+    v.t1=t;v.u1=uu;
+  }catch(eMk){}
+}
 function skyWarmStars(s){
   try{
+    var t=performance.now(),v=SWARM.cur,c=0,d;
     if(!SWARM.q||SWARM.key!==s.k){
-      var seen=Object.create(null),L=[];
-      CONS.forEach(function(cc){var k,c;if(s.ids.indexOf(cc.id)<0)return;for(k in cc.stars){c=cc.stars[k].rgb;if(c&&!seen[c]&&!STAR_SPRITE_CACHE[c]){seen[c]=1;L.push(c);}}});
-      if(s.ids.indexOf('pleiades')>=0)['145,170,255','110,145,205','190,218,255'].forEach(function(c){if(!seen[c]&&!STAR_SPRITE_CACHE[c]){seen[c]=1;L.push(c);}});   /* Pleiades (drawPleiades) pakai 3 warna tetap, bukan s.rgb */
+      var seen=Object.create(null),L=[],add=function(col){if(col&&!seen[col]&&!STAR_SPRITE_CACHE[col]){seen[col]=1;L.push(col);}};
+      if(s.ids.indexOf('pleiades')>=0)SWARM_PL.forEach(add);   /* v455: Pleiades di DEPAN antrean (v454: di ekor, 2 warna masih miss sesudah drawPleiades mulai) */
+      CONS.forEach(function(cc){var k;if(s.ids.indexOf(cc.id)<0)return;for(k in cc.stars)add(cc.stars[k].rgb);});
       SWARM.q=L;SWARM.key=s.k;
     }
-    var n=2;while(n-->0&&SWARM.q.length)getStarSprite(SWARM.q.shift());
+    if(v&&v.q0==null)v.q0=SWARM.q.length;
+    if(SWARM.q.length){
+      do{getStarSprite(SWARM.q.shift());c++;}while(SWARM.q.length&&performance.now()-t<SWARM.bud);   /* anggaran waktu, bukan 2 sprite tetap */
+    }
+    if(v){
+      v.left=SWARM.q.length;
+      if(c){d=performance.now()-t;v.n++;v.sp+=c;v.ms+=d;if(d>v.mx)v.mx=d;if(v.calls.length<24)v.calls.push([Math.round(t),+d.toFixed(1),c,SWARM.q.length]);}
+    }
   }catch(eSw){SWARM.q=[];}
 }
 function skyWarmStep(){
@@ -256,7 +277,7 @@ function sectStep(now){
   if(SECT.phase==='in'){
     sectApply(s,sectEase(u));
     if(u>=.3&&u<.95&&(SECT.warmQ==null||SECT.warmQ.length))skyWarmStep();
-    if(SWARM.on&&u>=.25&&u<.95)skyWarmStars(s);
+    if(u>=.25&&u<.95){swMark(s,u);if(SWARM.on)skyWarmStars(s);}   /* swMark selalu (A/B); skyWarmStars hanya kalau swarm aktif */
     if(u>=1){
       /* whperf: pecah biaya blok akhir phase-in (tunnel@~3.6s) — window.__whMk dibaca 09-wormhole panel */
       var _mk=[],_t=performance.now(),_m=function(n){var t=performance.now();_mk.push(n+' '+(t-_t).toFixed(0));_t=t;};

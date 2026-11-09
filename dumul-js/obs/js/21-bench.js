@@ -1,5 +1,5 @@
 'use strict';
-/* BENCH v11.29 (?bench=1) — v11.29zm: byFn juga membungkus planetBhOkFn / planetBhParkFn (geometri limb sekali per sumSpot; planetBhOk / planetBhPark tidak dipanggil lagi dari sumSpot); whMk memuat sumSpot[hdr pts hud grid] (ms). Bench-only. v11.29zl: byFn juga membungkus drawCons, drawPulses, drawStars, drawPleiades, drawTxLines, skyWarmStars (pecah cons+stars). Bench-only. v11.29zk: byFn (dump post) juga membungkus sumSpot, sumPlace, hudRects, planetBhOk, planetBhPark (05-sector-ui / 17-planet3d): total ms + jumlah panggilan masing-masing, supaya kelihatan berat di grid Math.hypot, planetBhOk, atau pembacaan layout hudRects. Bench-only. v11.29zj: byFn (dump post) juga membungkus sectSet, fxSectSync, applyObserveIcon (05-sector-ui / 06-interaction / 02-sky-logic) untuk memecah biaya sectSet ±32 ms saat masuk sektor; selisih sectSet - fxSectSync - applyObserveIcon = toggle kelas body. Bench-only. v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
+/* BENCH v11.29 (?bench=1) — v11.29zn: dump.swarm = probe dt rAF per frame di jendela fase-in sektor (ring timestamp rAF di watcher za) + stat antrean skyWarmStars (q0 / left / sp / ms / calls; swarm jadi default ON di v455, ?swarm=0 = A) . v11.29zm: byFn juga membungkus planetBhOkFn / planetBhParkFn (geometri limb sekali per sumSpot; planetBhOk / planetBhPark tidak dipanggil lagi dari sumSpot); whMk memuat sumSpot[hdr pts hud grid] (ms). Bench-only. v11.29zl: byFn juga membungkus drawCons, drawPulses, drawStars, drawPleiades, drawTxLines, skyWarmStars (pecah cons+stars). Bench-only. v11.29zk: byFn (dump post) juga membungkus sumSpot, sumPlace, hudRects, planetBhOk, planetBhPark (05-sector-ui / 17-planet3d): total ms + jumlah panggilan masing-masing, supaya kelihatan berat di grid Math.hypot, planetBhOk, atau pembacaan layout hudRects. Bench-only. v11.29zj: byFn (dump post) juga membungkus sectSet, fxSectSync, applyObserveIcon (05-sector-ui / 06-interaction / 02-sky-logic) untuk memecah biaya sectSet ±32 ms saat masuk sektor; selisih sectSet - fxSectSync - applyObserveIcon = toggle kelas body. Bench-only. v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29zh: ?autoabboot=1 = autoab MODE BOOT (reload -> boot -> obs-entered -> diam ±12 dtk -> snapshot() full-boot, bukan __benchPost; metrik CPU pra-kapsul per run: longtask, preMs, threeQ, LoAF, frame1). Dipasangkan dgn ?autoabq=gs=0 dst.
     v11.29zg: ?autoabov=1 = autoab MODE OVERVIEW (tanpa masuk sektor; rekam ov saja, metrik fps/dt/teleTop/pt.copy/sc.sub per run) + ?autoabq=a=1,b=2 (param tambahan khusus sisi B; ?autoab=none = tanpa ?off=). Tanpa ?autoab tidak mengubah apa pun.
     v11.29y: UI saja dirapikan (kit 'dk-*' sama dengan 19-auto-debug v27; chip 'bench', grup dump/post, kotak fase kiri-bawah); isi dump tidak berubah.
@@ -1127,15 +1127,15 @@
      gpuSum, dan RATA-RATA ms per frame tiap segmen pmk. Dengan ?gpup=1 segmen .gpu per modul (pl/sc/as/dr/pt) + q.big/q.small ikut terekam per detik (gpuSum = jumlahnya);
      tanpa gpup cuma segmen CPU + wait (tidak mengubah perilaku). hump = ringkasan otomatis: 3 detik dengan dt terbesar (puncak) vs 3 detik terakhir jendela (late), segmen urut (puncak - late). */
   /* ===== v11.29za: watcher rAF independen. Bin 250 ms sejak start (2400 bin = 600 dtk): ra = jumlah callback rAF, rg = gap rAF terbesar (ms), mc = jumlah frame utama (pmEnd). */
-  var RB = { on: 0, t0: 0, bin: 250, n: 2400, ra: null, rg: null, mc: null, last: 0 };
+  var RB = { on: 0, t0: 0, bin: 250, n: 2400, ra: null, rg: null, mc: null, last: 0, fr: null, fn: 0, fc: 4096 };   /* v11.29zn: fr = ring timestamp (performance.now) tiap callback rAF, fc frame terakhir; dipakai swOut */
   function rbStart() {
     if (RB.on || RB.ra) return;
     RB.on = 1; RB.t0 = performance.now(); RB.last = RB.t0;
-    RB.ra = new Uint16Array(RB.n); RB.rg = new Uint16Array(RB.n); RB.mc = new Uint16Array(RB.n);
+    RB.ra = new Uint16Array(RB.n); RB.rg = new Uint16Array(RB.n); RB.mc = new Uint16Array(RB.n); RB.fr = new Float64Array(RB.fc); RB.fn = 0;
     (function L() {
       var t = performance.now(), i = Math.floor((t - RB.t0) / RB.bin), g;
       if (i >= RB.n) { RB.on = 0; return; }
-      RB.ra[i]++; g = Math.min(65535, Math.round(t - RB.last)); if (g > RB.rg[i]) RB.rg[i] = g; RB.last = t;
+      RB.fr[RB.fn % RB.fc] = t; RB.fn++; RB.ra[i]++; g = Math.min(65535, Math.round(t - RB.last)); if (g > RB.rg[i]) RB.rg[i] = g; RB.last = t;
       requestAnimationFrame(L);
     })();
   }
@@ -1152,6 +1152,42 @@
       return { ra: ra, mc: mc, raFps: Math.round(ra / sec * 10) / 10, mcFps: Math.round(mc / sec * 10) / 10, raGapMax: mg };
     };
     return { _cols: 'bin ms; from = offset ms bin pertama relatif t0 (secP.t0); ra = callback rAF per bin; rg = gap rAF terbesar (ms) per bin; mc = frame utama (pmEnd) per bin; sum = ringkasan per rentang relatif t0 (ms)', bin: RB.bin, from: Math.round(RB.t0 + b0 * RB.bin - t0), ra: sl(RB.ra), rg: sl(RB.rg), mc: sl(RB.mc), sum: { pre: sum(-4000, 0), s0_4: sum(0, 4000), s4_8: sum(4000, 8000), s9_14: sum(9000, 14000) } };
+  }
+  /* ===== v11.29zn: probe dt rAF per frame di jendela fase-in sektor (u .25-.95, saat skyWarmStars jalan) per kunjungan. Sumber: window.__swarm (05-sector-ui: swMark di A dan B, panggilan skyWarmStars hanya kalau swarm aktif) + ring RB.fr.
+     Keluaran per kunjungan: q0 = panjang antrean awal, left = sisa antrean di panggilan terakhir (>0 = ada warna yang tidak sempat dipanasi di terowongan), n/sp/ms/mx = panggilan / sprite / total ms / ms terbesar,
+     calls = [abs ms, ms, sprite, sisa antrean], w = ringkasan gap rAF di [t0, t1] (jendela fase-in), pre = gap rAF 1,5 dtk sebelum t0 (pembanding lokal),
+     cg = per panggilan [offset ms dari t0, ms panggilan, gap rAF yang mencakup panggilan, gap sesudahnya], fr = [offset ms dari t0, gap rAF] frame di [t0-300, t1+300]. */
+  function swOut() {
+    var S = window.__swarm; if (!S || !S.v || !S.v.length) return null;
+    var r1 = function (x) { return Math.round(x * 10) / 10; };
+    var n = RB.fr ? Math.min(RB.fn, RB.fc) : 0, st = (RB.fr && RB.fn > RB.fc) ? RB.fn % RB.fc : 0, T = [], i;
+    for (i = 0; i < n; i++) T.push(RB.fr[(st + i) % RB.fc]);
+    var sumG = function (G) {
+      if (!G.length) return null;
+      var so = G.slice().sort(function (a, b) { return a - b; }), m = 0, a33 = 0, a50 = 0, k;
+      for (k = 0; k < G.length; k++) { m += G[k]; if (G[k] > 33.5) a33++; if (G[k] > 50) a50++; }
+      return { n: G.length, mean: r1(m / G.length), med: r1(so[Math.floor(so.length / 2)]), p95: r1(so[Math.min(so.length - 1, Math.floor(so.length * .95))]), max: r1(so[so.length - 1]), o335: a33, o50: a50 };
+    };
+    var out = { _cols: 'on = swarm aktif (1) / ?swarm=0 (0); bud = anggaran ms per panggilan; rb = jumlah frame di ring; v = kunjungan (maks 6): lihat komentar v11.29zn di 21-bench', on: S.on ? 1 : 0, bud: S.bud, rb: n, v: [] };
+    S.v.forEach(function (v) {
+      var o = { k: v.k, t0: Math.round(v.t0), t1: Math.round(v.t1), u: [v.u0, v.u1], q0: v.q0, left: v.left, n: v.n, sp: v.sp, ms: r1(v.ms), mx: r1(v.mx), calls: v.calls, w: null, pre: null, cg: [], fr: [] };
+      if (n > 1) {
+        var Gw = [], Gp = [], g, j;
+        for (i = 1; i < n; i++) {
+          g = T[i] - T[i - 1];
+          if (T[i] >= v.t0 && T[i] <= v.t1) Gw.push(g);
+          else if (T[i] >= v.t0 - 1500 && T[i] < v.t0) Gp.push(g);
+          if (T[i] >= v.t0 - 300 && T[i] <= v.t1 + 300 && o.fr.length < 90) o.fr.push([Math.round(T[i] - v.t0), r1(g)]);
+        }
+        o.w = sumG(Gw); o.pre = sumG(Gp);
+        (v.calls || []).forEach(function (c) {
+          for (j = 1; j < n; j++) if (T[j] >= c[0]) break;
+          if (j < n) o.cg.push([Math.round(c[0] - v.t0), c[1], r1(T[j] - T[j - 1]), j + 1 < n ? r1(T[j + 1] - T[j]) : null]);
+        });
+      }
+      out.v.push(o);
+    });
+    return out;
   }
   var SP = { v: [], cur: null, max: 3, ms: 15000 };
   function spRec(t, js, fdt, lb) {
@@ -1483,6 +1519,7 @@ var DK_CSS =
       threeQWarm: tq && tq.warm ? { n: tq.warm.n, idleMs: Math.round(tq.warm.idleMs), cpuMs: Math.round(tq.warm.cpuMs), items: tq.warm.items } : null,
       timeline: tlTxt,
       pmk: pmOut(), fsState: fsOut(), cfg: cfgOut(), whStats: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgStats) ? WORMHOLE.dbgStats() : null; } catch (eWs) { return null; } })(), whCfg: (function () { try { return (window.WORMHOLE && WORMHOLE.dbgInfo) ? WORMHOLE.dbgInfo() : null; } catch (eWc) { return null; } })(), whMk: (typeof window.__whMk === 'string') ? window.__whMk : null, whMkH: window.__whMkH || null, '_whMkH_cols': 'abs ms (performance.now, sama basis dgn pmk.worst / byFn), rincian: warm(max/langkah) N | restore+ui N | sectSet N | focus N | panHits N | lisArrive N (ms)', nebDbg: window.__nebDbg || null, '_nebDbg_cols': 'job: [ukuran base, y band, ms alokasi, ms getImageData, ms salin]; pf: ["pf", y band, ms, abs ms, boot3d.warm 0/1]',
+      swarm: (function () { try { return swOut(); } catch (eSwO) { return null; } })(), '_swarm_cols': 'v11.29zn: probe dt rAF per frame di jendela fase-in sektor + stat antrean skyWarmStars; lihat swOut',
       events: PB.ev.filter(function (e) { return inW(e[1]); }), '_events_cols': 'nama, start, ms, arg',
       ricRuns: PB.ric.filter(function (r) { return inW(r[2]); }), '_ricRuns_cols': 'asal, dijadwalkan, mulai, ms, timeoutOpt, didTimeout, timeRemaining'
     };
