@@ -1469,6 +1469,7 @@ function snapCompose(){
   var gr=x.createRadialGradient(0,0,0,0,0,1);
   gr.addColorStop(0,'#10222f');gr.addColorStop(.55,'#08121b');gr.addColorStop(1,'#04080d');
   x.save();x.translate(ow*.5,oh*.28);x.scale(ow*1.2,oh*.8);x.fillStyle=gr;x.fillRect(-2,-2,4,4);x.restore();
+  try{if(window.GLSKY&&GLSKY.act&&GLSKY.cap){x.fillStyle=GLSKY.cap;x.fillRect(0,0,ow,oh);}}catch(eGc){}   /* ?glsky=1: warna dasar langit ada di kanvas GL, bukan #sky (G0 = warna polos; G1+ ganti dgn render ulang GL) */
   /* kanvas sky (diputar balik biar sama dgn yang terlihat di layar) */
   x.save();x.translate(ow/2,oh/2);if(rot)x.rotate(rot*Math.PI/180);
   x.drawImage(cv,-sw*sc/2,-sh*sc/2,sw*sc,sh*sc);x.restore();

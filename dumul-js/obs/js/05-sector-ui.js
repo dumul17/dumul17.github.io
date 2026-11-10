@@ -1011,10 +1011,11 @@ function frame(now){
     resetCanvasState();
     g.clearRect(0,0,W,H);
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='low';   /* reset: teleskop/drone/portal 3D men-set 'high'; kalau bocor ke frame berikut, blit plate layar penuh ikut mahal */
+    var _glk=false;try{_glk=(typeof glskyBegin==='function')&&glskyBegin(now,!!(bgCanvas&&!PX.sky));}catch(eGk){}   /* ?glsky=1 (24-glsky.js): GL di bawah #sky; true = GL sudah menggambar warna dasar */
     if(bgCanvas&&!PX.sky){
       // 1. Warna dasar ruang angkasa agar pinggiran layar tidak bocor saat background bergeser
-      g.fillStyle='#050b12';
-      g.fillRect(0,0,W,H);
+      if(!_glk){g.fillStyle='#050b12';
+      g.fillRect(0,0,W,H);}
 
       // 2. Astrophotography plate: 2 layer offscreen, hanya drawImage + offset parallax per frame.
       //    Deep (debu/galaksi) bergeser & zoom lebih lambat daripada mid (bintang) => kedalaman.
