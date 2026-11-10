@@ -19,14 +19,14 @@
    - Transform/opacity inline yang dipasang wormhole ke #sky (kamera zoom) disalin ke kanvas GL lewat MutationObserver.
    - Nol biaya untuk pengunjung biasa: file ini hanya dimuat kalau ?glsky=1|test (atau localStorage dumul_glsky=1). Loader inline di index.html, BUKAN di SHELL SW.
    Flag:  ?glsky=1 nyala | ?glsky=0 paksa 2D (menang atas localStorage) | ?glsky=test nyala + lapisan uji (gradien + 4 penanda sudut; latar 2D dimatikan supaya GL kelihatan)
-          ?gllay=0 = G0 saja (latar tetap digambar 2D, GL cuma warna dasar) untuk A/B | ?glskydpr=1|1.5|2 batas DPR buffer GL (default min(DPR,1.5))
+          ?gllay=0 = G0 saja (latar tetap digambar 2D, GL cuma warna dasar) untuk A/B | ?glskydpr=1|1.5|2 batas DPR buffer GL (default: TIDAK dibatasi = ukuran piksel sama persis dgn kanvas 2D, round(W*DPR); dulu 1.5 -> Milky Way burik/berkilau karena di-upscale kompositor) | ?glmwsnap=1 tile Milky Way dibulatkan ke piksel perangkat (uji coba anti-kilau)
           ?glvig=0 matikan vignette (?glvig=0.5 kekuatan 0..1, default .34) | ?gldrift=1 nyalakan drift (default 0 = diam; ?gldrift=2 = 2x lebih lebar) | konsol: GLSKY.vig / GLSKY.drift boleh diubah langsung.
           Konsol: GLSKY.on=false/true (A/B 2D vs GL), GLSKY.lay=false/true (G0 vs G1), GLSKY.st = {fr, msAvg, msMax, up (jumlah texture diunggah), tex (texture hidup)}.
    Fallback: renderer gagal / konteks hilang >=3x / texture melebihi batas GPU => balik ke 2D, kanvas GL disembunyikan, tanpa reload.
    Jalur 2D lama utuh: kalau file ini tidak dimuat, semua hook di frame()/plateBlit()/sectDrawSky()/snapCompose() tidak melakukan apa-apa (typeof / GLSKY guard). Token bench off= tetap jalur 2D saja.
    Pola penanda uji: sudut kiri-atas MERAH, kanan-atas HIJAU, kiri-bawah BIRU, kanan-bawah KUNING (kalau tertukar = arah y / rotasi salah). */
 var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:false,base:'#050b12',want:false,
-  r:null,scene:null,cam:null,root:null,cv:null,mo:null,W:0,H:0,pw:0,ph:0,S:1,sCap:1.5,shown:true,px:null,tm:null,
+  r:null,scene:null,cam:null,root:null,cv:null,mo:null,W:0,H:0,pw:0,ph:0,S:1,sCap:99,mwSnap:0,shown:true,px:null,tm:null,
   vig:.34,drift:0,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
@@ -35,6 +35,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     var m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(location.search),d=/[?&]glskydpr=([0-9.]+)/.exec(location.search);
     if(m){GLSKY.on=m[1]!=='0';GLSKY.test=m[1]==='test';}
     if(d&&parseFloat(d[1])>0)GLSKY.sCap=parseFloat(d[1]);
+    if(/[?&]glmwsnap=1(&|#|$)/.test(location.search))GLSKY.mwSnap=1;
     if(/[?&]gllay=0(&|#|$)/.test(location.search))GLSKY.lay=false;
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
     if(v&&isFinite(parseFloat(v[1])))GLSKY.vig=Math.max(0,Math.min(1,parseFloat(v[1])));
@@ -108,7 +109,7 @@ function glskyLayoutTest(){
 /* ---------- G1: daftar op + texture ---------- */
 var GLSKY_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
 /* highp WAJIB: uv di quad ~1800 px, mediump (10 bit) menggeser sampling beberapa piksel. uTex 0 = isi warna (uC sudah premultiplied), 1 = texture premultiplied x alpha (uC.a), 2 = vignette (hitam, alpha uC.a x kurva jarak dari pusat) */
-var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;void main(){if(uTex>1.5){vec2 p=(vUv-0.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,uC.a*smoothstep(0.5,1.4,length(p)));}else gl_FragColor=uTex>0.5?texture2D(uMap,vUv)*uC.a:uC;}';
+var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;uniform float uB;void main(){if(uTex>1.5){vec2 p=(vUv-0.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,uC.a*smoothstep(0.5,1.4,length(p)));}else gl_FragColor=uTex>0.5?texture2D(uMap,vUv,uB)*uC.a:uC;}';
 
 function glskyCol(str){
   var c=GLSKY.col[str],a;
@@ -116,7 +117,7 @@ function glskyCol(str){
   a=String(str).split(',');
   return (GLSKY.col[str]=[(+a[0]||0)/255,(+a[1]||0)/255,(+a[2]||0)/255]);
 }
-function glskyOp(){var S=GLSKY,o=S.ops[S.n];if(!o)o=S.ops[S.n]={};S.n++;return o;}
+function glskyOp(){var S=GLSKY,o=S.ops[S.n];if(!o)o=S.ops[S.n]={};o.b=0;S.n++;return o;}   /* b = bias LOD texture (0 = normal) */
 /* isi layar penuh (pengganti g.fillRect(0,0,W,H) berwarna 'r,g,b' dgn globalAlpha a) */
 function glskyFill(rgb,a){
   var o=glskyOp();o.k=0;o.c=glskyCol(rgb);o.a=a;o.add=0;o.cx=W*.5;o.cy=H*.5;o.w=W;o.h=H;o.rot=0;
@@ -181,7 +182,8 @@ function glskyMW(im,a,tw,th,lw,z,port,rt){
   if(!src)return false;
   for(k=kMin;k<=kMax;k++){
     x0=k*tw+MW.off;flip=MW.mirror&&(((k%2)+2)%2===1);
-    o=glskyOp();o.k=1;o.t=src;o.a=al;o.add=1;o.cx=px+z*x0*ca;o.cy=py+z*x0*sa;o.w=(flip?-1:1)*z*tw;o.h=z*th;o.rot=ang;
+    o=glskyOp();o.k=1;o.t=src;o.a=al;o.add=1;o.cx=px+z*x0*ca;o.cy=py+z*x0*sa;o.w=(flip?-1:1)*z*tw;o.h=z*th;o.rot=ang;o.b=-.5;
+    if(S.mwSnap&&S.S>0){o.cx=Math.round(o.cx*S.S)/S.S;o.cy=Math.round(o.cy*S.S)/S.S;}
   }
   return true;
 }
@@ -215,7 +217,7 @@ function glskySweep(){   /* buang texture yang canvas-nya sudah tidak dipakai (b
 function glskyMesh(i){
   var S=GLSKY,T=window.THREE,m;
   m=new T.Mesh(S.geo,new T.ShaderMaterial({
-    uniforms:{uMap:{value:S.dummy},uC:{value:new T.Vector4(0,0,0,1)},uTex:{value:0}},
+    uniforms:{uMap:{value:S.dummy},uC:{value:new T.Vector4(0,0,0,1)},uTex:{value:0},uB:{value:0}},
     vertexShader:GLSKY_VS,fragmentShader:GLSKY_FS,
     transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,
     blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));
@@ -229,7 +231,7 @@ function glskyApply(m,o){
   else if(o.k){
     tx=glskyTex(o.t);
     if(!tx){m.visible=false;return;}
-    u.uMap.value=tx;u.uTex.value=1;u.uC.value.set(0,0,0,a);
+    u.uMap.value=tx;u.uTex.value=1;u.uB.value=o.b||0;u.uC.value.set(0,0,0,a);
   }else{
     u.uTex.value=0;u.uC.value.set(o.c[0]*a,o.c[1]*a,o.c[2]*a,a);
   }
@@ -284,7 +286,7 @@ function glskyInit(){
 }
 
 function glskySize(){
-  var S=GLSKY,s=Math.min(DPR||1,S.sCap),pw=Math.max(2,Math.ceil(W*s)),ph=Math.max(2,Math.ceil(H*s));
+  var S=GLSKY,s=Math.min(DPR||1,S.sCap),pw=Math.max(2,Math.round(W*s)),ph=Math.max(2,Math.round(H*s));   /* round = sama dgn layout() 2D (cv.width=round(W*DPR)): satu piksel GL = satu piksel kanvas 2D, tidak ada resampling kompositor */
   if(pw!==S.pw||ph!==S.ph){S.r.setSize(pw,ph,false);S.pw=pw;S.ph=ph;S.S=s;}   /* false = jangan sentuh style CSS (100% dari #stage) */
   if(W!==S.W||H!==S.H){
     S.cam.left=0;S.cam.right=W;S.cam.top=0;S.cam.bottom=H;S.cam.updateProjectionMatrix();
