@@ -1065,8 +1065,10 @@ function frame(now){
     if(window.__stSeg)pmk('s.cons');   /* penanda pecahan (bench seq stars / ?stseg=1) */
     if(!PX.pulse)drawPulses(now,age);
     if(window.__stSeg)pmk('s.pulse');
-    if(!PX.stars){var _sce=(typeof starCacheBegin==='function')&&starCacheBegin(now,age);   /* ?starcache=1 (04-render.js): foto bintang per rasi */
+    if(!PX.stars){var _gle=(typeof stglBegin==='function')&&stglBegin(now);   /* ?stargl=1 (23-stargl.js): bintang via WebGL */
+    var _sce=!_gle&&(typeof starCacheBegin==='function')&&starCacheBegin(now,age);   /* ?starcache=1 (04-render.js): foto bintang per rasi */
     CONS.forEach(function(c){if(sectShow(c.id)){if(_sce&&starCacheDraw(c,age,now))return;drawStars(c,age,now);}});
+    if(_gle)stglFlush();
     if(window.__stSeg)pmk('s.stars');
     if(sectShow('pleiades')&&!PX.splei)drawPleiades(age,now);
     if(window.__stSeg)pmk('s.plei');}
