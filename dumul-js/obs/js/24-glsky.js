@@ -17,6 +17,7 @@
         Garis glow (pass lebar) ditepikan lembut (profil pangkat 1.5); ?glsoft=0 = tepi keras seperti 2D. Bintang di mode kamera & jalur potato audio-focus tetap 2D (di atas garis GL, urutan benar).
         Flag: ?glstars=0 bintang tetap 2D | ?gllines=0 garis tetap 2D | ?glsoft=0 glow garis keras. Konsol: GLSKY.starOn / GLSKY.lineOn / GLSKY.soft.
         Masih 2D (belum pindah): bintang/rasi/label, BH, planet, drawHud, bandDimDraw (source-over, aman).
+   G3c: METEOR ACAK (drawShooting, 04-render.js) pindah ke GL: sprite goresan yang sama (ssSprite) diunggah jadi texture SEKALI lewat glskyImg (source-over), posisi/arah/umur tetap dihitung JS; urutan sama dgn 2D (di bawah garis+bintang GL). Komet/Konami (kepala batu 3D, aurora, 'lighter') dan ?ss=1 tetap 2D. Flag: ?glss=0 meteor tetap 2D | konsol GLSKY.ssOn.
    G2c: tint BGM (ofxDrawTint, constellation.opus 'lighter' biru + collapsars.opus 'multiply' merah) pindah ke GL lewat glskyImg add=1 / add=2; dulu digambar di #sky 2D yang menutup bintang GL dan 'multiply' di kanvas transparan cuma jadi overlay merah, bukan menggelapkan.
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
@@ -33,7 +34,7 @@
    Pola penanda uji: sudut kiri-atas MERAH, kanan-atas HIJAU, kiri-bawah BIRU, kanan-bawah KUNING (kalau tertukar = arah y / rotasi salah). */
 var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:false,base:'#050b12',want:false,
   r:null,scene:null,cam:null,root:null,cv:null,mo:null,W:0,H:0,pw:0,ph:0,S:1,sCap:99,mwSnap:0,shown:true,px:null,tm:null,
-  vig:.34,drift:0,starOn:true,lineOn:true,soft:1,inst:false,sn:0,ln:0,bs:null,bl:null,ms:null,ml:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
+  vig:.34,drift:0,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,bs:null,bl:null,ms:null,ml:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -44,6 +45,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glmwsnap=1(&|#|$)/.test(location.search))GLSKY.mwSnap=1;
     if(/[?&]glstars=0(&|#|$)/.test(location.search))GLSKY.starOn=false;
     if(/[?&]gllines=0(&|#|$)/.test(location.search))GLSKY.lineOn=false;
+    if(/[?&]glss=0(&|#|$)/.test(location.search))GLSKY.ssOn=false;
     if(/[?&]glsoft=0(&|#|$)/.test(location.search))GLSKY.soft=0;
     if(/[?&]gllay=0(&|#|$)/.test(location.search))GLSKY.lay=false;
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
@@ -201,6 +203,7 @@ function glskyLive(c){
   if(c===plateDeep||c===bgCanvas||c===gridCanvas)return true;
   if(typeof MW!=='undefined'&&MW.img&&(c===MW.img||c===MW.img.__glc))return true;   /* texture Milky Way: jangan ikut tersapu */
   for(i=0;i<plateDust.length;i++)if(plateDust[i].c===c)return true;
+  if(typeof SS_SPR!=='undefined')for(k in SS_SPR)if(SS_SPR[k]===c)return true;   /* sprite goresan meteor (04-render.js ssSprite): jangan ikut tersapu, kalau tidak di-upload ulang tiap sapuan */
   if(typeof NEB!=='undefined'&&NEB.tint)for(k in NEB.tint)if(NEB.tint[k]===c)return true;
   if(typeof SKYT!=='undefined')for(k in SKYT)if(SKYT[k]&&(SKYT[k].spr===c||SKYT[k].spr2===c))return true;
   return false;
@@ -269,6 +272,8 @@ function glskyInstBuild(T){
 }
 function glskyStarsOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.starOn&&S.inst&&!CAMERA_MODE);}
 function glskyLinesOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.lineOn&&S.inst);}
+/* G3c: meteor acak (drawShooting, mode sprite ?ss=2) = quad texture lewat glskyImg; tidak butuh mesh instancing dan tetap di mode kamera (di 2D pun meteor di bawah garis/bintang) */
+function glskyShootOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.ssOn);}
 /* x,y = posisi layar; Rg = radius halo (0 = tanpa halo), gc/ga = 'r,g,b' + alpha halo; rc = radius inti, cc/ca = warna + alpha inti (0 = tanpa inti). Argumen = stglPush */
 function glskyStar(x,y,Rg,gc,ga,rc,cc,ca){
   var S=GLSKY,B=S.bs,n=S.sn,a,o,c;

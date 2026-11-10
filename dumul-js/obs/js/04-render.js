@@ -884,7 +884,7 @@ function ssSprite(c0,c1){
   x.fillStyle=vg;x.fillRect(0,0,64,8);
   SS_SPR[k]=c;SS_SPR_N++;return c;
 }
-var SS_WAS_IDLE=false,SS_WARM=false;
+var SS_WAS_IDLE=false,SS_WARM=false,SS_GLWARM=false;
 function drawShooting(now){
   if(reduce||IS_POTATO)return;
   if(!idleMode&&(now-lastActivity)>IDLE_MS)idleMode=true;
@@ -896,6 +896,8 @@ function drawShooting(now){
     try{if(!OFX.tc)OFX.tc=ofxMakeTint('c');if(!OFX.tk)OFX.tk=ofxMakeTint('k');}catch(eTn){}   /* tint BGM juga di-bake awal (dulu baru dibuat saat BGM pertama nyala) */
     try{ensureAsteroidSprites();}catch(eAs){}   /* 8 sprite batu di-bake di frame awal (dulu di drawAsteroids pertama: jank js16-19ms di 'shoot+astB') */
   }
+  var glSS=(typeof glskyShootOn==='function')&&glskyShootOn();   /* ?glsky=1 (24-glsky.js G3c): meteor sprite digambar di kanvas GL (komet tetap 2D) */
+  if(glSS&&SS_MODE===2&&!SS_GLWARM){SS_GLWARM=true;try{glskyImg(ssSprite('234,246,255','110,229,255'),.004,0,0,8,2,0,0);glskyImg(ssSprite(OFX.m0,OFX.m1),.004,0,0,8,2,0,0);}catch(eSSg){}}   /* upload texture GL di frame awal, bukan di meteor pertama */
   /* Shooting stars stay alive during star SFX and constellation alignment too
      (they used to be gated by secondaryFxScale). */
   if(now>nextSS&&!SW){
@@ -917,6 +919,11 @@ function drawShooting(now){
     }
     if(SS_MODE===2){   /* sprite goresan: 1 drawImage, tanpa createLinearGradient/stroke per frame */
       var sL=Math.hypot(s.vx,s.vy)*tl,sH=Math.max(3,(s.lw||1.4)*2.6);
+      if(glSS){   /* G3c: kepala di (x,y), ekor ke belakang; pusat quad = setengah panjang ke belakang, rot = arah gerak (sama dgn translate+rotate+drawImage(-sL,-sH/2) di bawah) */
+        var sA=Math.atan2(s.vy,s.vx);
+        glskyImg(ssSprite(s.c0||'234,246,255',s.c1||'110,229,255'),g.globalAlpha*(1-u),x-Math.cos(sA)*sL*.5,y-Math.sin(sA)*sL*.5,sL,sH,sA,0);
+        continue;
+      }
       g.save();g.translate(x,y);g.rotate(Math.atan2(s.vy,s.vx));g.globalAlpha*=(1-u);
       g.drawImage(ssSprite(s.c0||'234,246,255',s.c1||'110,229,255'),-sL,-sH*.5,sL,sH);
       g.restore();continue;
