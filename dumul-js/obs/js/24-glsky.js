@@ -16,8 +16,9 @@
         glskyFlush dipindah ke SESUDAH loop cons+stars di frame() (05-sector-ui.js) supaya garis & bintang sempat tercatat. Urutan GL: latar -> garis -> bintang. Kedip/napas/LOD/aturan BGM tetap dihitung JS (belum pindah ke shader).
         Garis glow (pass lebar) ditepikan lembut (profil pangkat 1.5); ?glsoft=0 = tepi keras seperti 2D. Bintang di mode kamera & jalur potato audio-focus tetap 2D (di atas garis GL, urutan benar).
         Flag: ?glstars=0 bintang tetap 2D | ?gllines=0 garis tetap 2D | ?glsoft=0 glow garis keras. Konsol: GLSKY.starOn / GLSKY.lineOn / GLSKY.soft.
-        Masih 2D (belum pindah): bintang/rasi/label, BH, planet, ofxDrawTint (tint BGM), drawHud, bandDimDraw (source-over, aman).
-   CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh, tint BGM) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
+        Masih 2D (belum pindah): bintang/rasi/label, BH, planet, drawHud, bandDimDraw (source-over, aman).
+   G2c: tint BGM (ofxDrawTint, constellation.opus 'lighter' biru + collapsars.opus 'multiply' merah) pindah ke GL lewat glskyImg add=1 / add=2; dulu digambar di #sky 2D yang menutup bintang GL dan 'multiply' di kanvas transparan cuma jadi overlay merah, bukan menggelapkan.
+   CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
    - Landscape (STG.rot) & letterbox desktop: kanvas GL anak #stage persis seperti #sky, jadi ikut diputar / di-scale CSS.
@@ -116,8 +117,8 @@ function glskyLayoutTest(){
 
 /* ---------- G1: daftar op + texture ---------- */
 var GLSKY_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
-/* highp WAJIB: uv di quad ~1800 px, mediump (10 bit) menggeser sampling beberapa piksel. uTex 0 = isi warna (uC sudah premultiplied), 1 = texture premultiplied x alpha (uC.a), 2 = vignette (hitam, alpha uC.a x kurva jarak dari pusat) */
-var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;uniform float uB;void main(){if(uTex>1.5){vec2 p=(vUv-0.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,uC.a*smoothstep(0.5,1.4,length(p)));}else gl_FragColor=uTex>0.5?texture2D(uMap,vUv,uB)*uC.a:uC;}';
+/* highp WAJIB: uv di quad ~1800 px, mediump (10 bit) menggeser sampling beberapa piksel. uTex 0 = isi warna (uC sudah premultiplied), 1 = texture premultiplied x alpha (uC.a), 2 = vignette (hitam, alpha uC.a x kurva jarak dari pusat), 3 = MULTIPLY (texture premultiplied; faktor = 1 - a*(tex.a - tex.rgb), blend ZERO,SRC_COLOR = canvas 'multiply' di atas backdrop opak; uC.a = alpha) */
+var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;uniform float uB;void main(){if(uTex>2.5){vec4 t=texture2D(uMap,vUv,uB);gl_FragColor=vec4(vec3(1.0)-uC.a*(vec3(t.a)-t.rgb),1.0);}else if(uTex>1.5){vec2 p=(vUv-0.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,uC.a*smoothstep(0.5,1.4,length(p)));}else gl_FragColor=uTex>0.5?texture2D(uMap,vUv,uB)*uC.a:uC;}';
 
 function glskyCol(str){
   var c=GLSKY.col[str],a;
@@ -158,9 +159,9 @@ function glskyDrift(o,c){
     o.cx+=dx;o.cy+=dy;
   }catch(e){}
 }
-/* gambar canvas c: pusat (cx,cy), ukuran w x h (px stage), rotasi rad (searah canvas.rotate), add=1 'lighter' */
+/* gambar canvas c: pusat (cx,cy), ukuran w x h (px stage), rotasi rad (searah canvas.rotate), add=1 'lighter', add=2 'multiply' */
 function glskyImg(c,a,cx,cy,w,h,rot,add){
-  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add?1:0;o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;
+  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;
   glskyDrift(o,c);
 }
 /* ekuivalen plateBlit(c,m,pw,ph,z,ox,oy) 02-sky-logic.js: zoom z di sekitar pusat layar + offset (ox,oy); alpha = g.globalAlpha saat dipanggil */
@@ -323,11 +324,12 @@ function glskyApply(m,o){
   else if(o.k){
     tx=glskyTex(o.t);
     if(!tx){m.visible=false;return;}
-    u.uMap.value=tx;u.uTex.value=1;u.uB.value=o.b||0;u.uC.value.set(0,0,0,a);
+    u.uMap.value=tx;u.uTex.value=o.add===2?3:1;u.uB.value=o.b||0;u.uC.value.set(0,0,0,a);
   }else{
     u.uTex.value=0;u.uC.value.set(o.c[0]*a,o.c[1]*a,o.c[2]*a,a);
   }
-  m.material.blendDst=o.add?T.OneFactor:T.OneMinusSrcAlphaFactor;
+  if(o.add===2){m.material.blendSrc=200;m.material.blendDst=202;}   /* multiply: ZeroFactor, SrcColorFactor (tidak diekspor three-entry, angka standar three) */
+  else{m.material.blendSrc=T.OneFactor;m.material.blendDst=o.add?T.OneFactor:T.OneMinusSrcAlphaFactor;}
   m.position.set(o.cx,o.cy,0);m.rotation.z=o.rot;m.scale.set(o.w,o.h,1);
   m.visible=true;
 }

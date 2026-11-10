@@ -2588,6 +2588,17 @@ function sectDrawSky(){
 function ofxDrawTint(now){
   if(OFX.p<.01)return;
   var S=Math.max(W,H)*2.2;
+  if(typeof GLSKY!=='undefined'&&GLSKY.act&&GLSKY.lay){   /* ?glsky=1 (24-glsky.js): tint dicatat jadi op GL (add=1 lighter, add=2 multiply), urutan di bawah garis+bintang GL sama dgn 2D */
+    if(OFX.pC>.01){
+      if(!OFX.tc)OFX.tc=ofxMakeTint('c');
+      glskyImg(OFX.tc,.17*OFX.pC*(.88+.12*Math.sin(now*.00105)),W*.5,H*.45,S,S,0,1);
+    }
+    if(OFX.pK>.01){
+      if(!OFX.tk)OFX.tk=ofxMakeTint('k');
+      glskyImg(OFX.tk,OFX.pK*(.92+.08*Math.sin(now*.0013)),(SECT.cur?(BH.hx||BH.x):BH.x),(SECT.cur?(BH.hy||BH.y):BH.y),S,S,0,2);
+    }
+    return;
+  }
   g.save();g.globalCompositeOperation='lighter';
   if(OFX.pC>.01){
     if(!OFX.tc)OFX.tc=ofxMakeTint('c');
