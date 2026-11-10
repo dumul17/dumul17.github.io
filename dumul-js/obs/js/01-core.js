@@ -37,6 +37,22 @@ try{
 /* TES RESOLUSI: ?dpr=0.75 mengalikan DPR kanvas utama (layout() membaca window.__dprMul). Tanpa parameter = 1 (tidak berubah). */
 try{var _dm=/[?&]dpr=([0-9.]+)/.exec(location.search);if(_dm){var _dv=parseFloat(_dm[1]);if(_dv>=.4&&_dv<=1)window.__dprMul=_dv;}}catch(eDm){}
 try{if(IS_POTATO)document.documentElement.classList.add('perf-tier-0');else document.documentElement.classList.remove('perf-tier-0');}catch(e){}
+/* P0 migrasi three (PLAN-MIGRASI-THREE.md): ?gl=0|1|cmp. Default '0' = jalur 2D lama, NOL biaya (probe WebGL2 HANYA jalan kalau ?gl=1|cmp). BELUM ada jalur render GL: P0 cuma flag + deteksi + konfigurasi. SKY3D_ON = flag nyala && WebGL2 ada && bukan IS_POTATO && bukan reduce-motion; SKY3D_WHY = alasan (flag-off | potato | reduce-motion | no-webgl2 | err | ok). D1: antialias:false (tepi halus lewat smoothstep di shader), pixelRatio 1 seperti sekarang. */
+var GLMODE=(function(){var m=/[?&]gl=(0|1|cmp)(&|$)/.exec(location.search);return m?m[1]:'0';})();
+var SKY3D_CFG={antialias:false,pixelRatio:1};
+var SKY3D_ON=false,SKY3D_WHY=GLMODE==='0'?'flag-off':'';
+if(GLMODE!=='0'){
+  try{
+    if(IS_POTATO)SKY3D_WHY='potato';
+    else if(reduce)SKY3D_WHY='reduce-motion';
+    else{
+      var _glc=document.createElement('canvas'),_glx=_glc.getContext('webgl2',{antialias:false,alpha:false,depth:false,stencil:false,failIfMajorPerformanceCaveat:true});
+      if(!_glx)SKY3D_WHY='no-webgl2';
+      else{SKY3D_ON=true;SKY3D_WHY='ok';var _gle=_glx.getExtension('WEBGL_lose_context');if(_gle)_gle.loseContext();}   /* probe dilepas: jangan makan slot konteks GL */
+      _glc.width=_glc.height=0;
+    }
+  }catch(eGl){SKY3D_ON=false;SKY3D_WHY='err';}
+}
 var W=0,H=0,DPR=1,START=performance.now(),renderRAF=0,renderGeneration=0,pageHidden=false,hiddenAt=0;
 /* Idle saver: after 60s without pointer activity, skip secondary particles (SS) etc. */
 var lastActivity=performance.now(),idleMode=false,IDLE_MS=60000;
