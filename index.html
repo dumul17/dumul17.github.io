@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="dumul-css/index.css?v=104">
+<link rel="stylesheet" href="dumul-css/index.css?v=105">
 <!-- Three.js (ES module) diunduh + diparse lebih awal, paralel (three.module -> three.core tidak lagi berurutan). fetchpriority low: tidak nyaingin CSS/script utama. URL + ?v= HARUS sama persis dgn AST3D_CFG.lib, SHELL service-worker.js, dan import di dalam three.custom.r186.js -> kalau naikkan ?v=, ganti semuanya. -->
 <link rel="modulepreload" href="dumul-js/obs/lib/three.custom.r186.js?v=1" fetchpriority="low">
 <meta name="gimmick-revision" content="v41.15: ring-buffer ripples + spatial Doppler throttle + constellation alignment">
@@ -315,11 +315,11 @@
 <script defer src="dumul-js/obs/i18n.js?v=51"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=150"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=151"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=154"></script>
 <script defer src="dumul-js/obs/js/03-gargantua.js?v=115"></script>
 <script defer src="dumul-js/obs/js/04-render.js?v=158"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=202"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=203"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=132"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=187"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
@@ -363,6 +363,9 @@
 <script defer src="dumul-js/obs/js/22-sky-now.js?v=4"></script>
 <script>/* StarGL (23-stargl.js): prototipe bintang via WebGL. NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?stargl=1. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
 (function(){var e=false;try{e=/[?&]stargl=1\b/.test(location.search);}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/23-stargl.js?v=1"></scr'+'ipt>');})();
+</script>
+<script>/* GLSky (24-glsky.js): kanvas WebGL di bawah #sky (rencana-gl-sky.md). NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?glsky=1|test atau localStorage dumul_glsky=1 (?glsky=0 paksa 2D). Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
+(function(){var e=false;try{var m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(location.search);e=m?m[1]!=='0':localStorage.getItem('dumul_glsky')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/24-glsky.js?v=1"></scr'+'ipt>');})();
 </script>
 <script>
 /* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
