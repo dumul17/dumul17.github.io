@@ -9,7 +9,9 @@
        gambarnya dicatat jadi daftar op (glskyPlate/glskyFill/glskyImg), lalu glskyFlush() menggambarnya sekali per frame sebagai quad. Satu sumber kebenaran.
        Blend: shader sendiri, premultiplied (texture diunggah premultiplyAlpha) -> source-over = ONE,1-SRCA; 'lighter' = ONE,ONE. Sama dgn canvas 2D.
    Mainan G1 (khusus GL, 2D tidak punya): VIGNETTE (shader, gelap lembut di tepi, ikut tertangkap saat capture) + DRIFT opsional (DEFAULT MATI: langit sektor sengaja diam, planet yang bergerak) untuk plateDeep, nebula.webp sektor (NEB.tint) & glow sektor; nyalakan ?gldrift=1. Overview (milky-way.webp, mwDraw) belum di GL dan sudah bergerak di 2D.
-   Masih 2D (belum pindah): mwDraw (Milky Way overview), bintang/rasi/label, BH, planet, ofxDrawTint (tint BGM), drawHud, bandDimDraw (source-over, aman).
+   G1b: Milky Way overview (mwDraw, milky-way.webp) ikut GL lewat hook 1 baris di mwDraw (02-sky-logic.js) -> glskyMW(): gulungan tile, mirror, zoom, pan, portrait/landscape dihitung
+        sama persis dgn mwDraw; MW.off/MW.t/tuning tune3d tetap milik mwDraw (satu sumber kebenaran). Gambar diunggah SEKALI (mipmap aktif); kalau lebih besar dari batas GPU, diperkecil sekali ke kanvas.
+   Masih 2D (belum pindah): bintang/rasi/label, BH, planet, ofxDrawTint (tint BGM), drawHud, bandDimDraw (source-over, aman).
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh, tint BGM) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
@@ -157,9 +159,36 @@ function glskyPlate(c,a,m,pw,ph,z,ox,oy){
   var cx=W*.5,cy=H*.5;
   glskyImg(c,a,cx+z*(-m+pw*.5-cx+ox),cy+z*(-m+ph*.5-cy+oy),z*pw,z*ph,0,0);
 }
+/* sumber texture Milky Way: gambar langsung kalau muat di GPU, kalau tidak diperkecil SEKALI ke kanvas (dicache di im.__glc). null = tidak bisa -> mwDraw menggambar 2D */
+function glskyMWSrc(im){
+  var S=GLSKY,w=im.naturalWidth||im.width,h=im.naturalHeight||im.height,cap=Math.min(S.maxTex||2048,4096),k,c,x;
+  if(!w||!h)return null;
+  if(w<=cap&&h<=cap){im.__glmip=1;return im;}
+  if(im.__glc)return im.__glc;
+  try{
+    k=cap/Math.max(w,h);c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
+    x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(im,0,0,c.width,c.height);
+    c.__glmip=1;im.__glc=c;return c;
+  }catch(e){return null;}
+}
+/* ekuivalen bagian gambar mwDraw (02-sky-logic.js): kanvas 2D = translate(pusat+pan*pf) scale(z) rotate(upAng bila landscape) rotate(-90 bila portrait) lalu tile di x0 (mirror = x dibalik), 'lighter'.
+   Titik (x0,0) lokal -> pusat + z*x0*(cos th, sin th). Mengembalikan true kalau dicatat ke GL (mwDraw lalu return); false = mwDraw menggambar 2D seperti biasa. */
+function glskyMW(im,a,tw,th,lw,z,port,rt){
+  var S=GLSKY,src=glskyMWSrc(im),al=Math.min(1,a*MW.A),px=W*.5+skyPan.x*MW.pf,py=H*.5+skyPan.y*MW.pf,
+      ang=(rt?upAng():0)+(port?-Math.PI/2:0),ca=Math.cos(ang),sa=Math.sin(ang),
+      kMin=Math.floor((-lw*.5-MW.off)/tw)-1,kMax=Math.ceil((lw*.5-MW.off)/tw)+1,k,x0,flip,o;
+  if(!src)return false;
+  for(k=kMin;k<=kMax;k++){
+    x0=k*tw+MW.off;flip=MW.mirror&&(((k%2)+2)%2===1);
+    o=glskyOp();o.k=1;o.t=src;o.a=al;o.add=1;o.cx=px+z*x0*ca;o.cy=py+z*x0*sa;o.w=(flip?-1:1)*z*tw;o.h=z*th;o.rot=ang;
+  }
+  return true;
+}
 function glskyLive(c){
   var S=GLSKY,i,k;
   if(c===plateDeep||c===bgCanvas||c===gridCanvas)return true;
+  if(typeof MW!=='undefined'&&MW.img&&(c===MW.img||c===MW.img.__glc))return true;   /* texture Milky Way: jangan ikut tersapu */
   for(i=0;i<plateDust.length;i++)if(plateDust[i].c===c)return true;
   if(typeof NEB!=='undefined'&&NEB.tint)for(k in NEB.tint)if(NEB.tint[k]===c)return true;
   if(typeof SKYT!=='undefined')for(k in SKYT)if(SKYT[k]&&(SKYT[k].spr===c||SKYT[k].spr2===c))return true;
@@ -172,6 +201,7 @@ function glskyTex(c){
     if(c.width>S.maxTex||c.height>S.maxTex){S.big=1;return null;}
     t=new T.CanvasTexture(c);
     t.flipY=false;t.premultiplyAlpha=true;t.generateMipmaps=false;t.minFilter=T.LinearFilter;t.magFilter=T.LinearFilter;
+    if(c.__glmip){t.generateMipmaps=true;t.minFilter=T.LinearMipmapLinearFilter;}   /* gambar besar yang diperkecil (Milky Way): mipmap supaya tidak berkilau saat bergulir */
     e={t:t,v:v,w:c.width,h:c.height};S.tx.set(c,e);S.st.up++;
   }
   return e.t;

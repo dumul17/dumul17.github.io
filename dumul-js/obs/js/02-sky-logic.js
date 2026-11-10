@@ -1409,6 +1409,7 @@ function mwDraw(now,a){
       th=lh*MW.scale,tw=th*((im.naturalWidth||im.width||1)/(im.naturalHeight||im.height||1)),per=MW.mirror?tw*2:tw,k,x0,flip;
   MW.t=now;
   if(!(typeof reduce!=='undefined'&&reduce))MW.off=(MW.off+dt*.001*MW.vx)%per;if(MW.off<0)MW.off+=per;
+  if(typeof GLSKY!=='undefined'&&GLSKY.act&&GLSKY.lay&&glskyMW(im,a,tw,th,lw,z,port,rt))return;   /* ?glsky=1 (24-glsky.js): tile dicatat, digambar GL di bawah #sky; state MW.off/MW.t sudah diperbarui di atas */
   g.save();
   g.globalCompositeOperation='lighter';g.globalAlpha=Math.min(1,a*MW.A);
   g.translate(W*.5+skyPan.x*MW.pf,H*.5+skyPan.y*MW.pf);g.scale(z,z);if(rt)g.rotate(upAng());if(port)g.rotate(-Math.PI/2);
