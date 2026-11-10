@@ -2339,8 +2339,10 @@ function placeSecretMsg(){
   el.style.left=Math.round(x)+'px';
   el.style.top=Math.round(y)+'px';
 }
+var _puX=[0,0,0,0,0,0,0],_puY=[0,0,0,0,0,0,0],_puOk=[false,false,false,false,false,false,false];   /* buffer sampel ekor pulse untuk jalur GL (nseg maks 6 => 7 titik) */
 function drawPulses(now,age){
   if(reduce||IS_POTATO||age<4||SW)return;
+  var glPL=(typeof glskyLinesOn==='function')&&glskyLinesOn(),glPD=(typeof glskyStarsOn==='function')&&glskyStarsOn();   /* garis / bintang GL aktif? (pulse shock tetap 2D) */
   if(now>nextPU){nextPU=now+500+Math.random()*900;
     /* Pick any constellation (Orion / Virgo / Canis Major) so every figure gets line pulses */
     var cand=[],ci;
@@ -2373,6 +2375,13 @@ function drawPulses(now,age){
     if(!cullSegAt(A.x+ox,A.y+oy,B.x+ox,B.y+oy))continue;
     var t2=Math.max(0,u-.2),al=Math.sin(u*Math.PI);
     var nseg=IS_POTATO?4:6,drawn=0,drawing=false;
+    if(glPL){   /* ?glsky=1 (24-glsky.js): ekor pulse = ruas di mesh garis GL (sampel lensa gSky tetap dihitung di sini), tepi keras 2 px seperti 2D */
+      for(var si2=0;si2<=nseg;si2++){
+        var tt2=t2+(u-t2)*si2/nseg,q2=gSky(A.x+(B.x-A.x)*tt2+ox,A.y+(B.y-A.y)*tt2+oy);
+        _puX[si2]=q2[0];_puY[si2]=q2[1];_puOk[si2]=q2[2]<1;
+      }
+      glskyPoly(_puX,_puY,_puOk,nseg,2,'200,245,255',.95*al,0);
+    }else{
     g.strokeStyle='rgba(200,245,255,'+(.95*al)+')';g.lineWidth=2;g.beginPath();
     for(var si=0;si<=nseg;si++){
       var tt=t2+(u-t2)*si/nseg;
@@ -2382,14 +2391,19 @@ function drawPulses(now,age){
       drawn++;
     }
     if(drawn>1)g.stroke();
+    }
     var qp=gSky(A.x+(B.x-A.x)*u+ox,A.y+(B.y-A.y)*u+oy);
     if(qp[2]<1){
-      g.fillStyle='rgba(235,250,255,'+al+')';g.beginPath();g.arc(qp[0],qp[1],2,0,6.283);g.fill();
+      if(glPD)glskyStar(qp[0],qp[1],0,'0,0,0',0,2,'235,250,255',al);   /* kepala pulse = inti bulat tanpa halo (di GL, di bawah bintang) */
+      else{g.fillStyle='rgba(235,250,255,'+al+')';g.beginPath();g.arc(qp[0],qp[1],2,0,6.283);g.fill();}
       /* Micro-spark when pulse arrives at target star */
       if(u>0.90){
         var sparkA=(u-0.90)*10;
+        if(glPD)glskyStar(qp[0],qp[1],0,'0,0,0',0,2.5+sparkA*2,'235,250,255',0.8*sparkA);
+        else{
         g.fillStyle='rgba(235,250,255,'+(0.8*sparkA)+')';
         g.beginPath();g.arc(qp[0],qp[1],2.5+sparkA*2,0,6.283);g.fill();
+        }
       }
     }
   }
