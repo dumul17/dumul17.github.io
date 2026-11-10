@@ -2530,7 +2530,7 @@ function sectSkySprite(rgb){
 /* Data: SECTORS[].sky = {rgb,a, dim:0..1 (redam kabut/dust default dulu, biar warna sektor nggak campur), dimRgb:'r,g,b', acc:{rgb,a,x,y,s,sy,rot}}
    Urutan: (1) dim = source-over gelapin plate default, (2) tint aditif, (3) aksen aditif (blob/pita). Dua pass supaya crossfade antar sektor nggak saling nutup. */
 function sectDrawSky(){
-  var i,s,t,tgt,S=Math.max(W,H)*2.2,A;
+  var i,s,t,tgt,S=Math.max(W,H)*2.2,A,GLL=(typeof GLSKY!=='undefined'&&GLSKY.act&&GLSKY.lay);   /* GLL: ?glsky=1, gambar dicatat -> GL (24-glsky.js); state SKYT tetap dihitung di sini */
   for(i=0;i<SECT.list.length;i++){
     s=SECT.list[i];if(!s.sky)continue;
     t=SKYT[s.k]||(SKYT[s.k]={v:0,spr:null,spr2:null});
@@ -2540,6 +2540,7 @@ function sectDrawSky(){
   for(i=0;i<SECT.list.length;i++){                    /* pass 1: dim */
     s=SECT.list[i];t=s.sky&&SKYT[s.k];
     if(!t||t.v<.01||!s.sky.dim)continue;
+    if(GLL){glskyFill(s.sky.dimRgb||'2,5,10',t.v*s.sky.dim);continue;}
     g.save();g.globalAlpha=t.v*s.sky.dim;g.fillStyle='rgb('+(s.sky.dimRgb||'2,5,10')+')';g.fillRect(0,0,W,H);g.restore();
   }
   var zn=skyZoom<=4?1:Math.max(0,1-(skyZoom-4)/4);zn=zn*zn*(3-2*zn);   /* nebula "keluar layar" saat zoom tinggi: penuh sampai x4, hilang di x8+ (skip blit = lebih ringan) */
@@ -2550,7 +2551,7 @@ function sectDrawSky(){
       A=nebTint(s);if(!A)continue;
       var rp=A._t?Math.min(1,(performance.now()-A._t)/450):1;   /* v13: baru selesai di-bake -> fade-in, bukan pop */
       g.save();
-      if(A._m){g.globalAlpha=t.v*NEB.SDIM*rp;g.fillStyle='rgb(2,5,10)';g.fillRect(0,0,W,H);}   /* nebula bertopeng: gelapkan plate (nebula overview) dulu biar nggak dobel + latar pekat */
+      if(A._m){if(GLL)glskyFill('2,5,10',t.v*NEB.SDIM*rp);else{g.globalAlpha=t.v*NEB.SDIM*rp;g.fillStyle='rgb(2,5,10)';g.fillRect(0,0,W,H);}}   /* nebula bertopeng: gelapkan plate (nebula overview) dulu biar nggak dobel + latar pekat */
       if(zn>.01){
         g.globalAlpha=t.v*NEB.A_SEC*zn*rp;
         plateBlit(A,plateM,W+2*plateM,H+2*plateM,1+(skyZoom-1)*NEB.ZF,skyPan.x*.14,skyPan.y*.14);
@@ -2562,6 +2563,7 @@ function sectDrawSky(){
     s=SECT.list[i];t=s.sky&&SKYT[s.k];
     if(!t||t.v<.01)continue;
     if(!t.spr)t.spr=sectSkySprite(s.sky.rgb);
+    if(GLL){glskyImg(t.spr,t.v*(s.sky.a==null?.22:s.sky.a),W*.5,H*.45,S,S,0,1);A=s.sky.acc;if(A){if(!t.spr2)t.spr2=sectSkySprite(A.rgb);var as0=S*(A.s||.6);glskyImg(t.spr2,t.v*A.a,W*A.x,H*A.y,as0,as0*(A.sy||1),A.rot||0,1);}continue;}
     g.save();g.globalCompositeOperation='lighter';g.globalAlpha=t.v*(s.sky.a==null?.22:s.sky.a);
     g.drawImage(t.spr,W*.5-S/2,H*.45-S/2,S,S);
     A=s.sky.acc;

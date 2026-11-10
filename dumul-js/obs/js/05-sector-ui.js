@@ -1045,6 +1045,7 @@ function frame(now){
       }
       drawHud();
     }
+    if(_glk)try{glskyFlush();}catch(eGf){}   /* ?glsky=1: render GL sekali (daftar op dari plateBlit/sectDrawSky) */
     pmk('sky');
     bandDimDraw();   /* filter UV/IR: redam latar cahaya-tampak (04-render.js) */
     if(!PX.sky&&!PX.neb)ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */

@@ -1809,6 +1809,7 @@ function bakeCamGrid(){
   }
   gc.setLineDash([]);
   gridDPR=DPR;gridRot=STG.rot;gridW=W;gridH=H;
+  gridCanvas.__glv=(gridCanvas.__glv|0)+1;   /* kanvas ini digambar ulang di tempat: penanda versi untuk texture GL (24-glsky.js) */
 }
 function ensureCamGrid(){
   if(!bgCanvas)return;
@@ -1816,6 +1817,7 @@ function ensureCamGrid(){
 }
 /* One layer blit: zoom about screen centre (deep layer zooms less => parallax depth) + offset. */
 function plateBlit(c,m,pw,ph,z,ox,oy){
+  if(typeof GLSKY!=='undefined'&&GLSKY.act&&GLSKY.lay){glskyPlate(c,g.globalAlpha,m,pw,ph,z,ox,oy);return;}   /* ?glsky=1 (24-glsky.js): dicatat, digambar GL di bawah #sky (alpha = g.globalAlpha dari pemanggil) */
   if(z!==1){var cx=W*.5,cy=H*.5;g.save();g.translate(cx,cy);g.scale(z,z);g.translate(-cx+ox,-cy+oy);g.drawImage(c,-m,-m,pw,ph);g.restore();}
   else g.drawImage(c,ox-m,oy-m,pw,ph);
 }
