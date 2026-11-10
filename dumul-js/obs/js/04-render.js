@@ -1516,6 +1516,7 @@ function drawCons(c,age,now){
   if(locked)drawLockedSignal(c,age,now,ox,oy,focus);
   /* Adaptive lens samples: few when far from BH; denser only near horizon.
      One sample pass per line — glow (if any) reuses the same points. */
+  var glL=(typeof glskyLinesOn==='function')&&glskyLinesOn();   /* ?glsky=1 (24-glsky.js): garis digambar di kanvas GL (sampel lensa gSky tetap dihitung di sini) */
   var lines=c.lines,lfa=lineFadeStep(c,linesVisible(c)?1:0,now),nLines=(locked||lfa<.004)?0:lines.length;   /* garis: lihat linesVisible (cam = tombol GARIS, di luar cam = cuma rasi SFX aktif) */
   /* Reward pas unlock: garis digambar satu-satu dari waktu unlock (bukan dari boot). */
   if(c._reveal!=null&&(reduce||now-c._reveal>lines.length*90+1400))c._reveal=null;
@@ -1551,14 +1552,20 @@ function drawCons(c,age,now){
     var audioPulse=0;   /* dulu garis berkedip ngikut bass SFX; sekarang dentuman itu diterapkan ke bintang rasi SFX (drawStars) */
 
     for(pass=doGlow?0:1;pass<2&&!PX.lstroke;pass++){   /* [bench ?off=lstroke] lewati glow+stroke, sampling gSky tetap jalan */
+      var _lA,_lW;   /* alpha + lebar goresan (angka, supaya jalur GL memakai nilai yang sama dgn 2D) */
       if(pass===0){
-        g.strokeStyle='rgba(110,229,255,'+(((lineHot?.14:.07) + audioPulse * 0.12)*focus*lfa*(1+.5*obr))+')';
-        g.lineWidth=(lineHot?6:4) + audioPulse * 2.0;
+        _lA=(((lineHot?.14:.07) + audioPulse * 0.12)*focus*lfa*(1+.5*obr));
+        _lW=(lineHot?6:4) + audioPulse * 2.0;
+        g.strokeStyle='rgba(110,229,255,'+_lA+')';
+        g.lineWidth=_lW;
       }
       else{
-        g.strokeStyle='rgba(150,212,255,'+Math.min(1,((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*fK*Math.sin(tn*.0014+i)))*focus*lfa*(1+.32*obr))+')';
-        g.lineWidth=(lineHot?1.8:1.1) + audioPulse * 1.2 + .4*obr;
+        _lA=Math.min(1,((lineHot?.72:.42) + audioPulse * 0.25 + (reduce?0:.1*fK*Math.sin(tn*.0014+i)))*focus*lfa*(1+.32*obr));
+        _lW=(lineHot?1.8:1.1) + audioPulse * 1.2 + .4*obr;
+        g.strokeStyle='rgba(150,212,255,'+_lA+')';
+        g.lineWidth=_lW;
       }
+      if(glL){glskyPoly(xs,ys,alive,samples,_lW,pass?'150,212,255':'110,229,255',_lA*kk,pass?0:1);continue;}   /* GL: globalAlpha=kk ikut dikalikan ke alpha */
       g.globalAlpha=kk;g.beginPath();drawing2=false;
       for(var sj=0;sj<=samples;sj++){
         if(!alive[sj]){drawing2=false;continue;}
@@ -1792,6 +1799,7 @@ function stLodK(now){   /* 1 = halo penuh, 0 = halo kecil/sedang mati; diperbaru
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   var glOn=!!(window.STGL&&STGL.act);   /* ?stargl=1 (23-stargl.js): halo+inti lewat WebGL, di-flush sekali per frame */
+  var gsOn=(typeof glskyStarsOn==='function')&&glskyStarsOn();   /* ?glsky=1 (24-glsky.js): halo+inti di kanvas GL di bawah #sky (mesh instancing), menang atas StarGL */
   c._vis=0;
   var k2=W<500?.95:1.2;
   var audioFocus=potatoAudioFocus();
@@ -1862,10 +1870,10 @@ function drawStars(c,age,now){
       }
     }else{
       var sb=ofxBreath(c.phase+(s.ph||0)*.35,now)*fK;
-      if(glOn){
+      if(glOn||gsOn){
         var _gR=r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),_gA=_ng?0:Math.min(1,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb)*_lk),_cA=_nc?0:Math.min(1,.95*a);
         if(window.__stCnt){if(!_ng){ST_C.g++;ST_C.ga+=r*r;}if(!_nc)ST_C.c++;}
-        if((_gA>.01&&_gR>0)||_cA>.004)stglPush(x,y,(_gA>.01&&_gR>0)?_gR*5:0,bandCol||s.rgb,(_gA>.01&&_gR>0)?_gA:0,Math.max(.9,r*.62),bandCore||'255,255,255',_cA);
+        if((_gA>.01&&_gR>0)||_cA>.004)(gsOn?glskyStar:stglPush)(x,y,(_gA>.01&&_gR>0)?_gR*5:0,bandCol||s.rgb,(_gA>.01&&_gR>0)?_gA:0,Math.max(.9,r*.62),bandCore||'255,255,255',_cA);
       }else{
       if(!_ng){if(window.__stCnt){ST_C.g++;ST_C.ga+=r*r;}drawStarGlow(x,y,r*(HALO_IDLE_S+(1-HALO_IDLE_S)*fK)*(1+.14*sb),bandCol||s.rgb,a*tw*(HALO_IDLE_A+(1-HALO_IDLE_A)*fK)*(1+.3*sb)*_lk);}   /* IDLE: halo tipis & kecil; FULL: penuh */
       if(!_nc){if(window.__stCnt)ST_C.c++;g.fillStyle=coreStyle(bandCore||'255,255,255',.95*a);g.beginPath();g.arc(x,y,Math.max(.9,r*.62),0,6.283);g.fill();}

@@ -1045,7 +1045,6 @@ function frame(now){
       }
       drawHud();
     }
-    if(_glk)try{glskyFlush();}catch(eGf){}   /* ?glsky=1: render GL sekali (daftar op dari plateBlit/sectDrawSky) */
     pmk('sky');
     bandDimDraw();   /* filter UV/IR: redam latar cahaya-tampak (04-render.js) */
     if(!PX.sky&&!PX.neb)ofxSafe(ofxDrawTint,now); /* langit bergeser warna mengikuti BGM */
@@ -1068,7 +1067,7 @@ function frame(now){
     if(!PX.pulse)drawPulses(now,age);
     if(window.__stSeg)pmk('s.pulse');
     if(!PX.stars){var _gle=(typeof stglBegin==='function')&&stglBegin(now);   /* ?stargl=1 (23-stargl.js): bintang via WebGL */
-    var _sce=!_gle&&(typeof starCacheBegin==='function')&&starCacheBegin(now,age);   /* ?starcache=1 (04-render.js): foto bintang per rasi */
+    var _sce=!_gle&&!(typeof glskyStarsOn==='function'&&glskyStarsOn())&&(typeof starCacheBegin==='function')&&starCacheBegin(now,age);   /* ?starcache=1 (04-render.js): foto bintang per rasi */
     CONS.forEach(function(c){if(sectShow(c.id)){if(_sce&&starCacheDraw(c,age,now))return;drawStars(c,age,now);}});
     if(_gle)stglFlush();
     if(window.__stSeg)pmk('s.stars');
@@ -1077,6 +1076,7 @@ function frame(now){
     try{if(!PX.pulse&&typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
     }
     pmk('cons+stars');
+    if(_glk)try{glskyFlush();}catch(eGf){}   /* ?glsky=1: render GL sekali per frame (daftar op latar dari plateBlit/sectDrawSky + garis & bintang dari drawCons/drawStars); dulu di atas blok latar, dipindah ke sini supaya garis/bintang sempat tercatat */
     drawTriggerVisuals(now);
     ofxSafe(ofxDrawAvail,now);
     drawFocusFx(now);
