@@ -8,6 +8,7 @@
        Kode 2D lama TIDAK menghitung ulang apa pun: plateBlit() dan sectDrawSky() tetap menghitung alpha/zoom/pan seperti biasa, tapi saat GLSKY.act&&GLSKY.lay
        gambarnya dicatat jadi daftar op (glskyPlate/glskyFill/glskyImg), lalu glskyFlush() menggambarnya sekali per frame sebagai quad. Satu sumber kebenaran.
        Blend: shader sendiri, premultiplied (texture diunggah premultiplyAlpha) -> source-over = ONE,1-SRCA; 'lighter' = ONE,ONE. Sama dgn canvas 2D.
+   Mainan G1 (khusus GL, 2D tidak punya): VIGNETTE (shader, gelap lembut di tepi, ikut tertangkap saat capture) + DRIFT opsional (DEFAULT MATI: langit sektor sengaja diam, planet yang bergerak) untuk plateDeep, nebula.webp sektor (NEB.tint) & glow sektor; nyalakan ?gldrift=1. Overview (milky-way.webp, mwDraw) belum di GL dan sudah bergerak di 2D.
    Masih 2D (belum pindah): mwDraw (Milky Way overview), bintang/rasi/label, BH, planet, ofxDrawTint (tint BGM), drawHud, bandDimDraw (source-over, aman).
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh, tint BGM) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
@@ -17,13 +18,14 @@
    - Nol biaya untuk pengunjung biasa: file ini hanya dimuat kalau ?glsky=1|test (atau localStorage dumul_glsky=1). Loader inline di index.html, BUKAN di SHELL SW.
    Flag:  ?glsky=1 nyala | ?glsky=0 paksa 2D (menang atas localStorage) | ?glsky=test nyala + lapisan uji (gradien + 4 penanda sudut; latar 2D dimatikan supaya GL kelihatan)
           ?gllay=0 = G0 saja (latar tetap digambar 2D, GL cuma warna dasar) untuk A/B | ?glskydpr=1|1.5|2 batas DPR buffer GL (default min(DPR,1.5))
+          ?glvig=0 matikan vignette (?glvig=0.5 kekuatan 0..1, default .34) | ?gldrift=1 nyalakan drift (default 0 = diam; ?gldrift=2 = 2x lebih lebar) | konsol: GLSKY.vig / GLSKY.drift boleh diubah langsung.
           Konsol: GLSKY.on=false/true (A/B 2D vs GL), GLSKY.lay=false/true (G0 vs G1), GLSKY.st = {fr, msAvg, msMax, up (jumlah texture diunggah), tex (texture hidup)}.
    Fallback: renderer gagal / konteks hilang >=3x / texture melebihi batas GPU => balik ke 2D, kanvas GL disembunyikan, tanpa reload.
    Jalur 2D lama utuh: kalau file ini tidak dimuat, semua hook di frame()/plateBlit()/sectDrawSky()/snapCompose() tidak melakukan apa-apa (typeof / GLSKY guard). Token bench off= tetap jalur 2D saja.
    Pola penanda uji: sudut kiri-atas MERAH, kanan-atas HIJAU, kiri-bawah BIRU, kanan-bawah KUNING (kalau tertukar = arah y / rotasi salah). */
 var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:false,base:'#050b12',want:false,
   r:null,scene:null,cam:null,root:null,cv:null,mo:null,W:0,H:0,pw:0,ph:0,S:1,sCap:1.5,shown:true,px:null,tm:null,
-  ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
+  vig:.34,drift:0,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -32,6 +34,9 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(m){GLSKY.on=m[1]!=='0';GLSKY.test=m[1]==='test';}
     if(d&&parseFloat(d[1])>0)GLSKY.sCap=parseFloat(d[1]);
     if(/[?&]gllay=0(&|#|$)/.test(location.search))GLSKY.lay=false;
+    var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
+    if(v&&isFinite(parseFloat(v[1])))GLSKY.vig=Math.max(0,Math.min(1,parseFloat(v[1])));
+    if(dr&&isFinite(parseFloat(dr[1])))GLSKY.drift=Math.max(0,Math.min(4,parseFloat(dr[1])));
     if(/[?&]off=/.test(location.search)){GLSKY.on=false;GLSKY.why='bench-off';}   /* token off= (bench): jalur 2D saja */
   }catch(e){}
 })();
@@ -100,8 +105,8 @@ function glskyLayoutTest(){
 
 /* ---------- G1: daftar op + texture ---------- */
 var GLSKY_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
-/* highp WAJIB: uv di quad ~1800 px, mediump (10 bit) menggeser sampling beberapa piksel. uTex 0 = isi warna (uC sudah premultiplied), 1 = texture premultiplied x alpha (uC.a) */
-var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;void main(){gl_FragColor=uTex>0.5?texture2D(uMap,vUv)*uC.a:uC;}';
+/* highp WAJIB: uv di quad ~1800 px, mediump (10 bit) menggeser sampling beberapa piksel. uTex 0 = isi warna (uC sudah premultiplied), 1 = texture premultiplied x alpha (uC.a), 2 = vignette (hitam, alpha uC.a x kurva jarak dari pusat) */
+var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;void main(){if(uTex>1.5){vec2 p=(vUv-0.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,uC.a*smoothstep(0.5,1.4,length(p)));}else gl_FragColor=uTex>0.5?texture2D(uMap,vUv)*uC.a:uC;}';
 
 function glskyCol(str){
   var c=GLSKY.col[str],a;
@@ -114,9 +119,38 @@ function glskyOp(){var S=GLSKY,o=S.ops[S.n];if(!o)o=S.ops[S.n]={};S.n++;return o
 function glskyFill(rgb,a){
   var o=glskyOp();o.k=0;o.c=glskyCol(rgb);o.a=a;o.add=0;o.cx=W*.5;o.cy=H*.5;o.w=W;o.h=H;o.rot=0;
 }
+/* DRIFT: sin/cos lambat (pola sama dgn plateDust di frame()). Kelas kanvas di-cache di c.__gld: 1 = plateDeep, 2 = sprite nebula/tint sektor, 3 = lainnya (tidak melayang) */
+function glskyDriftClass(c){
+  var k,d=c.__gld;
+  if(d)return d;
+  d=3;
+  try{
+    if(c===plateDeep)d=1;
+    else{
+      if(typeof NEB!=='undefined'&&NEB.tint)for(k in NEB.tint)if(NEB.tint[k]===c)d=2;
+      if(d===3&&typeof SKYT!=='undefined')for(k in SKYT)if(SKYT[k]&&(SKYT[k].spr===c||SKYT[k].spr2===c))d=2;
+    }
+  }catch(e){}
+  c.__gld=d;return d;
+}
+function glskyDrift(o,c){
+  var S=GLSKY,d,t,sc,dx,dy,ua,uc,us,tx,per,amp,ph;
+  if(!(S.drift>0))return;
+  try{
+    if(typeof reduce!=='undefined'&&reduce)return;
+    d=glskyDriftClass(c);if(d>2)return;
+    sc=S.drift;   /* sengaja TIDAK ikut SKY_DRIFT (itu =0: langit 2D diam); drift GL punya flag sendiri */
+    t=S.now*.001;
+    per=d===1?110:84;amp=(d===1?Math.min(6,(typeof plateM!=='undefined'?plateM:28)*.2):11)*sc;ph=d===1?1.3:4.1;   /* deep dibatasi ke 20% margin plate supaya tepi tidak terbuka */
+    dx=Math.sin(t*6.2832/per+ph)*amp;dy=Math.cos(t*6.2832/(per*1.37)+ph)*amp*.6;
+    if(STG.rot){ua=upAng();uc=Math.cos(ua);us=Math.sin(ua);tx=dx*uc-dy*us;dy=dx*us+dy*uc;dx=tx;}   /* landscape: melayang searah layar */
+    o.cx+=dx;o.cy+=dy;
+  }catch(e){}
+}
 /* gambar canvas c: pusat (cx,cy), ukuran w x h (px stage), rotasi rad (searah canvas.rotate), add=1 'lighter' */
 function glskyImg(c,a,cx,cy,w,h,rot,add){
   var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add?1:0;o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;
+  glskyDrift(o,c);
 }
 /* ekuivalen plateBlit(c,m,pw,ph,z,ox,oy) 02-sky-logic.js: zoom z di sekitar pusat layar + offset (ox,oy); alpha = g.globalAlpha saat dipanggil */
 function glskyPlate(c,a,m,pw,ph,z,ox,oy){
@@ -161,7 +195,8 @@ function glskyMesh(i){
 }
 function glskyApply(m,o){
   var S=GLSKY,T=window.THREE,u=m.material.uniforms,a=o.a,tx;
-  if(o.k){
+  if(o.k===2){u.uTex.value=2;u.uC.value.set(0,0,0,a);}
+  else if(o.k){
     tx=glskyTex(o.t);
     if(!tx){m.visible=false;return;}
     u.uMap.value=tx;u.uTex.value=1;u.uC.value.set(0,0,0,a);
@@ -244,7 +279,7 @@ function glskyBegin(now,want){
       PX.neb=1;PX.mw=1;   /* diagnosa PX yang sudah ada: tanpa plate / debu / MW / tint supaya GL kelihatan di bawah bintang & rasi 2D */
       S.tm.mat.uniforms.uTime.value=now*.001;
     }
-    S.want=!!want;S.act=true;
+    S.now=now;S.want=!!want;S.act=true;
   }catch(e){glskyFail(String(e&&e.message||e));return false;}
   return true;
 }
@@ -256,6 +291,7 @@ function glskyFlush(){
   t0=performance.now();
   try{
     S.big=0;
+    if(S.vig>0&&S.want&&S.lay&&!S.test){var vo=glskyOp();vo.k=2;vo.a=S.vig;vo.add=0;vo.cx=W*.5;vo.cy=H*.5;vo.w=W;vo.h=H;vo.rot=0;}   /* vignette: op terakhir => di atas latar GL, di bawah semua yang masih 2D */
     for(i=0;i<S.n;i++){m=S.mesh[i]||glskyMesh(i);glskyApply(m,S.ops[i]);}
     for(;i<S.mesh.length;i++)S.mesh[i].visible=false;
     if(S.big){S.lay=false;glskyFail('texture melebihi batas GPU ('+S.maxTex+'px)');return;}   /* texture terlalu besar: tidak bisa jujur menggantikan 2D -> 2D penuh */
