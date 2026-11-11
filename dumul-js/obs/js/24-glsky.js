@@ -23,7 +23,9 @@
    G3d: BH SHOCKWAVES (drawBHShockwaves, 04-render.js) pindah ke GL: sprite cincin lembut aditif (add=1), renderOrder 5100 (di atas bintang/garis 5000). Body BH / breathing ring tetap 2D. Flag ?glbhshock=0 A/B | konsol GLSKY.bhShockOn.
    G3e: SUPERNOVA + BELT FX (drawSupernovaBursts / drawBeltFx, 05-sector-ui.js) pindah ke GL lewat sprite snBake yang sama (core/ring/streak/flash), add=1 + hi=1. Flag ?glsn=0 A/B | konsol GLSKY.snOn.
    G3f: TRIGGER VISUALS + pulse shock (drawTriggerVisuals / drawPulses.shock / drawRipple, 04-render.js) pindah ke GL lewat getRingSprite yang sama, add=1 + hi=1. Flag ?gltrig=0 A/B | konsol GLSKY.trigOn.
-   G3g: PLEIADES bintang (drawPleiades, 04-render.js) halo+inti lewat glskyStar (mesh bintang yang sama); label/nama/spektrum tetap 2D. Flag ?glplei=0 A/B | konsol GLSKY.pleiOn. Mode kamera tetap 2D (sama glskyStarsOn).
+   G3g: PLEIADES bintang (drawPleiades, 04-render.js) halo+inti lewat glskyStar (mesh bintang yang sama); label/nama/spektrum tetap 2D. Flag ?glplei=0 A/B | konsol GLSKY.pleiOn.
+   G4.14: bintang mode kamera + Pleiades mode kamera pindah ke mesh bintang GL (inti saja, tanpa halo; gaya sensor). camLens / label / reticle / spektrum tetap 2D. Guard !CAMERA_MODE di glskyStarsOn/glskyPleiOn diangkat. Flag ?glstars=0 / ?glplei=0 A/B.
+   G4.14b: hotfix stacking — bintang ber-camLens: inti 2D di #sky SETELAH lensa (identik ?glsky=0); tanpa lensa tetap mesh GL.
    G4.2b: PORTAL overview full GL (cincin billboard + mulut PTT + petir glskySeg + percikan + charge) SEBELUM flush; #sky 2D tidak lagi menerima blit portal. Flag ?glportal=0 A/B | konsol GLSKY.portalOn.
    G4.3b: BH BODY+plasma+drag (drawHoleGl) sprite+bloom+serat+kilau cakram+warp drag ke GL sebelum flush. Flag ?glbh=0 A/B | konsol GLSKY.bhOn.
    G4.5: TELESKOP 3D (13-scope3d.js) jadi Group di PASS ATAS (glskyAttachTop: scene+kamera y-ke-atas sendiri, dirender sesudah scene utama; lihat catatan FIX di glskyAttachTop): tanpa renderer 'small', tanpa blit/drawImage ke #sky saat GL aktif; salinan tepi layar = klon Group; wormhole dive tetap jalur 2D (terowongan masih kanvas 2D z 13). Flag ?glscope=0 A/B | konsol SCP3D_GL.on.
@@ -335,7 +337,8 @@ function glskyInstBuild(T){
   S.layers.add(S.ml);S.layers.add(S.ms);S.layers.add(S.ml2);S.layers.add(S.ml3);
   S.inst=true;
 }
-function glskyStarsOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.starOn&&S.inst&&!CAMERA_MODE);}
+/* [PATCH G4.14] guard !CAMERA_MODE diangkat: mode kamera kirim inti saja lewat glskyStar (tanpa halo) */
+function glskyStarsOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.starOn&&S.inst);}
 function glskyLinesOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.lineOn&&S.inst);}
 /* G3c: meteor acak (drawShooting, mode sprite ?ss=2) = quad texture lewat glskyImg; tidak butuh mesh instancing dan tetap di mode kamera (di 2D pun meteor di bawah garis/bintang) */
 /* [G4.11] cincin sabuk Orion + garis penghubung portal (drawPortals) ke mesh garis GL; hanya dalam jendela rekam (sebelum flush). Mode kamera tetap boleh (garis GL tidak peduli). ?glportal=0 / ?gllines=0 = 2D */
@@ -883,7 +886,8 @@ function glskyAstOn(){var S=GLSKY;return !!(S.act&&S.astOn&&S.ok&&S.r);}   /* [P
 function glskyBhShockOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.bhShockOn&&S.ok&&S.r);}   /* [PATCH G3d] true = BH shockwaves digambar di GL */
 function glskySnOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.snOn&&S.ok&&S.r);}   /* [PATCH G3e] true = supernova/belt digambar di GL */
 function glskyTrigOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.trigOn&&S.ok&&S.r);}   /* [FIX] +rec: drawRipple dipanggil juga setelah flush (drawTargetLock, drawHole 2D) -> harus tetap 2D */   /* [PATCH G3f] true = trigger ripple / pulse shock di GL */
-function glskyPleiOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.starOn&&S.pleiOn&&S.inst&&!CAMERA_MODE);}   /* [PATCH G3g] Pleiades halo+inti di mesh bintang GL */
+/* [PATCH G4.14] guard !CAMERA_MODE diangkat: mode kamera Pleiades = inti saja di mesh bintang GL */
+function glskyPleiOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.starOn&&S.pleiOn&&S.inst);}   /* [PATCH G3g] Pleiades halo+inti di mesh bintang GL */
 function glskyPortalOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.portalOn&&S.ok&&S.r);}   /* [PATCH G4.2] true = cincin portal overview ke GL billboard */
 function glskyFxOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.fxOn&&S.inst&&S.ok&&S.r);}   /* [PATCH G3h] true = efek kecil (avail/dust/focus/lock) boleh dicatat ke GL; false di luar jendela rekam */
 function glskyPlOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.plOn&&S.ok&&S.r&&S.pScene&&S.pErr<3);}   /* [G4.8] true = permukaan planet boleh dijadwalkan ke pass planet (sebelum flush) */

@@ -65,6 +65,20 @@ var ZN=.05, BG='#02050d', WARM=16;
 var cv=null,g=null,spr=null,SC=48,dpr=1,RGB=[],NP=STAR_PAL.length,NN=NEB_PAL.length,
     ST=[],inited=false,ok=true,raf=0,last=0,state='idle',S={},env=0,ema=.016,dens=1,roll=0,tt=0,
     W=0,H=0,bw=0,bh=0,bq=.5,bA=null,bB=null,gA=null,gB=null,nebAcc=0,dustAcc=0;
+/* [PATCH G4.12] feedback terowongan lewat WebGLRenderTarget ping-pong (ganti bA/bB saat hidup).
+   [PATCH G4.12b] inject radial + composite layar penuh (#glwh): streak + hole + mask; #wh-canvas sisa portal.
+   Flag ?glwh=0 A/B | ?glsky=0 paksa 2D | konsol WORMHOLE.gl / WHG.
+   [PATCH G4.12f P0] hormati glsky=0; hole/mask/rim/clip uniform = piksel FB; smoothstep edge0<edge1.
+   [PATCH G4.12 P2] satu WebGLRenderer (#glwh) utk feedback+composite+portal+tele (bukan 2 konteks). */
+var WHG={on:true,ok:false,err:0,cv:null,r:null,rtA:null,rtB:null,scene:null,cam:null,fbMat:null,fbMesh:null,
+  injScene:null,injMesh:null,injGeo:null,injN:0,injCap:0,tex:null,sprTex:null,dummy:null,why:'',
+  bg:[2/255,5/255,13/255],
+  fullCv:null,fullR:null,compScene:null,compCam:null,compMesh:null,compMat:null,
+  stGeo:null,stMesh:null,stN:0,stCap:0,holeMesh:null,holeMat:null,maskMesh:null,maskMat:null,
+  teleScene:null,teleCam:null,teleGrp:null,
+  fullW:0,fullH:0,compOk:false,skipTeleGl:false};
+try{if(/[?&]glwh=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGlw){}
+try{if(/[?&]glsky=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGls){}   /* [PATCH G4.12f P0] rencana 0.1: ?glsky=0 = paksa 2D termasuk wormhole */
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
 function usable(){return ok&&!(reduceMq&&reduceMq.matches);}
@@ -118,6 +132,7 @@ function build(){
 function mkBuf(){var c=document.createElement('canvas');c.width=bw;c.height=bh;return c;}
 function clearBufs(){
   [gA,gB].forEach(function(x){if(!x)return;x.setTransform(1,0,0,1,0,0);x.globalCompositeOperation='source-over';x.globalAlpha=1;x.fillStyle=BG;x.fillRect(0,0,bw,bh);});
+  try{whGlClear();}catch(eWgc){}   /* [PATCH G4.12] */
 }
 function resize(){
   if(!cv)return;
@@ -129,8 +144,764 @@ function resize(){
   nw=Math.max(32,Math.round(W*bq));nh=Math.max(32,Math.round(H*bq));
   if(!bA||nw!==bw||nh!==bh){
     bw=nw;bh=nh;bA=mkBuf();bB=mkBuf();gA=bA.getContext('2d');gB=bB.getContext('2d');
+    try{whGlResize(bw,bh);}catch(eWgr){}   /* [PATCH G4.12] */
   }
   clearBufs();
+}
+/* ---------- [PATCH G4.12] feedback GL (WebGLRenderTarget ping-pong) ---------- */
+var WHG_FB_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+var WHG_FB_FS=[
+  'precision mediump float;',
+  'uniform sampler2D tPrev;uniform vec2 uC;uniform float uS;uniform float uR;uniform float uD;uniform vec3 uBg;uniform vec2 uRes;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  vec2 uv=vUv-uC;',
+  '  float c=cos(uR),s=sin(uR);',
+  '  uv=vec2(c*uv.x-s*uv.y,s*uv.x+c*uv.y)/max(uS,1e-4);',
+  '  uv+=uC;',
+  '  if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){gl_FragColor=vec4(uBg,1.0);return;}',
+  '  vec4 p=texture2D(tPrev,uv);',
+  '  gl_FragColor=vec4(mix(uBg,p.rgb,uD),1.0);',
+  '}'
+].join('\n');
+/* [PATCH G4.12b] inject: iP=x,y,len,w (buffer px); iC=atlas uv; iA=alpha,ang */
+var WHG_IN_VS=[
+  'attribute vec4 iP;attribute vec4 iC;attribute vec2 iA;',
+  'varying vec2 vUv;varying float vA;',
+  'uniform vec2 uRes;',
+  'void main(){',
+  '  vec2 q=position.xy*0.5+0.5;',
+  '  vUv=mix(iC.xy,iC.zw,q);',
+  '  vA=iA.x;',
+  '  float c=cos(iA.y),s=sin(iA.y);',
+  '  vec2 loc=vec2((q.x-0.5)*iP.z,(q.y-0.5)*iP.w);',
+  '  vec2 p=iP.xy+vec2(c*loc.x-s*loc.y,s*loc.x+c*loc.y);',
+  '  vec2 ndc=vec2((p.x/uRes.x)*2.0-1.0,1.0-(p.y/uRes.y)*2.0);',
+  '  gl_Position=vec4(ndc,0.0,1.0);',
+  '}'
+].join('\n');
+var WHG_IN_FS=[
+  'precision mediump float;',
+  'uniform sampler2D tSpr;',
+  'varying vec2 vUv;varying float vA;',
+  'void main(){',
+  '  vec4 t=texture2D(tSpr,vUv);',
+  '  gl_FragColor=vec4(t.rgb*t.a*vA,t.a*vA);',
+  '}'
+].join('\n');
+/* composite full: feedback + bloom uniform */
+var WHG_COMP_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+var WHG_COMP_FS=[
+  'precision mediump float;',
+  'uniform sampler2D tFb;uniform float uBloom;uniform vec3 uBg;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  vec3 c=texture2D(tFb,vUv).rgb;',
+  '  c=c+c*uBloom;',
+  '  gl_FragColor=vec4(c,1.0);',
+  '}'
+].join('\n');
+/* streak lines: iP = x0,y0,x1,y1 (screen px); iC = rgb + alpha; iW = width */
+var WHG_ST_VS=[
+  'attribute vec4 iP;attribute vec4 iC;attribute float iW;',
+  'varying vec4 vC;',
+  'uniform vec2 uRes;',
+  'void main(){',
+  '  vec2 a=iP.xy,b=iP.zw;',
+  '  vec2 dir=b-a;float len=length(dir);',
+  '  vec2 n=len>1e-4?dir/len:vec2(1.0,0.0);',
+  '  vec2 perp=vec2(-n.y,n.x);',
+  '  float along=position.x*0.5+0.5;',
+  '  float side=position.y;',
+  '  vec2 p=mix(a,b,along)+perp*(side*iW*0.5);',
+  '  vC=iC;',
+  '  gl_Position=vec4((p.x/uRes.x)*2.0-1.0,1.0-(p.y/uRes.y)*2.0,0.0,1.0);',
+  '}'
+].join('\n');
+var WHG_ST_FS=[
+  'precision mediump float;',
+  'varying vec4 vC;',
+  'void main(){gl_FragColor=vec4(vC.rgb*vC.a,vC.a);}'
+].join('\n');
+/* hole + soft mask (radial) */
+/* [PATCH G4.12f P0] uC/uR/uRes = koordinat framebuffer (CSS×dpr). smoothstep edge0<edge1. */
+var WHG_HOLE_FS=[
+  'precision mediump float;',
+  'uniform vec2 uC;uniform float uR;uniform float uA;uniform vec2 uRes;',
+  'void main(){',
+  '  vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
+  '  float d=distance(p,uC);',
+  '  float a=uA*(1.0-smoothstep(uR*0.8,uR*1.3,d));',
+  '  gl_FragColor=vec4(0.0,0.0,0.0,a);',
+  '}'
+].join('\n');
+/* uMode 0 = destination-in soft mouth (small/exit); 1 = vignette source-over full-screen [G4.12f P1] */
+var WHG_MASK_FS=[
+  'precision mediump float;',
+  'uniform vec2 uC;uniform float uR;uniform float uEdge;uniform float uFade;uniform vec2 uRes;uniform vec4 uTm;',
+  'uniform float uUseTm;uniform float uMode;',
+  'void main(){',
+  '  vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
+  '  vec2 d=p-uC;',
+  '  if(uUseTm>0.5){',
+  '    float inv=uTm.x*uTm.w-uTm.y*uTm.z;inv=abs(inv)<1e-8?1.0:1.0/inv;',
+  '    d=inv*vec2(uTm.w*d.x-uTm.z*d.y,-uTm.y*d.x+uTm.x*d.y);',
+  '  }',
+  '  float rr=length(d)/max(uR,1.0);',
+  '  if(uMode>0.5){',
+  '    float edge=smoothstep(clamp(uEdge,0.0,0.99),1.0,rr);',
+  '    float a=edge*0.55*clamp(uFade,0.0,1.0);',
+  '    gl_FragColor=vec4(0.0078,0.0196,0.0510,1.0)*a;',
+  '    return;',
+  '  }',
+  '  float es=clamp(uEdge,0.0,0.999);',
+  '  float a=1.0;',
+  '  if(rr>es){float t=clamp((rr-es)/max(1e-4,1.0-es),0.0,1.0);a=1.0-smoothstep(0.0,1.0,t);a*=mix(1.0,a,0.35);}',
+  '  if(rr>1.0)a=0.0;',
+  '  a*=clamp(uFade,0.0,1.0);',
+  '  gl_FragColor=vec4(0.0,0.0,0.0,a);',
+  '}'
+].join('\n');
+/* WebGL blend constants (three custom r186 tidak export ZeroFactor/SrcAlphaFactor) */
+var WHG_GL_ZERO=0,WHG_GL_SRC_ALPHA=770,WHG_GL_ONE=1,WHG_GL_ONE_MINUS_SRC_ALPHA=771;
+function whGlWant(){
+  return !!(WHG.on&&!potato()&&usable()&&typeof THREE!=='undefined'&&THREE.WebGLRenderTarget&&THREE.WebGLRenderer);
+}
+/* [PATCH G4.12f P1] snapshot feedback GL → buffer 2D sebelum fallback (hindari loncatan kosong) */
+function whGlHandoff(){
+  var gx,G=WHG,r,u;
+  try{
+    if(!bA||!G.ok)return;
+    /* jika present ke WHG.cv di-skip (compOk), render sekali rtA → cv dulu */
+    if(G.compOk&&G.r&&G.rtA&&G.fbMat&&G.scene&&G.cam){
+      try{
+        u=G.fbMat.uniforms;u.tPrev.value=G.rtA.texture;
+        u.uC.value.set(.5,.5);u.uS.value=1;u.uR.value=0;u.uD.value=1;
+        r=G.r;r.setRenderTarget(null);r.setClearColor(0x02050d,1);r.render(G.scene,G.cam);
+      }catch(eP){}
+    }
+    if(!G.cv||!(G.cv.width>0))return;
+    gx=gA||bA.getContext('2d');
+    if(!gx)return;
+    gx.setTransform(1,0,0,1,0,0);gx.globalAlpha=1;gx.globalCompositeOperation='copy';
+    gx.drawImage(G.cv,0,0,G.cv.width,G.cv.height,0,0,bw,bh);
+    gx.globalCompositeOperation='source-over';
+  }catch(e){}
+}
+function whGlFail(why){
+  try{whGlHandoff();}catch(eH){}   /* [PATCH G4.12f P1] */
+  WHG.err++;WHG.ok=false;WHG.why=why||'err';
+  try{console.warn('[wormhole] GL feedback mati → 2D:',WHG.why,'(#'+WHG.err+')');}catch(e){}
+  if(WHG.err>=3)WHG.on=false;
+}
+function whGlDisposeRt(){
+  try{if(WHG.rtA)WHG.rtA.dispose();}catch(e){}
+  try{if(WHG.rtB)WHG.rtB.dispose();}catch(e){}
+  WHG.rtA=WHG.rtB=null;
+}
+function whGlAllocRt(T,w,h){
+  return new T.WebGLRenderTarget(w,h,{depthBuffer:false,stencilBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter});
+}
+/* [PATCH G4.12 P2] satu WebGLRenderer (#glwh) utk feedback RT + composite + portal + tele */
+function whGlEnsure(w,h){
+  var T,r,c,geo,mat,cap,pw,ph;
+  if(!whGlWant()||WHG.err>=3)return false;
+  if(WHG.ok&&WHG.r&&WHG.rtA&&WHG.rtA.width===w&&WHG.rtA.height===h)return true;
+  try{
+    T=THREE;
+    pw=Math.max(64,Math.round(W*dpr));ph=Math.max(64,Math.round(H*dpr));
+    if(!WHG.r){
+      c=document.createElement('canvas');c.id='glwh';c.setAttribute('aria-hidden','true');
+      c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none;z-index:12;touch-action:none';
+      if(cv&&cv.parentNode)cv.parentNode.insertBefore(c,cv);else document.body.appendChild(c);
+      WHG.fullCv=c;WHG.cv=c;   /* cv = fullCv: handoff drawImage dari canvas yang sama */
+      r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:true,powerPreference:'low-power'});
+      r.setClearColor(0x02050d,1);r.autoClear=true;
+      WHG.r=r;WHG.fullR=r;   /* [P2] satu konteks */
+      WHG.cam=new T.OrthographicCamera(-1,1,1,-1,-1,1);
+      WHG.scene=new T.Scene();
+      WHG.injScene=new T.Scene();
+      WHG.dummy=new T.DataTexture(new Uint8Array([2,5,13,255]),1,1);
+      WHG.dummy.needsUpdate=true;
+      geo=new T.PlaneGeometry(2,2);
+      mat=new T.ShaderMaterial({
+        uniforms:{tPrev:{value:WHG.dummy},uC:{value:new T.Vector2(.5,.5)},uS:{value:1},uR:{value:0},uD:{value:1},uBg:{value:new T.Vector3(WHG.bg[0],WHG.bg[1],WHG.bg[2])},uRes:{value:new T.Vector2(w,h)}},
+        vertexShader:WHG_FB_VS,fragmentShader:WHG_FB_FS,depthTest:false,depthWrite:false
+      });
+      WHG.fbMat=mat;WHG.fbMesh=new T.Mesh(geo,mat);WHG.fbMesh.frustumCulled=false;WHG.scene.add(WHG.fbMesh);
+      cap=512;WHG.injCap=cap;
+      WHG.injGeo=new T.InstancedBufferGeometry();
+      WHG.injGeo.setAttribute('position',geo.attributes.position);
+      WHG.injGeo.setAttribute('uv',geo.attributes.uv);
+      WHG.injGeo.setIndex(geo.index);
+      WHG.injGeo.setAttribute('iP',new T.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(T.DynamicDrawUsage));
+      WHG.injGeo.setAttribute('iC',new T.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(T.DynamicDrawUsage));
+      WHG.injGeo.setAttribute('iA',new T.InstancedBufferAttribute(new Float32Array(cap*2),2).setUsage(T.DynamicDrawUsage));
+      WHG.injGeo.instanceCount=0;
+      mat=new T.ShaderMaterial({
+        uniforms:{tSpr:{value:WHG.dummy},uRes:{value:new T.Vector2(w,h)}},
+        vertexShader:WHG_IN_VS,fragmentShader:WHG_IN_FS,
+        transparent:true,depthTest:false,depthWrite:false,
+        blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneFactor
+      });
+      WHG.injMesh=new T.Mesh(WHG.injGeo,mat);WHG.injMesh.frustumCulled=false;WHG.injScene.add(WHG.injMesh);
+    }else{
+      WHG.fbMat.uniforms.uRes.value.set(w,h);
+      WHG.injMesh.material.uniforms.uRes.value.set(w,h);
+    }
+    whGlDisposeRt();
+    WHG.rtA=whGlAllocRt(T,w,h);WHG.rtB=whGlAllocRt(T,w,h);
+    WHG.r.setRenderTarget(WHG.rtA);WHG.r.setClearColor(0x02050d,1);WHG.r.clear();
+    WHG.r.setRenderTarget(WHG.rtB);WHG.r.clear();
+    WHG.r.setRenderTarget(null);
+    if(spr&&!WHG.sprTex){
+      WHG.sprTex=new T.CanvasTexture(spr);
+      WHG.sprTex.minFilter=T.LinearFilter;WHG.sprTex.magFilter=T.LinearFilter;
+      WHG.injMesh.material.uniforms.tSpr.value=WHG.sprTex;
+    }
+    WHG.ok=true;WHG.why='';
+    return true;
+  }catch(e){
+    whGlFail((e&&e.message)||'ensure');
+    return false;
+  }
+}
+function whGlResize(w,h){
+  if(!WHG.ok&&!whGlWant())return;
+  try{
+    if(WHG.ok){WHG.ok=false;whGlEnsure(w,h);}
+  }catch(e){whGlFail('resize');}
+}
+function whGlClear(){
+  if(!WHG.ok||!WHG.r)return;
+  try{
+    WHG.r.setRenderTarget(WHG.rtA);WHG.r.setClearColor(0x02050d,1);WHG.r.clear();
+    WHG.r.setRenderTarget(WHG.rtB);WHG.r.clear();
+    WHG.r.setRenderTarget(null);
+    WHG.r.setClearColor(0x02050d,1);WHG.r.clear();
+  }catch(e){}
+}
+function whGlKill(){
+  try{whGlDisposeRt();}catch(e){}
+  try{if(WHG.sprTex)WHG.sprTex.dispose();}catch(e2){}
+  try{if(WHG.r)WHG.r.dispose();}catch(e3){}
+  try{if(WHG.fullCv&&WHG.fullCv.parentNode)WHG.fullCv.parentNode.removeChild(WHG.fullCv);}catch(e4){}
+  WHG.ok=false;WHG.compOk=false;WHG.r=null;WHG.fullR=null;WHG.cv=null;WHG.fullCv=null;
+  WHG.scene=null;WHG.injScene=null;WHG.compScene=null;WHG.teleScene=null;
+  WHG.fbMat=null;WHG.fbMesh=null;WHG.injMesh=null;WHG.injGeo=null;WHG.sprTex=null;
+  WHG.compMesh=null;WHG.stMesh=null;WHG.holeMesh=null;WHG.maskMesh=null;
+}
+/* [PATCH G4.12b] x,y,len,w buffer-px; ang = sudut radial (sama dot 2D) */
+function whGlPush(x,y,len,w,ang,ci,al){
+  var n=WHG.injN,cap=WHG.injCap,a,o,rows,v0,v1;
+  if(!WHG.injGeo||n>=cap||!(al>.004))return;
+  a=WHG.injGeo.attributes;o=n*4;
+  a.iP.array[o]=x;a.iP.array[o+1]=y;a.iP.array[o+2]=len;a.iP.array[o+3]=w;
+  rows=STAR_PAL.length+NEB_PAL.length;
+  v0=ci/rows;v1=(ci+1)/rows;
+  a.iC.array[o]=0;a.iC.array[o+1]=v0;a.iC.array[o+2]=1;a.iC.array[o+3]=v1;
+  a.iA.array[n*2]=al>1?1:al;a.iA.array[n*2+1]=ang||0;
+  WHG.injN=n+1;
+}
+function whGlStep(dt,cx,cy,Rv,Rh,adv){
+  var G=WHG,r,s,rot,dec,k,sg,x,y,i,n,c,L,rh,a,rr,d,ci,f,t,ang,ga,u,pr,T;
+  if(!G.ok&&!whGlEnsure(bw,bh))return false;
+  if(!G.ok||!G.r||!G.rtA)return false;
+  try{
+    r=G.r;T=THREE;
+    s=Math.exp(ZOOM*adv);rot=SPIN*adv;dec=Math.pow(DECAY,dt*60);k=Math.min(1.6,dt*60);sg=s-1;
+    x=cx*bq;y=cy*bq; /* pusat di ruang buffer */
+    /* 1) feedback: sample rtA → rtB */
+    u=G.fbMat.uniforms;
+    u.tPrev.value=G.rtA.texture;
+    u.uC.value.set(x/bw,y/bh);
+    u.uS.value=s;
+    u.uR.value=rot;
+    u.uD.value=dec;
+    u.uRes.value.set(bw,bh);
+    r.setRenderTarget(G.rtB);
+    r.setClearColor(0x02050d,1);
+    r.autoClear=true;
+    r.render(G.scene,G.cam);
+    /* 2) inject additive ke rtB */
+    G.injN=0;
+    nebAcc+=NEB_RATE*adv;if(nebAcc>40)nebAcc=40;
+    while(nebAcc>=1){
+      nebAcc-=1;
+      ang=Math.random()*6.283185307;
+      f=ang/6.283185307*NN+(Math.random()*2-.5);
+      ci=NP+(((Math.floor(f)%NN)+NN)%NN);
+      rr=Rh*(1.1+.8*Math.random());
+      d=rr*(2.2+Math.random()*1.6);
+      whGlPush((cx+Math.cos(ang)*rr)*bq,(cy+Math.sin(ang)*rr)*bq,(d+rr*sg*2)*bq,d*bq,ang,ci,NEB_A*(.5+Math.random()*.7)*k);
+    }
+    dustAcc+=DUST_RATE*adv;if(dustAcc>120)dustAcc=120;
+    while(dustAcc>=1){
+      dustAcc-=1;
+      ang=Math.random()*6.283185307;
+      if(Math.random()<.22)ci=(Math.random()*2)|0;
+      else{f=ang/6.283185307*NN+(Math.random()*2.4-.7);ci=NP+(((Math.floor(f)%NN)+NN)%NN);}
+      rr=Rh*(1.05+.35*Math.random());
+      d=1.5+Math.random()*2.2;
+      whGlPush((cx+Math.cos(ang)*rr)*bq,(cy+Math.sin(ang)*rr)*bq,(d+rr*sg*1.4)*bq,d*bq,ang,ci,DUST_A*(.4+Math.random()*.6)*k);
+    }
+    if(GLOW_A>0){
+      ga=-2.3+.35*Math.sin(tt*.35);
+      for(i=0;i<4;i++){
+        ang=ga+(Math.random()-.5)*.7;rr=Rh*(1.05+.25*Math.random());
+        d=Rh*(.3+.45*Math.random());
+        whGlPush((cx+Math.cos(ang)*rr)*bq,(cy+Math.sin(ang)*rr)*bq,(d+rr*sg*1.6)*bq,d*bq,ang,i&1?6:4,GLOW_A*.6*k);
+      }
+    }
+    n=ST.length;
+    for(i=0;i<n;i++){
+      c=ST[i];
+      if(c.r>dens)continue;
+      L=LAYERS[c.L];
+      rh=Rv*ZN/c.z;
+      if(rh<Rh*1.3)continue;
+      a=c.th+roll;
+      t=clamp((rh-Rh)/(Rh*1.5+1),0,1);
+      d=1.4+rh*.005*L.sz;
+      whGlPush((cx+Math.cos(a)*rh)*bq,(cy+Math.sin(a)*rh)*bq,(d+rh*sg*1.3)*bq,d*bq,a,c.ci,c.al*c.age*t*.7*k);
+    }
+    if(G.injN>0){
+      G.injGeo.attributes.iP.needsUpdate=true;
+      G.injGeo.attributes.iC.needsUpdate=true;
+      G.injGeo.attributes.iA.needsUpdate=true;
+      G.injGeo.instanceCount=G.injN;
+      if(G.sprTex)G.injMesh.material.uniforms.tSpr.value=G.sprTex;
+      r.autoClear=false;
+      r.render(G.injScene,G.cam);
+      r.autoClear=true;
+    }
+    /* 3) swap RT */
+    pr=G.rtA;G.rtA=G.rtB;G.rtB=pr;
+    /* 4) present rtA → WHG.cv hanya jika composite belum hidup (fallback 2D / whGlSrc). [PATCH G4.12f P1] skip redundan saat #glwh membaca rtA.texture */
+    if(!G.compOk){
+      u.tPrev.value=G.rtA.texture;
+      u.uC.value.set(.5,.5);u.uS.value=1;u.uR.value=0;u.uD.value=1;
+      r.setRenderTarget(null);
+      r.setClearColor(0x02050d,1);
+      r.render(G.scene,G.cam);
+    }
+    return true;
+  }catch(e){
+    whGlFail((e&&e.message)||'step');
+    return false;
+  }
+}
+function whGlSrc(){return (WHG.ok&&WHG.cv)?WHG.cv:bA;}   /* sumber drawImage feedback */
+/* ---------- [PATCH G4.12b] composite layar penuh ---------- */
+function whGlCompEnsure(){
+  var T,G=WHG,geo,mat,cap,pw,ph;
+  if(!G.ok||!G.r)return false;
+  G.fullR=G.r;G.fullCv=G.fullCv||G.cv;   /* [P2] alias satu renderer */
+  if(G.compOk&&G.fullCv&&G.fullW===Math.round(W*dpr)&&G.fullH===Math.round(H*dpr))return true;
+  try{
+    T=THREE;
+    pw=Math.max(64,Math.round(W*dpr));ph=Math.max(64,Math.round(H*dpr));
+    if(!G.compScene){
+      G.compCam=new T.OrthographicCamera(-1,1,1,-1,-1,1);
+      G.compScene=new T.Scene();
+      geo=new T.PlaneGeometry(2,2);
+      mat=new T.ShaderMaterial({
+        uniforms:{tFb:{value:G.dummy},uBloom:{value:0},uBg:{value:new T.Vector3(G.bg[0],G.bg[1],G.bg[2])}},
+        vertexShader:WHG_COMP_VS,fragmentShader:WHG_COMP_FS,depthTest:false,depthWrite:false
+      });
+      G.compMat=mat;G.compMesh=new T.Mesh(geo,mat);G.compMesh.frustumCulled=false;G.compScene.add(G.compMesh);
+      cap=768;G.stCap=cap;
+      G.stGeo=new T.InstancedBufferGeometry();
+      G.stGeo.setAttribute('position',geo.attributes.position);
+      G.stGeo.setAttribute('uv',geo.attributes.uv);
+      G.stGeo.setIndex(geo.index);
+      G.stGeo.setAttribute('iP',new T.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(T.DynamicDrawUsage));
+      G.stGeo.setAttribute('iC',new T.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(T.DynamicDrawUsage));
+      G.stGeo.setAttribute('iW',new T.InstancedBufferAttribute(new Float32Array(cap),1).setUsage(T.DynamicDrawUsage));
+      G.stGeo.instanceCount=0;
+      mat=new T.ShaderMaterial({
+        uniforms:{uRes:{value:new T.Vector2(W,H)}},
+        vertexShader:WHG_ST_VS,fragmentShader:WHG_ST_FS,
+        transparent:true,depthTest:false,depthWrite:false,
+        blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneFactor
+      });
+      G.stMesh=new T.Mesh(G.stGeo,mat);G.stMesh.frustumCulled=false;G.compScene.add(G.stMesh);
+      mat=new T.ShaderMaterial({
+        uniforms:{uC:{value:new T.Vector2(0,0)},uR:{value:1},uA:{value:1},uRes:{value:new T.Vector2(W,H)}},
+        vertexShader:WHG_COMP_VS,fragmentShader:WHG_HOLE_FS,
+        transparent:true,depthTest:false,depthWrite:false,
+        blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor
+      });
+      G.holeMat=mat;G.holeMesh=new T.Mesh(geo.clone(),mat);G.holeMesh.frustumCulled=false;G.compScene.add(G.holeMesh);
+      mat=new T.ShaderMaterial({
+        uniforms:{
+          uC:{value:new T.Vector2(0,0)},uR:{value:1},uEdge:{value:EDGE_SOLID},uFade:{value:1},
+          uRes:{value:new T.Vector2(W,H)},uTm:{value:new T.Vector4(1,0,0,1)},uUseTm:{value:0},uMode:{value:0}
+        },
+        vertexShader:WHG_COMP_VS,fragmentShader:WHG_MASK_FS,
+        transparent:true,depthTest:false,depthWrite:false,
+        blending:T.CustomBlending,blendEquation:T.AddEquation,
+        blendSrc:WHG_GL_ZERO,blendDst:WHG_GL_SRC_ALPHA,
+        blendSrcAlpha:WHG_GL_ZERO,blendDstAlpha:WHG_GL_SRC_ALPHA
+      });
+      G.maskMat=mat;G.maskMesh=new T.Mesh(geo.clone(),mat);G.maskMesh.frustumCulled=false;G.maskMesh.renderOrder=10;G.compScene.add(G.maskMesh);
+      G.teleScene=new T.Scene();
+      G.teleCam=new T.OrthographicCamera(0,1,1,0,-600,600);G.teleCam.position.z=5;
+    }
+    /* setSize drawing buffer = full window; RT feedback tetap half-res terpisah */
+    G.fullCv.width=pw;G.fullCv.height=ph;G.fullR.setSize(pw,ph,false);
+    G.fullW=pw;G.fullH=ph;
+    G.stMesh.material.uniforms.uRes.value.set(W,H);
+    G.holeMat.uniforms.uRes.value.set(pw,ph);
+    if(G.maskMat)G.maskMat.uniforms.uRes.value.set(pw,ph);
+    if(G.teleCam){G.teleCam.left=0;G.teleCam.right=W;G.teleCam.top=H;G.teleCam.bottom=0;G.teleCam.updateProjectionMatrix();}
+    G.compOk=true;
+    return true;
+  }catch(e){
+    G.compOk=false;
+    try{console.warn('[wormhole] composite GL gagal:',e&&e.message);}catch(e2){}
+    return false;
+  }
+}
+function whGlStPush(x0,y0,x1,y1,rgb,al,w){
+  var n=WHG.stN,a,o;
+  if(!WHG.stGeo||n>=WHG.stCap||!(al>.02))return;
+  a=WHG.stGeo.attributes;o=n*4;
+  a.iP.array[o]=x0;a.iP.array[o+1]=y0;a.iP.array[o+2]=x1;a.iP.array[o+3]=y1;
+  a.iC.array[o]=(rgb[0]|0)/255;a.iC.array[o+1]=(rgb[1]|0)/255;a.iC.array[o+2]=(rgb[2]|0)/255;a.iC.array[o+3]=al>1?1:al;
+  a.iW.array[n]=w;
+  WHG.stN=n+1;
+}
+/* true = composite GL berhasil digambar ke #glwh (pemanggil skip 2D feedback/streak/hole/mask) */
+function whGlComposite(cx,cy,r,cvr,Rv,Rh,small,low,tmW){
+  var G=WHG,rdr,i,n,c,L,rh,a,lf,tr,ca,sa,hx,hy,tx,ty,al,w,col,bloom,es;
+  if(!G.ok||!whGlCompEnsure())return false;
+  try{
+    rdr=G.fullR;
+    /* feedback texture */
+    G.compMat.uniforms.tFb.value=G.rtA?G.rtA.texture:G.dummy;
+    bloom=(!low&&WH_DBG.indexOf('nobloom')<0&&!(WH_NOBLOOM&&small))?.45:0;
+    G.compMat.uniforms.uBloom.value=bloom;
+    G.stN=0;
+    n=ST.length;
+    for(i=0;i<n;i++){
+      c=ST[i];
+      if(c.r>dens)continue;
+      L=LAYERS[c.L];
+      rh=Rv*ZN/c.z;
+      if(rh<Rh*1.3)continue;
+      a=c.th+roll;
+      lf=clamp(.17*Math.sqrt(c.v)*c.lf*S.rate,.06,.5);
+      tr=Math.max(Rh*1.05,rh*(1-lf));
+      if(small&&tr>r*1.15)continue;
+      ca=Math.cos(a);sa=Math.sin(a);
+      hx=cx+ca*rh;hy=cy+sa*rh;
+      a-=SPIN*lf/Math.max(.3,c.v);
+      tx=cx+Math.cos(a)*tr;ty=cy+Math.sin(a)*tr;
+      al=c.al*c.age*clamp((rh-Rh)/(Rh*1.5+1),0,1);
+      if(al<.03)continue;
+      w=clamp(.5+rh*.0018*L.sz,.5,2.2);
+      col=STAR_PAL[c.ci]||STAR_PAL[0];
+      whGlStPush(tx,ty,hx,hy,col,al*.55,w);
+      if(!low&&c.L>0){
+        whGlStPush(hx-(hx-tx)*.35,hy-(hy-ty)*.35,hx,hy,col,al,w*1.2);
+        if(c.L>1)whGlStPush(hx-(hx-tx)*.2,hy-(hy-ty)*.2,hx,hy,[255,255,255],al*.9,w*.6);
+      }
+    }
+    if(G.stN>0){
+      G.stGeo.attributes.iP.needsUpdate=true;
+      G.stGeo.attributes.iC.needsUpdate=true;
+      G.stGeo.attributes.iW.needsUpdate=true;
+      G.stGeo.instanceCount=G.stN;
+      G.stMesh.visible=true;
+    }else{G.stMesh.visible=false;G.stGeo.instanceCount=0;}
+    /* hole — uniform dalam piksel FB (×dpr) [G4.12f P0] */
+    var _px=dpr||1;
+    if(state!=='exit'){
+      G.holeMesh.visible=true;
+      G.holeMat.uniforms.uC.value.set(cx*_px,cy*_px);
+      G.holeMat.uniforms.uR.value=Rh*_px;
+      G.holeMat.uniforms.uA.value=1;
+    }else{
+      var uxH=S.u||0,waH=1-sm((uxH-.74)/.26);
+      G.holeMesh.visible=waH>.01;
+      G.holeMat.uniforms.uC.value.set(cx*_px,cy*_px);
+      G.holeMat.uniforms.uR.value=Rh*_px;
+      G.holeMat.uniforms.uA.value=Math.max(0,(1-sm(uxH))*waH);
+    }
+    /* soft mask (small/exit) atau vignette full-screen [G4.12f P1] — FB px */
+    if(G.maskMesh&&G.maskMat){
+      var maskR=r,maskFade=1,es=S.edge||EDGE_SOLID,mode=0;
+      if(state==='exit'){
+        var ux=S.u||0,wk=sm(ux/.78),wa=1-sm((ux-.74)/.26),Rm=Math.min(W,H)*.06;
+        try{
+          var kk=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
+          Rm=(!S.dest&&typeof PT3D!=='undefined'&&PT3D.ovR>2)?PT3D.ovR*kk*(typeof PT_IN==='number'?PT_IN:.745):S.rp*(typeof PT_IN==='number'?PT_IN:.745);
+        }catch(eRm){}
+        if(!(Rm>2))Rm=Math.min(W,H)*.06;
+        maskR=lerp(Math.hypot(W,H)*1.1,Rm,wk);
+        maskFade=wa;es=.7;mode=0;
+      }else if(!small){
+        /* full-screen: source-over gelap tepi (setara gradient 2D alpha .55), bukan destination-in */
+        maskR=Math.hypot(W,H)*.62;es=.45;mode=1;
+      }
+      G.maskMat.uniforms.uC.value.set(cx*_px,cy*_px);
+      G.maskMat.uniforms.uR.value=Math.max(1,maskR*_px);
+      G.maskMat.uniforms.uEdge.value=es;
+      G.maskMat.uniforms.uFade.value=maskFade;
+      G.maskMat.uniforms.uMode.value=mode;
+      if(tmW&&tmW.length>=4){
+        G.maskMat.uniforms.uTm.value.set(tmW[0],tmW[1],tmW[2],tmW[3]);
+        G.maskMat.uniforms.uUseTm.value=1;
+      }else G.maskMat.uniforms.uUseTm.value=0;
+      if(mode>0.5){
+        G.maskMat.blendSrc=WHG_GL_ONE;G.maskMat.blendDst=WHG_GL_ONE_MINUS_SRC_ALPHA;
+        G.maskMat.blendSrcAlpha=WHG_GL_ONE;G.maskMat.blendDstAlpha=WHG_GL_ONE_MINUS_SRC_ALPHA;
+      }else{
+        G.maskMat.blendSrc=WHG_GL_ZERO;G.maskMat.blendDst=WHG_GL_SRC_ALPHA;
+        G.maskMat.blendSrcAlpha=WHG_GL_ZERO;G.maskMat.blendDstAlpha=WHG_GL_SRC_ALPHA;
+      }
+      G.maskMesh.visible=true;
+    }
+    /* render: clear transparent, feedback, streaks, hole, mask */
+    rdr.setClearColor(0x000000,0);
+    rdr.autoClear=true;
+    rdr.setSize(G.fullW,G.fullH,false);
+    G.compMesh.renderOrder=0;G.stMesh.renderOrder=1;G.holeMesh.renderOrder=2;
+    if(G.maskMesh)G.maskMesh.renderOrder=10;
+    rdr.render(G.compScene,G.compCam);
+    /* reset CSS leftovers dari G4.12b */
+    if(G.fullCv){G.fullCv.style.clipPath='none';G.fullCv.style.opacity='1';if(G.fullCv.style.display!=='block')G.fullCv.style.display='block';}
+    return true;
+  }catch(e){
+    try{console.warn('[wormhole] composite:',e&&e.message);}catch(e2){}
+    return false;
+  }
+}
+function whGlCompHide(){
+  if(WHG.fullCv)WHG.fullCv.style.display='none';
+}
+/* [PATCH G4.12c/d] teleskop di present #glwh; [G4.12d] clip setengah-bidang lewat tele RT + shader */
+function whGlTeleWant(){return !!(WHG.compOk&&WHG.fullR&&WHG.teleScene&&WHG.ok&&!WHG.skipTeleGl);}   /* [PATCH G4.12f P1] skipTeleGl saat portal fallback 2D */
+function whGlTeleAttach(grp){
+  if(!whGlTeleWant()||!grp)return false;
+  try{
+    if(grp.parent&&grp.parent!==WHG.teleScene)grp.parent.remove(grp);
+    if(grp.parent!==WHG.teleScene)WHG.teleScene.add(grp);
+    WHG.teleGrp=grp;return true;
+  }catch(e){return false;}
+}
+function whGlTeleDetach(grp){
+  try{if(WHG.teleScene&&grp&&grp.parent===WHG.teleScene)WHG.teleScene.remove(grp);}catch(e){}
+  if(WHG.teleGrp===grp)WHG.teleGrp=null;
+}
+var WHG_CLIP_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+var WHG_CLIP_FS=[
+  'precision mediump float;',
+  'uniform sampler2D tMap;uniform vec2 uP;uniform vec2 uN;uniform float uUseClip;uniform float uA;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  vec4 c=texture2D(tMap,vUv);',
+  '  if(uUseClip>0.5){',
+  '    vec2 p=vec2(vUv.x,1.0-vUv.y);', /* vUv top-left style → match screen y-down if texture from RT */
+  '    /* RT di three: v=0 bawah; p layar: y ke bawah dari atas → pakai frag di present */',
+  '  }',
+  '  gl_FragColor=vec4(c.rgb*uA,c.a*uA);',
+  '}'
+].join('\n');
+/* clip FS memakai gl_FragCoord (lebih andal daripada vUv flip) */
+var WHG_CLIP_FS2=[
+  'precision mediump float;',
+  'uniform sampler2D tMap;uniform vec2 uP;uniform vec2 uN;uniform float uUseClip;uniform float uA;uniform vec2 uRes;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  if(uUseClip>0.5){',
+  '    vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
+  '    if(dot(p-uP,uN)<0.0)discard;',
+  '  }',
+  '  vec4 c=texture2D(tMap,vUv);',
+  '  gl_FragColor=vec4(c.rgb*c.a*uA,c.a*uA);',
+  '}'
+].join('\n');
+function whGlTeleEnsureClip(){
+  var G=WHG,T,pw,ph,geo,mat;
+  if(!G.compOk||!G.fullR)return false;
+  if(G.teleRT&&G.clipMat)return true;
+  try{
+    T=THREE;pw=G.fullW||Math.max(64,Math.round(W*dpr));ph=G.fullH||Math.max(64,Math.round(H*dpr));
+    G.teleRT=new T.WebGLRenderTarget(pw,ph,{depthBuffer:true,stencilBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter});
+    geo=new T.PlaneGeometry(2,2);
+    mat=new T.ShaderMaterial({
+      uniforms:{tMap:{value:G.dummy},uP:{value:new T.Vector2(0,0)},uN:{value:new T.Vector2(1,0)},uUseClip:{value:0},uA:{value:1},uRes:{value:new T.Vector2(W,H)}},
+      vertexShader:WHG_CLIP_VS,fragmentShader:WHG_CLIP_FS2,
+      transparent:true,depthTest:false,depthWrite:false,
+      blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor
+    });
+    G.clipMat=mat;G.clipMesh=new T.Mesh(geo,mat);G.clipMesh.frustumCulled=false;
+    G.clipScene=new T.Scene();G.clipScene.add(G.clipMesh);
+    G.clipCam=new T.OrthographicCamera(-1,1,1,-1,-1,1);
+    return true;
+  }catch(e){return false;}
+}
+function whGlTeleDraw(opacity,clip){
+  var G=WHG,rdr,pr,ac,pw,ph,useClip;
+  if(!whGlTeleWant()||!G.teleGrp)return false;
+  try{
+    rdr=G.fullR;
+    if(G.teleCam.right!==W||G.teleCam.top!==H){
+      G.teleCam.left=0;G.teleCam.right=W;G.teleCam.top=H;G.teleCam.bottom=0;G.teleCam.updateProjectionMatrix();
+    }
+    useClip=!!(clip&&clip.dx!=null&&clip.dy!=null);
+    if(useClip){
+      if(!whGlTeleEnsureClip())return false;
+      pw=G.fullW;ph=G.fullH;
+      if(G.teleRT.width!==pw||G.teleRT.height!==ph){G.teleRT.setSize(pw,ph);}
+      pr=rdr.getRenderTarget();ac=rdr.autoClear;
+      rdr.setRenderTarget(G.teleRT);rdr.setClearColor(0x000000,0);rdr.autoClear=true;
+      rdr.render(G.teleScene,G.teleCam);
+      /* present clipped */
+      G.clipMat.uniforms.tMap.value=G.teleRT.texture;
+      G.clipMat.uniforms.uUseClip.value=1;
+      /* [G4.12f P0] clip point dalam FB px; normal arah (unit) tidak di-scale */
+      G.clipMat.uniforms.uP.value.set(clip.x*(dpr||1),clip.y*(dpr||1));
+      G.clipMat.uniforms.uN.value.set(clip.dx,clip.dy);
+      G.clipMat.uniforms.uA.value=opacity<0?0:(opacity>1?1:opacity);
+      G.clipMat.uniforms.uRes.value.set(G.fullW,G.fullH);
+      rdr.setRenderTarget(null);rdr.autoClear=false;
+      rdr.render(G.clipScene,G.clipCam);
+      rdr.autoClear=ac;rdr.setRenderTarget(pr);
+    }else{
+      pr=rdr.getRenderTarget();ac=rdr.autoClear;
+      rdr.setRenderTarget(null);rdr.autoClear=false;
+      rdr.render(G.teleScene,G.teleCam);
+      rdr.autoClear=ac;rdr.setRenderTarget(pr);
+    }
+    return true;
+  }catch(e){
+    try{console.warn('[wormhole] tele GL:',e&&e.message);}catch(e2){}
+    return false;
+  }
+}
+/* [PATCH G4.12d] portal tunnel: bake portal3dDraw → texture → quad di #glwh */
+function whGlPortalDraw(cx,cy,Rp,now,a,opts){
+  var G=WHG,T,res,cv,gx,src,mat,mesh,S,ang=0,tm=null,tk,pw,ph,rdr,pr,ac,u;
+  if(!G.compOk||!G.fullR||!(Rp>2)||!(a>.01))return false;
+  if(typeof portal3dDraw!=='function')return false;
+  try{
+    T=THREE;
+    res=Math.max(128,Math.min(512,Math.ceil(Rp*2.4*Math.min(2,dpr||1)/32)*32));
+    cv=G.ptCv||(G.ptCv=document.createElement('canvas'));
+    if(cv.width!==res||cv.height!==res){cv.width=res;cv.height=res;}
+    gx=cv.getContext('2d');
+    gx.setTransform(1,0,0,1,0,0);gx.clearRect(0,0,res,res);
+    gx.setTransform(1,0,0,1,res/2,res/2);
+    portal3dDraw(gx,0,0,Rp,now,1,opts||{});
+    if(!G.ptTex){
+      G.ptTex=new T.CanvasTexture(cv);
+      G.ptTex.minFilter=T.LinearFilter;G.ptTex.magFilter=T.LinearFilter;
+      G.ptTex.flipY=true;
+    }else{G.ptTex.image=cv;G.ptTex.needsUpdate=true;}
+    if(!G.ptMesh){
+      mat=new T.MeshBasicMaterial({map:G.ptTex,transparent:true,depthTest:false,depthWrite:false,opacity:1,toneMapped:false});
+      G.ptMat=mat;
+      G.ptMesh=new T.Mesh(new T.PlaneGeometry(1,1),mat);
+      G.ptMesh.frustumCulled=false;
+      if(!G.ptScene){G.ptScene=new T.Scene();G.ptCam=new T.OrthographicCamera(0,1,1,0,-10,10);G.ptCam.position.z=5;}
+      G.ptScene.add(G.ptMesh);
+    }
+    G.ptMat.map=G.ptTex;G.ptMat.opacity=a>1?1:a;G.ptMat.transparent=true;
+    /* ukuran di layar: portal3dDraw radius Rp = outer; kanvas res mencakup ~2.4*Rp diameter → scale = res/2.4 in CSS px? 
+       Kita menggambar di pusat 0,0 dengan Rp dalam px layar di context yang ditranslate res/2 — jadi diameter visual di texture ≈ 2*Rp*scale di mana scale=1 di unit px.
+       Transform gx: unit = 1 px layar; texture width res px mewakili res layar-px → quad size = res (CSS px) */
+    S=res; /* full texture size in CSS px */
+    G.ptMesh.position.set(cx,H-cy,0);
+    G.ptMesh.scale.set(S,S,1);
+    tk=(opts&&opts.tilt)||0;
+    if(tk>0.001&&typeof ptTiltAng==='function'&&typeof ptTiltMat==='function'){
+      /* approx: apply rotation only from tilt angle around Z is incomplete for affine; bake already includes tilt in 2D */
+    }
+    G.ptCam.left=0;G.ptCam.right=W;G.ptCam.top=H;G.ptCam.bottom=0;G.ptCam.updateProjectionMatrix();
+    rdr=G.fullR;pr=rdr.getRenderTarget();ac=rdr.autoClear;
+    rdr.setRenderTarget(null);rdr.autoClear=false;
+    rdr.render(G.ptScene,G.ptCam);
+    rdr.autoClear=ac;rdr.setRenderTarget(pr);
+    G.ptOk=true;
+    return true;
+  }catch(e){
+    G.ptOk=false;
+    try{console.warn('[wormhole] portal GL:',e&&e.message);}catch(e2){}
+    return false;
+  }
+}
+/* [PATCH G4.12e] rim glow mulut + flash layar di #glwh (di BAWAH tele, di ATAS portal) — stacking = 2D */
+var WHG_RIM_FS=[
+  'precision mediump float;',
+  'uniform vec2 uC;uniform float uR;uniform float uA;uniform vec2 uRes;',
+  'void main(){',
+  '  vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
+  '  float d=distance(p,uC)/max(uR,1.0);',
+  '  float ring=smoothstep(0.70,0.95,d)*(1.0-smoothstep(1.05,1.30,d));',
+  '  float a=uA*ring;',
+  '  gl_FragColor=vec4(0.47,0.65,1.0,1.0)*a;',
+  '}'
+].join('\n');
+var WHG_FLASH_FS=[
+  'precision mediump float;',
+  'uniform float uA;',
+  'void main(){gl_FragColor=vec4(0.894,0.976,1.0,1.0)*uA;}',
+].join('\n');
+function whGlOverlayEnsure(){
+  var G=WHG,T,geo,mat;
+  if(!G.compOk||!G.fullR)return false;
+  if(G.rimMesh&&G.flashMesh)return true;
+  try{
+    T=THREE;geo=new T.PlaneGeometry(2,2);
+    if(!G.ovScene){G.ovScene=new T.Scene();G.ovCam=new T.OrthographicCamera(-1,1,1,-1,-1,1);}
+    mat=new T.ShaderMaterial({
+      uniforms:{uC:{value:new T.Vector2(0,0)},uR:{value:1},uA:{value:0},uRes:{value:new T.Vector2(W,H)}},
+      vertexShader:WHG_COMP_VS,fragmentShader:WHG_RIM_FS,
+      transparent:true,depthTest:false,depthWrite:false,
+      blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneFactor
+    });
+    G.rimMat=mat;G.rimMesh=new T.Mesh(geo,mat);G.rimMesh.frustumCulled=false;G.ovScene.add(G.rimMesh);
+    mat=new T.ShaderMaterial({
+      uniforms:{uA:{value:0}},
+      vertexShader:WHG_COMP_VS,fragmentShader:WHG_FLASH_FS,
+      transparent:true,depthTest:false,depthWrite:false,
+      blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor
+    });
+    G.flashMat=mat;G.flashMesh=new T.Mesh(geo.clone(),mat);G.flashMesh.frustumCulled=false;G.ovScene.add(G.flashMesh);
+    return true;
+  }catch(e){return false;}
+}
+function whGlRim(cx,cy,r,al){
+  var G=WHG,rdr,pr,ac;
+  if(!(al>.01)||!(r>1)||!whGlOverlayEnsure())return false;
+  try{
+    G.rimMesh.visible=true;G.flashMesh.visible=false;
+    G.rimMat.uniforms.uC.value.set(cx*(dpr||1),cy*(dpr||1));
+    G.rimMat.uniforms.uR.value=r*(dpr||1);
+    G.rimMat.uniforms.uA.value=al>1?1:al;
+    G.rimMat.uniforms.uRes.value.set(G.fullW||Math.round(W*(dpr||1)),G.fullH||Math.round(H*(dpr||1)));
+    rdr=G.fullR;pr=rdr.getRenderTarget();ac=rdr.autoClear;
+    rdr.setRenderTarget(null);rdr.autoClear=false;
+    rdr.render(G.ovScene,G.ovCam);
+    rdr.autoClear=ac;rdr.setRenderTarget(pr);
+    return true;
+  }catch(e){return false;}
+}
+function whGlFlash(al){
+  var G=WHG,rdr,pr,ac;
+  if(!(al>.01)||!whGlOverlayEnsure())return false;
+  try{
+    G.rimMesh.visible=false;G.flashMesh.visible=true;
+    G.flashMat.uniforms.uA.value=Math.min(1,al);
+    rdr=G.fullR;pr=rdr.getRenderTarget();ac=rdr.autoClear;
+    rdr.setRenderTarget(null);rdr.autoClear=false;
+    rdr.render(G.ovScene,G.ovCam);
+    rdr.autoClear=ac;rdr.setRenderTarget(pr);
+    return true;
+  }catch(e){return false;}
 }
 function init(){
   if(inited||!usable())return inited&&ok;
@@ -220,6 +991,8 @@ function hide(){
   try{if(S){S.freshLeft=0;S.freshR=0;}}catch(eF){}
   if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}
   try{if(typeof tele3dGlLeave==='function')tele3dGlLeave(2);}catch(eTv){}   /* [G4.6] overlay teleskop GL dilepas (Group balik ke scene; pass atas GLSky sudah mengambil alih di handoff) */
+  try{whGlClear();}catch(eWgh){}   /* [PATCH G4.12] kosongkan RT, konteks GL tetap hidup untuk dive berikutnya */
+  try{whGlCompHide();if(WHG.fullCv){WHG.fullCv.style.clipPath='none';WHG.fullCv.style.opacity='1';}}catch(eWgc2){}   /* [PATCH G4.12b] */
 }
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
 /* ---- recorder FPS on-device (?whperf=1): implementasi PINDAH ke 19-auto-debug.js (installWP). Di sini cuma hook tipis.
@@ -334,6 +1107,8 @@ function dot(x,ci,px,py,w,len,ang,al){
 }
 /* satu langkah feedback: buffer lama di-zoom+putar+redam ke buffer baru, lalu suntik blob dinding, debu, kilau, dan kepala bintang */
 function stepBuf(dt,cx,cy,Rv,Rh,adv){
+  /* [PATCH G4.12] coba feedback GL dulu; gagal/mati → jalur 2D lama utuh */
+  if(whGlWant()&&(WHG.ok||whGlEnsure(bw,bh))&&whGlStep(dt,cx,cy,Rv,Rh,adv))return;
   var s=Math.exp(ZOOM*adv),rot=SPIN*adv,co=Math.cos(rot)*s,si=Math.sin(rot)*s,x=cx*bq,y=cy*bq,
       dec=Math.pow(DECAY,dt*60),k=Math.min(1.6,dt*60),sg=s-1,
       i,n=ST.length,c,L,rh,a,rr,d,ci,f,t,ang,ga;
@@ -507,10 +1282,23 @@ function drawFrame(dt,cx,cy,r,cvr){
   /* kanvas ini = koordinat LAYAR asli (tidak ikut #stage yang diputar), jadi TIDAK boleh rotate(upAng()) — itu bikin cincin/mulut miring balik ke sumbu portrait saat landscape */
   var mouthXf=function(){g.translate(cx,cy);if(tmW)g.transform(tmW[0],tmW[1],tmW[2],tmW[3],0,0);};
   if(small){g.save();mouthXf();g.beginPath();g.arc(0,0,Math.max(1,r*1.06),0,6.283185307);g.restore();g.clip();}   /* batas kerja saja; tepi tampak asli dibentuk mask alpha di bawah, bukan potongan ini */
+  /* [PATCH G4.12b] composite GL penuh (feedback+streak+hole) → #glwh; #wh-canvas transparan utk portal */
+  var glComp=false;
+  try{if(WHG.ok)glComp=whGlComposite(cx,cy,r,cvr,Rv,Rh,small,low,tmW);}catch(eGc){glComp=false;}
+  if(glComp){
+    g.setTransform(dpr,0,0,dpr,0,0);
+    g.globalCompositeOperation='source-over';g.globalAlpha=1;
+    g.clearRect(0,0,W,H);   /* 2D hanya portal di atas #glwh */
+    if(WP)wpM('comp');
+    if(WP)wpM('streak');
+  }else{
+  try{whGlCompHide();}catch(eGh){}
   g.fillStyle=BG;g.fillRect(0,0,W,H);
   g.imageSmoothingEnabled=true;
-  g.drawImage(bA,0,0,bw,bh,0,0,W,H);
-  if(!low&&WH_DBG.indexOf('nobloom')<0&&!(WH_NOBLOOM&&small)){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(bA,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
+  /* [PATCH G4.12] sumber feedback: kanvas WebGL (WHG.cv) kalau GL hidup, else bA 2D */
+  var fbSrc=whGlSrc();
+  g.drawImage(fbSrc,0,0,bw,bh,0,0,W,H);
+  if(!low&&WH_DBG.indexOf('nobloom')<0&&!(WH_NOBLOOM&&small)){g.globalCompositeOperation='lighter';g.globalAlpha=.45;g.drawImage(fbSrc,0,0,bw,bh,0,0,W,H);}   /* bloom murah: gambar buffer sekali lagi aditif */
 
   if(WP)wpM('comp');
   /* streak bintang tajam: garis tipis radial, ekor makin panjang kalau makin dekat tepi (perspektif) */
@@ -544,8 +1332,11 @@ function drawFrame(dt,cx,cy,r,cvr){
   if(WP)wpM('streak');
   /* pusat: lubang hitam dengan tepi lembut. Saat exit digambar SETELAH dinding dihapus (lihat bawah), dengan alpha yang memudar */
   if(state!=='exit')holeDisc(cx,cy,Rh,1);
-  /* vignette: portal mini = gelap di tepi lingkaran; layar penuh = tepi layar sedikit digelapkan */
-  if(small){
+  } /* end !glComp */
+  /* [PATCH G4.12c] vignette/mask: GL sudah di shader; 2D hanya jika !glComp */
+  if(glComp){
+    /* mask + exit sudah di whGlComposite */
+  }else if(small){
     /* tepi mulut portal: alpha diluruhkan halus ke 0 (destination-in) -> terowongan menyatu dengan sky di bawahnya, tanpa potongan keras / vignette gelap */
     g.globalCompositeOperation='destination-in';
     gr=tmW?g.createRadialGradient(0,0,0,0,0,Math.max(1,r)):g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,r));
@@ -560,7 +1351,7 @@ function drawFrame(dt,cx,cy,r,cvr){
     gr.addColorStop(0,'rgba(2,5,13,0)');gr.addColorStop(1,'rgba(2,5,13,.55)');
     g.fillStyle=gr;g.fillRect(0,0,W,H);
   }
-  if(state==='exit'){   /* dinding terowongan memudar dari PINGGIR layar ke tengah: batas dinding menyusut sampai seukuran mulut portal tujuan (miring mengikuti kemiringan cincin overview), lalu memudar habis */
+  if(!glComp&&state==='exit'){   /* dinding terowongan memudar dari PINGGIR layar ke tengah: batas dinding menyusut sampai seukuran mulut portal tujuan (miring mengikuti kemiringan cincin overview), lalu memudar habis */
     var ux=S.u,wk=sm(ux/.78),wa=1-sm((ux-.74)/.26),Rm,tkE=0,tmE=null,re,fe=.3,BIGE=Math.hypot(W,H)*2;
     try{
       var kk=(typeof STG!=='undefined'&&STG.on&&!STG.rot&&STG.k)?STG.k:1;
@@ -581,25 +1372,42 @@ function drawFrame(dt,cx,cy,r,cvr){
   }
   g.restore();
   g.setTransform(dpr,0,0,dpr,0,0);
-  if(small&&RIM_GLOW>0&&S.rim>.02){   /* kilau lembut di sekitar mulut (bukan garis): halo tipis yang memudar ke dua arah */
-    g.globalCompositeOperation='lighter';
-    gr=g.createRadialGradient(cx,cy,r*.7,cx,cy,r*1.25);
-    gr.addColorStop(0,'rgba(120,165,255,0)');gr.addColorStop(.55,'rgba(120,165,255,'+(RIM_GLOW*S.rim).toFixed(3)+')');gr.addColorStop(1,'rgba(120,165,255,0)');
-    g.fillStyle=gr;g.beginPath();g.arc(cx,cy,r*1.25,0,6.283185307);g.fill();
-    g.globalCompositeOperation='source-over';
+  /* [PATCH G4.12e] rim: GL di #glwh; 2D hanya !glComp */
+  if(small&&RIM_GLOW>0&&S.rim>.02){
+    if(glComp){try{whGlRim(cx,cy,r,RIM_GLOW*S.rim);}catch(eRim){}}
+    else{
+      g.globalCompositeOperation='lighter';
+      gr=g.createRadialGradient(cx,cy,r*.7,cx,cy,r*1.25);
+      gr.addColorStop(0,'rgba(120,165,255,0)');gr.addColorStop(.55,'rgba(120,165,255,'+(RIM_GLOW*S.rim).toFixed(3)+')');gr.addColorStop(1,'rgba(120,165,255,0)');
+      g.fillStyle=gr;g.beginPath();g.arc(cx,cy,r*1.25,0,6.283185307);g.fill();
+      g.globalCompositeOperation='source-over';
+    }
   }
   if(WP)wpM('vig');
-  /* cincin portal ikut membesar (zoom-in): digambar DI ATAS dinding terowongan, memudar saat sudah hampir memenuhi layar */
+  /* cincin portal; [G4.12f P1] bake gagal + glComp → portal 2D + skipTeleGl (tele ke #glscope z14, stacking aman) */
+  WHG.skipTeleGl=false;
   if(S.ring&&small&&typeof portal3dDraw==='function'&&WH_DBG.indexOf('noring')<0){
-    var ra=(1-sm((r/cvr-.3)/.55))*ringFade();   /* sektor: BH mini di #sky masih tampak -> cincin fade-in selagi BH fade-out (tidak ganda) */
-    if(typeof PX!=='undefined'){if(WH_DBG.indexOf('noringgl')>=0)PX.ptr=1;if(WH_DBG.indexOf('nobolt')>=0)PX.ptb=1;}   /* v14 diagnosa: noringgl = tanpa cincin GL (bolt/kilau 2D tetap), nobolt = tanpa petir+kilau+percikan 2D (GL tetap) */
-    if(ra>.01){try{portal3dDraw(g,cx,cy,r/(typeof PT_IN==='number'?PT_IN:.745),performance.now(),ra,{noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr),lq:WH_DBG.indexOf('ringhq')<0,alt2:WH_RING});}catch(eR){}}
+    var ra=(1-sm((r/cvr-.3)/.55))*ringFade();
+    if(typeof PX!=='undefined'){if(WH_DBG.indexOf('noringgl')>=0)PX.ptr=1;if(WH_DBG.indexOf('nobolt')>=0)PX.ptb=1;}
+    if(ra>.01){
+      var pOpt={noMouth:true,noRot:true,ch:1,tilt:ptWhTilt(r/cvr),lq:WH_DBG.indexOf('ringhq')<0,alt2:WH_RING},
+          RpP=r/(typeof PT_IN==='number'?PT_IN:.745),nowP=performance.now(),didPt=false;
+      if(glComp){try{didPt=whGlPortalDraw(cx,cy,RpP,nowP,ra,pOpt);}catch(ePg){didPt=false;}}
+      if(!didPt){
+        if(glComp)WHG.skipTeleGl=true;   /* tele tidak di #glwh agar portal 2D di z13 tidak menutup badan */
+        try{portal3dDraw(g,cx,cy,RpP,nowP,ra,pOpt);}catch(eR){}
+      }
+    }
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;
   }
   if(WP)wpM('ring');
-  if(S.fl>.01){   /* kilat layar (di BAWAH teleskop supaya keluarnya dari portal tetap kelihatan) menjelang tiba di portal tujuan */
-    g.globalCompositeOperation='source-over';g.globalAlpha=1;
-    g.fillStyle='rgba(228,249,255,'+Math.min(1,S.fl*.96).toFixed(3)+')';g.fillRect(0,0,W,H);
+  /* [PATCH G4.12e] flash di #glwh sebelum tele (2D: di bawah tele di kanvas yang sama) */
+  if(S.fl>.01){
+    if(glComp){try{whGlFlash(Math.min(1,S.fl*.96));}catch(eFl){}}
+    else{
+      g.globalCompositeOperation='source-over';g.globalAlpha=1;
+      g.fillStyle='rgba(228,249,255,'+Math.min(1,S.fl*.96).toFixed(3)+')';g.fillRect(0,0,W,H);
+    }
   }
   /* teleskop: melayang mengikuti lubang hitam terowongan (travel), lalu keluar dari tengah portal tujuan (exit) */
   if(S.carry&&state==='travel'){
@@ -760,9 +1568,25 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:'')};},
-  dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;}
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why};},
+  dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;},
+  /* [PATCH G4.12] status feedback GL */
+  get gl(){return !!(WHG.ok&&WHG.on);},
+  get glOn(){return !!WHG.on;},
+  glWHG:WHG,
+  /* [PATCH G4.12c] API teleskop present #glwh (dipakai 13-scope3d tele3dTopDraw) */
+  teleWant:whGlTeleWant,
+  teleAttach:whGlTeleAttach,
+  teleDetach:whGlTeleDetach,
+  teleDraw:whGlTeleDraw
 };
+/* bridge global utk 13-scope3d (IIFE wormhole) */
+try{
+  window.whGlTeleWant=whGlTeleWant;
+  window.whGlTeleAttach=whGlTeleAttach;
+  window.whGlTeleDetach=whGlTeleDetach;
+  window.whGlTeleDraw=whGlTeleDraw;
+}catch(eBr){}
 
 window.addEventListener('resize',function(){if(state!=='idle'&&cv)resize();},{passive:true});
 /* bake atlas ~puluhan ms: lakukan saat idle supaya transisi pertama tidak patah (HP lemah: lazy). */
