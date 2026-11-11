@@ -947,6 +947,13 @@ function ptGlSegPath(P,Rin,f,px,py,tm,ang,w,rgb,al,soft,lv){
     glskySegL(lv,a[0],a[1],b[0],b[1],w,rgb,al,soft);
   }
 }
+/* [G4.17] ripple (sprite cincin lembut) di BIDANG cincin: posisi (lx,ly) = koordinat lokal cincin (px), dipetakan lewat kemiringan tm + rotasi layar ang; sprite ikut jadi elips lewat affine tm
+   (jalur 2D menggambar ini di bawah g.transform(tm), jadi bulatan = elips miring). hi = renderOrder literal. Pakai sprite getRingSprite yang sama dengan drawRipple. */
+function ptGlRipple(lx,ly,r,rgb,alpha,glow,px,py,tm,ang,hi){
+  if(!(alpha>.012)||!(r>1.5)||typeof getRingSprite!=='function'||typeof glskyImg!=='function')return;
+  var q=ptGlMap(lx,ly,px,py,tm,ang),sp=getRingSprite(rgb,Math.round(r*2)/2,glow),pa=(typeof g!=='undefined'&&g)?g.globalAlpha:1;
+  glskyImg(sp.c,pa*Math.min(1,alpha),q[0],q[1],sp.pad*2,sp.pad*2,ang,1,hi,tm);
+}
 function portal3dGlRing(now){
   try{
     if(typeof glskyPortalOn!=='function'||!glskyPortalOn())return false;
@@ -1019,7 +1026,7 @@ function portal3dGlRing(now){
         var i,j,b,u,fl,al,P,sc,mf,f,e,sk=(now-PT3D.spkT)/180;
         if(sk>=0&&sk<1){
           /* kilat mulut: soft fill via ring sprite */
-          try{drawRipple(px,py,Rin,PT3D_CFG.boltCol||'255,255,255',.2*(1-sk)*(1-sk),true);}catch(eSk){}
+          try{ptGlRipple(0,0,Rin,PT3D_CFG.boltCol||'255,255,255',.2*(1-sk)*(1-sk),true,px,py,tm,ang,1);}catch(eSk){}   /* [G4.17] elips mengikuti mulut miring (dulu bulatan penuh di px,py) */
         }
         for(i=B.length-1;i>=0;i--){
           b=B[i];e=now-b.t0;u=e/b.d;mf=e>=b.g?1:e/b.g;
@@ -1094,10 +1101,9 @@ function portal3dGlRing(now){
           if(uu>=1||uu<0){Sp.splice(si2,1);continue;}
           if(s.k){
             al2=(1-uu)*(1-uu)*s.a;
-            try{GLSKY.hiOv=5104;
-                drawRipple(px+s.x*Rin,py+s.y*Rin,Rin*.15*(1+.6*uu),PT3D_CFG.sparkCol||'255,214,140',.35*al2,true);
-                drawRipple(px+s.x*Rin,py+s.y*Rin,Rin*.05,PT3D_CFG.boltCol||'255,255,255',.9*al2,true);}catch(eR){}
-            GLSKY.hiOv=0;
+            try{   /* [G4.17] posisi titik sambar dipetakan lewat tm+ang (dulu px+s.x*Rin: tidak ikut kemiringan/rotasi -> glow melenceng dari tepi cincin) */
+                ptGlRipple(s.x*Rin,s.y*Rin,Rin*.15*(1+.6*uu),PT3D_CFG.sparkCol||'255,214,140',.35*al2,true,px,py,tm,ang,5104);
+                ptGlRipple(s.x*Rin,s.y*Rin,Rin*.05,PT3D_CFG.boltCol||'255,255,255',.9*al2,true,px,py,tm,ang,5104);}catch(eR){}
             continue;
           }
           t=(now-s.t0)/1000;t2=Math.max(0,t-.04);var k2=1-.35*uu;
