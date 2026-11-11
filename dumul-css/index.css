@@ -586,6 +586,7 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 /* Hard cut the old Gargantua renderer behind the transition. The transition owns the screen now. */
 body.tesseract-running #sky,
 body.tesseract-running #glsky,
+body.tesseract-running #gldrone,
 body.tesseract-running .scan,
 body.tesseract-running #header,
 body.tesseract-running footer,
