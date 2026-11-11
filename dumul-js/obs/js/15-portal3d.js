@@ -932,19 +932,19 @@ function ptGlMap(lx,ly,px,py,tm,ang){
   if(ang){c=Math.cos(ang);s=Math.sin(ang);nx=c*x-s*y;ny=s*x+c*y;x=nx;y=ny;}
   return [px+x,py+y];
 }
-function ptGlSegPath(P,Rin,f,px,py,tm,ang,w,rgb,al,soft){
+function ptGlSegPath(P,Rin,f,px,py,tm,ang,w,rgb,al,soft,lv){
   var n=P.length/2,tot=f*(n-1),full=tot|0,k,fr,a,b,x0,y0,x1,y1;
   if(n<2||f<=0)return;
   a=ptGlMap(P[0]*Rin,P[1]*Rin,px,py,tm,ang);
   for(k=1;k<=full&&k<n;k++){
     b=ptGlMap(P[2*k]*Rin,P[2*k+1]*Rin,px,py,tm,ang);
-    glskySeg(a[0],a[1],b[0],b[1],w,rgb,al,soft);a=b;
+    glskySegL(lv,a[0],a[1],b[0],b[1],w,rgb,al,soft);a=b;
   }
   if(full<n-1){
     fr=tot-full;
     x0=P[2*full];y0=P[2*full+1];x1=P[2*full+2];y1=P[2*full+3];
     b=ptGlMap((x0+(x1-x0)*fr)*Rin,(y0+(y1-y0)*fr)*Rin,px,py,tm,ang);
-    glskySeg(a[0],a[1],b[0],b[1],w,rgb,al,soft);
+    glskySegL(lv,a[0],a[1],b[0],b[1],w,rgb,al,soft);
   }
 }
 function portal3dGlRing(now){
@@ -1032,10 +1032,10 @@ function portal3dGlRing(now){
             if(j){e=b.br[j-1];P=e.p;sc=e.s;f=(mf-e.at)/e.den;if(f<=0)continue;if(f>1)f=1;}
             else{P=b.p;sc=1;f=mf;}
             if(GL>.02){
-              ptGlSegPath(P,Rin,f,px,py,tm,ang,Math.max(.6,Math.max(1.6,Rin*.11*BW*sc)*GL),bc,.22*al*(.5+.5*GL),1);
-              ptGlSegPath(P,Rin,f,px,py,tm,ang,Math.max(.6,Math.max(1.1,Rin*.045*BW*sc)*(.5+.5*GL)),bc,.55*al,1);
+              ptGlSegPath(P,Rin,f,px,py,tm,ang,Math.max(.6,Math.max(1.6,Rin*.11*BW*sc)*GL),bc,.22*al*(.5+.5*GL),1,2);
+              ptGlSegPath(P,Rin,f,px,py,tm,ang,Math.max(.6,Math.max(1.1,Rin*.045*BW*sc)*(.5+.5*GL)),bc,.55*al,1,2);
             }
-            ptGlSegPath(P,Rin,f,px,py,tm,ang,Math.max(.7,Rin*.016*sc),bc,.95*al,0);
+            ptGlSegPath(P,Rin,f,px,py,tm,ang,Math.max(.7,Rin*.016*sc),bc,.95*al,0,2);
           }
         }
       }
@@ -1044,8 +1044,12 @@ function portal3dGlRing(now){
     /* --- cincin 3D offscreen → texture GL (bukan ke #sky 2D) --- */
     var want=pt3dRes(Rd);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
     var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!(ch>0))||!!ova;
-    var reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&now-PT3D.ccT<(ova?900:140);
+    /* [G4.16 FIX] selang-seling cincin = hitungan FRAME (FS.n), persis jalur 2D (alt2: FS.n%periode; FS.slow tanpa ova: ganjil/genap). Dulu berbasis waktu (ova?900:140 ms): saat governor 'heavy' nyala (30 fps) cincin cuma
+       dirender ulang ±1x/dtk (spin/lampu plat loncat-loncat), padahal 2D tiap 2-3 frame. */
+    var fsn=(typeof FS!=='undefined')?(FS.n|0):0,
+        reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(ova?(fsn%(ova>1?ova:2))!==0:(fsn&1)===1),rendered=false;
     if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
+      rendered=true;
       PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rd,playing,tk);
       if(alt){
         var rs=PT3D.res;
@@ -1062,8 +1066,8 @@ function portal3dGlRing(now){
     var S=2*PT3D_CFG.half*Rd;
     var _cs=PT3D.ccSn?((PT3D.ccSnN===PT3D.snN&&threeGLSrc(PT3D.gl)===PT3D.gl.sn)?PT3D.gl.sn:null):PT3D.cc;
     var _src=((reuse||(ova&&PT3D.ccOK))&&_cs)?_cs:threeGLSrc(PT3D.gl);
-    _src.__gldyn=1;   /* [FIX] kanvas cincin 3D (GL renderer portal / snapshot / cache) berubah tiap render -> upload ulang per frame */
-    glskyImg(_src,1,px,py,S,S,ang,0,1);
+    _src.__gldyn=(rendered||!reuse)?1:0;   /* [FIX] kanvas cincin 3D berubah tiap RENDER -> upload ulang; frame reuse (isi sama persis) tidak upload lagi (dulu upload tiap frame) */
+    glskyImg(_src,1,px,py,S,S,ang,0,5102);   /* [G4.16] cincin 5102: di atas mulut (5100) + petir (5101), di bawah kilau charge + percikan (5103) */
 
     /* --- kilau charge di atas cincin --- */
     if(!PXo.ptb&&ch>0){
@@ -1076,7 +1080,7 @@ function portal3dGlRing(now){
           t0=a0+(a1-a0)*si/nSeg;t1=a0+(a1-a0)*(si+1)/nSeg;
           p0=ptGlMap(Math.cos(-t0)*rr,Math.sin(-t0)*rr,px,py,tm,ang);
           p1=ptGlMap(Math.cos(-t1)*rr,Math.sin(-t1)*rr,px,py,tm,ang);
-          glskySeg(p0[0],p0[1],p1[0],p1[1],Rd*(1-PT3D_CFG.inR)*1.25,rc,.30*v,1);
+          glskySegL(3,p0[0],p0[1],p1[0],p1[1],Rd*(1-PT3D_CFG.inR)*1.25,rc,.30*v,1);
         }
       }
     }
@@ -1090,16 +1094,18 @@ function portal3dGlRing(now){
           if(uu>=1||uu<0){Sp.splice(si2,1);continue;}
           if(s.k){
             al2=(1-uu)*(1-uu)*s.a;
-            try{drawRipple(px+s.x*Rin,py+s.y*Rin,Rin*.15*(1+.6*uu),PT3D_CFG.sparkCol||'255,214,140',.35*al2,true);
+            try{GLSKY.hiOv=5104;
+                drawRipple(px+s.x*Rin,py+s.y*Rin,Rin*.15*(1+.6*uu),PT3D_CFG.sparkCol||'255,214,140',.35*al2,true);
                 drawRipple(px+s.x*Rin,py+s.y*Rin,Rin*.05,PT3D_CFG.boltCol||'255,255,255',.9*al2,true);}catch(eR){}
+            GLSKY.hiOv=0;
             continue;
           }
           t=(now-s.t0)/1000;t2=Math.max(0,t-.04);var k2=1-.35*uu;
           pA=ptGlMap((s.x+s.vx*t*k2)*Rin,(s.y+s.vy*t*k2)*Rin,px,py,tm,ang);
           pB=ptGlMap((s.x+s.vx*t2*k2)*Rin,(s.y+s.vy*t2*k2)*Rin,px,py,tm,ang);
           al2=(1-uu)*(1-uu)*s.a*(.65+.35*Math.sin(now*.05+s.w*20));
-          glskySeg(pB[0],pB[1],pA[0],pA[1],Math.max(1.3,Rin*.032),scC,.85*al2,1);
-          glskySeg(pB[0],pB[1],pA[0],pA[1],Math.max(.7,Rin*.012),bc2,.95*al2,0);
+          glskySegL(3,pB[0],pB[1],pA[0],pA[1],Math.max(1.3,Rin*.032),scC,.85*al2,1);
+          glskySegL(3,pB[0],pB[1],pA[0],pA[1],Math.max(.7,Rin*.012),bc2,.95*al2,0);
         }
       }catch(eS){}
     }
@@ -1107,7 +1113,8 @@ function portal3dGlRing(now){
     /* tip denyut idle (petunjuk tap) ikut GL */
     if(!OVSEL.seen&&!op.hid&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
       var ph=(now%2600)/2600,tipR=Rd*(1.04+.26*ph);
-      try{drawRipple(px,py,tipR,ptCol(),.38*(1-ph),false);}catch(eT){}
+      try{GLSKY.hiOv=5104;drawRipple(px,py,tipR,ptCol(),.38*(1-ph),false);}catch(eT){}
+      GLSKY.hiOv=0;
     }
 
     PT3D.glRingT=now;PT3D.ovR=Rp;PT3D.ovT=now;PT3D.ovX=px;PT3D.ovY=py;PT3D.ovHid=op.hid;

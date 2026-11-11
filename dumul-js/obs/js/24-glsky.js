@@ -50,7 +50,7 @@
    Pola penanda uji: sudut kiri-atas MERAH, kanan-atas HIJAU, kiri-bawah BIRU, kanan-bawah KUNING (kalau tertukar = arah y / rotasi salah). */
 var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:false,base:'#050b12',want:false,
   r:null,scene:null,cam:null,root:null,cv:null,mo:null,W:0,H:0,pw:0,ph:0,S:1,sCap:99,mwSnap:0,shown:true,px:null,tm:null,
-  vig:.34,drift:0,rec:false,fxOn:true,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,bs:null,bl:null,ms:null,ml:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
+  vig:.34,drift:0,rec:false,fxOn:true,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,ln2:0,ln3:0,hiOv:0,bs:null,bl:null,bl2:null,bl3:null,ms:null,ml:null,ml2:null,ml3:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   /* [PATCH G4.1] unit 3D yang di-attach ke scene bersama (batu belakang dulu); astOn = A/B ?glast=0 */
   /* [PATCH G3d] bhShockOn = A/B ?glbhshock=0 */
   units:[],tScene:null,tCam:null,tUnits:[],oR:null,oCv:null,oScene:null,oCam:null,oOk:false,oErr:0,oPw:0,oPh:0,astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
@@ -215,7 +215,7 @@ function glskyDrift(o,c){
 /* gambar canvas c: pusat (cx,cy), ukuran w x h (px stage), rotasi rad (searah canvas.rotate), add=1 'lighter', add=2 'multiply' */
 /* aff (opsional) = [a,b,c,d] affine 2x2 gaya g.transform/ptTiltMat (x'=a*x+c*y, y'=b*x+d*y) yang dikenakan pada quad SEBELUM rotasi rot, mis. mulut portal yang ikut kemiringan cincin */
 function glskyImg(c,a,cx,cy,w,h,rot,add,hi,aff){
-  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;o.hi=hi?1:0;o.aff=aff||null;   /* [PATCH G3d] hi=1 -> renderOrder 5100 */
+  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;o.hi=GLSKY.hiOv?GLSKY.hiOv:(hi>=1000?hi:(hi?1:0));o.aff=aff||null;   /* [G4.16] hi >= 1000 = renderOrder literal (urutan di dalam portal: mulut 5100 < petir 5101 < cincin 5102 < kilau+percikan 5103); GLSKY.hiOv (sementara) menimpa hi untuk efek kecil yang dipanggil lewat drawRipple   /* [PATCH G3d] hi=1 -> renderOrder 5100 */
   glskyDrift(o,c);
 }
 /* ekuivalen plateBlit(c,m,pw,ph,z,ox,oy) 02-sky-logic.js: zoom z di sekitar pusat layar + offset (ox,oy); alpha = g.globalAlpha saat dipanggil */
@@ -327,7 +327,12 @@ function glskyInstBuild(T){
   S.bl=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],6144);    /* ruas garis: kapasitas 6144 */
   S.ml=GLSKY_T_MESH(T,S.bl,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},5000);   /* renderOrder 5000+ = di atas semua op latar (10+i) dan vignette */
   S.ms=GLSKY_T_MESH(T,S.bs,GLSKY_STAR_VS,GLSKY_STAR_FS,{uS:{value:1}},5001);
-  S.layers.add(S.ml);S.layers.add(S.ms);
+  /* [G4.16] mesh garis tingkat 2/3 (portal overview): petir DI ATAS mulut (5100) tapi di bawah cincin (5102); kilau charge + percikan DI ATAS cincin. Mesh garis utama 5000 selalu di bawah semua op hi (5100+). */
+  S.bl2=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],1536);
+  S.bl3=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],1536);
+  S.ml2=GLSKY_T_MESH(T,S.bl2,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},5101);
+  S.ml3=GLSKY_T_MESH(T,S.bl3,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},5103);
+  S.layers.add(S.ml);S.layers.add(S.ms);S.layers.add(S.ml2);S.layers.add(S.ml3);
   S.inst=true;
 }
 function glskyStarsOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.starOn&&S.inst&&!CAMERA_MODE);}
@@ -354,6 +359,18 @@ function glskySeg(x0,y0,x1,y1,w,c,al,soft){
   a.iL[o]=c[0];a.iL[o+1]=c[1];a.iL[o+2]=c[2];a.iL[o+3]=al>1?1:(al<0?0:al);
   a.iW[n*2]=w;a.iW[n*2+1]=soft;
   S.ln=n+1;
+}
+/* [G4.16] ruas garis di tingkat urutan lv: 2 = di atas mulut/di bawah cincin portal (5101), 3 = di atas cincin (5103); selain itu = mesh garis utama (glskySeg) */
+function glskySegL(lv,x0,y0,x1,y1,w,c,al,soft){
+  var S=GLSKY,B,n,a,o;
+  if(lv!==2&&lv!==3){glskySeg(x0,y0,x1,y1,w,c,al,soft);return;}
+  B=lv===2?S.bl2:S.bl3;n=lv===2?S.ln2:S.ln3;
+  if(!B||n>=B.cap)return;
+  a=B.a;o=n*4;
+  a.iP[o]=x0;a.iP[o+1]=y0;a.iP[o+2]=x1;a.iP[o+3]=y1;
+  a.iL[o]=c[0];a.iL[o+1]=c[1];a.iL[o+2]=c[2];a.iL[o+3]=al>1?1:(al<0?0:al);
+  a.iW[n*2]=w;a.iW[n*2+1]=soft;
+  if(lv===2)S.ln2=n+1;else S.ln3=n+1;
 }
 /* ekuivalen polyline g.stroke() di drawCons: ruas hanya antara dua sampel BERURUTAN yang sama-sama hidup (sampel mati = putus, seperti moveTo) */
 function glskyPoly(xs,ys,alive,samples,w,rgb,al,soft){
@@ -480,6 +497,11 @@ function glskyInstFlush(){
   if(!S.inst)return;
   S.ml.material.uniforms.uS.value=S.S;S.ml.material.uniforms.uSoft.value=S.soft?1:0;
   S.ms.material.uniforms.uS.value=S.S;
+  if(S.ml2){
+    S.ml2.material.uniforms.uS.value=S.S;S.ml2.material.uniforms.uSoft.value=S.soft?1:0;
+    S.ml3.material.uniforms.uS.value=S.S;S.ml3.material.uniforms.uSoft.value=S.soft?1:0;
+    glskyInstUpload(S.bl2,S.ml2,S.ln2);glskyInstUpload(S.bl3,S.ml3,S.ln3);
+  }
   glskyInstUpload(S.bl,S.ml,S.ln);glskyInstUpload(S.bs,S.ms,S.sn);
 }
 
@@ -507,7 +529,7 @@ function glskyApply(m,o){
   if(o.add===2){m.material.blendSrc=200;m.material.blendDst=202;}   /* multiply: ZeroFactor, SrcColorFactor (tidak diekspor three-entry, angka standar three) */
   else{m.material.blendSrc=T.OneFactor;m.material.blendDst=o.add?T.OneFactor:T.OneMinusSrcAlphaFactor;}
   /* [PATCH G3d] o.hi = FX aditif di atas bintang/garis (BH shock 5100); meteor/tint tetap renderOrder mesh (10+i) */
-  m.renderOrder=o.hi?5100:m.__ro;   /* [FIX] selalu di-set ulang: dulu sekali 5100 tetap 5100 walau op di index itu bukan hi lagi (vignette/plate jadi menimpa bintang) */
+  m.renderOrder=o.hi?(o.hi>=1000?o.hi:5100):m.__ro;   /* [FIX] selalu di-set ulang: dulu sekali 5100 tetap 5100 walau op di index itu bukan hi lagi (vignette/plate jadi menimpa bintang) */
   if(o.aff&&o.k===1){   /* [PATCH G4.13] quad dengan affine: M = T(cx,cy) R(rot) A S(w,h) */
     var A=o.aff,cr=Math.cos(o.rot),sr=Math.sin(o.rot),sw=o.w,sh=o.h;
     m.matrixAutoUpdate=false;
@@ -1131,7 +1153,7 @@ function glskyBegin(now,want){
       PX.neb=1;PX.mw=1;   /* diagnosa PX yang sudah ada: tanpa plate / debu / MW / tint supaya GL kelihatan di bawah bintang & rasi 2D */
       S.tm.mat.uniforms.uTime.value=now*.001;
     }
-    S.now=now;S.sn=0;S.ln=0;S.want=!!want;S.act=true;S.rec=true;   /* [FIX] rec = jendela rekam op GL: dari sini sampai glskyFlush */
+    S.now=now;S.sn=0;S.ln=0;S.ln2=0;S.ln3=0;S.hiOv=0;S.want=!!want;S.act=true;S.rec=true;   /* [FIX] rec = jendela rekam op GL: dari sini sampai glskyFlush */
   }catch(e){glskyFail(String(e&&e.message||e));return false;}
   return true;
 }
