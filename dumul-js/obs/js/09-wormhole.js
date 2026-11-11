@@ -219,6 +219,7 @@ function hide(){
   try{if(typeof TELESCOPE!=='undefined')TELESCOPE.dive=0;}catch(eD){}
   try{if(S){S.freshLeft=0;S.freshR=0;}}catch(eF){}
   if(cv){cv.style.display='none';cv.style.opacity='1';cv.style.zIndex='13';}
+  try{if(typeof tele3dGlLeave==='function')tele3dGlLeave(2);}catch(eTv){}   /* [G4.6] overlay teleskop GL dilepas (Group balik ke scene; pass atas GLSky sudah mengambil alih di handoff) */
 }
 function runCover(){skyReset();if(S&&S.onCover){var f=S.onCover;S.onCover=null;try{f();}catch(eC){}}}
 /* ---- recorder FPS on-device (?whperf=1): implementasi PINDAH ke 19-auto-debug.js (installWP). Di sini cuma hook tipis.
@@ -442,16 +443,22 @@ function drawTele(ov){
   x=(ov.x!=null?ov.x:b.x)+Math.sin(tt*5.3)*3*wob;y=(ov.y!=null?ov.y:b.y)+Math.cos(tt*4.1)*2.5*wob;
   sc=b.sc*(ov.s!=null?ov.s:1+.10*wob);al=b.al*(ov.a!=null?ov.a:1);
   if(sc<.01||al<.01)return;
-  g.save();
-  if(ov.clip&&WH_DBG.indexOf('telenoclip')<0){   /* [v48] ?whdbg=telenoclip = lewati clip setengah-bidang (ALAT UKUR A/B: teleskop terlihat di kedua sisi bidang portal; tanpa flag = perilaku normal) */   /* muncul dari mulut portal: hanya bagian di depan bidang portal yang terlihat (hidung duluan); setengah-bidang tegak lurus arah keluar */
-    var Cp=ov.clip,Rc=Math.hypot(W,H)*2,nx=-Cp.dy*Rc,ny=Cp.dx*Rc,fx=Cp.dx*Rc,fy=Cp.dy*Rc;
-    g.beginPath();g.moveTo(Cp.x+nx,Cp.y+ny);g.lineTo(Cp.x-nx,Cp.y-ny);g.lineTo(Cp.x-nx+fx,Cp.y-ny+fy);g.lineTo(Cp.x+nx+fx,Cp.y+ny+fy);g.closePath();g.clip();
-  }
   var tl=ov.tilt,t3=!!(tl&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&typeof SCP3D_CFG!=='undefined'&&SCP3D_CFG.on&&!potato());
   var a0=b.ang+b.rot,kk=(t3&&tl&&tl.k!=null)?clamp(tl.k,0,1):0;
   if(kk>0)a0=wrapPi(a0)*(1-kk);   /* pose kamera: arah hidung diatur 3D, roll layar-nya diredam ke tegak supaya tidak berputar liar */
   if(ov.head!=null&&!t3){var hk=ov.hk!=null?clamp(ov.hk,0,1):1;a0=a0+wrapPi(ov.head-a0)*hk;}   /* badan 2D: hidung (+x) mengarah ke arah terbang */
-  g.translate(x,y);g.rotate(a0+(ov.sp||0)+Math.sin(tt*2.7)*.14*wob*(1-.7*kk)+(tl&&!t3?tl.z:0));g.scale(sc,sc);
+  var rotT=a0+(ov.sp||0)+Math.sin(tt*2.7)*.14*wob*(1-.7*kk)+(tl&&!t3?tl.z:0),clipOn=!!(ov.clip&&WH_DBG.indexOf('telenoclip')<0);
+  /* [G4.6] ?glsky=1: teleskop GL penuh di overlay #glscope (13-scope3d.js tele3dTopDraw), tanpa blit ke kanvas ini. false = jalur 2D di bawah. */
+  if(t3&&typeof tele3dTopDraw==='function'){
+    var tdr=false;try{tdr=tele3dTopDraw(performance.now(),x,y,sc,clamp(al,0,1),rotT,tl,clipOn?ov.clip:null);}catch(eTop){tdr=false;}
+    if(tdr)return;
+  }
+  g.save();
+  if(clipOn){   /* [v48] ?whdbg=telenoclip = lewati clip setengah-bidang (ALAT UKUR A/B: teleskop terlihat di kedua sisi bidang portal; tanpa flag = perilaku normal) */   /* muncul dari mulut portal: hanya bagian di depan bidang portal yang terlihat (hidung duluan); setengah-bidang tegak lurus arah keluar */
+    var Cp=ov.clip,Rc=Math.hypot(W,H)*2,nx=-Cp.dy*Rc,ny=Cp.dx*Rc,fx=Cp.dx*Rc,fy=Cp.dy*Rc;
+    g.beginPath();g.moveTo(Cp.x+nx,Cp.y+ny);g.lineTo(Cp.x-nx,Cp.y-ny);g.lineTo(Cp.x-nx+fx,Cp.y-ny+fy);g.lineTo(Cp.x+nx+fx,Cp.y+ny+fy);g.closePath();g.clip();
+  }
+  g.translate(x,y);g.rotate(rotT);g.scale(sc,sc);
   g.globalAlpha=clamp(al,0,1);
   if(t3){SCP3D.tilt=tl;SCP3D.altOK=ov.alt?1:0;SCP3D.last=-1e9;}   /* paksa render 3D ulang dengan kemiringan ini (cache 3ms di tele3dBody) */
   try{teleDrawBody(g,performance.now());}catch(e){}
@@ -708,6 +715,7 @@ function tick(now){
       }   /* tetap terlihat di tengah mulut (tidak memudar) supaya travel melanjutkan tanpa pop */
     }
     cv.style.opacity='1';
+    try{if(typeof tele3dTopEnd==='function')tele3dTopEnd();}catch(eTe){}
     raf=requestAnimationFrame(tick);return;
   }
   /* kalau frame berat: kurangi jumlah stream (maks sampai 45%), resolusi tetap tajam */
@@ -719,7 +727,8 @@ function tick(now){
   var _w0=performance.now();
   try{drawFrame(dt,S.cx,S.cy,Math.max(1,S.r),cvr);
     try{var _k=state==='travel'?(S.cov?'tunnel':'zoom'):state,_o=WHS[_k]||(WHS[_k]={n:0,js:0,dt:0,max:0,cw:0,ch:0,dpr:0}),_j=performance.now()-_w0;_o.n++;_o.js+=_j;_o.dt+=dt*1000;if(_j>_o.max)_o.max=_j;_o.cw=cv.width;_o.ch=cv.height;_o.dpr=dpr;}catch(eWs){}
-    if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs,leadMs);}
+    if(WP)wpRec(now,state==='travel'?(S.cov?'tunnel':'zoom'):state,state==='travel'?q:now-(S.tx||now),performance.now()-now,skyMs,leadMs);
+    try{if(typeof tele3dTopEnd==='function')tele3dTopEnd();}catch(eTe2){}}
   catch(errD){   /* satu frame error jangan bikin state nyangkut (portal mati sampai reload) */
     try{console.warn('[wormhole] frame error:',errD&&errD.message);}catch(e4){}
     hardStop();return;

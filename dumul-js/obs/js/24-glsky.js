@@ -47,7 +47,7 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   vig:.34,drift:0,rec:false,fxOn:true,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,bs:null,bl:null,ms:null,ml:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   /* [PATCH G4.1] unit 3D yang di-attach ke scene bersama (batu belakang dulu); astOn = A/B ?glast=0 */
   /* [PATCH G3d] bhShockOn = A/B ?glbhshock=0 */
-  units:[],tScene:null,tCam:null,tUnits:[],astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
+  units:[],tScene:null,tCam:null,tUnits:[],oR:null,oCv:null,oScene:null,oCam:null,oOk:false,oErr:0,oPw:0,oPh:0,astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -93,6 +93,7 @@ function glskyFail(why){
   glskyRestorePX();
   try{if(S.mo)S.mo.disconnect();}catch(e3){}
   try{if(S.cv)S.cv.style.display='none';}catch(e4){}
+  try{glskyOvHide();}catch(e4b){}
   try{if(S.r)S.r.dispose();}catch(e5){}
   S.r=null;
 }
@@ -504,6 +505,62 @@ function glskyDetachTop(grp){
   if(!grp)return;
   for(i=S.tUnits.length-1;i>=0;i--)if(S.tUnits[i]===grp)S.tUnits.splice(i,1);
   try{if(S.tScene&&grp.parent===S.tScene)S.tScene.remove(grp);}catch(e){}
+}
+/* [G4.6] OVERLAY teleskop untuk terowongan wormhole. Terowongan (09-wormhole.js) = kanvas 2D #wh-canvas z 13 DI ATAS #sky dan di atas kanvas GL, jadi pass atas GLSky (di bawah #sky) tertutup.
+   Solusi tanpa blit/drawImage: kanvas GL kedua (#glscope, z 14, transparan, seukuran jendela, koordinat = koordinat layar asli yang dipakai #wh-canvas) dengan renderer + scene + kamera y-ke-atas sendiri.
+   Hanya hidup selama dive (dibuat malas saat teleskop pertama masuk terowongan). Alpha = CSS opacity kanvas (sama dengan globalAlpha 2D: satu kesatuan, bukan per material); potong setengah-bidang (keluar portal) = CSS clip-path
+   (build three kita tidak punya Plane untuk clippingPlanes). Selesai dive: Group dikembalikan ke pass atas GLSky (tele3dGlLeave/tele3dGl di 13-scope3d.js). Gagal / konteks hilang >=3x -> jalur 2D lama (tele3dBody). */
+function glskyOvEnsure(){
+  var S=GLSKY,T=window.THREE,c,r;
+  if(S.oR)return !!S.oOk;
+  if(S.oErr>=3||!T||!S.ok||!S.act||!document.body)return false;
+  try{
+    c=document.createElement('canvas');c.id='glscope';c.setAttribute('aria-hidden','true');
+    c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none;touch-action:none;z-index:14';
+    document.body.appendChild(c);
+    r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:true,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});
+    r.autoClear=true;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;r.setClearColor(0x000000,0);
+    c.addEventListener('webglcontextlost',function(e){
+      try{e.preventDefault();}catch(x){}
+      S.oOk=false;S.oErr++;glskyOvHide();
+    },false);
+    c.addEventListener('webglcontextrestored',function(){if(S.oErr<3){S.oPw=S.oPh=0;S.oOk=true;}},false);
+    S.oScene=new T.Scene();S.oCam=new T.OrthographicCamera(0,1,1,0,-600,600);S.oCam.position.z=5;
+    S.oCv=c;S.oR=r;S.oPw=S.oPh=0;S.oOk=true;
+    return true;
+  }catch(e){
+    S.oErr=3;S.oOk=false;
+    try{if(c&&c.parentNode)c.parentNode.removeChild(c);}catch(e2){}
+    S.oR=null;S.oCv=null;
+    try{console.warn('[glsky] overlay teleskop gagal',e);}catch(e3){}
+    return false;
+  }
+}
+function glskyOvAttach(grp){
+  var S=GLSKY;
+  if(!S.oScene||!grp)return false;
+  try{if(grp.parent)grp.parent.remove(grp);S.oScene.add(grp);return true;}catch(e){return false;}
+}
+function glskyOvDetach(grp){
+  var S=GLSKY;
+  try{if(S.oScene&&grp&&grp.parent===S.oScene)S.oScene.remove(grp);}catch(e){}
+}
+function glskyOvHide(){
+  var c=GLSKY.oCv;
+  if(c){c.style.display='none';c.style.opacity='1';c.style.clipPath='';}
+}
+/* w,h = ukuran jendela (CSS px, sama dengan #wh-canvas); opacity 0..1; clip = string clip-path CSS atau '' */
+function glskyOvDraw(w,h,opacity,clip){
+  var S=GLSKY,c=S.oCv,r=S.oR,d,pw,ph;
+  if(!c||!r||!S.oOk)return false;
+  d=Math.min(window.devicePixelRatio||1,2);pw=Math.max(2,Math.round(w*d));ph=Math.max(2,Math.round(h*d));
+  if(pw!==S.oPw||ph!==S.oPh){r.setPixelRatio(1);r.setSize(pw,ph,false);S.oPw=pw;S.oPh=ph;}
+  if(S.oCam.right!==w||S.oCam.top!==h){S.oCam.left=0;S.oCam.right=w;S.oCam.top=h;S.oCam.bottom=0;S.oCam.updateProjectionMatrix();}
+  c.style.opacity=opacity>=.995?'1':opacity.toFixed(3);
+  c.style.clipPath=clip||'';
+  if(c.style.display!=='block')c.style.display='block';
+  try{r.render(S.oScene,S.oCam);}catch(e){S.oErr++;S.oOk=false;glskyOvHide();return false;}
+  return true;
 }
 /* render scene utama + pass atas. Dipakai glskyFlush dan glskySnap. */
 function glskyRenderAll(){

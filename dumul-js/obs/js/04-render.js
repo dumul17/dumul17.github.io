@@ -665,12 +665,12 @@ function drawFloatingTelescopeTop(now){
 function drawFloatingTelescopeGl(now){
   var D=TELE_DRAW,pts=[],ci,tq,cp;
   if(typeof tele3dGl!=='function'||typeof tele3dGlOk!=='function')return false;
-  if(!D||!(TELESCOPE.al>.02)||TELESCOPE.dive||!tele3dGlOk()){tele3dGlLeave();return false;}
+  if(!D||!(TELESCOPE.al>.02)||TELESCOPE.dive||!tele3dGlOk()){tele3dGlLeave(1);return false;}   /* (1) = hanya pass atas GLSky; kalau Group sedang di overlay terowongan (tgt 2) jangan diganggu */
   cp=D.copies;
   for(ci=0;ci<cp.length;ci++){tq=lens(TELESCOPE.x+cp[ci][0],TELESCOPE.y+cp[ci][1]);if(tq)pts.push([tq[0],tq[1]]);}
-  if(!pts.length){tele3dGlLeave();TELE_DRAW=null;return true;}
+  if(!pts.length){tele3dGlLeave(1);TELE_DRAW=null;return true;}
   try{if(tele3dGl(now,pts,D.sc,TELESCOPE.al,TELESCOPE.ang)){TELE_DRAW=null;return true;}}
-  catch(eTG){SCP3D_GL.err++;try{tele3dGlLeave();}catch(eTL){}}
+  catch(eTG){SCP3D_GL.err++;try{tele3dGlLeave(1);}catch(eTL){}}
   return false;
 }
 
