@@ -587,6 +587,8 @@ body.touch-short .portal.mobile-show{opacity:1!important;pointer-events:auto!imp
 body.tesseract-running #sky,
 body.tesseract-running #glsky,
 body.tesseract-running #gldrone,
+body.tesseract-running #glwh,   /* [PATCH G4.12] kanvas wormhole GL composite */
+body.tesseract-running #glscope, /* [PATCH G4.12] overlay tele wormhole (fallback) */
 body.tesseract-running .scan,
 body.tesseract-running #header,
 body.tesseract-running footer,
