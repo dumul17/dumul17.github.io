@@ -1005,7 +1005,7 @@ function portal3dGlRing(now){
             ptMouth(tg2,Rm,now,!still);mouthSrc=tmp2;
           }catch(eM2){}
         }
-        if(mouthSrc){mouthSrc.__gldyn=1;glskyImg(mouthSrc,mAct,px,py,Rm*2,Rm*2,ang,0,1);}   /* [FIX] __gldyn: kanvas mulut digambar ulang tiap frame */
+        if(mouthSrc){mouthSrc.__gldyn=1;glskyImg(mouthSrc,mAct,px,py,Rm*2,Rm*2,ang,0,1,tm);}   /* [PATCH G4.13] mulut ikut kemiringan cincin (elips) seperti jalur 2D (g.transform(tm)); dulu lingkaran penuh -> meluber dari cincin miring, makin parah saat membengkak (PT_SWELL) */   /* [FIX] __gldyn: kanvas mulut digambar ulang tiap frame */
       }
     }
 

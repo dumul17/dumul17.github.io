@@ -1802,6 +1802,7 @@ function bandDimDraw(){
   if(on)BANDLAST=BAND;
   BANDV+=((on?1:0)-BANDV)*.12;if(Math.abs((on?1:0)-BANDV)<.004)BANDV=on?1:0;
   if(BANDV<.01)return;
+  if(typeof GLSKY!=='undefined'&&GLSKY.act&&GLSKY.rec&&GLSKY.lay&&typeof glskyFill==='function'){glskyFill(BAND_BG[BANDLAST],BANDV*.62);return;}   /* [PATCH G4.13] ?glsky=1: redaman filter UV/IR jadi op latar GL (di bawah garis/bintang GL seperti 2D); dulu fillRect di #sky menimpa semua isi GL */
   g.save();g.globalAlpha=BANDV*.62;g.fillStyle='rgb('+BAND_BG[BANDLAST]+')';g.fillRect(0,0,W,H);g.restore();
 }
 /* Mode kamera = sensor teleskop masa depan: TANPA halo (halo = kesan polusi cahaya), TANPA diffraction spike dan TANPA cincin Airy (lensa pembelok cahaya sudah membelokkannya menjauh dari inti).

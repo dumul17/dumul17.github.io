@@ -204,8 +204,9 @@ function glskyDrift(o,c){
   }catch(e){}
 }
 /* gambar canvas c: pusat (cx,cy), ukuran w x h (px stage), rotasi rad (searah canvas.rotate), add=1 'lighter', add=2 'multiply' */
-function glskyImg(c,a,cx,cy,w,h,rot,add,hi){
-  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;o.hi=hi?1:0;   /* [PATCH G3d] hi=1 -> renderOrder 5100 */
+/* aff (opsional) = [a,b,c,d] affine 2x2 gaya g.transform/ptTiltMat (x'=a*x+c*y, y'=b*x+d*y) yang dikenakan pada quad SEBELUM rotasi rot, mis. mulut portal yang ikut kemiringan cincin */
+function glskyImg(c,a,cx,cy,w,h,rot,add,hi,aff){
+  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;o.hi=hi?1:0;o.aff=aff||null;   /* [PATCH G3d] hi=1 -> renderOrder 5100 */
   glskyDrift(o,c);
 }
 /* ekuivalen plateBlit(c,m,pw,ph,z,ox,oy) 02-sky-logic.js: zoom z di sekitar pusat layar + offset (ox,oy); alpha = g.globalAlpha saat dipanggil */
@@ -498,7 +499,15 @@ function glskyApply(m,o){
   else{m.material.blendSrc=T.OneFactor;m.material.blendDst=o.add?T.OneFactor:T.OneMinusSrcAlphaFactor;}
   /* [PATCH G3d] o.hi = FX aditif di atas bintang/garis (BH shock 5100); meteor/tint tetap renderOrder mesh (10+i) */
   m.renderOrder=o.hi?5100:m.__ro;   /* [FIX] selalu di-set ulang: dulu sekali 5100 tetap 5100 walau op di index itu bukan hi lagi (vignette/plate jadi menimpa bintang) */
-  m.position.set(o.cx,o.cy,0);m.rotation.z=o.rot;m.scale.set(o.w,o.h,1);
+  if(o.aff&&o.k===1){   /* [PATCH G4.13] quad dengan affine: M = T(cx,cy) R(rot) A S(w,h) */
+    var A=o.aff,cr=Math.cos(o.rot),sr=Math.sin(o.rot),sw=o.w,sh=o.h;
+    m.matrixAutoUpdate=false;
+    m.matrix.set(cr*A[0]*sw-sr*A[1]*sw,cr*A[2]*sh-sr*A[3]*sh,0,o.cx, sr*A[0]*sw+cr*A[1]*sw,sr*A[2]*sh+cr*A[3]*sh,0,o.cy, 0,0,1,0, 0,0,0,1);
+    m.matrixWorldNeedsUpdate=true;
+  }else{
+    m.matrixAutoUpdate=true;
+    m.position.set(o.cx,o.cy,0);m.rotation.z=o.rot;m.scale.set(o.w,o.h,1);
+  }
   m.visible=true;
 }
 
