@@ -315,11 +315,11 @@
 <script defer src="dumul-js/obs/i18n.js?v=51"></script>
 <script defer src="dumul-js/obs/i18n-sky.js?v=2"></script>
 <script defer src="dumul-js/obs/i18n-texts.js?v=1"></script>
-<script defer src="dumul-js/obs/js/01-core.js?v=152"></script>
+<script defer src="dumul-js/obs/js/01-core.js?v=153"></script>
 <script defer src="dumul-js/obs/js/02-sky-logic.js?v=156"></script>
-<script defer src="dumul-js/obs/js/03-gargantua.js?v=116"></script>
-<script defer src="dumul-js/obs/js/04-render.js?v=164"></script>
-<script defer src="dumul-js/obs/js/05-sector-ui.js?v=205"></script>
+<script defer src="dumul-js/obs/js/03-gargantua.js?v=117"></script>
+<script defer src="dumul-js/obs/js/04-render.js?v=165"></script>
+<script defer src="dumul-js/obs/js/05-sector-ui.js?v=206"></script>
 <script defer src="dumul-js/obs/js/06-interaction.js?v=132"></script>
 <script defer src="dumul-js/obs/js/07-boot.js?v=187"></script>
 <script>/* Layout editor (20-layout-editor.js): NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?layout=1 atau localStorage.obs_layout_on=1; document.write supaya jadi <script defer> berurutan tepat setelah 07-boot.js. Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
@@ -353,10 +353,10 @@
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>
-<script defer src="dumul-js/obs/js/12-ast3d.js?v=42"></script>
+<script defer src="dumul-js/obs/js/12-ast3d.js?v=43"></script>
 <script defer src="dumul-js/obs/js/13-scope3d.js?v=34"></script>
 <script defer src="dumul-js/obs/js/14-drone3d.js?v=19"></script>
-<script defer src="dumul-js/obs/js/15-portal3d.js?v=54"></script>
+<script defer src="dumul-js/obs/js/15-portal3d.js?v=55"></script>
 <script defer src="dumul-js/obs/js/16-sector-menu.js?v=7"></script>
 <script defer src="dumul-js/obs/js/17-planet3d.js?v=61"></script>
 <script defer src="dumul-js/obs/js/18-tune3d.js?v=19"></script>
@@ -365,7 +365,7 @@
 (function(){var e=false;try{e=/[?&]stargl=1\b/.test(location.search);}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/23-stargl.js?v=1"></scr'+'ipt>');})();
 </script>
 <script>/* GLSky (24-glsky.js): kanvas WebGL di bawah #sky (rencana-gl-sky.md). NOL BIAYA untuk pengunjung biasa. Hanya dimuat kalau ?glsky=1|test atau localStorage dumul_glsky=1 (?glsky=0 paksa 2D). Tag sengaja dipecah ('<scr'+'ipt') agar check-sky tidak menganggapnya <script src> biasa. Bukan di SHELL SW. */
-(function(){var e=false;try{var m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(location.search);e=m?m[1]!=='0':localStorage.getItem('dumul_glsky')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/24-glsky.js?v=9"></scr'+'ipt>');})();
+(function(){var e=false;try{var m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(location.search);e=m?m[1]!=='0':localStorage.getItem('dumul_glsky')==='1';}catch(x){}if(e)document.write('<scr'+'ipt defer src="dumul-js/obs/js/24-glsky.js?v=10"></scr'+'ipt>');})();
 </script>
 <script>
 /* Auto-debug (19-auto-debug.js): NOL BIAYA untuk pengunjung biasa. Hanya diunduh kalau URL punya ?debug=1, dimuat setelah window load
