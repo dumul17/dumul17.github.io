@@ -300,11 +300,11 @@ function dr3dBuild(){dr3dDrive(dr3dBuildG(),[]);}
 /* ---------- per frame ---------- */
 function dr3dAngDiff(a,b){var d=(b-a)%6.283185;if(d>3.141593)d-=6.283185;if(d<-3.141593)d+=6.283185;return d;}
 
-function dr3dUpdate(now,x,y,col){
+function dr3dUpdate(now,x,y,col,glMode){   /* glMode (G4.7): cuma pose + lampu, TANPA render 'small' + salinan c2 (badan digambar layer GL) */
   var T=THREE,r=DR3D.r,o=DR3D.o,m=DR3D.m,sc=DR3D.sc;
   /* resolusi render mengikuti ukuran di layar */
   var res=Math.max(DR3D_CFG.resMin,Math.min(DR3D_CFG.resMax,Math.ceil(DR3D_CFG.size*(DR3D.scale||1)*Math.min(2,DPR||1)*1.2/32)*32));
-  if(res!==DR3D.res){DR3D.res=res;threeGLSize(DR3D.gl,res,res);DR3D.dirty=true;}
+  if(!glMode&&res!==DR3D.res){DR3D.res=res;threeGLSize(DR3D.gl,res,res);DR3D.dirty=true;}
 
   /* kecepatan (px/ms) dari posisi frame sebelumnya; loncatan/jeda panjang = reset */
   var dt=now-DR3D.pt,vx=0,vy=0,sp=0;
@@ -352,7 +352,7 @@ function dr3dUpdate(now,x,y,col){
   }catch(eL){}
   var lk=DR3D_CFG.light*DR3D_CFG.glowK*GLOW_T;o.rim.intensity=1.1*Math.PI*lk;o.hemi.intensity=.45*Math.PI*lk;o.fill.intensity=.55*Math.PI*lk;
   /* render GPU dibatasi (minDt); hasil disalin ke kanvas 2D kecil supaya frame yang dilewati tinggal drawImage (isi buffer WebGL tidak dijamin utuh antar frame) */
-  if(!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
+  if(!glMode&&!((typeof BELT!=='undefined'&&BELT)&&DR3D.c2&&DR3D.c2.width===res)&&(DR3D.dirty||!DR3D.c2||DR3D.c2.width!==res||now<DR3D.lastR||now-DR3D.lastR>=DR3D_CFG.minDt)){   /* BELT (zoom masuk dumul.html): tanpa render GL, frame tinggal drawImage salinan terakhir */
     threeGLBegin(DR3D.gl);
     r.render(sc,DR3D.cam);
     if(window.__gpuP)glProbe(DR3D.gl,'dr.sub','dr.gpu');   /* [v18] probe GPU (?bench=1&gpup=1) */
@@ -360,6 +360,85 @@ function dr3dUpdate(now,x,y,col){
     DR3D.x2.clearRect(0,0,res,res);DR3D.x2.drawImage(r.domElement,0,0,res,res,0,0,res,res);   /* sumber (0,0,res,res): kanvas dibagi bisa lebih besar dari res */
     DR3D.lastR=now;DR3D.dirty=false;
   }
+}
+
+/* ---------- G4.7: layer GL (24-glsky.js glskyDr*) ----------
+   Hanya SATU drone digambar per frame (TOP di 08-tx-drone.js), jadi master (DR3D.yaw + 4 lampu) langsung DIPINDAH ke pivot di scene layer (enter/leave, bukan klon); jalur 'small' lama utuh
+   buat fallback (leave mengembalikan semuanya ke DR3D.sc). Pivot = T(x,H-y) Q(invers kamera model) S(px per satuan): kamera model (ortho dari atas-depan, DR3D.cam) digantikan rotasi invers
+   di pivot, kamera layer ortho y-ke-atas biasa. Lampu arah ikut pivot + target-nya (arah = posisi - target, translasi hilang), HemisphereLight di akar scene (arahnya posisi dunia) diputar manual. */
+function dr3dGlUse(){
+  var S;
+  if(typeof glskyDrOn!=='function')return false;
+  S=GLSKY;
+  if(glskyDrOn()){
+    if(!DR3D.glIn&&!dr3dGlEnter())return false;
+    return true;
+  }
+  if(DR3D.glIn)dr3dGlLeave();   /* layer jatuh (GL mati / konteks hilang): badan balik ke 'small' + blit */
+  if(glskyDrWant()&&glskyDrEnsure()){
+    try{S.dR.compile(DR3D.sc,DR3D.cam);}catch(eC){}   /* program shader dikompilasi sekarang (frame ini masih blit), bukan di render GL pertama */
+  }
+  return false;
+}
+function dr3dGlEnter(){
+  var S=GLSKY,T=THREE,o=DR3D.o,pv,ls=[o.key,o.rim,o.fill],i;
+  if(DR3D.glIn)return true;
+  if(!S.dScene||!DR3D.yaw||!o.key||!o.hemi||!DR3D.cam)return false;
+  try{
+    pv=new T.Group();
+    pv.quaternion.copy(DR3D.cam.quaternion).invert();
+    pv.add(DR3D.yaw);
+    for(i=0;i<ls.length;i++){pv.add(ls[i]);pv.add(ls[i].target);}
+    S.dScene.add(o.hemi);o.hemi.position.set(0,1,0).applyQuaternion(pv.quaternion);
+    pv.visible=false;
+    glskyDrAttach(pv);
+    DR3D.glPv=pv;DR3D.glIn=true;
+    return true;
+  }catch(e){dr3dGlLeave();return false;}
+}
+function dr3dGlLeave(){
+  var o=DR3D.o,sc=DR3D.sc,pv=DR3D.glPv,ls=[o.key,o.rim,o.fill],i,L;
+  try{
+    if(sc&&DR3D.yaw)sc.add(DR3D.yaw);
+    for(i=0;i<ls.length;i++){
+      L=ls[i];if(!L)continue;
+      if(sc)sc.add(L);
+      if(L.target){if(L.target.parent)L.target.parent.remove(L.target);L.target.position.set(0,0,0);L.target.matrix.identity();L.target.matrixWorld.identity();}   /* target di luar scene: matrixWorld harus identitas lagi (titik asal), kalau tidak arah cahaya 'small' miring */
+    }
+    if(sc&&o.hemi){sc.add(o.hemi);o.hemi.position.set(0,1,0);}
+    if(pv)glskyDrDetach(pv);
+    dr3dFade(1);
+  }catch(e){}
+  DR3D.glIn=false;DR3D.glPv=null;DR3D.glF=-1;DR3D.dirty=true;
+}
+/* alpha seluruh drone (setara globalAlpha drone 2D): opacity semua material x a, transparent sementara kalau a < .995; dipulihkan persis saat a penuh / leave */
+function dr3dFade(a){
+  var m=DR3D.m,B=DR3D.fb||(DR3D.fb={}),on=a<.995,k,mt;
+  if(on===!!DR3D.fadeOn&&Math.abs(a-(DR3D.fadeA==null?1:DR3D.fadeA))<.004)return;
+  DR3D.fadeOn=on;DR3D.fadeA=a;
+  for(k in m){
+    mt=m[k];if(!mt)continue;
+    if(!B[k])B[k]={t:mt.transparent,o:mt.opacity};
+    if(on){mt.transparent=true;mt.opacity=B[k].o*a;}
+    else{mt.transparent=B[k].t;mt.opacity=B[k].o;}
+  }
+}
+function dr3dGlPlace(x,y,S,a,now){
+  var pv=DR3D.glPv,s;
+  if(!pv||!DR3D.glIn)return false;
+  s=S/(2*DR3D_CFG.half);   /* kotak gambar S px = 2*half satuan model (sama dgn drawImage c2 ke S x S) */
+  pv.position.set(x,H-y,0);pv.scale.set(s,s,s);pv.visible=true;
+  dr3dFade(a>1?1:(a<0?0:a));
+  DR3D.glF=now;
+  return true;
+}
+/* tiap frame SETELAH drawTxTop (05-sector-ui.js): ada drone yang ditaruh frame ini -> render layer, kalau tidak sembunyikan kanvas */
+function dr3dGlFlush(now){
+  var pv=DR3D.glPv;
+  if(typeof glskyDrDraw!=='function'||typeof GLSKY==='undefined'||!GLSKY.dOk)return;
+  if(!DR3D.glIn||!pv)return;
+  if(DR3D.glF===now){glskyDrDraw(true);}
+  else{pv.visible=false;glskyDrDraw(false);}
 }
 
 /* Dipanggil dari drawDrone() (08-tx-drone.js). true = drone 3D sudah digambar (2D dilewati); false = pakai drone 2D. */
@@ -370,7 +449,8 @@ function drone3dDraw(g,x,y,col,a,now,sc){
   if(document.body&&document.body.classList.contains('perf-tier-0'))return false;
   try{
     DR3D.scale=sc||1;
-    if(now!==DR3D.lastNow){DR3D.lastNow=now;dr3dUpdate(now,x,y,col);}
+    var glD=dr3dGlUse();   /* G4.7: layer GL siap => badan di #gldrone (di atas #sky), 2D cuma halo */
+    if(now!==DR3D.lastNow){DR3D.lastNow=now;dr3dUpdate(now,x,y,col,glD);}
     var S=DR3D_CFG.size*(sc||1);
     g.save();
     /* halo lembut di bawah (sama seperti 2D) supaya drone gelap tetap kebaca di langit hitam */
@@ -379,6 +459,10 @@ function drone3dDraw(g,x,y,col,a,now,sc){
     g.fillStyle='rgba('+col+','+Math.min(1,.14*a*hk)+')';g.beginPath();g.arc(x,y,S*.17,0,6.283);g.fill();}
     g.globalAlpha=a>1?1:(a<0?0:a);
     g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
+    if(glD){
+      if(dr3dGlPlace(x,y,S,a,now)){g.restore();return true;}
+      dr3dGlLeave();DR3D.dirty=true;dr3dUpdate(now,x,y,col,false);   /* gagal menaruh di layer GL: balik ke jalur blit di frame ini juga */
+    }
     if(DR3D.c2&&!(window.__offB&&window.__offB.dr))g.drawImage(DR3D.c2,x-S/2,y-S/2,S,S);   /* ?off=drb (21-bench) */
     g.restore();
     return true;

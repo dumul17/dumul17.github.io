@@ -1473,7 +1473,9 @@ function snapCompose(){
   /* kanvas sky (diputar balik biar sama dgn yang terlihat di layar) */
   x.save();x.translate(ow/2,oh/2);if(rot)x.rotate(rot*Math.PI/180);
   try{if(window.GLSKY&&GLSKY.act)glskySnap(x,-sw*sc/2,-sh*sc/2,sw*sc,sh*sc);}catch(eGc){}   /* ?glsky=1: latar + warna dasar ada di kanvas GL (di bawah #sky): render ulang daftar op terakhir sekarang, langsung drawImage (24-glsky.js) */
-  x.drawImage(cv,-sw*sc/2,-sh*sc/2,sw*sc,sh*sc);x.restore();
+  x.drawImage(cv,-sw*sc/2,-sh*sc/2,sw*sc,sh*sc);
+  try{if(window.GLSKY&&GLSKY.dShown)glskySnapTop(x,-sw*sc/2,-sh*sc/2,sw*sc,sh*sc);}catch(eGd){}   /* [G4.7] drone ada di kanvas GL di ATAS #sky: digambar sesudah #sky */
+  x.restore();
   /* cap: nama situs + sektor/fokus/pita/zoom + waktu */
   var f=FOCUS.list&&FOCUS.list[FOCUS.i],sec=SECT.cur?String(SECT.cur.k).toUpperCase():'',parts=[];
   if(sec)parts.push(sec);

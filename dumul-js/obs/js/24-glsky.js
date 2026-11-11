@@ -29,6 +29,7 @@
    G4.5: TELESKOP 3D (13-scope3d.js) jadi Group di PASS ATAS (glskyAttachTop: scene+kamera y-ke-atas sendiri, dirender sesudah scene utama; lihat catatan FIX di glskyAttachTop): tanpa renderer 'small', tanpa blit/drawImage ke #sky saat GL aktif; salinan tepi layar = klon Group; wormhole dive tetap jalur 2D (terowongan masih kanvas 2D z 13). Flag ?glscope=0 A/B | konsol SCP3D_GL.on.
    G4.4: AST dual-mesh — pass depan meshF RO 5200 tanpa blit (12-ast3d.js). Flag ?glast=0.
    G3h: EFEK KECIL sesudah flush pindah ke GL (dicatat sebelum flush, di atas BH/trigger): ofxDrawAvail (glow 8 bintang), ofxDrawDust (debu kursor), drawFocusFx (cincin/rasi fokus mode kamera, glskyFocusFx), reticle drawTargetLock (glskyLockReticle; teks telemetri tetap 2D). Glow = sprite getStarSprite lewat glskyImg add=1 hi=1, garis/cincin = glskySeg/glskyPoly. drawSectFlash SENGAJA tetap 2D (flash layar penuh harus di atas semua unit). Flag ?glfx=0 A/B | konsol GLSKY.fxOn.
+   G4.7: DRONE TX/RX 3D (14-drone3d.js) = Group di LAYER DRONE (kanvas #gldrone di ATAS #sky, kanvas GL ketiga, malas), tanpa blit/drawImage; halo lembut tetap 2D di bawahnya. Di atas #sky karena planet masih blit 2D dan drone digambar sesudah planet. Planet pindah GL => drone pindah ke pass atas, layer dihapus. Flag ?gldrone=0 A/B | konsol GLSKY.drOn.
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
@@ -48,6 +49,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   /* [PATCH G4.1] unit 3D yang di-attach ke scene bersama (batu belakang dulu); astOn = A/B ?glast=0 */
   /* [PATCH G3d] bhShockOn = A/B ?glbhshock=0 */
   units:[],tScene:null,tCam:null,tUnits:[],oR:null,oCv:null,oScene:null,oCam:null,oOk:false,oErr:0,oPw:0,oPh:0,astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
+  /* [G4.7] layer drone: kanvas GL ketiga (#gldrone) DI ATAS #sky, anak #stage; dibuat malas saat drone pertama muncul. drOn = A/B ?gldrone=0 */
+  drOn:true,dR:null,dCv:null,dScene:null,dCam:null,dOk:false,dErr:0,dPw:0,dPh:0,dShown:false,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -68,6 +71,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glfx=0(&|#|$)/.test(location.search))GLSKY.fxOn=false;   /* [PATCH G3h] A/B: efek kecil (avail/dust/focus/lock) tetap 2D */
     if(/[?&]glplei=0(&|#|$)/.test(location.search))GLSKY.pleiOn=false;   /* [PATCH G3g] A/B: Pleiades bintang tetap 2D */
     if(/[?&]glportal=0(&|#|$)/.test(location.search))GLSKY.portalOn=false;   /* [PATCH G4.2] A/B: portal cincin tetap 2D blit */
+    if(/[?&]gldrone=0(&|#|$)/.test(location.search))GLSKY.drOn=false;   /* [G4.7] A/B: drone tetap blit 2D */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
     if(v&&isFinite(parseFloat(v[1])))GLSKY.vig=Math.max(0,Math.min(1,parseFloat(v[1])));
@@ -94,20 +98,24 @@ function glskyFail(why){
   try{if(S.mo)S.mo.disconnect();}catch(e3){}
   try{if(S.cv)S.cv.style.display='none';}catch(e4){}
   try{glskyOvHide();}catch(e4b){}
+  try{glskyDrKill();}catch(e4c){}   /* [G4.7] layer drone ikut mati: drone balik blit 2D */
   try{if(S.r)S.r.dispose();}catch(e5){}
   S.r=null;
 }
 
 /* salin gaya inline #sky (transform kamera wormhole, opacity, dst) ke kanvas GL */
 function glskyMirror(){
-  var S=GLSKY,a=cv.style,b;
+  var S=GLSKY,a=cv.style,b,L=[S.cv,S.dCv],k;
   if(!S.cv)return;
-  b=S.cv.style;
-  if(b.transform!==a.transform)b.transform=a.transform;
-  if(b.transformOrigin!==a.transformOrigin)b.transformOrigin=a.transformOrigin;
-  if(b.opacity!==a.opacity)b.opacity=a.opacity;
-  if(b.willChange!==a.willChange)b.willChange=a.willChange;
-  if(b.visibility!==a.visibility)b.visibility=a.visibility;
+  for(k=0;k<2;k++){   /* [G4.7] kanvas drone (#gldrone) ikut transform/opacity #sky persis seperti kanvas GL utama */
+    if(!L[k])continue;
+    b=L[k].style;
+    if(b.transform!==a.transform)b.transform=a.transform;
+    if(b.transformOrigin!==a.transformOrigin)b.transformOrigin=a.transformOrigin;
+    if(b.opacity!==a.opacity)b.opacity=a.opacity;
+    if(b.willChange!==a.willChange)b.willChange=a.willChange;
+    if(b.visibility!==a.visibility)b.visibility=a.visibility;
+  }
 }
 
 /* lapisan uji (?glsky=test): gradien piksel-ruang-stage + 4 penanda sudut. ShaderMaterial dipakai supaya jalur shader ikut teruji. */
@@ -561,6 +569,71 @@ function glskyOvDraw(w,h,opacity,clip){
   if(c.style.display!=='block')c.style.display='block';
   try{r.render(S.oScene,S.oCam);}catch(e){S.oErr++;S.oOk=false;glskyOvHide();return false;}
   return true;
+}
+/* [G4.7] LAYER DRONE. Planet masih blit 2D di #sky dan drone TX/RX digambar SETELAH planet (berdiri di permukaan), jadi drone di scene utama (di bawah #sky) akan tertutup planet saat
+   mendarat/orbit di depannya. Solusi sementara: kanvas GL ketiga #gldrone, anak #stage tepat SESUDAH #sky (di atasnya, tetap di bawah elemen DOM lain seperti dulu), renderer + scene +
+   kamera y-ke-atas sendiri (antialias true, ACES, exposure 1.05 = renderer 'small' lama). Hanya hidup saat drone ada di layar (kanvas display:none kalau tidak). Begitu planet pindah ke GL,
+   Group drone cukup dipindah ke pass atas scene utama (glskyAttachTop) dan layer ini dihapus. Koordinat Group: x = x layar, y = H - y layar (sama dgn pass atas). Gagal / konteks hilang >=3x
+   / GL mati => drone balik ke blit 2D (drone3dDraw return false). */
+function glskyDrOn(){var S=GLSKY;return !!(S.drOn&&S.act&&S.ok&&S.dOk&&S.dErr<3);}
+function glskyDrWant(){var S=GLSKY;return !!(S.drOn&&S.act&&S.ok&&!S.dR&&S.dErr<3);}
+function glskyDrHide(){var S=GLSKY;if(S.dCv&&S.dShown){S.dCv.style.display='none';}S.dShown=false;}
+function glskyDrEnsure(){
+  var S=GLSKY,T=window.THREE,c,r;
+  if(S.dOk)return true;
+  if(S.dR||S.dErr>=3||!T||!S.ok||!S.act||!cv||!cv.parentNode)return false;
+  try{
+    c=document.createElement('canvas');c.id='gldrone';c.setAttribute('aria-hidden','true');
+    c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none;touch-action:none';
+    r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:true,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});
+    r.setPixelRatio(1);r.autoClear=true;r.setClearColor(0x000000,0);
+    r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.05;   /* sama dgn threeGLMake (tone) + expo drone di threeGLGet */
+    c.addEventListener('webglcontextlost',function(e){
+      try{e.preventDefault();}catch(x){}
+      S.dOk=false;S.dErr++;glskyDrHide();
+    },false);
+    c.addEventListener('webglcontextrestored',function(){if(S.dErr<3){S.dPw=S.dPh=0;S.dOk=true;}},false);
+    S.dScene=new T.Scene();S.dCam=new T.OrthographicCamera(0,1,1,0,-600,600);S.dCam.position.z=5;
+    S.dCv=c;S.dR=r;S.dPw=S.dPh=0;S.dShown=false;S.dOk=true;
+    cv.parentNode.insertBefore(c,cv.nextSibling);   /* tepat SESUDAH #sky => di atasnya */
+    glskyMirror();
+    return true;
+  }catch(e){
+    S.dErr=3;S.dOk=false;
+    try{if(c&&c.parentNode)c.parentNode.removeChild(c);}catch(e2){}
+    S.dR=null;S.dCv=null;
+    try{console.warn('[glsky] layer drone gagal, drone tetap blit 2D:',e);}catch(e3){}
+    return false;
+  }
+}
+function glskyDrAttach(grp){var S=GLSKY;if(!S.dScene||!grp)return false;try{S.dScene.add(grp);return true;}catch(e){return false;}}
+function glskyDrDetach(grp){var S=GLSKY;try{if(S.dScene&&grp&&grp.parent===S.dScene)S.dScene.remove(grp);}catch(e){}}
+/* show=false: sembunyikan kanvas (tidak ada drone frame ini). true: ukur + render scene. false dikembalikan kalau gagal (pemanggil jatuh ke 2D di frame berikut) */
+function glskyDrDraw(show){
+  var S=GLSKY,r=S.dR,c=S.dCv;
+  if(!r||!S.dOk)return false;
+  if(!show){glskyDrHide();return true;}
+  try{
+    if(S.dPw!==S.pw||S.dPh!==S.ph){r.setPixelRatio(1);r.setSize(S.pw,S.ph,false);S.dPw=S.pw;S.dPh=S.ph;}
+    if(S.dCam.right!==S.W||S.dCam.top!==S.H){S.dCam.left=0;S.dCam.right=S.W;S.dCam.top=S.H;S.dCam.bottom=0;S.dCam.updateProjectionMatrix();}
+    if(!S.dShown){c.style.display='block';S.dShown=true;}
+    r.render(S.dScene,S.dCam);
+  }catch(e){S.dErr++;S.dOk=false;glskyDrHide();return false;}
+  return true;
+}
+function glskyDrKill(){
+  var S=GLSKY;
+  S.dOk=false;S.dErr=3;
+  try{if(S.dCv)S.dCv.style.display='none';}catch(e){}
+  S.dShown=false;
+  try{if(S.dR)S.dR.dispose();}catch(e2){}
+  S.dR=null;
+}
+/* capture langit: kanvas drone ada di ATAS #sky, jadi digambar SESUDAH drawImage(#sky) di snapCompose (01-core.js). Render ulang sekarang (preserveDrawingBuffer:false) lalu drawImage. */
+function glskySnapTop(x,dx,dy,dw,dh){
+  var S=GLSKY;
+  if(!S.dShown||!S.dOk||!S.dR)return false;
+  try{S.dR.render(S.dScene,S.dCam);x.drawImage(S.dCv,dx,dy,dw,dh);return true;}catch(e){return false;}
 }
 /* render scene utama + pass atas. Dipakai glskyFlush dan glskySnap. */
 function glskyRenderAll(){

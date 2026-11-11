@@ -1117,7 +1117,8 @@ function frame(now){
     pmk('teleTop');   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
     pmk('planet');   /* hanya planet3dDraw (shader band + efek 2D); astF + teleTop dipisah di atasnya */
-    try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
+    try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}
+    try{if(typeof dr3dGlFlush==='function')dr3dGlFlush(now);}catch(eDg){}   /* [G4.7] layer GL drone (#gldrone, di atas #sky): render / sembunyikan sekali per frame */   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
     pmk('txTop');   /* drone TX/RX 3D (14-drone3d) + planetGroundAt */
     pmk('astFront');
     drawSectFlash(now);
