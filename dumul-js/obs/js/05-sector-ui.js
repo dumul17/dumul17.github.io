@@ -1091,6 +1091,7 @@ function frame(now){
     if(_glk)try{if(typeof drawHoleGl==='function')drawHoleGl(now,age);}catch(eBhG){}   /* [PATCH G4.3] antre body BH ke op GL sebelum flush */
     if(_glk)try{drawAsteroids(now,1);}catch(eAfG){}   /* [PATCH G4.4] batu depan dual-mesh sebelum flush */
     if(_glk)try{drawFloatingTelescopeGl(now);}catch(eTlG){}   /* [PATCH G4.5] teleskop 3D ke scene GL sebelum flush (jalur 2D teleTop dilewati kalau true) */
+    if(_glk)try{if(typeof pl3dGlPrep==='function')pl3dGlPrep(now);}catch(ePlGl){}   /* [G4.8] planet full GL: jadwalkan permukaan ke pass planet sebelum flush (planet3dDraw di bawah hanya efek 2D kalau true) */
     if(_glk)try{glskyFlush();}catch(eGf){}   /* ?glsky=1: render GL sekali per frame (daftar op latar dari plateBlit/sectDrawSky + garis & bintang dari drawCons/drawStars); dulu di atas blok latar, dipindah ke sini supaya garis/bintang sempat tercatat */
     if(!_glk)drawTriggerVisuals(now);   /* [PATCH G3f] jalur 2D saja */
     if(!_glfx)ofxSafe(ofxDrawAvail,now);

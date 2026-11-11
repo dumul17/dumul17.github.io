@@ -30,6 +30,7 @@
    G4.4: AST dual-mesh — pass depan meshF RO 5200 tanpa blit (12-ast3d.js). Flag ?glast=0.
    G3h: EFEK KECIL sesudah flush pindah ke GL (dicatat sebelum flush, di atas BH/trigger): ofxDrawAvail (glow 8 bintang), ofxDrawDust (debu kursor), drawFocusFx (cincin/rasi fokus mode kamera, glskyFocusFx), reticle drawTargetLock (glskyLockReticle; teks telemetri tetap 2D). Glow = sprite getStarSprite lewat glskyImg add=1 hi=1, garis/cincin = glskySeg/glskyPoly. drawSectFlash SENGAJA tetap 2D (flash layar penuh harus di atas semua unit). Flag ?glfx=0 A/B | konsol GLSKY.fxOn.
    G4.7: DRONE TX/RX 3D (14-drone3d.js) = Group di LAYER DRONE (kanvas #gldrone di ATAS #sky, kanvas GL ketiga, malas), tanpa blit/drawImage; halo lembut tetap 2D di bawahnya. Di atas #sky karena planet masih blit 2D dan drone digambar sesudah planet. Planet pindah GL => drone pindah ke pass atas, layer dihapus. Flag ?gldrone=0 A/B | konsol GLSKY.drOn.
+   G4.8: PLANET full GL (17-planet3d.js pl3dGlPrep): shader strip yang sama digambar langsung di PASS PLANET (pScene + tCam y-ke-atas), dirender sesudah pass teleskop dan sebelum #sky (urutan 2D lama). Tanpa renderer 'big', tanpa blit. Efek 2D planet (aurora/debris/flare/petir) tetap di #sky. Flag ?glplanet=0 A/B | konsol GLSKY.plOn, PL3D.glm.
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
@@ -51,6 +52,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   units:[],tScene:null,tCam:null,tUnits:[],oR:null,oCv:null,oScene:null,oCam:null,oOk:false,oErr:0,oPw:0,oPh:0,astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
   /* [G4.7] layer drone: kanvas GL ketiga (#gldrone) DI ATAS #sky, anak #stage; dibuat malas saat drone pertama muncul. drOn = A/B ?gldrone=0 */
   drOn:true,dR:null,dCv:null,dScene:null,dCam:null,dOk:false,dErr:0,dPw:0,dPh:0,dShown:false,
+  /* [G4.8] pass planet: pScene dirender sesudah pass atas (teleskop). plOn = A/B ?glplanet=0; pAct = planet dijadwalkan frame ini (di-reset glskyBegin); pChk = diagnosa shader belum dicek; pErr = galat prep */
+  plOn:true,pScene:null,pAct:false,pChk:false,pErr:0,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -72,6 +75,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glplei=0(&|#|$)/.test(location.search))GLSKY.pleiOn=false;   /* [PATCH G3g] A/B: Pleiades bintang tetap 2D */
     if(/[?&]glportal=0(&|#|$)/.test(location.search))GLSKY.portalOn=false;   /* [PATCH G4.2] A/B: portal cincin tetap 2D blit */
     if(/[?&]gldrone=0(&|#|$)/.test(location.search))GLSKY.drOn=false;   /* [G4.7] A/B: drone tetap blit 2D */
+    if(/[?&]glplanet=0(&|#|$)/.test(location.search))GLSKY.plOn=false;   /* [G4.8] A/B: planet tetap jalur lama (renderer 'big' + blit) */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
     if(v&&isFinite(parseFloat(v[1])))GLSKY.vig=Math.max(0,Math.min(1,parseFloat(v[1])));
@@ -637,13 +641,16 @@ function glskySnapTop(x,dx,dy,dw,dh){
 }
 /* render scene utama + pass atas. Dipakai glskyFlush dan glskySnap. */
 function glskyRenderAll(){
-  var S=GLSKY,i,u,any=false;
+  var S=GLSKY,i,top=false;
   S.r.render(S.scene,S.cam);
-  for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){any=true;break;}
-  if(!any)return;
+  for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){top=true;break;}
+  if(!top&&!S.pAct)return;
   S.r.autoClear=false;
-  try{S.r.clearDepth();S.r.render(S.tScene,S.tCam);}
-  finally{S.r.autoClear=true;}
+  try{
+    if(top){S.r.clearDepth();S.r.render(S.tScene,S.tCam);}                  /* pass atas: teleskop */
+    if(S.pAct&&S.pScene){S.r.clearDepth();S.r.render(S.pScene,S.tCam);}      /* [G4.8] pass planet: di atas teleskop (urutan 2D lama), di bawah #sky */
+  }finally{S.r.autoClear=true;}
+  if(S.pAct&&S.pChk){S.pChk=false;try{if(typeof pl3dGlVerify==='function')pl3dGlVerify();}catch(eV){}}   /* diagnosa shader planet, sekali, sesudah render pertama */
 }
 function glskyAstOn(){var S=GLSKY;return !!(S.act&&S.astOn&&S.ok&&S.r);}   /* [PATCH G4.1] true = batu belakang boleh ikut scene GL */
 function glskyBhShockOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.bhShockOn&&S.ok&&S.r);}   /* [PATCH G3d] true = BH shockwaves digambar di GL */
@@ -652,6 +659,9 @@ function glskyTrigOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.trigOn&&S.ok
 function glskyPleiOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.starOn&&S.pleiOn&&S.inst&&!CAMERA_MODE);}   /* [PATCH G3g] Pleiades halo+inti di mesh bintang GL */
 function glskyPortalOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.portalOn&&S.ok&&S.r);}   /* [PATCH G4.2] true = cincin portal overview ke GL billboard */
 function glskyFxOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.fxOn&&S.inst&&S.ok&&S.r);}   /* [PATCH G3h] true = efek kecil (avail/dust/focus/lock) boleh dicatat ke GL; false di luar jendela rekam */
+function glskyPlOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.plOn&&S.ok&&S.r&&S.pScene&&S.pErr<3);}   /* [G4.8] true = permukaan planet boleh dijadwalkan ke pass planet (sebelum flush) */
+function glskyPlWait(){var S=GLSKY;return !!(S.on&&S.plOn&&S.lay&&!S.test&&S.err<3&&S.pErr<3);}   /* [G4.8] true = jalur lama planet menunggu (GLSky aktif/sedang dimuat): jangan bangun renderer 'big' dulu */
+function glskyPlSet(v){GLSKY.pAct=!!v;}
 function glskyBhOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.bhOn&&S.ok&&S.r);}   /* [PATCH G4.3] true = body BH ke GL */
 
 function glskyBuild(){
@@ -681,6 +691,7 @@ function glskyBuild(){
     S.cam.position.z=5;
     S.tCam=new T.OrthographicCamera(0,1,1,0,-600,600);S.tCam.position.z=5;   /* [FIX G4.5] y-ke-ATAS (top=H, bottom=0) */
     S.tScene=new T.Scene();S.tUnits=[];
+    S.pScene=new T.Scene();   /* [G4.8] pass planet */
     S.root=new T.Group();S.scene.add(S.root);
     S.layers=new T.Group();S.root.add(S.layers);
     S.geo=new T.PlaneGeometry(1,1);
@@ -717,7 +728,7 @@ function glskySize(){
    Penggambaran GL sendiri di glskyFlush() (setelah blok latar). */
 function glskyBegin(now,want){
   var S=GLSKY;
-  S.act=false;S.n=0;
+  S.act=false;S.n=0;S.pAct=false;
   if(!S.on||S.err>=3){glskyShow(false);glskyRestorePX();return false;}
   if(!S.init){glskyInit();return false;}
   if(!S.ok||!S.r)return false;
