@@ -1092,6 +1092,9 @@ function frame(now){
     if(_glk)try{drawAsteroids(now,1);}catch(eAfG){}   /* [PATCH G4.4] batu depan dual-mesh sebelum flush */
     if(_glk)try{drawFloatingTelescopeGl(now);}catch(eTlG){}   /* [PATCH G4.5] teleskop 3D ke scene GL sebelum flush (jalur 2D teleTop dilewati kalau true) */
     if(_glk)try{if(typeof pl3dGlPrep==='function')pl3dGlPrep(now);}catch(ePlGl){}   /* [G4.8] planet full GL: jadwalkan permukaan ke pass planet sebelum flush (planet3dDraw di bawah hanya efek 2D kalau true) */
+    var _gdt=false,_gpt=false;
+    if(_glk)try{_gpt=(typeof glskyPortalRingsOn==='function')&&glskyPortalRingsOn();if(_gpt)drawPortals(age,now);}catch(ePtR){_gpt=false;window.__hub.renderError='drawPortals(GL): '+(ePtR&&ePtR.message||ePtR);}   /* [G4.11] cincin sabuk Orion + garis penghubung ke mesh garis GL sebelum flush (DOM/logika drawPortals ikut jalan di sini, jadi pemanggilan 2D di bawah dilewati) */
+    if(_glk)try{_gdt=(typeof drawTxTopGl==='function')&&drawTxTopGl(now);}catch(eTxG){_gdt=false;}   /* [G4.10] drone TX/RX: efek + halo + badan 3D ke PASS DRONE renderer utama sebelum flush (drawTxTop 2D di bawah dilewati kalau true) */
     if(_glk)try{glskyFlush();}catch(eGf){}   /* ?glsky=1: render GL sekali per frame (daftar op latar dari plateBlit/sectDrawSky + garis & bintang dari drawCons/drawStars); dulu di atas blok latar, dipindah ke sini supaya garis/bintang sempat tercatat */
     if(!_glk)drawTriggerVisuals(now);   /* [PATCH G3f] jalur 2D saja */
     if(!_glfx)ofxSafe(ofxDrawAvail,now);
@@ -1108,7 +1111,7 @@ function frame(now){
     /* Isolate late-stage canvas effects so one mobile/WebView compatibility
        issue cannot abort the frame before Gargantua is rendered. */
     pmk('warp');
-    try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
+    if(!_gpt)try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     pmk('portals');
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
     /* [PATCH G4.4] batu depan GL sudah sebelum flush; jalur 2D tetap di sini */
@@ -1118,7 +1121,7 @@ function frame(now){
     pmk('teleTop');   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
     try{if(typeof planet3dDraw==='function')planet3dDraw(now);}catch(err){window.__hub.renderError='planet3d: '+(err&&err.message||err);}   /* permukaan planet (17-planet3d.js): di atas rasi/BH/drone/portal/teleskop, di bawah asteroid depan + HUD */
     pmk('planet');   /* hanya planet3dDraw (shader band + efek 2D); astF + teleTop dipisah di atasnya */
-    try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}
+    if(!_gdt)try{if(typeof drawTxTop==='function')drawTxTop(now);}catch(eTx3){}
     try{if(typeof dr3dGlFlush==='function')dr3dGlFlush(now);}catch(eDg){}   /* [G4.7] layer GL drone (#gldrone, di atas #sky): render / sembunyikan sekali per frame */   /* drone TX/RX: SETELAH planet (berdiri di permukaan), di atas Gargantua/reticle, di bawah asteroid depan */
     pmk('txTop');   /* drone TX/RX 3D (14-drone3d) + planetGroundAt */
     pmk('astFront');

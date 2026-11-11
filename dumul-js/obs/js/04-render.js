@@ -2508,7 +2508,7 @@ function drawPulses(now,age){
   }
 }
 function drawPortals(age,now){
-  var na=clamp((age-3.6)/1);
+  var na=clamp((age-3.6)/1),glp=(typeof glskyPortalRingsOn==='function')&&glskyPortalRingsOn();   /* [G4.11] true = garis/cincin dicatat ke mesh garis GL (sebelum flush); DOM + state p.h tetap */
   PORTALS.forEach(function(p){
     var c=p.c,ox=c.ox,oy=c.oy;
     var here=!SECT.on&&sectShow(p.cons);
@@ -2546,9 +2546,11 @@ function drawPortals(age,now){
       var fx=p.fx!=null?p.fx:p.lx,fy=p.fy!=null?p.fy:p.ly;
       var l0=gSky(p.sx+ox,p.sy+oy);
       if(l0&&l0[2]<1){
+        if(glp)glfDash(l0[0],l0[1],fx-2,fy,1,p.col,(.32+.45*p.h)*na*(1-.5*l0[2]),3,5,0,0,0);   /* dash [3,5] tanpa offset, butt cap */
+        else{
         g.setLineDash([3,5]);g.lineWidth=1;g.strokeStyle='rgba('+p.col+','+((.32+.45*p.h)*na*(1-.5*l0[2]))+')';
-        g.beginPath();g.moveTo(l0[0],l0[1]);g.lineTo(fx-2,fy);g.stroke();g.setLineDash([]);
-      }else g.setLineDash([]);
+        g.beginPath();g.moveTo(l0[0],l0[1]);g.lineTo(fx-2,fy);g.stroke();g.setLineDash([]);}
+      }else if(!glp)g.setLineDash([]);
     }
 
     p.stars.forEach(function(k){
@@ -2556,8 +2558,9 @@ function drawPortals(age,now){
       if(!lp||lp[2]>=1)return;
       var x=lp[0],y=lp[1],fade=1-.85*lp[2];
       /* Ring pulse on Orion belt stars — keep as tap affordance even when panel hidden. */
-      g.strokeStyle='rgba('+p.col+','+((.5+.4*p.h)*na*fade)+')';g.lineWidth=1;g.beginPath();g.arc(x,y,8+2.5*p.h,0,6.283);g.stroke();
       var pr=reduce?0:((now*.0011+s.ph)%1);
+      if(glp){glfArc(x,y,8+2.5*p.h,0,6.283,1,p.col,(.5+.4*p.h)*na*fade);glfArc(x,y,8+pr*11,0,6.283,1,p.col,(1-pr)*.55*na*fade);return;}
+      g.strokeStyle='rgba('+p.col+','+((.5+.4*p.h)*na*fade)+')';g.lineWidth=1;g.beginPath();g.arc(x,y,8+2.5*p.h,0,6.283);g.stroke();
       g.strokeStyle='rgba('+p.col+','+((1-pr)*.55*na*fade)+')';g.beginPath();g.arc(x,y,8+pr*11,0,6.283);g.stroke();
     });
   });

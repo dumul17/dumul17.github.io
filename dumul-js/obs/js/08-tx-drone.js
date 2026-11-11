@@ -315,6 +315,95 @@ var TXFX=(function(){
     }finally{g.restore();}
   }
 
+
+  /* ---------- G4.10: jalur GL (pass drone di renderer utama, 24-glsky.js glskyDp*) ----------
+     Logika/timing/warna SAMA dgn jalur 2D di atas (tethF, beamF, fcol, TOP); hanya perintah gambarnya yang diganti: garis/titik/blob di scene pass drone (di bawah drone), cincin tahan di atas drone.
+     Dipanggil sebelum glskyFlush (drawTopGl) -> drawTop 2D dilewati. Pings dicatat di draw() (juga sebelum flush). Koordinat = stage (y ke bawah); helper membalik y. */
+  function glOn(){return typeof glskyDpOn==='function'&&glskyDpOn();}
+  function umap(x,y){return (typeof pl3dStage==='function')?pl3dStage(x,y):[x,y];}   /* ruang layar tegak (planetUprightBegin) -> stage */
+  function pingsGl(now){
+    var i,p,u,e;
+    for(i=pings.length-1;i>=0;i--){
+      p=pings[i];u=(now-p.t)/750;if(u>=1){pings.splice(i,1);continue;}
+      e=1-Math.pow(1-u,2);
+      glskyDpArc(p.x,p.y,p.r*e,0,6.283,1.4,p.col,(1-u)*.7,false,4);
+      if(u>.22){var u2=(u-.22)/.78,e2=1-Math.pow(1-u2,2);glskyDpArc(p.x,p.y,p.r*e2*.8,0,6.283,1.4,p.col,(1-u2)*.45,false,4);}
+    }
+  }
+  function trailGl(d,col,now){
+    var tr=d.trail,i,p,age,pr=null,c=glskyCol(col);
+    while(tr.length&&now-tr[0][2]>600)tr.shift();
+    if(tr.length<2)return;
+    for(i=1;i<tr.length;i++){
+      p=tr[i];pr=tr[i-1];age=1-(now-p[2])/600;
+      if(p[2]-pr[2]>90||Math.abs(p[0]-pr[0])+Math.abs(p[1]-pr[1])>70)continue;
+      glskyDpSeg(pr[0],pr[1],p[0],p[1],1.4,c,.5*age*age,false);
+    }
+  }
+  function tetherGl(a,b,col,al,now,pa,pb){
+    var dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);if(L<pa+pb+6||al<=.01)return;
+    var ux=dx/L,uy=dy/L,x0=a[0]+ux*pa,y0=a[1]+uy*pa,x1=b[0]-ux*pb,y1=b[1]-uy*pb,i,f,px,py,pk;
+    /* dash [2,5], offset -now*.02 (pola bergerak ke b), canvas lineCap 'round' (diwarisi dari drawTrail) -> dash dipanjangkan .5 px per ujung */
+    glfDash(x0,y0,x1,y1,1,col,.24*al,2,5,reduce?0:-now*.02,.5,1);
+    for(i=0;i<3;i++){
+      f=reduce?(i+.5)/3:((now*.00055+i/3)%1);
+      px=x0+(x1-x0)*f;py=y0+(y1-y0)*f;pk=Math.sin(f*3.1416)*al;
+      glskyDpDot(px,py,4,col,.22*pk);
+      glskyDpDot(px,py,1.5,'235,250,255',.9*pk);
+    }
+  }
+  function ellGl(x,y,rx,ry,w,col,al){   /* elips (ruang tegak) -> poligon di stage */
+    var n=Math.max(12,Math.min(40,Math.ceil((rx+ry)*.9))),i,t,p,q,c=glskyCol(col);
+    if(!(al>.004))return;
+    p=umap(x+rx,y);
+    for(i=1;i<=n;i++){t=i/n*6.283185;q=umap(x+Math.cos(t)*rx,y+Math.sin(t)*ry);glskyDpSeg(p[0],p[1],q[0],q[1],w,c,al,false);p=q;}
+  }
+  function feetGl(fp,col,pink,now,d){
+    var x=fp.ux,y=fp.uy,k=Math.max(.8,Math.min(1.2,fp.k/46))*fScale(),per=pink?1500:2600,i,f,lt,ctr=umap(x,y),rt=(typeof PL3D!=='undefined')?(PL3D.rot<0?1.5707963:(PL3D.rot>0?-1.5707963:0)):0;
+    glskyDpEll(ctr[0],ctr[1],7*k,2.4*k,rt,col,pink?.24:.12);
+    if(reduce||lite())ellGl(x,y,13*k,4.4*k,1.2,col,pink?.55:.3);
+    else for(i=0;i<(pink?2:1);i++){
+      f=((now+i*per*.5)%per)/per;
+      ellGl(x,y,(6+f*22)*k,(6+f*22)*k*.34,1.2,col,(pink?.62:.34)*(1-f));
+    }
+    lt=(d&&d.landT)?now-d.landT:1e9;
+    if(lt<700&&!reduce){f=lt/700;ellGl(x,y,(8+f*38)*k,(8+f*38)*k*.34,1.6,col,(1-f)*.75);}
+  }
+  function holdGl(now){
+    if(!hold)return;
+    var el=now-hold.t0;if(el<HOLD_SHOW)return;
+    var t=tele(),dd=(hold.tg==='drone'&&SECT.cur&&D[SECT.cur.k])?D[SECT.cur.k].pos:null;
+    if(dd)t=dd;if(!t)return;
+    var col=NEU;
+    if(SECT.cur&&!SECT.on)col=fcol('hold',ilCol(SECT.cur),now);
+    var f=c01(el/HOLD_MS),R=dd?18:26*teleSize(),fade=c01((el-HOLD_SHOW)/120),full=f>=1,pulse=full&&!reduce?.6+.4*Math.sin(now*.02):1;
+    /* di mdScene (atas badan drone): tiga goresan sama dgn drawHold 2D (lebar 2 / 6 / 2); ruas 1.5 px supaya sambungan garis tebal rapat */
+    glskyDpArc(t[0],t[1],R,0,6.283185,2,col,.18*fade,true,1.5);
+    glskyDpArc(t[0],t[1],R,-1.5708,-1.5708+6.283*f,6,col,.28*fade*pulse,true,1.5);
+    glskyDpArc(t[0],t[1],R,-1.5708,-1.5708+6.283*f,2,col,.95*fade*pulse,true,1.5);
+  }
+  /* true = frame ini ditangani GL (drawTop 2D dilewati); false = jalur 2D (TOP tidak disentuh) */
+  function drawTopGl(now){
+    if(!glOn())return false;
+    var T=TOP;TOP=null;
+    if(typeof g==='undefined'||!g||CAMERA_MODE)return true;
+    g.save();
+    try{
+      if(T){
+        trailGl(T.d,T.col,now);
+        if(T.beam)tetherGl(T.beam.a,[T.x,T.y],T.col,(T.beam.rx?.7:1)*beamF(T.d,now),now,T.beam.rx?0:8,10);
+        if(!T.quiet)tetherGl([T.x,T.y],T.tp,T.col,T.al*tethF(T.d,now),now,6,15);
+        if(T.foot)feetGl(T.foot,T.col,T.pulse,now,T.d);
+        if(typeof DR3D!=='undefined'){DR3D.land=T.land;DR3D.orbTan=T.tan||null;}
+        drawDrone(T.x,T.y,T.col,Math.max(.35,T.al),now,T.sc);
+        if(typeof DR3D!=='undefined')DR3D.orbTan=null;
+        if(DRONE_LABEL&&T.txt)label(T.x,T.y-26*T.sc,T.txt,T.col,T.al);   /* teks tetap 2D (#sky di atas GL) */
+      }
+      holdGl(now);
+    }finally{g.restore();}
+    return true;
+  }
+
   /* ---------- overview sektor: Gargantua = tunnel ---------- */
   function link(a,b,rA,rB,col,flow,now,sgn){   /* garis melengkung a→b; flow = paket ngalir a→b */
     var dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);if(L<rA+rB+12)return;
@@ -343,13 +432,14 @@ var TXFX=(function(){
     try{
       if(SECT.cur&&!SECT.on){if(!SECT.busy)drawSector(now,SECT.cur);}
       else lastCur=null;
-      drawPings(now);
+      if(glOn())pingsGl(now);else drawPings(now);   /* [G4.10] GL: cincin ping ke pass drone */
     }finally{g.restore();}
   }
   return {
     ORB:DRONE_ORB,   /* knob orbit atmosfer: TXFX.ORB.ru / rs / lift / bob / per / counter / pose (bisa dituning live dari console) */
     draw:draw,
     drawTop:drawTop,
+    drawTopGl:drawTopGl,
     holdStart:function(tg){hold={t0:performance.now(),tg:tg||'tele'};},
     /* hit-test drone (F8): true kalau (x,y) kena drone yang sedang terlihat di sektor ini. Dites SEBELUM teleskop. */
     droneAt:function(x,y){
@@ -369,3 +459,4 @@ var TXFX=(function(){
 })();
 function drawTxLines(now){TXFX.draw(now);}
 function drawTxTop(now){TXFX.drawTop(now);}
+function drawTxTopGl(now){return TXFX.drawTopGl(now);}   /* [G4.10] true = sudah digambar di pass drone GL (sebelum glskyFlush) */

@@ -57,6 +57,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   plOn:true,pScene:null,pAct:false,pChk:false,pErr:0,
   /* [G4.9] efek planet di pass planet: plfxOn = A/B ?glplfx=0; pf = {au,ds,dl,db,...} mesh; pfOk = mesh berhasil dibangun; pdn/pln/pbn/pan = jumlah baris dicatat frame ini (di-reset glskyBegin) */
   plfxOn:true,pf:null,pfOk:false,pdn:0,pln:0,pbn:0,pan:0,
+  /* [G4.10] PASS DRONE di renderer utama: dbScene (efek di BAWAH drone: trail/tether/kaki/halo/ping) lalu mdScene (Group drone + cincin tahan di ATAS). dpOn = A/B ?gldpass=0 (drone balik ke layer #gldrone); dpOk = mesh efek berhasil dibangun; dpAct = ada yang dijadwalkan frame ini; dbn/dln/dsn/dtn = jumlah blob/garis/titik/garis-atas dicatat frame ini (di-reset glskyBegin); aa = antialias renderer utama (?glaa=1) */
+  dpOn:true,dp:null,dpOk:false,dpErr:0,dpAct:false,dbn:0,dln:0,dsn:0,dtn:0,mdScene:null,dbScene:null,aa:false,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -79,6 +81,8 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glportal=0(&|#|$)/.test(location.search))GLSKY.portalOn=false;   /* [PATCH G4.2] A/B: portal cincin tetap 2D blit */
     if(/[?&]gldrone=0(&|#|$)/.test(location.search))GLSKY.drOn=false;   /* [G4.7] A/B: drone tetap blit 2D */
     if(/[?&]glplfx=0(&|#|$)/.test(location.search))GLSKY.plfxOn=false;   /* [G4.9] A/B: efek planet tetap 2D di #sky */
+    if(/[?&]gldpass=0(&|#|$)/.test(location.search))GLSKY.dpOn=false;   /* [G4.10] A/B: drone tetap di layer #gldrone (G4.7) */
+    if(/[?&]glaa=1(&|#|$)/.test(location.search))GLSKY.aa=true;   /* [G4.10] antialias MSAA renderer utama (drone kecil jadi halus; lebih berat) */
     if(/[?&]glplanet=0(&|#|$)/.test(location.search))GLSKY.plOn=false;   /* [G4.8] A/B: planet tetap jalur lama (renderer 'big' + blit) */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
@@ -319,6 +323,8 @@ function glskyInstBuild(T){
 function glskyStarsOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.starOn&&S.inst&&!CAMERA_MODE);}
 function glskyLinesOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.lineOn&&S.inst);}
 /* G3c: meteor acak (drawShooting, mode sprite ?ss=2) = quad texture lewat glskyImg; tidak butuh mesh instancing dan tetap di mode kamera (di 2D pun meteor di bawah garis/bintang) */
+/* [G4.11] cincin sabuk Orion + garis penghubung portal (drawPortals) ke mesh garis GL; hanya dalam jendela rekam (sebelum flush). Mode kamera tetap boleh (garis GL tidak peduli). ?glportal=0 / ?gllines=0 = 2D */
+function glskyPortalRingsOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.lineOn&&S.inst&&S.portalOn&&S.ok&&S.r);}
 function glskyShootOn(){var S=GLSKY;return !!(S.act&&S.lay&&S.ssOn);}
 /* x,y = posisi layar; Rg = radius halo (0 = tanpa halo), gc/ga = 'r,g,b' + alpha halo; rc = radius inti, cc/ca = warna + alpha inti (0 = tanpa inti). Argumen = stglPush */
 function glskyStar(x,y,Rg,gc,ga,rc,cc,ca){
@@ -355,6 +361,21 @@ function glfArc(cx,cy,r,a0,a1,w,rgb,al){   /* goresan busur (ekuivalen g.arc + s
 }
 function glfDot(x,y,r,rgb,al){if(al>.004)glskyStar(x,y,0,'0,0,0',0,r,rgb,al);}   /* lingkaran padat (ekuivalen arc + fill) */
 function glfLine(x0,y0,x1,y1,w,rgb,al){if(al>.004)glskySeg(x0,y0,x1,y1,w,glskyCol(rgb),al,0);}
+/* garis putus-putus (g.setLineDash([on,off]) + lineDashOffset): ph = posisi pola di awal garis (px), ext = perpanjangan tiap dash di dua ujung (setengah lebar bila canvas pakai lineCap round).
+   mode 0 = mesh garis utama (glskySeg), 1 = pass drone di bawah drone (glskyDpSeg). */
+function glfDash(x0,y0,x1,y1,w,rgb,al,on,off,ph,ext,mode){
+  var L=Math.hypot(x1-x0,y1-y0),ux,uy,per=on+off,s,pos=0,len,c,ea=ext||0,a,b,n=0;
+  if(!(al>.004)||L<.5)return;
+  ux=(x1-x0)/L;uy=(y1-y0)/L;c=glskyCol(rgb);
+  s=((ph||0)%per+per)%per;
+  while(pos<L&&n++<600){
+    if(s<on){
+      len=on-s;a=Math.max(0,pos-ea);b=Math.min(L,pos+len+ea);
+      if(mode===1)glskyDpSeg(x0+ux*a,y0+uy*a,x0+ux*b,y0+uy*b,w,c,al,0);else glskySeg(x0+ux*a,y0+uy*a,x0+ux*b,y0+uy*b,w,c,al,0);
+      pos+=len;s=on;
+    }else{pos+=per-s;s=0;}
+  }
+}
 function glfPlSprite(){   /* gradien glow bintang Pleiades fokus (sama stop dgn drawFocusFx 2D), alpha dasar 1 -> dikali al lewat glskyImg */
   var c,x,gr;
   if(GLF_PL)return GLF_PL;
@@ -584,7 +605,14 @@ function glskyOvDraw(w,h,opacity,clip){
    Group drone cukup dipindah ke pass atas scene utama (glskyAttachTop) dan layer ini dihapus. Koordinat Group: x = x layar, y = H - y layar (sama dgn pass atas). Gagal / konteks hilang >=3x
    / GL mati => drone balik ke blit 2D (drone3dDraw return false). */
 function glskyDrOn(){var S=GLSKY;return !!(S.drOn&&S.act&&S.ok&&S.dOk&&S.dErr<3);}
-function glskyDrWant(){var S=GLSKY;return !!(S.drOn&&S.act&&S.ok&&!S.dR&&S.dErr<3);}
+/* [G4.10] pass drone di renderer utama dipakai selama planet GL JALAN (PL3D.glm===2): urutan lapisan drone di atas planet sudah dijamin pass-nya sendiri, jadi layer #gldrone tidak perlu.
+   DpReady = struktur siap (tidak tergantung jendela rekam); DpOn = DpReady + jendela rekam frame ini terbuka (antre op sebelum glskyFlush). DpHold = jangan bikin layer (planet GL sedang kompilasi / sudah jalan). */
+function glskyDpReady(){var S=GLSKY;return !!(S.dpOn&&S.dpOk&&S.dpErr<3&&S.ok&&S.r&&S.plOn&&S.pErr<3&&typeof PL3D!=='undefined'&&PL3D.glm===2);}
+function glskyDpOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&glskyDpReady());}
+function glskyDpHold(){var S=GLSKY,m;if(!S.dpOn||!S.dpOk||S.dpErr>=3||!S.plOn||S.pErr>=3||typeof PL3D==='undefined')return false;m=PL3D.glm;return m===1||m===2;}
+/* 2 = pass drone utama, 1 = layer #gldrone, 0 = tidak ada (blit 2D) */
+function glskyDrTarget(){return glskyDpOn()?2:(glskyDpReady()?0:(glskyDrOn()?1:0));}
+function glskyDrWant(){var S=GLSKY;return !!(S.drOn&&S.act&&S.ok&&!S.dR&&S.dErr<3&&!glskyDpHold());}
 function glskyDrHide(){var S=GLSKY;if(S.dCv&&S.dShown){S.dCv.style.display='none';}S.dShown=false;}
 function glskyDrEnsure(){
   var S=GLSKY,T=window.THREE,c,r;
@@ -614,8 +642,9 @@ function glskyDrEnsure(){
     return false;
   }
 }
-function glskyDrAttach(grp){var S=GLSKY;if(!S.dScene||!grp)return false;try{S.dScene.add(grp);return true;}catch(e){return false;}}
-function glskyDrDetach(grp){var S=GLSKY;try{if(S.dScene&&grp&&grp.parent===S.dScene)S.dScene.remove(grp);}catch(e){}}
+function glskyDrScene(tg){var S=GLSKY;return tg===2?S.mdScene:S.dScene;}
+function glskyDrAttach(grp,tg){var sc=glskyDrScene(tg);if(!sc||!grp)return false;try{sc.add(grp);return true;}catch(e){return false;}}
+function glskyDrDetach(grp){var S=GLSKY;try{if(grp&&grp.parent&&(grp.parent===S.dScene||grp.parent===S.mdScene))grp.parent.remove(grp);}catch(e){}}
 /* show=false: sembunyikan kanvas (tidak ada drone frame ini). true: ukur + render scene. false dikembalikan kalau gagal (pemanggil jatuh ke 2D di frame berikut) */
 function glskyDrDraw(show){
   var S=GLSKY,r=S.dR,c=S.dCv;
@@ -645,14 +674,20 @@ function glskySnapTop(x,dx,dy,dw,dh){
 }
 /* render scene utama + pass atas. Dipakai glskyFlush dan glskySnap. */
 function glskyRenderAll(){
-  var S=GLSKY,i,top=false;
+  var S=GLSKY,i,top=false,ex;
   S.r.render(S.scene,S.cam);
   for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){top=true;break;}
-  if(!top&&!S.pAct)return;
+  if(!top&&!S.pAct&&!S.dpAct)return;
   S.r.autoClear=false;
   try{
     if(top){S.r.clearDepth();S.r.render(S.tScene,S.tCam);}                  /* pass atas: teleskop */
     if(S.pAct&&S.pScene){S.r.clearDepth();S.r.render(S.pScene,S.tCam);}      /* [G4.8] pass planet: di atas teleskop (urutan 2D lama), di bawah #sky */
+    if(S.dpAct&&S.dpOk&&S.dbScene){                                          /* [G4.10] pass drone: di atas planet + efek planet */
+      S.r.clearDepth();S.r.render(S.dbScene,S.tCam);                          /*   efek di BAWAH drone (garis/titik/blob: tanpa depth) */
+      try{if(typeof dr3dGlSync==='function')dr3dGlSync();}catch(eDs){}
+      ex=S.r.toneMappingExposure;S.r.toneMappingExposure=1.05;                /*   exposure drone = renderer 'small' lama */
+      try{S.r.clearDepth();S.r.render(S.mdScene,S.tCam);}finally{S.r.toneMappingExposure=ex;}   /*   Group drone + cincin tahan (di atas drone) */
+    }
   }finally{S.r.autoClear=true;}
   if(S.pAct&&S.pChk){S.pChk=false;try{if(typeof pl3dGlVerify==='function')pl3dGlVerify();}catch(eV){}}   /* diagnosa shader planet, sekali, sesudah render pertama */
 }
@@ -776,13 +811,86 @@ function glskyPfUpload(){
   glskyInstUpload(pf.bb,pf.mb,S.pbn);glskyInstUpload(pf.bs,pf.ms,S.pdn);glskyInstUpload(pf.bl,pf.ml,S.pln);
 }
 
+/* ================= [G4.10] PASS DRONE =================
+   Efek drone (trail, tether + paket sinyal, berkas, kaki/cincin mendarat, ping, halo lembut, cincin tahan) = garis/titik/blob instancing di dua scene yang dirender sesudah pass planet (glskyRenderAll):
+   dbScene = di BAWAH drone (blob RO 0, garis RO 1, titik RO 2), mdScene = Group drone 3D + cincin tahan (garis RO 10, transparan sehingga selalu di atas badan opaque drone).
+   Argumen helper = koordinat STAGE (y ke bawah, sama dgn #sky); y dibalik di sini (kamera pass y-ke-atas = tCam). Warna = string 'r,g,b' 0..255 (glskyCol). Logika/timing tetap di TXFX (08-tx-drone.js). */
+function glskyDpBuild(T){
+  var S=GLSKY,dp={};
+  dp.bb=glskyInstGeo(T,[['iB',4],['iQ',4],['iC0',4],['iC1',4]],24);
+  dp.mb=GLSKY_T_MESH(T,dp.bb,GLSKY_BL_VS,GLSKY_BL_FS,{},0);
+  dp.bl=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],1024);
+  dp.ml=GLSKY_T_MESH(T,dp.bl,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},1);
+  dp.bs=glskyInstGeo(T,[['iA',4],['iG',4],['iC',4]],128);
+  dp.ms=GLSKY_T_MESH(T,dp.bs,GLSKY_STAR_VS,GLSKY_STAR_FS,{uS:{value:1}},2);
+  dp.tl=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],768);
+  dp.mt=GLSKY_T_MESH(T,dp.tl,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},10);
+  S.dbScene.add(dp.mb);S.dbScene.add(dp.ml);S.dbScene.add(dp.ms);S.mdScene.add(dp.mt);
+  S.dp=dp;S.dpOk=true;
+}
+function glskyDpSet(){GLSKY.dpAct=true;}   /* ada isi di pass drone frame ini (mis. pivot drone 3D) */
+function glskyDpSeg(x0,y0,x1,y1,w,c,al,top){
+  var S=GLSKY,dp=S.dp,B,n,a,o,H=S.H;
+  if(!dp||!(al>.004))return;
+  if(top){B=dp.tl;n=S.dtn;}else{B=dp.bl;n=S.dln;}
+  if(n>=B.cap)return;
+  a=B.a;o=n*4;
+  a.iP[o]=x0;a.iP[o+1]=H-y0;a.iP[o+2]=x1;a.iP[o+3]=H-y1;
+  a.iL[o]=c[0];a.iL[o+1]=c[1];a.iL[o+2]=c[2];a.iL[o+3]=al>1?1:al;
+  a.iW[n*2]=w;a.iW[n*2+1]=0;
+  if(top)S.dtn=n+1;else S.dln=n+1;
+  S.dpAct=true;
+}
+function glskyDpDot(x,y,r,col,al){   /* lingkaran padat (g.arc + fill) */
+  var S=GLSKY,dp=S.dp,B,n=S.dsn,a,o,c;
+  if(!dp||!(al>.004)||!(r>.1))return;
+  B=dp.bs;if(n>=B.cap)return;
+  a=B.a;o=n*4;c=glskyCol(col);
+  a.iA[o]=x;a.iA[o+1]=S.H-y;a.iA[o+2]=0;a.iA[o+3]=r;
+  a.iG[o]=0;a.iG[o+1]=0;a.iG[o+2]=0;a.iG[o+3]=0;
+  a.iC[o]=c[0];a.iC[o+1]=c[1];a.iC[o+2]=c[2];a.iC[o+3]=al>1?1:al;
+  S.dsn=n+1;S.dpAct=true;
+}
+/* elips padat (kaki): rot = sudut sumbu-x elips di ruang STAGE (rad, y ke bawah); tepi lembut ~1.2 px (pengganti antialias) */
+function glskyDpEll(x,y,rx,ry,rot,col,al){
+  var S=GLSKY,dp=S.dp,B,n=S.dbn,a,o,c,p1;
+  if(!dp||!(al>.004)||!(rx>.3))return;
+  B=dp.bb;if(n>=B.cap)return;
+  a=B.a;o=n*4;c=glskyCol(col);
+  p1=Math.max(.55,1-1.2/Math.max(1,Math.min(rx,ry)));
+  a.iB[o]=x;a.iB[o+1]=S.H-y;a.iB[o+2]=rx;a.iB[o+3]=ry;
+  a.iQ[o]=-rot;a.iQ[o+1]=p1;a.iQ[o+2]=al;a.iQ[o+3]=al;
+  a.iC0[o]=c[0];a.iC0[o+1]=c[1];a.iC0[o+2]=c[2];a.iC0[o+3]=0;
+  a.iC1[o]=c[0];a.iC1[o+1]=c[1];a.iC1[o+2]=c[2];a.iC1[o+3]=0;
+  S.dbn=n+1;S.dpAct=true;
+}
+/* goresan busur (g.arc + stroke); seg = panjang ruas px (kecil untuk garis tebal supaya sambungan rapat) */
+function glskyDpArc(cx,cy,r,a0,a1,w,col,al,top,seg){
+  var c,n,i,a,xa,ya,xb,yb;
+  if(!(al>.004)||!(r>.5))return;
+  c=glskyCol(col);n=Math.max(8,Math.min(256,Math.ceil(Math.abs(a1-a0)*r/(seg||4))));
+  xa=cx+Math.cos(a0)*r;ya=cy+Math.sin(a0)*r;
+  for(i=1;i<=n;i++){
+    a=a0+(a1-a0)*i/n;xb=cx+Math.cos(a)*r;yb=cy+Math.sin(a)*r;
+    glskyDpSeg(xa,ya,xb,yb,w,c,al,top);xa=xb;ya=yb;
+  }
+}
+function glskyDpUpload(){
+  var S=GLSKY,dp=S.dp;
+  if(!dp)return;
+  if(!S.dpOk||!S.dpAct){dp.mb.visible=false;dp.ml.visible=false;dp.ms.visible=false;dp.mt.visible=false;return;}
+  dp.ml.material.uniforms.uS.value=S.S;dp.mt.material.uniforms.uS.value=S.S;dp.ms.material.uniforms.uS.value=S.S;
+  dp.ml.material.uniforms.uSoft.value=0;dp.mt.material.uniforms.uSoft.value=0;
+  glskyInstUpload(dp.bb,dp.mb,S.dbn);glskyInstUpload(dp.bl,dp.ml,S.dln);glskyInstUpload(dp.bs,dp.ms,S.dsn);glskyInstUpload(dp.tl,dp.mt,S.dtn);
+}
+
 function glskyBuild(){
   var S=GLSKY,T=window.THREE,c,r;
   if(S.err>=3||S.r)return;
   try{
     c=document.createElement('canvas');c.id='glsky';c.setAttribute('aria-hidden','true');
     c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;touch-action:none';
-    r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:false,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});   /* [PATCH G4.1] depth:true supaya unit 3D (batu) bisa depthTest; lapisan 2D-style tetap depthTest:false */
+    r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:!!S.aa,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});   /* [PATCH G4.1] depth:true supaya unit 3D (batu) bisa depthTest; lapisan 2D-style tetap depthTest:false */
     r.setPixelRatio(1);
     r.autoClear=true;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;   /* [G4.5] sama dgn renderer 'small' (threeGLGet tone): teleskop 3D di scene ini; ShaderMaterial GLSky tanpa chunk tonemapping tidak terpengaruh */
     c.addEventListener('webglcontextlost',function(e){
@@ -804,11 +912,13 @@ function glskyBuild(){
     S.tCam=new T.OrthographicCamera(0,1,1,0,-600,600);S.tCam.position.z=5;   /* [FIX G4.5] y-ke-ATAS (top=H, bottom=0) */
     S.tScene=new T.Scene();S.tUnits=[];
     S.pScene=new T.Scene();   /* [G4.8] pass planet */
+    S.dbScene=new T.Scene();S.mdScene=new T.Scene();   /* [G4.10] pass drone: bawah + (drone, atas) */
     S.root=new T.Group();S.scene.add(S.root);
     S.layers=new T.Group();S.root.add(S.layers);
     S.geo=new T.PlaneGeometry(1,1);
     try{glskyInstBuild(T);}catch(eIn){S.inst=false;try{console.warn('[glsky] instancing gagal, bintang/garis tetap 2D:',eIn);}catch(e0){}}   /* gagal di sini TIDAK menjatuhkan GL: latar tetap jalan, bintang/garis 2D */
     try{glskyPfBuild(T);}catch(ePf){S.pfOk=false;S.pf=null;try{console.warn('[glsky] efek planet GL gagal, tetap 2D:',ePf);}catch(e0b){}}   /* [G4.9] gagal di sini TIDAK menjatuhkan GL: efek planet tetap 2D */
+    try{glskyDpBuild(T);}catch(eDp){S.dpOk=false;S.dp=null;try{console.warn('[glsky] pass drone gagal, drone tetap layer #gldrone:',eDp);}catch(e0c){}}   /* [G4.10] gagal di sini TIDAK menjatuhkan GL */
     S.dummy=new T.DataTexture(new Uint8Array([0,0,0,0]),1,1,T.RGBAFormat);S.dummy.needsUpdate=true;
     if(S.test)S.root.add(glskyBuildTest(T));
     cv.parentNode.insertBefore(c,cv);   /* tepat SEBELUM #sky di dalam #stage => di bawahnya; urutan DOM lain tidak berubah */
@@ -841,7 +951,7 @@ function glskySize(){
    Penggambaran GL sendiri di glskyFlush() (setelah blok latar). */
 function glskyBegin(now,want){
   var S=GLSKY;
-  S.act=false;S.n=0;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;
+  S.act=false;S.n=0;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;S.dpAct=false;S.dbn=0;S.dln=0;S.dsn=0;S.dtn=0;
   if(!S.on||S.err>=3){glskyShow(false);glskyRestorePX();return false;}
   if(!S.init){glskyInit();return false;}
   if(!S.ok||!S.r)return false;
@@ -870,6 +980,7 @@ function glskyFlush(){
     for(i=0;i<S.n;i++){m=S.mesh[i]||glskyMesh(i);glskyApply(m,S.ops[i]);}
     for(;i<S.mesh.length;i++)S.mesh[i].visible=false;
     glskyInstFlush();
+    try{glskyDpUpload();}catch(eDpU){S.dpErr++;S.dpAct=false;if(S.dpErr>=3)S.dpOk=false;}   /* [G4.10] gagal x3 -> drone balik ke layer */
     try{glskyPfUpload();}catch(ePfU){S.pfOk=false;}   /* [G4.9] efek planet: gagal -> hilang sampai frame berikut (pl3dGlFx kembali ke 2D karena pfOk false) */
     if(S.big){S.lay=false;glskyFail('texture melebihi batas GPU ('+S.maxTex+'px)');return;}   /* texture terlalu besar: tidak bisa jujur menggantikan 2D -> 2D penuh */
     S.r.setClearColor(0x050b12,S.want?1:0);   /* ColorManagement mati (threeLoad) => hex dipakai apa adanya = #050b12 */

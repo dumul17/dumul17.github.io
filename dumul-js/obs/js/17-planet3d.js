@@ -261,9 +261,18 @@ function pl3dGeom(still,tgt,nolib){   /* tgt=true: pakai geometri TUJUAN (sektor
   return {R:R,cx:cx+ox,cy:cy+oy,ymin:ymin+oy,stripH:sH+bo,bo:bo,ox:ox,oy:oy,f:f};   /* bo = strip melebar ke BAWAH layar sebesar bo px, supaya transformasi ayunan tidak membuka celah di dasar layar */
 }
 
+/* [FIX G4.10] 24-glsky.js di-document.write SESUDAH 17-planet3d.js (urutan defer), jadi pl3dLoad() di akhir file ini jalan saat glskyPlWait belum ada -> jalur lama (renderer 'big') langsung dibangun dan planet GL (G4.8/G4.9) tidak pernah hidup di build nyata
+   (pl3dGlPrep: state!==0 -> keluar). Sekarang: kalau GLSky DIRAMALKAN dimuat (flag sama dgn loader index.html), tunggu; planet3dDraw memanggil pl3dLoad lagi tiap frame selama state 0, jadi begitu glskyPlWait ada (atau batas 25 dtk lewat) keputusan diambil ulang. */
+function pl3dGlExpect(){
+  try{
+    var ls=location.search,m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(ls),e=m?m[1]!=='0':localStorage.getItem('dumul_glsky')==='1';
+    if(!e||(m&&m[1]==='test')||/[?&]glplanet=0(&|#|$)/.test(ls)||/[?&]gllay=0(&|#|$)/.test(ls)||/[?&]off=/.test(ls))return false;
+    return performance.now()<25000;
+  }catch(x){return false;}
+}
 function pl3dLoad(){
   if(PL3D.state!==0)return;
-  if(PL3D.glm>=0&&typeof glskyPlWait==='function'&&glskyPlWait())return;   /* [G4.8] GLSky aktif/sedang dimuat: planet dibangun di scene GL (pl3dGlPrep), renderer 'big' tidak dibuat. Dibangun lama hanya kalau GL gagal / dimatikan (?glplanet=0) */
+  if(PL3D.glm>=0&&(typeof glskyPlWait==='function'?glskyPlWait():pl3dGlExpect()))return;   /* [G4.8] GLSky aktif/sedang dimuat: planet dibangun di scene GL (pl3dGlPrep), renderer 'big' tidak dibuat. Dibangun lama hanya kalau GL gagal / dimatikan (?glplanet=0) */
   if(!PL3D_CFG.on||PL3D_CFG.force2d||(typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce)){PL3D.state=3;PL3D.err=PL3D_CFG.on?(PL3D_CFG.force2d?'2d':'potato/reduce'):'off';return;}
   PL3D.state=1;
   var go=function(){try{pl3dBuild();}catch(e){pl3dFail(e&&e.message||e);}};
