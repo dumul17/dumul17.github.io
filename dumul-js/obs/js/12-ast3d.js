@@ -10,7 +10,7 @@
    ikut scene GLSky (glskyAttach, renderOrder 200). Dual-mesh (G4.4): meshF pass depan RO 5200 tanpa blit. ?glast=0 = paksa 2D. */
 var AST3D_CFG={
   on:true,
-  lib:'dumul-js/obs/lib/three.custom.r186.js?v=1',   /* ES module (r186, bundle tree-shaken: cuma class yang dipakai). Path + ?v= harus sama dgn SHELL service-worker */
+  lib:'dumul-js/obs/lib/three.custom.r186.js?v=2',   /* ES module (r186, bundle tree-shaken: cuma class yang dipakai). Path + ?v= harus sama dgn SHELL service-worker */
   rwSlow:450,    /* [v38] batas lebar kanvas GL batu (px perangkat) saat governor FS.slow; 0 = mati. pr efektif = min(pr, max(1, rwSlow / W)). Dulu Redmi 8A (W 450 CSS, DPR 1,6) dapat 562x965 vs itel (W 360) 450x792 = ±1,52x piksel padahal sama-sama GPU-bound; sama logikanya dgn PL3D_CFG.rwSlow. Tidak slow: tidak berubah. ?astrw=N = A/B (0 = perilaku lama) */
   dprMax:1.25,   /* resolusi render dibatasi: batu kecil (1-4 px) + lembut, nggak perlu DPR penuh. v23: dulu 1,5; kalau masih berat coba 1 */
   procVariants:6,
@@ -301,7 +301,7 @@ function threeLoad(ok,bad){
   var P=window.__threeP;
   if(!P){
     try{
-      var url=new URL((typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r186.js?v=1',document.baseURI).href;
+      var url=new URL((typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r186.js?v=2',document.baseURI).href;
       P=window.__threeP=import(url).then(function(m){
         try{m.ColorManagement.enabled=false;}catch(e){}
         window.THREE=Object.assign({},m);

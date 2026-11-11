@@ -15,7 +15,7 @@ var PL3D_CFG={
   /* DEFAULT angka di bawah = hasil COPY TUNE 2026-10-29 (komentar angka lama bisa kadaluarsa) */
   on:true,
   force2d:false,
-  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r186.js?v=1',   /* path + ?v= harus sama dgn SHELL service-worker */
+  lib:(typeof AST3D_CFG!=='undefined'&&AST3D_CFG.lib)||'dumul-js/obs/lib/three.custom.r186.js?v=2',   /* path + ?v= harus sama dgn SHELL service-worker */
   /* GEOMETRI PER SEKTOR: hL/hR (garis horizon, x tinggi layar dari atas, di tepi kiri/kanan), rot (px/dtk, + = geser ke kanan, - = ke kiri) dan seed
      (pasangan integer, geser pola noise) ada di ov (overview) dan di SECTORS[].planet (sky-data.js). Landscape (PW>PH): hLLand/hRLand kalau diisi,
      kalau tidak diturunkan dari hL/hR (h+(1-h)*.4). Nilai hidup = blend ov + sektor menurut bobot SKYT (PL3D_CFG.live), sama seperti palette. */
