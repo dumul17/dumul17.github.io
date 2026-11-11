@@ -669,6 +669,7 @@ function whGlComposite(cx,cy,r,cvr,Rv,Rh,small,low,tmW){
     rdr.setSize(G.fullW,G.fullH,false);
     G.compMesh.renderOrder=0;G.stMesh.renderOrder=1;G.holeMesh.renderOrder=2;
     if(G.maskMesh)G.maskMesh.renderOrder=10;
+    rdr.setRenderTarget(null);   /* [PATCH G4.12g] composite WAJIB ke layar: sesudah whGlStep target masih rtA (feedback loop rtA->rtA) */
     rdr.render(G.compScene,G.compCam);
     /* reset CSS leftovers dari G4.12b */
     if(G.fullCv){G.fullCv.style.clipPath='none';G.fullCv.style.opacity='1';if(G.fullCv.style.display!=='block')G.fullCv.style.display='block';}
