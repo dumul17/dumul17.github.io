@@ -660,6 +660,20 @@ function drawFloatingTelescopeTop(now){
   }
 }
 
+/* [G4.5] ?glsky=1: teleskop = Group di scene GLSky (13-scope3d.js tele3dGl). Dipanggil frame() SEBELUM glskyFlush; true = sudah dijadwalkan ke GL dan jalur 2D di atas (drawFloatingTelescopeTop) dilewati.
+   false (dive wormhole, potato/reduce, GL mati, ?glscope=0, error) = jalur 2D lama dengan badan 3D hasil blit, tidak berubah. */
+function drawFloatingTelescopeGl(now){
+  var D=TELE_DRAW,pts=[],ci,tq,cp;
+  if(typeof tele3dGl!=='function'||typeof tele3dGlOk!=='function')return false;
+  if(!D||!(TELESCOPE.al>.02)||TELESCOPE.dive||!tele3dGlOk()){tele3dGlLeave();return false;}
+  cp=D.copies;
+  for(ci=0;ci<cp.length;ci++){tq=lens(TELESCOPE.x+cp[ci][0],TELESCOPE.y+cp[ci][1]);if(tq)pts.push([tq[0],tq[1]]);}
+  if(!pts.length){tele3dGlLeave();TELE_DRAW=null;return true;}
+  try{if(tele3dGl(now,pts,D.sc,TELESCOPE.al,TELESCOPE.ang)){TELE_DRAW=null;return true;}}
+  catch(eTG){SCP3D_GL.err++;try{tele3dGlLeave();}catch(eTL){}}
+  return false;
+}
+
 /* ---------- [FITUR 2] Synthesizer Chime untuk Bintang Biasa (Web Audio) ---------- */
 function playStarChime(s){
   try{UIS.chime((ALIGN.cid&&ALIGN.next>0)?ALIGN.next-1:0);return;}catch(eUC){}   /* UIS belum termuat -> jatuh ke chime lama di bawah */

@@ -26,6 +26,7 @@
    G3g: PLEIADES bintang (drawPleiades, 04-render.js) halo+inti lewat glskyStar (mesh bintang yang sama); label/nama/spektrum tetap 2D. Flag ?glplei=0 A/B | konsol GLSKY.pleiOn. Mode kamera tetap 2D (sama glskyStarsOn).
    G4.2b: PORTAL overview full GL (cincin billboard + mulut PTT + petir glskySeg + percikan + charge) SEBELUM flush; #sky 2D tidak lagi menerima blit portal. Flag ?glportal=0 A/B | konsol GLSKY.portalOn.
    G4.3b: BH BODY+plasma+drag (drawHoleGl) sprite+bloom+serat+kilau cakram+warp drag ke GL sebelum flush. Flag ?glbh=0 A/B | konsol GLSKY.bhOn.
+   G4.5: TELESKOP 3D (13-scope3d.js) jadi Group di scene bersama (pivot glskyAttach renderOrder 9000, z 400): tanpa renderer 'small', tanpa blit/drawImage ke #sky saat GL aktif; salinan tepi layar = klon Group; wormhole dive tetap jalur 2D (terowongan masih kanvas 2D z 13). Flag ?glscope=0 A/B | konsol SCP3D_GL.on.
    G4.4: AST dual-mesh — pass depan meshF RO 5200 tanpa blit (12-ast3d.js). Flag ?glast=0.
    G3h: EFEK KECIL sesudah flush pindah ke GL (dicatat sebelum flush, di atas BH/trigger): ofxDrawAvail (glow 8 bintang), ofxDrawDust (debu kursor), drawFocusFx (cincin/rasi fokus mode kamera, glskyFocusFx), reticle drawTargetLock (glskyLockReticle; teks telemetri tetap 2D). Glow = sprite getStarSprite lewat glskyImg add=1 hi=1, garis/cincin = glskySeg/glskyPoly. drawSectFlash SENGAJA tetap 2D (flash layar penuh harus di atas semua unit). Flag ?glfx=0 A/B | konsol GLSKY.fxOn.
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
@@ -501,7 +502,7 @@ function glskyBuild(){
     c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;touch-action:none';
     r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:false,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});   /* [PATCH G4.1] depth:true supaya unit 3D (batu) bisa depthTest; lapisan 2D-style tetap depthTest:false */
     r.setPixelRatio(1);
-    r.autoClear=true;
+    r.autoClear=true;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;   /* [G4.5] sama dgn renderer 'small' (threeGLGet tone): teleskop 3D di scene ini; ShaderMaterial GLSky tanpa chunk tonemapping tidak terpengaruh */
     c.addEventListener('webglcontextlost',function(e){
       try{e.preventDefault();}catch(x){}
       S.ok=false;S.act=false;S.st.lost++;S.err++;

@@ -316,11 +316,11 @@ function scp3dDrive(it,tm){
 function scp3dBuild(){scp3dDrive(scp3dBuildG(),[]);}
 
 /* ---------- per frame ---------- */
-function scp3dUpdate(now,mm){
+function scp3dUpdate(now,mm,noRender){   /* noRender (G4.5): hanya perbarui scene (pose, cahaya, api, LED); render dilakukan GLSky */
   var T=THREE,r=SCP3D.r,o=SCP3D.o,m=SCP3D.m,sc=Math.hypot(mm.a,mm.b),res=Math.max(SCP3D_CFG.resMin,Math.min(SCP3D_CFG.resMax,Math.ceil(SCP3D_CFG.half*2*sc*1.4/32)*32));
   /* selama transisi portal skala teleskop berubah .1->.95 -> res bergeser per 32px = setSize (realokasi buffer) berulang = stutter. Kunci res di nilai frame pertama transisi. */
   if(typeof WORMHOLE!=='undefined'&&WORMHOLE.busy){if(SCP3D.rl==null)SCP3D.rl=res;res=SCP3D.rl;}else SCP3D.rl=null;
-  if(res!==SCP3D.res){SCP3D.res=res;threeGLSize(SCP3D.gl,res,res);}
+  if(!noRender&&res!==SCP3D.res){SCP3D.res=res;threeGLSize(SCP3D.gl,res,res);}
   var TL=(typeof TELESCOPE!=='undefined')?TELESCOPE:null,mode=TL?TL.mode:'drift';
 
   /* arah cahaya: telescop -> Gargantua, diputar balik dari frame kanvas ke frame badan (canvas y ke bawah -> GL y ke atas) */
@@ -420,6 +420,7 @@ function scp3dUpdate(now,mm){
     if(role)o.winGlow.material.color.setRGB(cr,cg,cb);else o.winGlow.material.color.setRGB(.21,.95,1);
   }
   o.winGlow.material.opacity=.32+.1*Math.sin(now*.004);
+  if(noRender)return;
   threeGLBegin(SCP3D.gl);
   r.render(SCP3D.sc,SCP3D.cam);
   if(window.__gpuP)glProbe(SCP3D.gl,'sc.sub','sc.gpu');   /* [v21] probe GPU (?bench=1&gpup=1) */
@@ -455,6 +456,7 @@ function scp3dWarmSync(stop){
 var SCP3D_SMQ=(function(){try{var m=/[?&]scsmq=(low|medium|high)(?:&|#|$)/.exec(location.search);return m?(m[1]==='high'?'':m[1]):'low';}catch(e){return 'low';}})();
 var SCP3D_SMQI=(function(){try{return /[?&]scsmqi=1(?:&|#|$)/.test(location.search);}catch(e){return false;}})();   /* [v34] ALAT LIHAT: ?scsmqi=1 = smoothing SCP3D_SMQ juga dipakai di idle overview/sektor (bukan cuma saat WORMHOLE.busy). Default MATI. Pasangkan ?scsmq=low|medium. */
 function tele3dBody(g,now){
+  if(SCP3D_GL.act)tele3dGlLeave();   /* [G4.5] jalur 2D (terowongan wormhole dll): kembalikan Group + lampu ke scene 'small' dulu */
   if(SCP3D.state===0){scp3dLoad();return false;}
   if(SCP3D.state!==2)return false;
   if(!SCP3D_CFG.on||(typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
@@ -490,5 +492,83 @@ function tele3dBody(g,now){
     scp3dFail(e&&e.message||e);
     return false;
   }
+}
+
+/* ---------- [G4.5] teleskop di scene GLSky (24-glsky.js): tanpa renderer sendiri, tanpa threeGLSnap/drawImage ke #sky ----------
+   Group badan (SCP3D.root) + lampu pindah ke pivot yang dipasang ke scene GLSky (glskyAttach, renderOrder 9000, z 400 = di depan batu depan). Kamera GLSky ortho y-ke-bawah:
+   matriks pivot = T(x,y) R(ang) S(sc,-sc,sc), -sc di y menggantikan pembalikan GL->kanvas yang dulu dilakukan drawImage (three membalik winding otomatis).
+   Posisi/skala/lensing/salinan tepi tetap dihitung 04-render.js (drawFloatingTelescopeGl); pose + cahaya + api + LED tetap scp3dUpdate (noRender). Salinan tepi layar = klon Group (geometri/material dibagi).
+   Lampu: Directional ikut pivot beserta target-nya (arah = posisi - target di ruang pivot), Hemisphere di akar GLSky dengan arah dihitung per frame. Alpha (TELESCOPE.al) = opacity semua material x al (transparent sementara < .995).
+   Jalur 2D (renderer 'small' + blit) tetap ada utk: terowongan wormhole (09-wormhole.js menggambar di kanvas 2D z 13), potato/reduce/?senv=1, GLSKY mati. tele3dBody() memanggil tele3dGlLeave() dulu, jadi scene kembali utuh sebelum jalur 2D menggambar.
+   Matikan: ?glscope=0 (A/B), konsol SCP3D_GL.on=false. Tepi: renderer GLSky tanpa antialias dan tanpa kotak potong 128px. Tone mapping ACES disamakan di renderer GLSky (24-glsky.js). */
+var SCP3D_GL={on:true,act:false,pv:[],cl:[],hemi:null,lts:[],mats:null,err:0};
+try{if(/[?&]glscope=0(&|#|$)/.test(location.search))SCP3D_GL.on=false;}catch(eSG){}
+function tele3dGlOk(){
+  try{
+    return !!(SCP3D_GL.on&&SCP3D_GL.err<3&&SCP3D.state===2&&SCP3D.root&&SCP3D.sc&&SCP3D_CFG.on&&!SCP3D_ENV&&!(typeof IS_POTATO!=='undefined'&&IS_POTATO)&&!(typeof reduce!=='undefined'&&reduce)
+      &&typeof GLSKY!=='undefined'&&GLSKY.act&&GLSKY.root&&typeof glskyAttach==='function'&&typeof glskyDetach==='function');
+  }catch(e){return false;}
+}
+function tele3dGlEnter(){
+  var T=THREE,S=SCP3D_GL,sc=SCP3D.sc,o=SCP3D.o,m=SCP3D.m,pv=new T.Group(),ch=sc.children.slice(),i,x,seen=[],dyn=[m.ion,m.ionCore,o.eg&&o.eg[0]&&o.eg[0].material,o.eg&&o.eg[1]&&o.eg[1].material,o.ledGlow&&o.ledGlow.material,o.ledGlow2&&o.ledGlow2.material,o.winGlow&&o.winGlow.material];
+  pv.position.z=400;S.pv=[pv];S.cl=[];S.lts=[];S.hemi=null;S.mats=[];
+  for(i=0;i<ch.length;i++){
+    x=ch[i];
+    if(x.isDirectionalLight){S.lts.push(x);pv.add(x);pv.add(x.target);}
+    else if(x.isHemisphereLight){S.hemi=x;GLSKY.root.add(x);}
+  }
+  pv.add(SCP3D.root);
+  SCP3D.root.traverse(function(n){
+    var mm=n.material,k,j;if(!mm)return;mm=Array.isArray(mm)?mm:[mm];
+    for(k=0;k<mm.length;k++){if(seen.indexOf(mm[k])>=0)continue;seen.push(mm[k]);j=dyn.indexOf(mm[k])>=0;S.mats.push({m:mm[k],bo:mm[k].opacity,bt:mm[k].transparent,dyn:j});}
+  });
+  if(!glskyAttach(pv,9000)){S.act=true;tele3dGlLeave();S.err++;return;}
+  S.act=true;
+  try{pv.visible=true;if(GLSKY.r&&GLSKY.scene&&GLSKY.cam)GLSKY.r.compile(GLSKY.scene,GLSKY.cam);}catch(eC){}   /* shader dikompilasi di sini, bukan di frame gambar pertama */
+  pv.visible=false;
+}
+function tele3dGlLeave(){
+  var S=SCP3D_GL,sc=SCP3D.sc,i,k,t,r;
+  if(!S.act)return;
+  S.act=false;
+  try{
+    for(i=0;i<S.lts.length;i++){k=S.lts[i];t=k.target;if(t.parent)t.parent.remove(t);t.position.set(0,0,0);t.matrix.identity();t.matrixWorld.identity();sc.add(k);}
+    if(S.hemi){sc.add(S.hemi);S.hemi.position.set(0,1,0);}
+    sc.add(SCP3D.root);
+    for(i=0;i<S.pv.length;i++)glskyDetach(S.pv[i]);
+    if(S.mats)for(i=0;i<S.mats.length;i++){r=S.mats[i];if(!r.dyn)r.m.opacity=r.bo;r.m.transparent=r.bt;}
+  }catch(e){S.err++;}
+  S.pv=[];S.cl=[];S.lts=[];S.hemi=null;S.mats=null;
+}
+function tele3dGlClone(i){
+  var T=THREE,S=SCP3D_GL,pv=new T.Group(),c=SCP3D.root.clone(true),pn=[],cn=[];
+  SCP3D.root.traverse(function(n){pn.push(n);});c.traverse(function(n){cn.push(n);});
+  if(pn.length!==cn.length)return null;
+  pv.add(c);pv.position.z=400;pv.visible=false;
+  if(!glskyAttach(pv,9000))return null;
+  S.pv[i]=pv;S.cl[i]={pn:pn,cn:cn};
+  return pv;
+}
+function tele3dGlSync(i){
+  var k=SCP3D_GL.cl[i],j,p,c;if(!k)return;
+  for(j=0;j<k.pn.length;j++){p=k.pn[j];c=k.cn[j];c.position.copy(p.position);c.quaternion.copy(p.quaternion);c.scale.copy(p.scale);c.visible=p.visible;}
+}
+/* pts = [[x,y],...] posisi layar (sudah lensa) tiap salinan; sc = skala; al = alpha; ang = TELESCOPE.ang. true = sudah dijadwalkan ke GL (flush menggambar). */
+function tele3dGl(now,pts,sc,al,ang){
+  var S=SCP3D_GL,i,n=pts.length,pv,r,v,ca=Math.cos(ang),sa=Math.sin(ang);
+  if(!S.act)tele3dGlEnter();
+  if(!S.act)return false;
+  SCP3D.last=now;
+  scp3dUpdate(now,{a:ca,b:sa},true);   /* pose/cahaya/api/LED saja, tanpa render ke renderer 'small' */
+  if(S.hemi)S.hemi.position.set(sa,-ca,0);   /* arah "atas badan" (0,1,0) lewat matriks pivot R(ang) diag(sc,-sc,sc) */
+  if(S.mats)for(i=0;i<S.mats.length;i++){r=S.mats[i];v=r.dyn?r.m.opacity:r.bo;r.m.opacity=v*al;r.m.transparent=al<.995?true:r.bt;}
+  for(i=0;i<n;i++){
+    pv=S.pv[i]||tele3dGlClone(i);
+    if(!pv)break;
+    pv.visible=true;pv.position.set(pts[i][0],pts[i][1],400);pv.rotation.z=ang;pv.scale.set(sc,-sc,sc);
+    if(i>0)tele3dGlSync(i);
+  }
+  for(;i<S.pv.length;i++)S.pv[i].visible=false;
+  return true;
 }
 try{scp3dLoad();}catch(eS3L){}   /* mulai muat lebih awal supaya tidak ada "pop" dari 2D ke 3D di tengah sesi */
