@@ -125,7 +125,7 @@ try{
 var PL3D={state:0,/* 0 belum, 1 memuat, 2 siap (3D), 3 gagal/nonaktif -> fallback 2D */r:null,sc:null,cam:null,mat:null,uni:null,cv2:null,c2:null,
   rw:0,rh:0,W:0,H:0,stripH:0,al:1,lastR:-1e9,lastLx:-1e9,lastLy:-1e9,dirty:true,err:'',fb:null,fbKey:'',warm:false,frames:0,renders:0,palR:null,lastB:0,pdef:{},ph:0,phT:null,topC:null,secW:0,cv3:null,c3:null,cyc:null,full:true,bwR:null};
 PL3D.hint=0;PL3D.hintAt=null;PL3D.hintT=0;PL3D.fsPrev=-1;PL3D.rsl=[];
-PL3D.glm=0;PL3D.glDraw=false;PL3D.glMesh=null;PL3D.glMat=null;PL3D.glPos=null;PL3D.glV=0;PL3D.glErr='';PL3D.glFrames=0;   /* [G4.8] glm: 0 belum, 1 kompilasi, 2 siap (permukaan digambar di scene GLSky), -1 mati/tidak dipakai -> jalur lama ('big' renderer + blit) */
+PL3D.glm=0;PL3D.glDraw=false;PL3D.glMesh=null;PL3D.glMat=null;PL3D.glPos=null;PL3D.glV=0;PL3D.glErr='';PL3D.glFrames=0;PL3D.glRtOn=false;PL3D.glRt=null;PL3D.glDMat=null;PL3D.glRtM=null;PL3D.glRtSc=null;PL3D.glRtCam=null;PL3D.glRtErr='';PL3D.gRw=0;PL3D.gRh=0;PL3D.gSh=0;PL3D.gBo=0;PL3D.gRox=0;PL3D.gRoy=0;PL3D.gRf=1;PL3D.gPox=0;PL3D.gPoy=0;PL3D.gLx=0;PL3D.gLy=0;PL3D.gLastR=0;PL3D.gHave=0;PL3D.gcyc=null;PL3D.gFadeT=null;PL3D.gSwapT=0;PL3D.gSwapInt=0;PL3D.gBlk=false;PL3D.gWasCh=false;PL3D.gBoltWas=false;PL3D.gChk=false;   /* [G4.8b] state jalur render target (prefix g = GL) */   /* [G4.8] glm: 0 belum, 1 kompilasi, 2 siap (permukaan digambar di scene GLSky), -1 mati/tidak dipakai -> jalur lama ('big' renderer + blit) */
 try{var _SH=PL3D_CFG.slowHint;if(_SH.on){if(_SH.force)PL3D.hint=1;else{var _hv=+localStorage.getItem(_SH.key);if(_hv>0&&Date.now()-_hv>=0&&Date.now()-_hv<_SH.ttl)PL3D.hint=1;}}}catch(eH0){}   /* [v57] baca petunjuk slow dari kunjungan sebelumnya */
 
 /* ---- palette (P2) ----
@@ -770,6 +770,33 @@ var PL3D_GLVS=[
   '}'
 ].join('\n');
 var PL3D_GLFS=PL3D_FS.replace('uniform sampler2D uNoise;','uniform sampler2D uNoise;uniform float uGlA;').replace('gl_FragColor=vec4(rgb,clamp(a,0.,1.));','gl_FragColor=vec4(rgb,clamp(a,0.,1.))*uGlA;');
+
+/* [G4.8b] PERMUKAAN PLANET KE RENDER TARGET (WebGLRenderTarget, build three ?v=2): strip dirender ke 3 target resolusi q (pl3dQ, ikut FS.slow/qSlow/rwSlow) dengan jadwal lama
+   (fps, bands pita via scissor, adaptif, cross-fade antar refresh, petir = render ulang penuh selagi kilat), lalu SETIAP frame cuma satu quad bertekstur (shader tampil di bawah) di pass planet:
+   ayunan, parallax, rotasi layar, alpha mode cam tetap mulus tanpa render ulang shader berat. Target: [0] tampil, [1] snapshot sebelumnya (fade), [2] belakang (sedang dibangun).
+   Alpha texture = premultiplied (blend ONE,1-SRCA ke target transparan), lerp fade premultiplied = prev*(1-fa)+cur*fa. ?glplrt=0 = jalur G4.8 (shader penuh tiap frame di resolusi buffer GLSky). Gagal = otomatis ke jalur itu. */
+var PL3D_GLRT_OFF=false;try{PL3D_GLRT_OFF=/[?&]glplrt=0(&|#|$)/.test(location.search);}catch(eGR){}
+var PL3D_GLDVS=[
+  'varying vec2 vUv;',
+  'void main(){',
+  '  vUv=uv;',
+  '  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);',
+  '}'
+].join('\n');
+var PL3D_GLDFS=[
+  'uniform sampler2D uCur;uniform sampler2D uPrev;uniform float uA;uniform float uFa;uniform vec2 uPo;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  vec4 c=texture2D(uCur,vUv);',
+  '  if(uFa<.999){',
+  '    vec2 q=vUv+uPo;',
+  '    vec4 p=texture2D(uPrev,q);',
+  '    if(q.x<0.||q.x>1.||q.y<0.||q.y>1.)p=vec4(0.);',
+  '    c=p*(1.-uFa)+c*uFa;',
+  '  }',
+  '  gl_FragColor=c*uA;',
+  '}'
+].join('\n');
 
 /* ukuran strip + kanvas 2D penyimpan hasil (kanvas WebGL offscreen tidak dijamin menyimpan isinya antar-task) */
 function pl3dSlowEff(){return (typeof FS!=='undefined'&&FS.slow)||(PL3D.hint===1&&typeof FS!=='undefined'&&FS.mode!==0);}   /* [v57] slow efektif untuk ukuran kanvas: governor FS.slow ATAU petunjuk dari kunjungan sebelumnya (FS.mode 0 = ?fs=0/?probe=1 mengabaikan petunjuk) */
@@ -1475,6 +1502,7 @@ function pl3dGate(now){
 function pl3dGlFail(why){
   var S=(typeof GLSKY!=='undefined')?GLSKY:null;
   try{console.warn('[planet3d] jalur GL berhenti, kembali ke renderer lama:',why);}catch(e0){}
+  try{pl3dGlRtKill();}catch(e0b){}   /* [G4.8b] target + material tampil ikut dibuang */
   try{if(PL3D.glMesh&&S&&S.pScene)S.pScene.remove(PL3D.glMesh);}catch(e1){}
   try{if(PL3D.glMesh&&PL3D.glMesh.geometry)PL3D.glMesh.geometry.dispose();}catch(e2){}
   try{if(PL3D.glMat)PL3D.glMat.dispose();}catch(e3){}
@@ -1501,6 +1529,8 @@ function pl3dGlBuild(){
     m=new T.Mesh(g,PL3D.glMat);m.frustumCulled=false;m.renderOrder=0;
     PL3D.glMesh=m;PL3D.glPos=pos;
     S.pScene.add(m);
+    PL3D.uni.uGlA.value=1;
+    if(!PL3D_GLRT_OFF){try{pl3dGlRtBuild(T,m);}catch(eRt){try{pl3dGlRtKill('build: '+(eRt&&eRt.message||eRt));}catch(eRk){}}}   /* [G4.8b] gagal = jalur G4.8 langsung */
     pl3dUniforms(performance.now());
     fin=function(){
       if(done)return;done=true;
@@ -1508,7 +1538,14 @@ function pl3dGlBuild(){
       PL3D.glm=2;PL3D.state=2;PL3D.dirty=true;PL3D.glV=0;S.pChk=true;   /* diagnosa program sebenarnya dicek SESUDAH render pertama (pl3dGlVerify): compileAsync belum mengisi diagnostics */
     };
     setTimeout(fin,4000);
-    try{if(r.compileAsync)r.compileAsync(S.pScene,S.tCam).then(fin,fin);else{r.compile(S.pScene,S.tCam);fin();}}catch(eC){fin();}
+    try{
+      var cpP=function(){return r.compileAsync?r.compileAsync(S.pScene,S.tCam):(r.compile(S.pScene,S.tCam),Promise.resolve());},cpR=null,rt0;
+      if(PL3D.glRtOn&&PL3D.glRt&&PL3D.glRtSc){   /* [G4.8b] program shader planet untuk RT dikompilasi dgn target terpasang (kunci program beda dgn kanvas: outputColorSpace) */
+        rt0=r.getRenderTarget();r.setRenderTarget(PL3D.glRt[2]);
+        try{cpR=r.compileAsync?r.compileAsync(PL3D.glRtSc,PL3D.glRtCam):(r.compile(PL3D.glRtSc,PL3D.glRtCam),Promise.resolve());}finally{r.setRenderTarget(rt0);}
+      }
+      (cpR?cpR.then(cpP):cpP()).then(fin,fin);
+    }catch(eC){fin();}
   }catch(e){pl3dGlFail(e&&e.message||e);return false;}
   return true;
 }
@@ -1520,12 +1557,19 @@ function pl3dGlVerify(){
   dg=cp&&cp.diagnostics;
   if(dg&&dg.runnable===false)bad=(dg.programLog||'')+' '+((dg.fragmentShader&&dg.fragmentShader.log)||'')+' '+((dg.vertexShader&&dg.vertexShader.log)||'');
   if(bad){pl3dGlFail('shader: '+bad.replace(/\s+/g,' ').slice(0,300));return;}
+  if(PL3D.glRtOn&&PL3D.glDMat){   /* [G4.8b] shader tampil: error = balik ke jalur G4.8 (shader penuh langsung), bukan ke renderer lama */
+    var cp3=null,dg3,bad3='';
+    try{cp3=r.properties.get(PL3D.glDMat).currentProgram;}catch(e3){}
+    dg3=cp3&&cp3.diagnostics;
+    if(dg3&&dg3.runnable===false)bad3=(dg3.programLog||'')+' '+((dg3.fragmentShader&&dg3.fragmentShader.log)||'')+' '+((dg3.vertexShader&&dg3.vertexShader.log)||'');
+    if(bad3){pl3dGlRtKill('shader tampil: '+bad3.replace(/\s+/g,' ').slice(0,300));}
+  }
   try{if(r.getContext&&r.getContext().isContextLost&&r.getContext().isContextLost()){pl3dGlFail('context lost');return;}}catch(e1){}
   PL3D.glV=1;
 }
 /* 4 sudut strip -> koordinat pass planet (x layar stage, y = Hs - y stage). Urutan transform = planet3dDraw lama: ayunan (libr) di ruang layar TEGAK, lalu rotasi ke ruang stage (pl3dStage).
    out = Float32Array/array >= 12 (x,y,0 per sudut: kiri-atas, kanan-atas, kiri-bawah, kanan-bawah). Murni terhadap geometri + parallax + ayunan sekarang, jadi bisa diuji tanpa GPU. */
-function pl3dGlCorners(gm,cp,Hs,out){
+function pl3dGlCorners(gm,cp,Hs,out,dx,dy){   /* dx,dy (opsional, [G4.8b]): selisih parallax posisi sekarang - parallax saat texture dirender, px CSS, sebelum ayunan (= offset drawImage lama) */
   var sh=gm.stripH,bo=gm.bo||0,top=PH-sh+bo,bot=PH+bo,xs=[0,PW,0,PW],ys=[top,top,bot,bot],lb=pl3dLib(),lv=PL3D_CFG.live,land=PW>PH,
       lib=!!(lb[0]||lb[1]),yc=0,th=0,sc=1,dd=0,ct=1,st=0,i,x,y,qx,qy,rx,ry,p;
   if(lib){
@@ -1533,7 +1577,7 @@ function pl3dGlCorners(gm,cp,Hs,out){
     th=Math.atan2((lb[1]-lb[0])*PH,PW);sc=1+Math.abs(Math.tan(th))*2*Math.max(0,PH+bo-yc)/PW;dd=(lb[0]+lb[1])*.5*PH;ct=Math.cos(th);st=Math.sin(th);
   }
   for(i=0;i<4;i++){
-    x=xs[i];y=ys[i];
+    x=xs[i]+(dx||0);y=ys[i]+(dy||0);
     if(lib){   /* translate(PW/2,yc) scale(sc,1) rotate(th) translate(-PW/2,-yc+dd), titik dikenai transform paling kanan dulu */
       qx=x-PW*.5;qy=y-yc+dd;rx=qx*ct-qy*st;ry=qx*st+qy*ct;x=PW*.5+sc*rx;y=yc+ry;
     }
@@ -1541,6 +1585,130 @@ function pl3dGlCorners(gm,cp,Hs,out){
     out[i*3]=p[0];out[i*3+1]=Hs-p[1];out[i*3+2]=0;
   }
   return out;
+}
+/* ---- [G4.8b] render target: bangun / alokasi / gambar / jadwal / bunuh ---- */
+function pl3dGlRtBuild(T,mesh){
+  var m2=new T.Mesh(new T.PlaneGeometry(1,1),PL3D.glMat),sc=new T.Scene(),cam=new T.OrthographicCamera(-.5,.5,.5,-.5,-1,1),dm;
+  m2.frustumCulled=false;sc.add(m2);
+  dm=new T.ShaderMaterial({uniforms:{uCur:{value:null},uPrev:{value:null},uA:{value:1},uFa:{value:1},uPo:{value:new T.Vector2(0,0)}},vertexShader:PL3D_GLDVS,fragmentShader:PL3D_GLDFS,
+    transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor});
+  PL3D.glRtSc=sc;PL3D.glRtCam=cam;PL3D.glRtM=m2;PL3D.glDMat=dm;PL3D.glRt=null;PL3D.gRw=0;PL3D.gRh=0;
+  mesh.material=dm;
+  PL3D.glRtOn=true;
+  pl3dGlRtAlloc();
+  if(!PL3D.glRt)throw new Error('alokasi render target gagal');
+}
+function pl3dGlRtAlloc(){
+  var T=window.THREE,gm,q,rw,rh,i,R=PL3D.glRt;
+  pl3dSync();if(!PW||!PH||!T)return R;
+  gm=pl3dGeom(true,false,true);q=pl3dQ();rw=Math.max(8,Math.round(PW*q));rh=Math.max(4,Math.round(gm.stripH*q));
+  if(R&&PL3D.gRw===rw&&PL3D.gRh===rh)return R;
+  if(R){for(i=0;i<R.length;i++)R[i].setSize(rw,rh);}
+  else{R=[];for(i=0;i<3;i++)R.push(new T.WebGLRenderTarget(rw,rh,{depthBuffer:false,stencilBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter}));PL3D.glRt=R;}
+  PL3D.gRw=rw;PL3D.gRh=rh;PL3D.gSh=gm.stripH;PL3D.gHave=0;PL3D.gcyc=null;PL3D.gFadeT=null;PL3D.gBoltWas=false;PL3D.dirty=true;PL3D.full=true;   /* ukuran berubah: render penuh sekali jalan dulu */
+  return R;
+}
+/* gambar baris [y0,y1) (piksel target, 0 = dasar strip) ke target rt; clear color/alpha renderer utama dipulihkan (pass lain memakainya) */
+function pl3dGlRtDraw(rt,y0,y1){
+  var S=GLSKY,r=S.r,T=window.THREE,pr=r.getRenderTarget(),cc=PL3D.gCc||(PL3D.gCc=new T.Color()),ca,ac=r.autoClear;
+  r.getClearColor(cc);ca=r.getClearAlpha();
+  rt.scissorTest=(y1-y0)<PL3D.gRh;rt.scissor.set(0,y0,PL3D.gRw,y1-y0);
+  r.setRenderTarget(rt);r.setClearColor(0x000000,0);r.autoClear=true;
+  try{r.render(PL3D.glRtSc,PL3D.glRtCam);}
+  finally{r.setRenderTarget(pr);r.setClearColor(cc,ca);r.autoClear=ac;rt.scissorTest=false;}
+}
+function pl3dGlRtFull(now,lx,ly,bolt){
+  var R=PL3D.glRt,t,bf;
+  pl3dUniforms(now,!bolt);PL3D.uni.uGlA.value=1;   /* petir: kilau ikut dibake selagi kilat aktif (render penuh tiap frame, hanya beberapa frame) */
+  pl3dGlRtDraw(R[2],0,PL3D.gRh);
+  t=R[0];R[0]=R[2];R[2]=t;
+  PL3D.gRox=PL3D.rox;PL3D.gRoy=PL3D.roy;PL3D.gRf=PL3D.rf;PL3D.gBo=PL3D.bo;
+  PL3D.gLastR=now;PL3D.gLx=lx;PL3D.gLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.gcyc=null;PL3D.gFadeT=null;PL3D.gBoltWas=!!bolt;PL3D.gHave++;PL3D.renders++;
+  try{if(typeof pl3dRfMark==='function')pl3dRfMark();}catch(eM){}
+  if(!PL3D.gChk){   /* sekali: piksel dasar-tengah harus terisi (di dalam bola); target kosong = GPU/driver tidak mendukung -> jalur langsung */
+    PL3D.gChk=true;
+    try{bf=new Uint8Array(4);GLSKY.r.readRenderTargetPixels(R[0],PL3D.gRw>>1,0,1,1,bf);if(bf[3]<40){pl3dGlRtKill('target kosong (alpha '+bf[3]+')');return false;}}catch(eRb){}
+  }
+  return true;
+}
+function pl3dGlRtCycStart(now,lx,ly,nb,fade){
+  pl3dUniforms(now,true);PL3D.uni.uGlA.value=1;
+  PL3D.gcyc={t:now,i:0,n:nb,rox:PL3D.rox,roy:PL3D.roy,rf:PL3D.rf,bo:PL3D.bo,fade:!!fade};   /* offset baru baru berlaku saat tukar target */
+  PL3D.gLastR=now;PL3D.gLx=lx;PL3D.gLy=ly;PL3D.dirty=false;
+}
+function pl3dGlRtCycStep(){
+  var c=PL3D.gcyc,R=PL3D.glRt,rh=PL3D.gRh,n=c.n,k=c.i,y0=Math.round(rh*k/n),y1=Math.round(rh*(k+1)/n),tn=PL3D.curNow||0,t,iv;
+  if(y1>y0)pl3dGlRtDraw(R[2],y0,y1);
+  if(++c.i>=n){   /* putar: tampil -> sebelumnya, belakang -> tampil, sebelumnya lama -> belakang */
+    t=R[1];R[1]=R[0];R[0]=R[2];R[2]=t;
+    if(c.fade&&PL3D.gHave>=1&&PL3D_CFG.fade>0&&tn>0&&!PL3D.gBlk){   /* cross-fade lama -> baru selama ~satu interval tukar (EMA, 100..900 ms) */
+      if(PL3D.gSwapT){iv=Math.max(100,Math.min(900,tn-PL3D.gSwapT));PL3D.gSwapInt=PL3D.gSwapInt?PL3D.gSwapInt*.5+iv*.5:iv;}
+      PL3D.gFadeT=tn;PL3D.gPox=PL3D.gRox;PL3D.gPoy=PL3D.gRoy;
+    }else PL3D.gFadeT=null;
+    if(tn>0)PL3D.gSwapT=tn;
+    PL3D.gRox=c.rox;PL3D.gRoy=c.roy;PL3D.gRf=c.rf;PL3D.gBo=c.bo;PL3D.gcyc=null;PL3D.gHave++;PL3D.renders++;
+    try{if(typeof pl3dRfMark==='function')pl3dRfMark();}catch(eM){}
+  }
+}
+/* per frame (dipanggil pl3dGlPrep): jadwal refresh (logika 'due' sama dgn jalur lama), lalu isi uniform tampil + 4 sudut quad. true = siap digambar */
+function pl3dGlRtUpdate(now,cp){
+  var C=PL3D_CFG,S=GLSKY,R,bp,lx,ly,palCh,parCh,rotMov,animOn,lMv,settle,due,nb,perOnly,bu,bolt,bmn,bfit,BA,fa=1,U;
+  R=pl3dGlRtAlloc();if(!R)return false;
+  bp=pl3dLightPos();lx=bp[0];ly=PH-bp[1];
+  PL3D.curNow=now;
+  palCh=pl3dPalUpdate();
+  bu=PL3D.bu;bolt=!!(bu&&bu.a>.002);
+  parCh=Math.abs(cp.x-PL3D.gRox)+Math.abs(cp.y-PL3D.gRoy)>1.5||Math.abs(cp.f-PL3D.gRf)>.004;
+  rotMov=Math.abs(C.live.rot*C.rotK)>1e-6;
+  animOn=(C.cloud>0&&C.cloudDrift!==0)||(C.cityTw>0&&C.bioA>0&&(C.cityA>0||C.bioSea>0||C.earthK>0));
+  lMv=Math.abs(lx-PL3D.gLx)+Math.abs(ly-PL3D.gLy);
+  settle=!!PL3D.gWasCh&&!palCh;PL3D.gWasCh=palCh;
+  due=PL3D.dirty||bolt||PL3D.gBoltWas||((rotMov||animOn)&&now-PL3D.gLastR>=1000/C.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.gLastR>=(rotMov?30:1000/C.fps))||settle||((palCh||parCh)&&now-PL3D.gLastR>=1000/C.palFps);
+  nb=Math.max(1,Math.min(8,C.bands|0));
+  if(nb>1&&typeof FS!=='undefined'&&FS.slow&&FS.ema>0){   /* pita adaptif: sama dgn jalur lama (bandMin, bmAdapt) */
+    bmn=Math.max(1,Math.min(nb,(C.bandMin|0)||nb));bfit=Math.floor(1000/Math.max(1,C.fps)/Math.max(16.7,FS.ema));BA=C.bmAdapt;
+    if(BA&&BA.on&&bmn<nb){
+      if(PL3D.bmL&&now-PL3D.bmL>500)PL3D.bmT=0;PL3D.bmL=now;
+      if(!PL3D.bmHi){
+        if(FS.ema>=BA.ema){if(!PL3D.bmT)PL3D.bmT=now;else if(now-PL3D.bmT>=BA.hold){PL3D.bmHi=1;PL3D.bmAt=Math.round(now);}}
+        else PL3D.bmT=0;
+      }
+      if(PL3D.bmHi)bmn=nb;
+    }
+    nb=Math.max(bmn,Math.min(nb,bfit));
+  }
+  perOnly=!PL3D.dirty&&!settle&&!palCh&&!parCh&&!(lMv>(rotMov?40:.5))&&!bolt;   /* refresh murni periodik boleh cross-fade; selain itu tampil langsung */
+  PL3D.gBlk=!perOnly;
+  if(PL3D.gcyc&&settle)PL3D.dirty=true;
+  if(PL3D.gcyc){
+    if(now-PL3D.gcyc.t>600){PL3D.gcyc=null;PL3D.dirty=true;}   /* basi (render ditahan lama oleh menu/tab) */
+    else pl3dGlRtCycStep();
+  }else if(due){
+    if(nb<=1||PL3D.full||PL3D.gHave<1||bolt||PL3D.gBoltWas){if(!pl3dGlRtFull(now,lx,ly,bolt))return false;}
+    else{pl3dGlRtCycStart(now,lx,ly,nb,perOnly&&C.fade>0);pl3dGlRtCycStep();}
+  }
+  if(!PL3D.glRtOn||!PL3D.glRt)return false;
+  R=PL3D.glRt;
+  if(PL3D.gFadeT!=null&&C.fade>0&&!PL3D.gBlk&&!bolt){
+    fa=(now-PL3D.gFadeT)/(PL3D.gSwapInt||400);
+    if(fa>=1){PL3D.gFadeT=null;fa=1;}else if(fa<0)fa=0;
+  }else PL3D.gFadeT=null;
+  U=PL3D.glDMat.uniforms;
+  U.uCur.value=R[0].texture;U.uPrev.value=R[1].texture;U.uFa.value=fa;U.uA.value=PL3D.al;
+  U.uPo.value.set(-(PL3D.gRox-PL3D.gPox)/Math.max(1,PW),(PL3D.gRoy-PL3D.gPoy)/Math.max(1,PL3D.gSh));   /* snapshot lama digeser ke kerangka snapshot baru (y texture ke ATAS, y layar ke bawah) */
+  pl3dGlCorners({stripH:PL3D.gSh,bo:PL3D.gBo},cp,S.H,PL3D.glPos.array,cp.x-PL3D.gRox,cp.y-PL3D.gRoy);
+  return true;
+}
+function pl3dGlRtKill(why){
+  var R=PL3D.glRt,i;
+  if(why){try{console.warn('[planet3d] render target planet berhenti, balik ke shader langsung:',why);}catch(e0){}PL3D.glRtErr=String(why);}
+  try{if(PL3D.glMesh&&PL3D.glMat&&PL3D.glDMat)PL3D.glMesh.material=PL3D.glMat;}catch(e1){}
+  if(R)for(i=0;i<R.length;i++){try{R[i].dispose();}catch(e2){}}
+  try{if(PL3D.glDMat)PL3D.glDMat.dispose();}catch(e3){}
+  try{if(PL3D.glRtM&&PL3D.glRtM.geometry)PL3D.glRtM.geometry.dispose();}catch(e4){}
+  if(PL3D.glRtOn){PL3D.dirty=true;}
+  PL3D.glRt=null;PL3D.glDMat=null;PL3D.glRtM=null;PL3D.glRtSc=null;PL3D.glRtCam=null;PL3D.glRtOn=false;PL3D.gcyc=null;PL3D.gFadeT=null;PL3D.gHave=0;
+  try{if(PL3D.uni&&PL3D.uni.uGlA)PL3D.uni.uGlA.value=PL3D.al;}catch(e5){}
 }
 function pl3dGlPrep(now){
   var S=(typeof GLSKY!=='undefined')?GLSKY:null,gm,cp,arr;
@@ -1560,10 +1728,16 @@ function pl3dGlPrep(now){
     if(!pl3dGate(now))return false;
     cp=pl3dPar();
     try{pl3dGlFx(now,cp);}catch(eFxG){PL3D.fxGl=false;}   /* [G4.9] efek planet ke pass planet (sebelum pl3dUniforms: PL3D.bu petir terbaca frame yang sama) */
-    gm=pl3dUniforms(now,false);                   /* uniform sama dgn jalur lama; petir (uBolt) ikut, tanpa jendela render parsial */
-    PL3D.uni.uGlA.value=PL3D.al;
-    arr=PL3D.glPos.array;
-    pl3dGlCorners(gm,cp,S.H,arr);
+    var rtOk=false;
+    if(PL3D.glRtOn){   /* [G4.8b] strip ke render target + quad tampil; galat/render kosong = pl3dGlRtKill lalu jalur langsung di bawah (frame yang sama) */
+      try{rtOk=pl3dGlRtUpdate(now,cp);}catch(eRu){try{pl3dGlRtKill('update: '+(eRu&&eRu.message||eRu));}catch(eRk2){}rtOk=false;}
+    }
+    if(!rtOk){
+      gm=pl3dUniforms(now,false);                   /* uniform sama dgn jalur lama; petir (uBolt) ikut, tanpa jendela render parsial */
+      PL3D.uni.uGlA.value=PL3D.al;
+      arr=PL3D.glPos.array;
+      pl3dGlCorners(gm,cp,S.H,arr);
+    }
     PL3D.glPos.needsUpdate=true;
     glskyPlSet(true);
     PL3D.glDraw=true;
