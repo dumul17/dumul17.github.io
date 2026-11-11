@@ -5,7 +5,9 @@
    lalu hasilnya di-drawImage ke canvas 2D -> urutan lapisan (di bawah rasi/BH vs di atas BH), rotasi landscape, dan zoom persis sama.
    Pencahayaan: kunci hangat dari arah Gargantua per batu (dihitung di shader dari posisi batu -> BH), jadi satu draw call per varian.
    Gagal apa pun (WebGL mati, context lost, file nggak termuat) -> state 3 -> sprite 2D lama dipakai lagi.
-   Matikan: ?ast3d=0 di URL atau localStorage dumul_ast3d=0. */
+   Matikan: ?ast3d=0 di URL atau localStorage dumul_ast3d=0.
+   [PATCH G4.1] Saat GLSKY.act && GLSKY.astOn: pass BELAKANG (half=-1) tidak di-render/blit ke 2D; instance di-update lalu mesh
+   ikut scene GLSky (glskyAttach, renderOrder 200). Dual-mesh (G4.4): meshF pass depan RO 5200 tanpa blit. ?glast=0 = paksa 2D. */
 var AST3D_CFG={
   on:true,
   lib:'dumul-js/obs/lib/three.custom.r186.js?v=1',   /* ES module (r186, bundle tree-shaken: cuma class yang dipakai). Path + ?v= harus sama dgn SHELL service-worker */
@@ -207,6 +209,26 @@ function threeGLWarmBegin(r,H){
 
 function ast3dFail(why){AST3D.state=3;AST3D.err=String(why||'');try{console.warn('[ast3d] fallback ke sprite 2D:',AST3D.err);}catch(e){}}
 
+/* [PATCH G4.1] true = pass belakang boleh ikut scene GLSky (satu renderer). */
+function ast3dUseGlsky(){
+  try{
+    return !!(typeof GLSKY!=='undefined' && typeof glskyAstOn==='function' && glskyAstOn()
+      && AST3D.state===2 && AST3D.sc && GLSKY.root);
+  }catch(e){return false;}
+}
+/* [PATCH G4.1] reparent scene AST ke GLSky atau lepas (saat act berubah). */
+function ast3dSyncGlsky(){
+  try{
+    if(typeof glskyAttach!=='function'||!AST3D.sc)return;
+    if(ast3dUseGlsky()){
+      if(AST3D.sc.parent!==GLSKY.root)glskyAttach(AST3D.sc,200);
+    }else if(typeof glskyDetach==='function'){
+      glskyDetach(AST3D.sc);
+    }
+  }catch(e){}
+}
+
+
 /* Pemuat three.js BERSAMA (12/13/14/15/17 semuanya memanggil ini). three r186 hanya ada sebagai ES module -> import() dinamis, hasilnya dipasang ke window.THREE
    supaya semua kode lama (T=THREE; T.Mesh ...) tetap jalan. Satu promise (window.__threeP) dipakai bersama: modul kedua dst. tinggal menunggu, tidak muat dobel.
    - window.THREE = SALINAN (Object.assign) agar bisa ditulisi (21-bench.js membungkus THREE.WebGLRenderer); namespace module asli read-only.
@@ -343,9 +365,40 @@ function ast3dAddVariant(geo,tier){
   (AST3D.tiers[tier]||(AST3D.tiers[tier]=[])).push(v);
   v.mesh=new T.Mesh(ig,AST3D.mat);
   v.mesh.frustumCulled=false;v.mesh.visible=false;
+  v.mesh.renderOrder=200;
+  v.mesh.onBeforeRender=function(){try{if(AST3D.uni)AST3D.uni.uBack.value=v._uBack!=null?v._uBack:0;}catch(e){}};
   AST3D.sc.add(v.mesh);
+  v.meshF=null;v.Af=v.Bf=v.Zf=null;v.geoF=null;v.nF=0;   /* [PATCH G4.4] dual-mesh depan (lazy) */
   AST3D.vars.push(v);
   return v;
+}
+/* [PATCH G4.4] mesh depan terpisah (buffer instance sendiri) supaya satu flush bisa belakang+depan */
+function ast3dEnsureFront(v){
+  if(v.meshF)return v;
+  var T=THREE,cap=AST3D.cap,ig=new T.InstancedBufferGeometry();
+  ig.index=v.base.index;
+  ig.setAttribute('position',v.base.attributes.position);
+  ig.setAttribute('normal',v.base.attributes.normal);
+  v.Af=new T.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(T.DynamicDrawUsage);
+  v.Bf=new T.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(T.DynamicDrawUsage);
+  v.Zf=new T.InstancedBufferAttribute(new Float32Array(cap),1).setUsage(T.DynamicDrawUsage);
+  ig.setAttribute('iA',v.Af);ig.setAttribute('iB',v.Bf);ig.setAttribute('iZ',v.Zf);
+  ig.instanceCount=0;v.geoF=ig;
+  v.meshF=new T.Mesh(ig,AST3D.mat);
+  v.meshF.frustumCulled=false;v.meshF.visible=false;v.meshF.renderOrder=5200;
+  v.meshF.onBeforeRender=function(rr){try{if(AST3D.uni)AST3D.uni.uBack.value=0;
+    /* [FIX] pass depan = render terpisah di jalur lama (depth bersih): batu belakang tidak boleh menutupi batu depan lewat depth. Kosongkan depth sekali per render() sebelum mesh depan pertama. */
+    var fr=rr.info.render.frame;if(AST3D._cdF!==fr){AST3D._cdF=fr;rr.clearDepth();}}catch(e){}};
+  AST3D.sc.add(v.meshF);
+  return v;
+}
+function ast3dHideFront(){
+  var vars=AST3D.vars,i;
+  if(!vars)return;
+  for(i=0;i<vars.length;i++){
+    if(vars[i].meshF){vars[i].meshF.visible=false;if(vars[i].geoF)vars[i].geoF.instanceCount=0;}
+    vars[i].nF=0;
+  }
 }
 
 /* [v32] Build dipecah jadi 5 tahap (generator, yield di batas tahap), pola sama dgn scp3dBuildG / dr3dBuildG / pt3dBuildG. Dulu satu blok sinkron 0,6-1,0 dtk di itel (bench 6 Nov;
@@ -371,19 +424,20 @@ function* ast3dBuildG(){
   AST3D.sc=new T.Scene();
   AST3D.cam=new T.OrthographicCamera(0,W,H,0,-600,600);
   yield;   /* ---- tahap 0 selesai: renderer + scene + kamera ---- */
-  AST3D.uni={uBH:{value:new T.Vector2(W*.5,H*.5)},uBack:{value:0},uFall:{value:Math.max(W,H)*.9},uSm:{value:new T.Vector2(AST3D_CFG.smooth.on?AST3D_CFG.smooth.s0:-2,AST3D_CFG.smooth.on?AST3D_CFG.smooth.s1:-1)}};   /* [v41] uSm (-2,-1) = mati: smoothstep selalu 1 */
+  AST3D.uni={uBH:{value:new T.Vector2(W*.5,H*.5)},uFlip:{value:1},uBack:{value:0},uFall:{value:Math.max(W,H)*.9},uSm:{value:new T.Vector2(AST3D_CFG.smooth.on?AST3D_CFG.smooth.s0:-2,AST3D_CFG.smooth.on?AST3D_CFG.smooth.s1:-1)}};   /* [v41] uSm (-2,-1) = mati: smoothstep selalu 1 */
   AST3D.mat=new T.ShaderMaterial({
     uniforms:AST3D.uni,
     transparent:true,depthTest:true,depthWrite:true,
     blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor,
     vertexShader:[
       'attribute vec4 iA;attribute vec4 iB;attribute float iZ;',
-      'uniform vec2 uBH;',
+      'uniform vec2 uBH;uniform float uFlip;',   /* [FIX] uFlip=-1 di GLSky: kamera y-ke-bawah membalik winding, tanpa ini sisi depan batu kena cull dan yang tampak sisi dalam */
       'varying vec3 vN;varying vec3 vL;varying float vA;varying float vD;varying float vS;',
       'vec3 rot(vec3 v,vec3 k,float a){float c=cos(a),s=sin(a);return v*c+cross(k,v)*s+k*dot(k,v)*(1.-c);}',
       'void main(){',
       '  vec3 p=rot(position,iB.xyz,iB.w);',
       '  vN=rot(normal,iB.xyz,iB.w);',
+      '  p.y*=uFlip;vN.y*=uFlip;',
       '  vec2 d=uBH-iA.xy;float len=length(d);',
       '  vL=normalize(vec3(d,len*.5+18.));',   /* arah ke Gargantua (sedikit mengangkat ke arah kamera biar sisi depan juga kena) */
       '  vA=iA.w;vD=len;vS=iA.z;',
@@ -551,18 +605,22 @@ function ast3dDraw(now,half){
   if(!AST3D_CFG.on||(typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
   try{
     var ci=half<0?0:(half>0?1:2);
-    if(AST3D.ru[ci]===now&&ast3dBlitCache(ci))return true;   /* frame cache: nggak ada GL, nggak ada astStep */
+    /* [PATCH G4.1] jalur GLSky: jangan early-out cache blit 2D; instance tetap di-update tiap frame */
+    if(!(ast3dUseGlsky()&&(half<0||half>0))&&AST3D.ru[ci]===now&&ast3dBlitCache(ci))return true;   /* frame cache: nggak ada GL, nggak ada astStep */
     var vars=AST3D.vars,nv=vars.length,nA=astN(),i,a,v,k,total=0;
     if(!nv)return false;
     if(nA+4>AST3D.cap){   /* jumlah batu bertambah (slider): bangun ulang varian dengan kapasitas baru */
       AST3D.cap=nA+32;
       var bases=vars.map(function(b){return [b.base,b.tier];});
-      for(i=0;i<nv;i++){AST3D.sc.remove(vars[i].mesh);vars[i].geo.dispose();}
+      for(i=0;i<nv;i++){
+        AST3D.sc.remove(vars[i].mesh);vars[i].geo.dispose();
+        if(vars[i].meshF){AST3D.sc.remove(vars[i].meshF);if(vars[i].geoF)vars[i].geoF.dispose();}
+      }
       vars.length=0;AST3D.tiers=[];
       bases.forEach(function(q){ast3dAddVariant(q[0],q[1]);});
     }
     ast3dResize();
-    for(i=0;i<nv;i++)vars[i].n=0;
+    for(i=0;i<nv;i++){vars[i].n=0;if(half>0)vars[i].nF=0;}
     var bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9;   /* bbox layar (px CSS) dari batu yang kegambar: blit cuma area ini */
     for(i=0;i<nA;i++){
       a=AST[i];
@@ -576,33 +634,76 @@ function ast3dDraw(now,half){
         var th=(i*2.399963)%6.283185,cz=1-2*((i*.618034+.13)%1),sz2=Math.sqrt(Math.max(0,1-cz*cz));
         a._ax=sz2*Math.cos(th);a._ay=sz2*Math.sin(th);a._az=cz;
       }
-      v=ast3dPick(a);k=v.n++;
+      v=ast3dPick(a);
       var al=a._fl?.96:(a._back?.86+.36*a._s:Math.min(1,.9+.1*a._s));
       al*=(a._fa==null?1:a._fa);
       var SM=AST3D_CFG.smooth,smOn=SM&&SM.on;
       if(smOn&&a._sz<SM.fHi){var ft=(a._sz-SM.fLo)/(SM.fHi-SM.fLo);ft=ft<0?0:ft;al*=ft*ft*(3-2*ft);}   /* [v41] fade batu sub-piksel (tanpa antialias batu muncul/hilang per piksel) */
-      var A=v.A.array,B=v.B.array,o=k*4;
-      A[o]=a._x;A[o+1]=H-a._y;A[o+2]=a._sz;A[o+3]=al>1?1:(al<0?0:al);
+      var useF=half>0&&ast3dUseGlsky();   /* [PATCH G4.4] pass depan GL → buffer meshF */
+      var k;if(useF){ast3dEnsureFront(v);k=v.nF++;}else{k=v.n++;}
+      var A=(useF?v.Af:v.A).array,B=(useF?v.Bf:v.B).array,o=k*4;
+      /* [PATCH G4.1/G4.4] GLSky cam y-ke-bawah => y layar apa adanya */
+      A[o]=a._x;A[o+1]=ast3dUseGlsky()?a._y:(H-a._y);A[o+2]=a._sz;A[o+3]=al>1?1:(al<0?0:al);
       B[o]=a._ax;B[o+1]=a._ay;B[o+2]=a._az;B[o+3]=a.rot*2+((smOn&&a._sz<SM.s0)?0:now*a.rs);   /* [v41] batu < s0 px: rotasi dibekukan (shading di sana sudah rata) */
-      v.Z.array[k]=a._s*120;
+      (useF?v.Zf:v.Z).array[k]=a._s*120;
       if(a._x-hf<bx0)bx0=a._x-hf;if(a._x+hf>bx1)bx1=a._x+hf;if(a._y-hf<by0)by0=a._y-hf;if(a._y+hf>by1)by1=a._y+hf;
       total++;
     }
     AST3D.passes++;AST3D.drawn+=total;
     AST_DRAWN+=total;
-    if(!total){ast3dStore(ci,0,0,0,0,0,0,0,0,0);return true;}
+    if(!total){
+      /* [PATCH G4.1/G4.4] sembunyikan mesh kalau kosong */
+      for(i=0;i<nv;i++){
+        vars[i].mesh.visible=false;vars[i].geo.instanceCount=0;vars[i].n=0;
+        if(half>0||!ast3dUseGlsky()){vars[i].nF=0;if(vars[i].meshF){vars[i].meshF.visible=false;if(vars[i].geoF)vars[i].geoF.instanceCount=0;}}
+      }
+      if(!(half<0&&ast3dUseGlsky()))ast3dStore(ci,0,0,0,0,0,0,0,0,0);
+      return true;
+    }
     var bp=camBH();
-    AST3D.uni.uBH.value.set(bp[0],H-bp[1]);
+    /* [PATCH G4.1/G4.3] uBH di ruang yang sama dgn posisi instance (y-bawah di GLSky) */
+    if(ast3dUseGlsky())AST3D.uni.uBH.value.set(bp[0],bp[1]);
+    else AST3D.uni.uBH.value.set(bp[0],H-bp[1]);
     AST3D.uni.uBack.value=(half<0&&!(AST.length&&AST[0]._fl))?1:0;   /* batu cincin limb (a._fl) tampil seperti batu depan: tanpa tint dingin pass belakang */
+    var glOn=ast3dUseGlsky();
+    AST3D.uni.uFlip.value=glOn?-1:1;   /* [FIX] lihat shader */
     for(i=0;i<nv;i++){
       v=vars[i];
-      v.mesh.visible=v.n>0;
-      if(!v.n)continue;
-      v.geo.instanceCount=v.n;
-      v.A.clearUpdateRanges();v.A.addUpdateRange(0,v.n*4);v.A.needsUpdate=true;   /* r159+ (masih valid di r186): updateRange{offset,count} diganti addUpdateRange(start,count) */
-      v.B.clearUpdateRanges();v.B.addUpdateRange(0,v.n*4);v.B.needsUpdate=true;
-      v.Z.clearUpdateRanges();v.Z.addUpdateRange(0,v.n);v.Z.needsUpdate=true;
+      if(half<=0||!glOn){
+        v.mesh.visible=v.n>0;
+        if(v.n){
+          v.geo.instanceCount=v.n;v._uBack=(half<0&&!(AST.length&&AST[0]._fl))?1:0;
+          v.A.clearUpdateRanges();v.A.addUpdateRange(0,v.n*4);v.A.needsUpdate=true;
+          v.B.clearUpdateRanges();v.B.addUpdateRange(0,v.n*4);v.B.needsUpdate=true;
+          v.Z.clearUpdateRanges();v.Z.addUpdateRange(0,v.n);v.Z.needsUpdate=true;
+        }else{v.geo.instanceCount=0;}
+      }
+      if(glOn&&half>0){
+        if(v.meshF||v.nF){
+          ast3dEnsureFront(v);
+          v.meshF.visible=v.nF>0;
+          if(v.nF){
+            v.geoF.instanceCount=v.nF;
+            v.Af.clearUpdateRanges();v.Af.addUpdateRange(0,v.nF*4);v.Af.needsUpdate=true;
+            v.Bf.clearUpdateRanges();v.Bf.addUpdateRange(0,v.nF*4);v.Bf.needsUpdate=true;
+            v.Zf.clearUpdateRanges();v.Zf.addUpdateRange(0,v.nF);v.Zf.needsUpdate=true;
+          }else{v.geoF.instanceCount=0;v.meshF.visible=false;}
+        }
+      }else if(!(glOn&&half<0)){
+        if(v.meshF){v.meshF.visible=false;if(v.geoF)v.geoF.instanceCount=0;}
+      }
     }
+    /* [PATCH G4.1/G4.4] GLSky: instance di scene bersama, tanpa blit 2D */
+    if(glOn&&(half<0||half>0)){
+      ast3dSyncGlsky();
+      try{
+        var cA=AST3D.cam;if(cA){cA.left=0;cA.right=W;cA.top=H;cA.bottom=0;cA.near=-600;cA.far=600;cA.updateProjectionMatrix();}
+      }catch(eCam){}
+      return true;
+    }
+    /* jalur lama: render offscreen + drawImage (?glast=0 / GLSky mati) */
+    if(AST3D.sc && typeof glskyDetach==='function'){try{glskyDetach(AST3D.sc);}catch(eD){}}
+    ast3dHideFront();
     threeGLBegin(AST3D.gl);
     AST3D.r.render(AST3D.sc,AST3D.cam);
     if(window.__gpuP)glProbe(AST3D.gl,'as.sub','as.gpu');

@@ -323,6 +323,134 @@ function drawHoleSafe(now,age){
    Keduanya terpisah supaya menurunkan lensa nggak ikut menurunkan serat cakram. */
 var BH_DISK_DY=.20,BH_LENS_DY=0;
 var WH_NOHOLE=/[?&]whdbg=([a-z,]*,)?nohole(,|&|$)/.test(location.search);   /* diagnosa exit: ?whdbg=nohole = sprite BH tidak digambar selama wormhole aktif (DOM #bh disembunyikan oleh 19-auto-debug.js) */
+/* [PATCH G4.3b] Body BH + plasma cakram + drag highlight ke GL SEBELUM flush. true = sudah diantre. */
+function drawHoleGl(now,age){
+  try{
+    if(typeof glskyBhOn!=='function'||!glskyBhOn())return false;
+    if(typeof glskyImg!=='function')return false;
+    /* Overview: portal menggantikan BH */
+    if(!SECT.cur&&typeof portal3dOverview==='function'){
+      try{if(typeof portal3dGlRing==='function'&&PT3D&&PT3D.glRingT===now)return false;}catch(e0){}
+      /* portal path aktif / akan aktif: jangan gambar BH body */
+      if(typeof pt3dUsable==='function'&&pt3dUsable()&&typeof glskyPortalOn==='function'&&glskyPortalOn())return false;
+    }
+    if(SECT.cur){var whF=0;try{if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringFade)whF=WORMHOLE.ringFade();}catch(eWF){}if(whF>=.995)return false;}
+    var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3);
+    sc*=ARV;
+    BH.Rr=BH.R*sc*BHSC*bhSizeMul();
+    if(BH.Rr<1||!BH.sprite)return false;
+    BH.h+=((hot==='bh'?1:0)-BH.h)*.12;
+    var R=BH.Rr*BHZ,k=((BH.Rr)/BH.R)*(1+(reduce?0:.012*Math.sin(now*.0016*BHU.speed))),S=BH.S*k*BHZ;
+    var bp=camBH();
+    var gk=OFX.pK;
+    var bhFull=!!(BH_CSS.spr&&BH.sprite===BH_CSS.spr),bhCS=bhFull?.72:1;
+    var ang=(typeof STG!=='undefined'&&STG.rot&&typeof upAng==='function')?upAng():0;
+    var ba=0,bsp=null;
+    if(CAMERA_MODE&&bhFull&&!IS_POTATO&&typeof BANDV!=='undefined'&&BANDV>.01&&BANDLAST&&BANDLAST!=='vis'){
+      bsp=bhBandBake(BANDLAST,BH_CSS.R,BH_CSS.S,DPR);
+      var be=BH_CSS.band[BANDLAST];
+      if(bsp)ba=BANDV*Math.min(1,(performance.now()-be.t)/300);
+    }
+    /* bloom di belakang (add) */
+    if(bhFull&&BHU.bloom>.01){
+      var bhr=R*4.6,bha=Math.min(1,.42*BHU.bloom*(1+.35*gk+.15*BH.h))*(1-.85*ba);
+      try{glskyImg(bhBloomSprite(),bha,bp[0],bp[1],bhr*2,bhr*2,ang,1,1);}catch(eB){}
+    }
+    var a0=Math.min(1,.86+.14*BH.h+.08*gk);
+    if(ba<.99)glskyImg(BH.sprite,a0*(1-ba),bp[0],bp[1],S,S,ang,0,1);
+    if(ba>.01&&bsp)glskyImg(bsp,a0*ba,bp[0],bp[1],S,S,ang,0,1);
+    /* serat cakram */
+    if(bhFull&&BHU.bloom>.01&&BH.S>0){
+      var fb=bhFiberSprite();
+      if(fb){
+        var fk=S/BH.S,fsh=(reduce||IS_POTATO)?0:Math.sin(now*.0011*BHU.speed);
+        var fa=Math.min(1,(.8+.2*BH.h+.12*gk)*Math.min(1,.5+.5*BHU.bloom))*(1+.1*(reduce||IS_POTATO?0:Math.sin(now*.0007*BHU.speed+1.3)))*(1-.85*ba);
+        var fw=fb.w*fk*(1+.012*fsh),fh=fb.h*fk;
+        /* pusat serat = bp + rotasi(BH.ang+ang) * (0, R*BH_DISK_DY) */
+        var da=BH.ang+ang,ox=Math.sin(da)*R*BH_DISK_DY,oy=Math.cos(da)*R*BH_DISK_DY;
+        /* y-down canvas: rotate then offset — approx with rotated offset */
+        var cx=bp[0]+Math.cos(da)*0-Math.sin(da)*(R*BH_DISK_DY);
+        var cy=bp[1]+Math.sin(da)*0+Math.cos(da)*(R*BH_DISK_DY);
+        glskyImg(fb.c,Math.min(1,fa),cx,cy,fw,fh,da,1,1);
+      }
+    }
+    /* breathing ring (sprite lama saja) */
+    if(!reduce&&!bhFull){
+      var breathe=.5+.5*Math.sin(now*.00115);
+      var ringR=R*(1.022+.012*breathe);
+      try{
+        drawRipple(bp[0],bp[1],ringR,'185,215,245',(.09+.06*breathe+.05*gk)*(bhCS<1?.5:1),false);
+        drawRipple(bp[0],bp[1],ringR,'238,245,248',(.55+.18*breathe+.12*gk)*(bhCS<1?.5:1),false);
+      }catch(eR){}
+    }
+
+    /* [PATCH G4.3b] plasma + highlight cakram + drag di GL (sebelumnya hilang karena early-return drawHole) */
+    if(!reduce){
+      var totAng=BH.ang+ang;
+      var diskDy=bhFull?(R*BH_DISK_DY):0;
+      function bhMap(lx,ly){
+        var x=lx,y=ly+diskDy,c=Math.cos(totAng),s=Math.sin(totAng);
+        return [bp[0]+c*x-s*y,bp[1]+s*x+c*y];
+      }
+      /* soft blob helper: star sprite di-scale jadi elips tipis di bidang cakram */
+      function bhBlob(lx,ly,rw,rh,rgb,al){
+        if(!(al>0.008))return;
+        try{
+          var sp=typeof getStarSprite==='function'?getStarSprite(rgb):null;
+          if(!sp){var q=bhMap(lx,ly);drawRipple(q[0],q[1],Math.max(rw,rh),'255,255,255',al,true);return;}
+          var q2=bhMap(lx,ly);
+          var ext=sp.R*2; /* pad space */
+          glskyImg(sp.c,Math.min(1,al),q2[0],q2[1],rw*2,rh*2,totAng,1,1);
+        }catch(eBl){}
+      }
+      if(gk>.01){
+        var gp=.5+.5*Math.sin(now*.0013*BHU.speed);
+        bhBlob(0,0,R*(3.9+.25*gp)*bhCS,R*(.20+.03*gp),'255,176,110',.07*gk*(.65+.35*gp));
+        bhBlob(0,0,R*2.5*bhCS,R*.09,'255,222,184',.10*gk*(.5+.5*gp));
+      }
+      if(bhFull&&BHU.speed>.01){
+        var sp2=.00020*BHU.speed*(1+.55*BH.h),m2,q2,uu,al3;
+        for(m2=0;m2<(IS_POTATO?3:6);m2++){
+          q2=(now*sp2+OFX.dph+m2/6)%1;uu=q2*2-1;
+          al3=Math.pow(1-Math.abs(uu),1.8)*(.22+.14*BH.h+.10*gk)*Math.min(1,.6+.4*BHU.bloom);
+          bhBlob(uu*R*2.7,R*(.015+((m2%3)-1)*.05),R*(.05+.025*(1-Math.abs(uu))),R*.02,'255,233,216',al3);
+        }
+      }
+      if(!bhFull){
+        var sp=.00024*(1+.55*BH.h),m,ph2,u,al2,tilt;
+        for(m=0;m<(IS_POTATO?3:7);m++){
+          ph2=(now*sp+OFX.dph+m/7)%1;u=ph2*2-1;
+          al2=Math.pow(1-Math.abs(u),1.9)*(.16+.12*BH.h+.10*gk);
+          tilt=(m%3-1)*.18;
+          bhBlob(u*R*4.1*bhCS,R*(.02+tilt*.04),R*(.025+.012*(1-Math.abs(u))),R*.016,'235,240,245',al2);
+        }
+        /* secondary lens arcs ≈ beberapa drawRipple tipis di radius elips (aproksimasi) */
+        if(!IS_POTATO&&bhCS===1){
+          try{
+            drawRipple(bp[0],bp[1],R*1.5,'200,220,245',(.28+.14*gk)*.35,false);
+            drawRipple(bp[0],bp[1],R*1.4,'240,245,255',(.18+.12*gk)*.3,false);
+          }catch(eL){}
+        }
+      }
+      /* drag highlight + warp rings */
+      if(typeof drag!=='undefined'&&drag.on&&drag.moved){
+        var vx2=(BH.x-drag.bx)*.0025,vy2=(BH.y-drag.by)*.0025;
+        var wobS2=Math.min(1,Math.hypot(vx2,vy2)*8);
+        bhBlob(0,0,R*4.3*bhCS,R*.09,'255,200,140',.10+.08*wobS2);
+        bhBlob(0,0,R*3.6*bhCS,R*.04,'255,220,190',.06+.05*wobS2);
+        var ringN=IS_POTATO?4:9,di,dr,da2;
+        for(di=1;di<=ringN;di++){
+          dr=R*(2.2+di*(66.6/ringN));da2=.34*(1-di/(ringN+2));
+          try{drawRipple(bp[0],bp[1],dr,'205,150,100',da2*.42,false);}catch(eW){}
+        }
+        try{drawRipple(bp[0],bp[1],R*6,'255,200,140',.08,true);}catch(eG){}
+      }
+    }
+
+    BH.glBodyT=now;
+    return true;
+  }catch(e){try{console.warn('[bh] glBody',e);}catch(e2){}return false;}
+}
 function drawHole(now,age){
   var a=clamp((age-.9)/1.5),sc=1-Math.pow(1-a,3);
   sc*=ARV;   /* keluar dari terowongan (sektor -> overview / lompat sektor): BH tujuan dari jauh -> penuh */
@@ -341,6 +469,8 @@ function drawHole(now,age){
   }
   /* zoom-in dari sektor: cincin + terowongan digambar di kanvas wormhole (09). BH mini ikut di-scale skyCam dan tampak sebagai portal kedua -> sembunyikan setelah serah-terima. */
   if(SECT.cur){var whF=0;try{if(typeof WORMHOLE!=='undefined'&&WORMHOLE.ringFade)whF=WORMHOLE.ringFade();}catch(eWF){}if(whF>=.995)return;}
+  /* [PATCH G4.3b] body+plasma+drag sudah di GL frame ini — skip seluruh visual BH ke #sky 2D */
+  if(BH.glBodyT===now)return;
 
   g.save();
   g.translate(bp[0],bp[1]);

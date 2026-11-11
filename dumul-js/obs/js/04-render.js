@@ -708,19 +708,50 @@ function createBHShockwave(x, y){
   if(reduce || IS_POTATO) return;
   BH_SHOCKWAVES.push({x: x, y: y, r: Math.max(3, BH.R * 1.1 * BHSC), maxR: Math.min(W, H) * (0.14 + 0.26 * Math.min(1, BHSC)), t0: performance.now(), dur: 580});
 }
+/* [PATCH G3d] sprite cincin lembut untuk BH shock di GL (add=1). Bake sekali; warna cyan / pink. */
+var BH_SHOCK_SPR={c0:null,c1:null};
+function bhShockSprite(kind){
+  var k=kind===1?'c1':'c0',c=BH_SHOCK_SPR[k],x,i,j,d,a,R=32,lw=3.2,img,p;
+  if(c)return c;
+  c=document.createElement('canvas');c.width=c.height=64;
+  x=c.getContext('2d');
+  img=x.createImageData(64,64);p=img.data;
+  for(j=0;j<64;j++)for(i=0;i<64;i++){
+    d=Math.sqrt((i+0.5-32)*(i+0.5-32)+(j+0.5-32)*(j+0.5-32));
+    a=Math.exp(-Math.pow((d-R*0.72)/lw,2)*0.5);   /* cincin gaussian di r≈23 */
+    a=a>1?1:(a<0.004?0:a);
+    var o=(j*64+i)*4;
+    if(kind===1){p[o]=255;p[o+1]=122;p[o+2]=217;}   /* pink */
+    else{p[o]=110;p[o+1]=229;p[o+2]=255;}           /* cyan */
+    p[o+3]=Math.round(a*255);
+  }
+  x.putImageData(img,0,0);
+  BH_SHOCK_SPR[k]=c;return c;
+}
 function drawBHShockwaves(now){
   if(!BH_SHOCKWAVES.length) return;
+  var glOn=(typeof glskyBhShockOn==='function')&&glskyBhShockOn();   /* [PATCH G3d] ?glsky=1: cincin di GL aditif */
   for(var i = BH_SHOCKWAVES.length - 1; i >= 0; i--){
     var sw = BH_SHOCKWAVES[i];
     var u = (now - sw.t0) / sw.dur;
     if(u >= 1){ BH_SHOCKWAVES.splice(i, 1); continue; }
     var currR = sw.r + (sw.maxR - sw.r) * Math.sin(u * Math.PI * 0.5); // Ease Out
     var alpha = (1 - u) * 0.45;
+    var lw = Math.max(1, 3.5 * (1 - u));
+
+    if(glOn){
+      /* pusat = sw.x/y; diameter ≈ 2*r; tebal visual ikut lw lewat alpha (sprite tetap); hi=1 di atas bintang GL */
+      /* [FIX] cincin di sprite = 0.72 x setengah lebar (R*0.72 dari R=32 px) -> lebar quad = 2*r/0.72 supaya radius cincin = currR seperti jalur 2D (dulu 2.08 => cincin cuma ~75% radius) */
+      var d0=currR*2.7778,d1=currR*1.12*2.7778;
+      glskyImg(bhShockSprite(0),alpha,sw.x,sw.y,d0,d0,0,1,1);
+      glskyImg(bhShockSprite(1),alpha*0.4,sw.x,sw.y,d1,d1,0,1,1);
+      continue;
+    }
 
     g.save();
     g.globalCompositeOperation = 'lighter';
     g.strokeStyle = 'rgba(110, 229, 255, ' + alpha + ')';
-    g.lineWidth = Math.max(1, 3.5 * (1 - u));
+    g.lineWidth = lw;
     g.beginPath();g.arc(sw.x, sw.y, currR, 0, 6.283);g.stroke();
 
     g.strokeStyle = 'rgba(255, 122, 217, ' + (alpha * 0.4) + ')';
@@ -1294,7 +1325,8 @@ function drawTriggerVisuals(now){
     var pulseR=base+2.2+6.5*phase;
     var outerR=base+5.5+7.5*phase;
     var coreR=base*(.92+.10*breathe);
-    g.save();g.globalCompositeOperation='lighter';
+    var glT=(typeof glskyTrigOn==='function')&&glskyTrigOn();   /* [PATCH G3f] ripple ke GL lewat drawRipple */
+    if(!glT)g.save(),g.globalCompositeOperation='lighter';
     drawRipple(x,y,coreR*1.15,tr.rgb,.22*strength*fade);
     drawRipple(x,y,base+2.8*breathe,tr.rgb,(.50+.16*breathe)*strength*fade);
     var pa=(1-phase)*(.58+.22*strength)*fade;
@@ -1302,9 +1334,19 @@ function drawTriggerVisuals(now){
     var phase2=(phase+.42)%1,pa2=(1-phase2)*.36*strength*fade;
     drawRipple(x,y,base+4.5+7*phase2,tr.rgb,pa2);
     if(selected)drawRipple(x,y,outerR+3,tr.rgb,.16*strength*fade,true);
-    g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
-    g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
-    g.restore();
+    /* centang silang kecil di radius base */
+    var tickA=.55*strength*fade;
+    if(glT&&typeof glskySeg==='function'){
+      var tc=glskyCol(tr.rgb);
+      glskySeg(x-base-1.5,y,x-base+.8,y,.7,tc,tickA,0);
+      glskySeg(x+base-.8,y,x+base+1.5,y,.7,tc,tickA,0);
+      glskySeg(x,y-base-1.5,x,y-base+.8,.7,tc,tickA,0);
+      glskySeg(x,y+base-.8,x,y+base+1.5,.7,tc,tickA,0);
+    }else if(!glT){
+      g.strokeStyle='rgba('+tr.rgb+','+tickA+')';g.lineWidth=.7;
+      g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
+      g.restore();
+    }
   });
 }
 
@@ -1616,6 +1658,12 @@ function getRingSprite(rgbStr,rq,glow){
 function drawRipple(x,y,r,rgbStr,alpha,glow){
   if(!(alpha>0.012)||!(r>1.5))return;
   var rq=Math.round(r*2)/2,sp=getRingSprite(rgbStr,rq,glow);
+  /* [PATCH G3f] ?glsky=1: cincin ke GL aditif di atas bintang (hi=1) */
+  if((typeof glskyTrigOn==='function')&&glskyTrigOn()){
+    var prevA=g.globalAlpha;
+    glskyImg(sp.c,prevA*Math.min(1,alpha),x,y,sp.pad*2,sp.pad*2,0,1,1);
+    return;
+  }
   var prev=g.globalAlpha;
   g.globalAlpha=prev*Math.min(1,alpha);
   g.drawImage(sp.c,x-sp.pad,y-sp.pad,sp.pad*2,sp.pad*2);
@@ -2196,10 +2244,18 @@ function drawPleiades(age,now){
        drawStarGlow uses extent=r*5, so pass rAdj = r * factor/5. */
     var rAdj=r*((dim?4.5:5.8)/5);
     var pHK=CAMERA_MODE?clamp(1-(skyZoom-CAM_HALO_Z0)/CAM_HALO_Z1):1,pHF=CAMERA_MODE?0:pFK;   /* halo: sama dengan drawStars (idle / cam free ~1x tipis, FULL penuh, fokus cam tanpa halo) */
-    if(pHK>.02&&!PX.pglow)drawStarGlow(x,y,rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),rgbc,a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK);   /* mode kamera: tanpa halo, sama dengan drawStars */
+    var glP=(typeof glskyPleiOn==='function')&&glskyPleiOn();   /* [PATCH G3g] halo+inti Pleiades di mesh bintang GL */
+    if(glP){
+      var hK=rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),hA=a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK;
+      var cR=Math.max(.7,r*.58),cA=PX.pcore?0:(a*.94);
+      if(!(pHK>.02)||PX.pglow){hK=0;hA=0;}
+      glskyStar(x,y,hA>0.01?hK*5:0,bandCol||rgbc,hA>0.01?hA:0,cA>0.004?cR:0,bandCore||'238,246,255',cA>0.004?cA:0);
+    }else{
+      if(pHK>.02&&!PX.pglow)drawStarGlow(x,y,rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),rgbc,a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK);   /* mode kamera: tanpa halo, sama dengan drawStars */
+    }
     if(_P)plM('gl');
     if(CAMERA_MODE&&!dim){var plg=plLens&&star._lg;if(plg){if(!plg.drawn){plg.drawn=true;camLensR(plg.x,plg.y,plg.R,bandCore||'238,246,255',a,now);}}else camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);}   /* bintang terang klaster (non-dim): lensa pembelok cahaya di bawah inti */
-    if(!PX.pcore){g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94*(CAMERA_MODE?(1+.1*(1-pHK)):1))+')';g.beginPath();g.arc(x,y,CAMERA_MODE?(Math.max(.7,r*.58)*pHK+Math.max(.9,r*.7*camZK())*(1-pHK)):Math.max(.7,r*.58),0,6.283);g.fill();}
+    if(!glP&&!PX.pcore){g.fillStyle='rgba('+(bandCore||'238,246,255')+','+(a*.94*(CAMERA_MODE?(1+.1*(1-pHK)):1))+')';g.beginPath();g.arc(x,y,CAMERA_MODE?(Math.max(.7,r*.58)*pHK+Math.max(.9,r*.7*camZK())*(1-pHK)):Math.max(.7,r*.58),0,6.283);g.fill();}
     if(_P)plM('co');
     if(star.interactive&&!PX.pint){
       var hotP=(hot==='pleione'),tr=TRIGGERS.pleione;
@@ -2349,7 +2405,7 @@ function placeSecretMsg(){
 var _puX=[0,0,0,0,0,0,0],_puY=[0,0,0,0,0,0,0],_puOk=[false,false,false,false,false,false,false];   /* buffer sampel ekor pulse untuk jalur GL (nseg maks 6 => 7 titik) */
 function drawPulses(now,age){
   if(reduce||IS_POTATO||age<4||SW)return;
-  var glPL=(typeof glskyLinesOn==='function')&&glskyLinesOn(),glPD=(typeof glskyStarsOn==='function')&&glskyStarsOn();   /* garis / bintang GL aktif? (pulse shock tetap 2D) */
+  var glPL=(typeof glskyLinesOn==='function')&&glskyLinesOn(),glPD=(typeof glskyStarsOn==='function')&&glskyStarsOn();   /* garis / bintang GL aktif; pulse shock ikut glskyTrigOn (G3f) */
   if(now>nextPU){nextPU=now+500+Math.random()*900;
     /* Pick any constellation (Orion / Virgo / Canis Major) so every figure gets line pulses */
     var cand=[],ci;
@@ -2370,6 +2426,13 @@ function drawPulses(now,age){
       if(!base||base[2]>=1)continue;
       var sx=base[0]+Math.cos(p.ang)*p.sp*u*(1-.35*base[2]),sy=base[1]+Math.sin(p.ang)*p.sp*u*(1-.35*base[2]);
       var sa=(1-u)*.72*(1-.7*base[2]);
+      var glS=(typeof glskyTrigOn==='function')&&glskyTrigOn();   /* [PATCH G3f] partikel + cincin pulse shock ke GL */
+      if(glS){
+        var pr=1.2+2.2*u;
+        drawRipple(sx,sy,Math.max(pr,2),tr.rgb,sa,true);   /* titik partikel ≈ glow kecil */
+        if((p.i||0)%3===0)drawRipple(base[0],base[1],((sb.r)||1.9)*(2+7*u),tr.rgb,sa*.42,false);
+        continue;
+      }
       g.fillStyle='rgba('+tr.rgb+','+sa+')';g.beginPath();g.arc(sx,sy,1.2+2.2*u,0,6.283);g.fill();
       if((p.i||0)%3===0){
         g.strokeStyle='rgba('+tr.rgb+','+(sa*.42)+')';g.lineWidth=.65;
