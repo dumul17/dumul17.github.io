@@ -315,7 +315,7 @@ function whGlEnsure(w,h){
       c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none;z-index:12;touch-action:none';
       if(cv&&cv.parentNode)cv.parentNode.insertBefore(c,cv);else document.body.appendChild(c);
       WHG.fullCv=c;WHG.cv=c;   /* cv = fullCv: handoff drawImage dari canvas yang sama */
-      r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:true,powerPreference:'low-power'});
+      r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:false,depth:true,stencil:false,preserveDrawingBuffer:true,powerPreference:'low-power'});
       r.setClearColor(0x02050d,1);r.autoClear=true;
       WHG.r=r;WHG.fullR=r;   /* [P2] satu konteks */
       WHG.cam=new T.OrthographicCamera(-1,1,1,-1,-1,1);
@@ -357,6 +357,7 @@ function whGlEnsure(w,h){
     if(spr&&!WHG.sprTex){
       WHG.sprTex=new T.CanvasTexture(spr);
       WHG.sprTex.minFilter=T.LinearFilter;WHG.sprTex.magFilter=T.LinearFilter;
+      WHG.sprTex.flipY=false;   /* [PATCH G4.12i] baris ci dari atas (sama dgn 2D drawImage ci*SC) */
       WHG.injMesh.material.uniforms.tSpr.value=WHG.sprTex;
     }
     WHG.ok=true;WHG.why='';
@@ -414,7 +415,7 @@ function whGlStep(dt,cx,cy,Rv,Rh,adv){
     /* 1) feedback: sample rtA → rtB */
     u=G.fbMat.uniforms;
     u.tPrev.value=G.rtA.texture;
-    u.uC.value.set(x/bw,y/bh);
+    u.uC.value.set(x/bw,1-y/bh);   /* [PATCH G4.12i] RT y-ke-atas, cx/cy y-ke-bawah: pivot zoom harus (x, 1-y) */
     u.uS.value=s;
     u.uR.value=rot;
     u.uD.value=dec;
@@ -774,6 +775,7 @@ function whGlTeleDraw(opacity,clip){
     }else{
       pr=rdr.getRenderTarget();ac=rdr.autoClear;
       rdr.setRenderTarget(null);rdr.autoClear=false;
+      rdr.clearDepth();   /* [PATCH G4.12i] badan teleskop butuh depth test (dulu kanvas tanpa depth = badan terbalik/kedip) */
       rdr.render(G.teleScene,G.teleCam);
       rdr.autoClear=ac;rdr.setRenderTarget(pr);
     }
@@ -785,17 +787,19 @@ function whGlTeleDraw(opacity,clip){
 }
 /* [PATCH G4.12d] portal tunnel: bake portal3dDraw → texture → quad di #glwh */
 function whGlPortalDraw(cx,cy,Rp,now,a,opts){
-  var G=WHG,T,res,cv,gx,src,mat,mesh,S,ang=0,tm=null,tk,pw,ph,rdr,pr,ac,u;
+  var G=WHG,T,res,cv,gx,src,mat,mesh,S,ang=0,tm=null,tk,pw,ph,rdr,pr,ac,u,bs;
   if(!G.compOk||!G.fullR||!(Rp>2)||!(a>.01))return false;
   if(typeof portal3dDraw!=='function')return false;
   try{
     T=THREE;
-    res=Math.max(128,Math.min(512,Math.ceil(Rp*2.4*Math.min(2,dpr||1)/32)*32));
+    /* [PATCH G4.12i] bake pada resolusi perangkat: bs = piksel bake per px CSS (maks dpr/2, dan <=1024 px kanvas); tier 256/512/768/1024 supaya tekstur jarang dialokasi ulang */
+    bs=Math.min(Math.min(2,dpr||1),1024/(Rp*2.4));
+    var need=Rp*2.4*bs;res=need<=256?256:(need<=512?512:(need<=768?768:1024));
     cv=G.ptCv||(G.ptCv=document.createElement('canvas'));
-    if(cv.width!==res||cv.height!==res){cv.width=res;cv.height=res;}
+    if(cv.width!==res||cv.height!==res){cv.width=res;cv.height=res;if(G.ptTex){try{G.ptTex.dispose();}catch(eD){}G.ptTex=null;}}
     gx=cv.getContext('2d');
     gx.setTransform(1,0,0,1,0,0);gx.clearRect(0,0,res,res);
-    gx.setTransform(1,0,0,1,res/2,res/2);
+    gx.setTransform(bs,0,0,bs,res/2,res/2);
     portal3dDraw(gx,0,0,Rp,now,1,opts||{});
     if(!G.ptTex){
       G.ptTex=new T.CanvasTexture(cv);
@@ -814,7 +818,7 @@ function whGlPortalDraw(cx,cy,Rp,now,a,opts){
     /* ukuran di layar: portal3dDraw radius Rp = outer; kanvas res mencakup ~2.4*Rp diameter → scale = res/2.4 in CSS px? 
        Kita menggambar di pusat 0,0 dengan Rp dalam px layar di context yang ditranslate res/2 — jadi diameter visual di texture ≈ 2*Rp*scale di mana scale=1 di unit px.
        Transform gx: unit = 1 px layar; texture width res px mewakili res layar-px → quad size = res (CSS px) */
-    S=res; /* full texture size in CSS px */
+    S=res/bs; /* [G4.12i] ukuran quad dalam px CSS = piksel tekstur / skala bake */
     G.ptMesh.position.set(cx,H-cy,0);
     G.ptMesh.scale.set(S,S,1);
     tk=(opts&&opts.tilt)||0;
