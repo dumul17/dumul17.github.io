@@ -1298,6 +1298,7 @@ var BH_FX_PAL={
 };
 function drawFocusFx(now){
   var id=FFX.id;if(!id||!CAMERA_MODE||reduce)return;
+  if(typeof glskyFxOn==='function'&&glskyFxOn()){glskyFocusFx(now);return;}   /* [PATCH G3h] ?glsky=1: dicatat ke GL sebelum flush */
   var t=now-FFX.t0,i,q,A,B,segs=[],rgb='110,229,255';
   g.save();g.globalCompositeOperation='lighter';g.lineCap='round';
   if(id==='bh'){

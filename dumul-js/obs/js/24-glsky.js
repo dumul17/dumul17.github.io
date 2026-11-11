@@ -27,6 +27,7 @@
    G4.2b: PORTAL overview full GL (cincin billboard + mulut PTT + petir glskySeg + percikan + charge) SEBELUM flush; #sky 2D tidak lagi menerima blit portal. Flag ?glportal=0 A/B | konsol GLSKY.portalOn.
    G4.3b: BH BODY+plasma+drag (drawHoleGl) sprite+bloom+serat+kilau cakram+warp drag ke GL sebelum flush. Flag ?glbh=0 A/B | konsol GLSKY.bhOn.
    G4.4: AST dual-mesh — pass depan meshF RO 5200 tanpa blit (12-ast3d.js). Flag ?glast=0.
+   G3h: EFEK KECIL sesudah flush pindah ke GL (dicatat sebelum flush, di atas BH/trigger): ofxDrawAvail (glow 8 bintang), ofxDrawDust (debu kursor), drawFocusFx (cincin/rasi fokus mode kamera, glskyFocusFx), reticle drawTargetLock (glskyLockReticle; teks telemetri tetap 2D). Glow = sprite getStarSprite lewat glskyImg add=1 hi=1, garis/cincin = glskySeg/glskyPoly. drawSectFlash SENGAJA tetap 2D (flash layar penuh harus di atas semua unit). Flag ?glfx=0 A/B | konsol GLSKY.fxOn.
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
@@ -42,7 +43,7 @@
    Pola penanda uji: sudut kiri-atas MERAH, kanan-atas HIJAU, kiri-bawah BIRU, kanan-bawah KUNING (kalau tertukar = arah y / rotasi salah). */
 var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:false,base:'#050b12',want:false,
   r:null,scene:null,cam:null,root:null,cv:null,mo:null,W:0,H:0,pw:0,ph:0,S:1,sCap:99,mwSnap:0,shown:true,px:null,tm:null,
-  vig:.34,drift:0,rec:false,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,bs:null,bl:null,ms:null,ml:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
+  vig:.34,drift:0,rec:false,fxOn:true,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,bs:null,bl:null,ms:null,ml:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   /* [PATCH G4.1] unit 3D yang di-attach ke scene bersama (batu belakang dulu); astOn = A/B ?glast=0 */
   /* [PATCH G3d] bhShockOn = A/B ?glbhshock=0 */
   units:[],astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
@@ -63,6 +64,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glbhshock=0(&|#|$)/.test(location.search))GLSKY.bhShockOn=false;   /* [PATCH G3d] A/B: BH shock tetap 2D */
     if(/[?&]glsn=0(&|#|$)/.test(location.search))GLSKY.snOn=false;   /* [PATCH G3e] A/B: supernova+belt tetap 2D */
     if(/[?&]gltrig=0(&|#|$)/.test(location.search))GLSKY.trigOn=false;   /* [PATCH G3f] A/B: trigger/ripple/pulse-shock tetap 2D */
+    if(/[?&]glfx=0(&|#|$)/.test(location.search))GLSKY.fxOn=false;   /* [PATCH G3h] A/B: efek kecil (avail/dust/focus/lock) tetap 2D */
     if(/[?&]glplei=0(&|#|$)/.test(location.search))GLSKY.pleiOn=false;   /* [PATCH G3g] A/B: Pleiades bintang tetap 2D */
     if(/[?&]glportal=0(&|#|$)/.test(location.search))GLSKY.portalOn=false;   /* [PATCH G4.2] A/B: portal cincin tetap 2D blit */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
@@ -227,6 +229,8 @@ function glskyLive(c){
   if(typeof RING_SPRITE_CACHE!=='undefined'){for(var _rk in RING_SPRITE_CACHE){var _rs=RING_SPRITE_CACHE[_rk];if(_rs&&_rs.c===c)return true;}}   /* [PATCH G3f] sprite cincin trigger/ripple */
   try{if(typeof PT3D!=='undefined'){if(PT3D.gl&&(c===PT3D.gl.sn||(PT3D.r&&c===PT3D.r.domElement)||c===PT3D.cc))return true;if(c===PT3D._glMouth)return true;}}catch(ePtL){}   /* [PATCH G4.2b] kanvas cincin+mulut portal */
   try{if(typeof BH!=='undefined'){if(c===BH.sprite)return true;}}catch(eBhL){}   /* [PATCH G4.3] sprite BH */
+  if(c===GLF_PL)return true;   /* [PATCH G3h] sprite glow Pleiades fokus */
+  if(typeof STAR_SPRITE_CACHE!=='undefined'){for(var _gk in STAR_SPRITE_CACHE){var _gs=STAR_SPRITE_CACHE[_gk];if(_gs&&_gs.c===c)return true;}}   /* [PATCH G3h] sprite glow bintang (avail/dust/BH blob) */
   if(typeof NEB!=='undefined'&&NEB.tint)for(k in NEB.tint)if(NEB.tint[k]===c)return true;
   if(typeof SKYT!=='undefined')for(k in SKYT)if(SKYT[k]&&(SKYT[k].spr===c||SKYT[k].spr2===c))return true;
   return false;
@@ -322,6 +326,100 @@ function glskyPoly(xs,ys,alive,samples,w,rgb,al,soft){
   var c=glskyCol(rgb),i;
   for(i=1;i<=samples;i++)if(alive[i-1]&&alive[i])glskySeg(xs[i-1],ys[i-1],xs[i],ys[i],w,c,al,soft);
 }
+/* ---------- G3h: efek kecil ---------- */
+var GLF_X=[],GLF_Y=[],GLF_A=[],GLF_PL=null;
+function glfArc(cx,cy,r,a0,a1,w,rgb,al){   /* goresan busur (ekuivalen g.arc + stroke) */
+  var n,i,a;
+  if(!(al>.004)||!(r>.5))return;
+  n=Math.max(6,Math.min(64,Math.ceil(Math.abs(a1-a0)*r/5)));
+  for(i=0;i<=n;i++){a=a0+(a1-a0)*i/n;GLF_X[i]=cx+Math.cos(a)*r;GLF_Y[i]=cy+Math.sin(a)*r;GLF_A[i]=1;}
+  glskyPoly(GLF_X,GLF_Y,GLF_A,n,w,rgb,al,0);
+}
+function glfDot(x,y,r,rgb,al){if(al>.004)glskyStar(x,y,0,'0,0,0',0,r,rgb,al);}   /* lingkaran padat (ekuivalen arc + fill) */
+function glfLine(x0,y0,x1,y1,w,rgb,al){if(al>.004)glskySeg(x0,y0,x1,y1,w,glskyCol(rgb),al,0);}
+function glfPlSprite(){   /* gradien glow bintang Pleiades fokus (sama stop dgn drawFocusFx 2D), alpha dasar 1 -> dikali al lewat glskyImg */
+  var c,x,gr;
+  if(GLF_PL)return GLF_PL;
+  c=document.createElement('canvas');c.width=c.height=64;x=c.getContext('2d');
+  gr=x.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(235,242,255,.55)');gr.addColorStop(.4,'rgba(145,170,255,.22)');gr.addColorStop(1,'rgba(145,170,255,0)');
+  x.fillStyle=gr;x.fillRect(0,0,64,64);
+  return (GLF_PL=c);
+}
+/* reticle drawTargetLock: cincin putus-putus (dash 3/3 mulai sudut 0) + 4 bracket sudut diputar rot; teks telemetri tetap 2D */
+function glskyLockReticle(x,y,sz,rot,rgb){
+  var R=sz+5,n=Math.max(6,Math.floor(6.2832*R/6)),k,i,a0,a1,L=5,ca=Math.cos(rot),sa=Math.sin(rot),p,q0x,q0y,q1x,q1y,c=glskyCol(rgb),cw=glskyCol('234,246,255');
+  var P=[[-sz,-sz+L,-sz,-sz,-sz+L,-sz],[sz-L,-sz,sz,-sz,sz,-sz+L],[sz,sz-L,sz,sz,sz-L,sz],[-sz+L,sz,-sz,sz,-sz,sz-L]];
+  for(k=0;k<n;k++){a0=k*6/R;a1=(k*6+3)/R;glskySeg(x+Math.cos(a0)*R,y+Math.sin(a0)*R,x+Math.cos(a1)*R,y+Math.sin(a1)*R,1,c,.6,0);}
+  for(k=0;k<4;k++){
+    p=P[k];
+    for(i=0;i<2;i++){
+      q0x=p[i*2];q0y=p[i*2+1];q1x=p[i*2+2];q1y=p[i*2+3];
+      glskySeg(x+q0x*ca-q0y*sa,y+q0x*sa+q0y*ca,x+q1x*ca-q1y*sa,y+q1x*sa+q1y*ca,1.2,cw,.85,0);
+    }
+  }
+}
+/* drawFocusFx (01-core.js) versi GL: logika sama, hanya perintah gambarnya jadi glsky*. Pemanggil memastikan glskyFxOn(). */
+function glskyFocusFx(now){
+  var id=FFX.id,t,i,q,A,B,segs=[],rgb='110,229,255';
+  if(!id||!CAMERA_MODE||reduce)return;
+  t=now-FFX.t0;
+  if(id==='bh'){
+    var bp=camBH(),R=BH.Rr*BHZ,pal=BH_FX_PAL[BAND]||BH_FX_PAL.vis,rr=R*pal.rm;
+    if(R>=1&&t<2800){
+      var u=Math.min(1,t/1200),e=u*u*(3-2*u),al=t<1200?1:Math.max(0,1-(t-1200)/1600),a0=-1.5708,a1=a0+6.2832*e;
+      glfArc(bp[0],bp[1],rr,a0,a1,pal.gw,pal.gc,pal.ga*al);
+      glfArc(bp[0],bp[1],rr,a0,a1,pal.lw,pal.lc,pal.la*al);
+      if(u<1)glfDot(bp[0]+Math.cos(a1)*rr,bp[1]+Math.sin(a1)*rr,3.2,pal.hc,.95);
+    }
+    if(BAND==='ir'&&R>=1){
+      var fi=Math.min(1,t/900),j,ra,an,ox2,oy2;
+      for(j=0;j<4;j++){
+        ra=R*(1.9+.55*j);an=t*.0016/(1+.55*j)+j*1.7;
+        ox2=bp[0]+Math.cos(an)*ra;oy2=bp[1]+Math.sin(an)*ra*.62;
+        glfDot(ox2,oy2,5,'255,170,110',.16*fi);
+        glfDot(ox2,oy2,1.7,'255,226,196',.8*fi);
+      }
+    }
+    return;
+  }
+  if(id==='pleiades'){
+    if(!PLEIADES.ready)return;
+    var ox=mouse.x*1.4+skyPan.x,oy=mouse.y*1.0+skyPan.y,pts=PLEIADES.bright.slice().sort(function(a,b){return a.x-b.x;}),nn=pts.length,per=Math.min(320,2400/Math.max(nn,1)),dur=1100,spr=glfPlSprite();
+    for(i=0;i<nn;i++){
+      q=gSky(PLEIADES.x+pts[i].x*PLEIADES.scale+ox,PLEIADES.y+pts[i].y*PLEIADES.scale+oy);
+      if(!q||q[2]>=1)continue;
+      var ts=t-420-i*per,al2=0,sc=1;if(ts<0)continue;
+      if(ts<dur){var u2=ts/dur;al2=Math.sin(u2*Math.PI);sc=1+.9*al2;}
+      else al2=.2+.14*Math.sin(t*.0021+i*1.9);
+      var r=(3+7*al2)*sc,L=(7+16*al2)*sc;
+      glskyImg(spr,Math.min(1,al2),q[0],q[1],r*5.2,r*5.2,0,1,1);
+      glfLine(q[0]-L,q[1],q[0]+L,q[1],1,'225,236,255',.8*al2);
+      glfLine(q[0],q[1]-L,q[0],q[1]+L,1,'225,236,255',.8*al2);
+    }
+    return;
+  }
+  var c=cons(id);if(!c||!linesVisible(c))return;
+  for(i=0;i<c.lines.length;i++){
+    A=c.stars[c.lines[i][0]];B=c.stars[c.lines[i][1]];if(!A||!B)continue;
+    var qa=gSky(A.x+c.ox,A.y+c.oy),qb=gSky(B.x+c.ox,B.y+c.oy);
+    if(qa&&qb)segs.push([[qa[0],qa[1],qa[2]],[qb[0],qb[1],qb[2]]]);
+  }
+  var n=segs.length;if(!n)return;
+  var per2=Math.min(190,1900/n),dur2=per2*1.5,tEnd=420+(n-1)*per2+dur2;
+  var glow=t<tEnd?1:Math.max(.32,1-(t-tEnd)/1600*.68);
+  for(i=0;i<n;i++){
+    var s0=segs[i][0],s1=segs[i][1];if(s0[2]>=1||s1[2]>=1)continue;
+    var ts2=t-420-i*per2;if(ts2<0)continue;
+    var p=Math.min(1,ts2/dur2);p=p*p*(3-2*p);
+    var ex=s0[0]+(s1[0]-s0[0])*p,ey=s0[1]+(s1[1]-s0[1])*p;
+    glfLine(s0[0],s0[1],ex,ey,4.2,rgb,.13*glow);
+    glfLine(s0[0],s0[1],ex,ey,1.1,'225,248,255',.78*glow);
+    if(ts2<520){var pu=ts2/520;glfArc(s0[0],s0[1],3+11*pu,0,6.2832,1,rgb,.7*(1-pu));}
+    if(p<1)glfDot(ex,ey,2.6,'255,255,255',.95);
+    else if(ts2-dur2<520){var pu2=(ts2-dur2)/520;glfArc(s1[0],s1[1],3+11*pu2,0,6.2832,1,rgb,.7*(1-pu2));}
+  }
+}
 function glskyInstUpload(B,m,n){
   var k,at;
   m.visible=n>0;B.g.instanceCount=n;
@@ -392,6 +490,7 @@ function glskySnOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.snOn&&S.ok&&S.
 function glskyTrigOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.trigOn&&S.ok&&S.r);}   /* [FIX] +rec: drawRipple dipanggil juga setelah flush (drawTargetLock, drawHole 2D) -> harus tetap 2D */   /* [PATCH G3f] true = trigger ripple / pulse shock di GL */
 function glskyPleiOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.starOn&&S.pleiOn&&S.inst&&!CAMERA_MODE);}   /* [PATCH G3g] Pleiades halo+inti di mesh bintang GL */
 function glskyPortalOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.portalOn&&S.ok&&S.r);}   /* [PATCH G4.2] true = cincin portal overview ke GL billboard */
+function glskyFxOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.fxOn&&S.inst&&S.ok&&S.r);}   /* [PATCH G3h] true = efek kecil (avail/dust/focus/lock) boleh dicatat ke GL; false di luar jendela rekam */
 function glskyBhOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.bhOn&&S.ok&&S.r);}   /* [PATCH G4.3] true = body BH ke GL */
 
 function glskyBuild(){

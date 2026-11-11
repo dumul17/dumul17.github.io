@@ -1076,17 +1076,31 @@ function frame(now){
     try{if(!PX.pulse&&typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
     }
     pmk('cons+stars');
+    if(_glk)try{drawBHShockwaves(now);}catch(eBhS){}   /* [PATCH G3d] antre cincin BH shock ke op GL SEBELUM flush (setelah bintang/garis tercatat) */
+    if(_glk)try{drawSupernovaBursts(now);}catch(eSnG){}   /* [PATCH G3e] antre supernova ke op GL sebelum flush */
+    if(_glk&&BELT)try{drawBeltFx(now);}catch(eBfG){}   /* [PATCH G3e] antre belt FX ke op GL sebelum flush */
+    if(_glk)try{drawTriggerVisuals(now);}catch(eTrG){}   /* [PATCH G3f] antre trigger ripple ke op GL sebelum flush */
+    var _glfx=_glk&&typeof glskyFxOn==='function'&&glskyFxOn();   /* [PATCH G3h] efek kecil (urutan 2D lama: avail, focus, dust, lock) dicatat ke GL sebelum BH body/portal; drawSectFlash sengaja tetap 2D (paling atas) */
+    if(_glfx){
+      try{ofxSafe(ofxDrawAvail,now);}catch(eAvG){}
+      try{drawFocusFx(now);}catch(eFfG){}
+      try{ofxSafe(ofxDrawDust,now);}catch(eDuG){}
+      try{drawTargetLock(now);}catch(eTlG){}   /* hanya reticle; teks telemetri digambar di panggilan 2D sesudah flush */
+    }
+    if(_glk)try{if(typeof portal3dGlRing==='function')portal3dGlRing(now);}catch(ePtG){}   /* [PATCH G4.2] antre cincin portal overview ke op GL sebelum flush */
+    if(_glk)try{if(typeof drawHoleGl==='function')drawHoleGl(now,age);}catch(eBhG){}   /* [PATCH G4.3] antre body BH ke op GL sebelum flush */
+    if(_glk)try{drawAsteroids(now,1);}catch(eAfG){}   /* [PATCH G4.4] batu depan dual-mesh sebelum flush */
     if(_glk)try{glskyFlush();}catch(eGf){}   /* ?glsky=1: render GL sekali per frame (daftar op latar dari plateBlit/sectDrawSky + garis & bintang dari drawCons/drawStars); dulu di atas blok latar, dipindah ke sini supaya garis/bintang sempat tercatat */
-    drawTriggerVisuals(now);
-    ofxSafe(ofxDrawAvail,now);
-    drawFocusFx(now);
-    drawSupernovaBursts(now);
-    if(BELT)drawBeltFx(now);   /* F4: supernova Alnilam + zoom ke sabuk Orion */
-    ofxSafe(ofxDrawDust,now);
+    if(!_glk)drawTriggerVisuals(now);   /* [PATCH G3f] jalur 2D saja */
+    if(!_glfx)ofxSafe(ofxDrawAvail,now);
+    if(!_glfx)drawFocusFx(now);
+    if(!_glk)drawSupernovaBursts(now);   /* [PATCH G3e] jalur 2D saja */
+    if(!_glk&&BELT)drawBeltFx(now);   /* F4: supernova Alnilam + zoom ke sabuk Orion; GL sudah di atas */
+    if(!_glfx)ofxSafe(ofxDrawDust,now);
 
     // RENDER EFEK KOSMIK BARU:
     pmk('fx');
-    drawBHShockwaves(now);
+    if(!_glk)drawBHShockwaves(now);   /* [PATCH G3d] jalur 2D saja; GL sudah diantre + di-flush di atas */
     drawTargetLock(now);
 
     /* Isolate late-stage canvas effects so one mobile/WebView compatibility
@@ -1095,7 +1109,8 @@ function frame(now){
     try{drawPortals(age,now);}catch(err){window.__hub.renderError='drawPortals: '+(err&&err.message||err);}
     pmk('portals');
     if(!PX.hole)drawHoleSafe(now,age);pmk('hole+viz');
-    try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);} /* seluruh orbit asteroid (separuh depan juga) di BELAKANG planet: digambar sebelum planet3dDraw, jadi permukaan planet menutupinya */
+    /* [PATCH G4.4] batu depan GL sudah sebelum flush; jalur 2D tetap di sini */
+    if(!_glk){try{drawAsteroids(now,1);}catch(err){window.__hub.renderError='drawAsteroids: '+(err&&err.message||err);}}
     pmk('astF');
     try{drawFloatingTelescopeTop(now);}catch(err){window.__hub.renderError='teleTop: '+(err&&err.message||err);}
     pmk('teleTop');   /* teleskop 3D: lapisan paling atas (di atas rasi, bintang, garis, portal, BH, drone) */
@@ -2081,18 +2096,21 @@ function drawSupernovaBursts(now){
   if(!SNFX.on)return drawSupernovaBurstsOld(now);
   var nf=SN_FLASHES.length,nb=SN_BURSTS.length;
   if(!nf&&!nb)return;
+  var glOn=(typeof glskySnOn==='function')&&glskySnOn();   /* [PATCH G3e] ?glsky=1: sprite snBake ke GL aditif */
   var A0=g.globalAlpha,i,j,u,S,al;
-  g.save();g.globalCompositeOperation='lighter';
+  if(!glOn){g.save();g.globalCompositeOperation='lighter';}
   for(i=nf-1;i>=0;i--){   /* flash: kurva sama dgn @keyframes snflash (naik cepat ke 1 di 12%, 0.78 di 30%, lalu memudar) */
     var f=SN_FLASHES[i];u=(now-f.t)/f.d;
     if(u>=1){SN_FLASHES.splice(i,1);continue;}
     if(u<0)u=0;
     al=u<.12?u/.12:(u<.30?1-.22*(u-.12)/.18:.78*Math.pow(1-(u-.30)/.70,1.7));
     if(al<.01)continue;
-    S=snBake(f.rgb);g.globalAlpha=A0*al;
+    S=snBake(f.rgb);
+    if(glOn){glskyImg(S.flash,A0*al,f.x,f.y,f.R*2,f.R*2,0,1,1);continue;}
+    g.globalAlpha=A0*al;
     g.drawImage(S.flash,f.x-f.R,f.y-f.R,f.R*2,f.R*2);
   }
-  _snM=g.getTransform?g.getTransform():null;
+  if(!glOn)_snM=g.getTransform?g.getTransform():null;
   for(i=nb-1;i>=0;i--){
     var b=SN_BURSTS[i];u=(now-b.t)/b.d;
     if(u>1){SN_BURSTS.splice(i,1);continue;}
@@ -2104,7 +2122,27 @@ function drawSupernovaBursts(now){
     if(!q||q[2]>=1)continue;
     var fade=1-.85*q[2],easeOut=1-Math.pow(1-u,3),sr=(s&&s.r)||1.9,base=sr*(2.5+9*easeOut),inv=(1-u)*fade,hs,rs;
     S=snBake(tr.rgb);
-    hs=base*2.6;g.globalAlpha=A0*inv;                       /* core + flare */
+    hs=base*2.6;
+    if(glOn){
+      glskyImg(S.core,A0*inv,q[0],q[1],hs*2,hs*2,0,1,1);
+      rs=base*1.1034;glskyImg(S.ring,A0*inv*.85,q[0],q[1],rs*2,rs*2,0,1,1);
+      if(u>.08){
+        var u2=(u-.08)/.92,e2=1-Math.pow(1-u2,3);
+        rs=base*(1.3+1.9*e2)*1.1034;
+        glskyImg(S.ring,A0*Math.pow(1-u2,1.6)*fade*.5,q[0],q[1],rs*2,rs*2,0,1,1);
+      }
+      var ps=b.ps;
+      if(ps&&ps.length){
+        var k=1-.35*q[2],pa=(1-u)*.72*(1-.7*q[2]),wd=2.6*(1-.4*u),aSt=A0*Math.min(1,pa*1.35);
+        for(j=0;j<ps.length;j++){
+          var p=ps[j],dd=p.sp*u*k,len=(5+p.sp*.12)*(1-.55*u),hx=q[0]+p.c*dd,hy=q[1]+p.s*dd;
+          /* pusat quad = setengah panjang di belakang kepala (sama dgn snStreak drawImage(-len,-wid/2)) */
+          glskyImg(S.streak,aSt,hx-Math.cos(p.ang)*len*.5,hy-Math.sin(p.ang)*len*.5,len,wd,p.ang,1,1);
+        }
+      }
+      continue;
+    }
+    g.globalAlpha=A0*inv;                       /* core + flare */
     g.drawImage(S.core,q[0]-hs,q[1]-hs,hs*2,hs*2);
     rs=base*1.1034;g.globalAlpha=A0*inv*.85;                /* cincin 1: radius = base */
     g.drawImage(S.ring,q[0]-rs,q[1]-rs,rs*2,rs*2);
@@ -2124,7 +2162,7 @@ function drawSupernovaBursts(now){
       if(_snM)g.setTransform(_snM.a,_snM.b,_snM.c,_snM.d,_snM.e,_snM.f);
     }
   }
-  g.restore();
+  if(!glOn)g.restore();
 }
 /* pre-bake sprite semua warna saat idle (satu per giliran): tap pertama nggak bayar bake */
 (function(){
@@ -2177,6 +2215,25 @@ function drawBeltFx(now){
       core=sr*(3+10*eo)*(1+1.8*u*u),
       wash=Math.max(0,Math.min(1,(u-.58)/.4)),
       big=Math.sqrt(W*W+H*H);
+  var glOn=(typeof glskySnOn==='function')&&glskySnOn();   /* [PATCH G3e] belt pakai sprite snBake di GL */
+  if(glOn){
+    var S=snBake(B.rgb),hs=core*3,a0=.95*(1-.4*u);
+    glskyImg(S.core,a0,x,y,hs*2,hs*2,0,1,1);
+    if(b<1){
+      var ring=core*(1.6+eo*9),a=(1-b),rs=ring*1.1034;
+      glskyImg(S.ring,.75*a,x,y,rs*2,rs*2,0,1,1);
+      glskyImg(S.ring,.5*a,x,y,rs*1.24,rs*1.24,0,1,1);   /* cincin dalam ~0.62 */
+      var L=core*(2.2+4*eo);
+      /* flare silang: dua streak horizontal/vertikal lewat pusat */
+      glskyImg(S.streak,.55*a,x,y,L*2,Math.max(1.2,core*.12),0,1,1);
+      glskyImg(S.streak,.55*a,x,y,L*2,Math.max(1.2,core*.12),Math.PI/2,1,1);
+    }
+    if(wash>0){
+      var wr=big*(.1+.8*wash);
+      glskyImg(S.flash,.55*wash,x,y,wr*2,wr*2,0,1,1);
+    }
+    return;
+  }
   g.save();g.globalCompositeOperation='lighter';
   var rg=g.createRadialGradient(x,y,0,x,y,core*3);
   rg.addColorStop(0,'rgba(255,255,255,'+(.95*(1-.4*u))+')');

@@ -811,6 +811,7 @@ function tlHudSprite(l1,l2,l3,rgb){
   TL_HUD.key=key;TL_HUD.pw=pw;TL_HUD.ph=ph;
   return TL_HUD;
 }
+var TL_GL_T=-1;   /* [PATCH G3h] frame terakhir reticle dicatat ke GL (panggilan kedua, sesudah flush, hanya menggambar teks telemetri 2D) */
 function drawTargetLock(now){
   if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)return;
   if(reduce || SW) return;
@@ -847,6 +848,9 @@ function drawTargetLock(now){
   var sz = 17 + Math.sin(now * 0.003) * 1.5;
   var rot = now * 0.0006;
 
+  /* [PATCH G3h] ?glsky=1: panggilan sebelum flush mencatat reticle ke GL lalu selesai; panggilan sesudah flush lewati reticle, gambar teks saja */
+  if(typeof glskyFxOn==='function'&&glskyFxOn()){glskyLockReticle(x,y,sz,rot,tr.rgb);TL_GL_T=now;return;}
+  if(TL_GL_T!==now){
   g.save();
   g.translate(x, y);
 
@@ -869,6 +873,7 @@ function drawTargetLock(now){
   g.beginPath(); g.moveTo(-sz + clen, sz); g.lineTo(-sz, sz); g.lineTo(-sz, sz - clen); g.stroke();
 
   g.restore();
+  }
 
   // Telemetry HUD Text — panel diukur dari lebar teks asli, dijepit ke area layar yang kelihatan,
   // dan dijauhkan dari reticle (lingkaran + bracket) supaya frame & teks nggak numpuk / kepotong.
@@ -1735,6 +1740,16 @@ function getStarSprite(rgbStr){
   hit={c:sc,pad:pad,R:R};
   STAR_SPRITE_CACHE[rgbStr]=hit;
   return hit;
+}
+/* [PATCH G3h] drawStarGlow untuk efek aditif kecil (avail/dust): ?glsky=1 dalam jendela rekam -> sprite yang sama ke GL aditif (hi), selain itu 2D biasa */
+function drawStarGlowFx(x,y,r,rgbStr,alpha){
+  if(typeof glskyFxOn==='function'&&glskyFxOn()){
+    if(!(alpha>0.01)||!(r>0))return;
+    var sp=getStarSprite(rgbStr),half=sp.pad*(r*5/sp.R);
+    glskyImg(sp.c,g.globalAlpha*Math.min(1,alpha),x,y,half*2,half*2,0,1,1);
+    return;
+  }
+  drawStarGlow(x,y,r,rgbStr,alpha);
 }
 function drawStarGlow(x,y,r,rgbStr,alpha){
   if(!(alpha>0.01)||!(r>0))return;
@@ -2703,8 +2718,8 @@ function ofxDrawTint(now){
 function ofxDrawAvail(now){
   if(OFX.p<.02||SECT.on)return;
   var keys=OFX.keys||(OFX.keys=Object.keys(TRIGGERS)),i,j,key,tr,q,c,s,ps,x,y,pu;
-  var dim=(activeSfx&&!activeSfx.paused&&!activeSfx.ended)?.35:1;
-  g.save();g.globalCompositeOperation='lighter';
+  var dim=(activeSfx&&!activeSfx.paused&&!activeSfx.ended)?.35:1,glF=(typeof glskyFxOn==='function')&&glskyFxOn();   /* [PATCH G3h] glF = catat ke GL (aditif) */
+  if(!glF){g.save();g.globalCompositeOperation='lighter';}
   for(i=0;i<keys.length;i++){
     key=keys[i];tr=TRIGGERS[key];
     if(!sectShow(tr.cons))continue;
@@ -2725,9 +2740,9 @@ function ofxDrawAvail(now){
       x=q[0];y=q[1];
     }
     pu=.5+.5*Math.sin(now*.0016+i*.83);
-    drawStarGlow(x,y,5.2+2.4*pu,tr.rgb,(.16+.16*pu)*OFX.p*dim*(1-.85*q[2]));
+    drawStarGlowFx(x,y,5.2+2.4*pu,tr.rgb,(.16+.16*pu)*OFX.p*dim*(1-.85*q[2]));
   }
-  g.restore();
+  if(!glF)g.restore();
 }
 /* Jejak debu bintang di kursor / sentuhan. Warna ngikut BGM aktif. Jumlah partikel dibatasi. */
 function ofxSpawnDust(x,y,n){
@@ -2741,13 +2756,14 @@ function ofxSpawnDust(x,y,n){
 function ofxDrawDust(now){
   var a=OFX.dust,i,p,dt,u;
   if(!a.length)return;
-  g.save();g.globalCompositeOperation='lighter';
+  var glD=(typeof glskyFxOn==='function')&&glskyFxOn();   /* [PATCH G3h] */
+  if(!glD){g.save();g.globalCompositeOperation='lighter';}
   for(i=a.length-1;i>=0;i--){
     p=a[i];dt=Math.max(0,now-p.t);u=dt/p.l;
     if(u>=1){a.splice(i,1);continue;}
-    drawStarGlow(p.x+p.vx*dt,p.y+p.vy*dt,p.r*(1.25-.45*u),p.c,.7*(1-u)*(1-u));
+    drawStarGlowFx(p.x+p.vx*dt,p.y+p.vy*dt,p.r*(1.25-.45*u),p.c,.7*(1-u)*(1-u));
   }
-  g.restore();
+  if(!glD)g.restore();
 }
 if(!reduce&&!IS_POTATO){
   window.addEventListener('pointermove',function(e){
