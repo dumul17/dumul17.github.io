@@ -31,6 +31,7 @@
    G3h: EFEK KECIL sesudah flush pindah ke GL (dicatat sebelum flush, di atas BH/trigger): ofxDrawAvail (glow 8 bintang), ofxDrawDust (debu kursor), drawFocusFx (cincin/rasi fokus mode kamera, glskyFocusFx), reticle drawTargetLock (glskyLockReticle; teks telemetri tetap 2D). Glow = sprite getStarSprite lewat glskyImg add=1 hi=1, garis/cincin = glskySeg/glskyPoly. drawSectFlash SENGAJA tetap 2D (flash layar penuh harus di atas semua unit). Flag ?glfx=0 A/B | konsol GLSKY.fxOn.
    G4.7: DRONE TX/RX 3D (14-drone3d.js) = Group di LAYER DRONE (kanvas #gldrone di ATAS #sky, kanvas GL ketiga, malas), tanpa blit/drawImage; halo lembut tetap 2D di bawahnya. Di atas #sky karena planet masih blit 2D dan drone digambar sesudah planet. Planet pindah GL => drone pindah ke pass atas, layer dihapus. Flag ?gldrone=0 A/B | konsol GLSKY.drOn.
    G4.8: PLANET full GL (17-planet3d.js pl3dGlPrep): shader strip yang sama digambar langsung di PASS PLANET (pScene + tCam y-ke-atas), dirender sesudah pass teleskop dan sebelum #sky (urutan 2D lama). Tanpa renderer 'big', tanpa blit. Efek 2D planet (aurora/debris/flare/petir) tetap di #sky. Flag ?glplanet=0 A/B | konsol GLSKY.plOn, PL3D.glm.
+   G4.9: EFEK PLANET (aurora/debris/flare/petir, 17-planet3d.js pl3dGlFx) pindah ke PASS PLANET (pScene) sesudah permukaan: aurora = mesh kolom instancing (VS menghitung tinggi/alpha tirai per kolom dari fungsi waktu, tanpa bake/keyframe/kanvas offscreen), debris = titik+garis, flare = blob radial 3-stop, petir = ruas garis (glow awan tetap shader uBolt planet). Titik planet-ruang -> pass planet lewat affine (ayunan libr + rotasi stage + balik y) dari JS. Blend source-over premultiplied (sama dgn 'lighter' di kanvas transparan lalu ditumpuk normal). Flag ?glplfx=0 A/B | konsol GLSKY.pfOn, PL3D.fxGl.
    CATATAN KNOWN: efek 'lighter' yang masih 2D (halo BH, supernova, bintang jatuh) kini digambar aditif di atas kanvas 2D transparan lalu ditumpuk
    normal di atas GL, bukan aditif di atas plate => bisa ada cincin gelap tipis di atas nebula terang. Halo bintang pindah ke GL di G2.
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
@@ -54,6 +55,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   drOn:true,dR:null,dCv:null,dScene:null,dCam:null,dOk:false,dErr:0,dPw:0,dPh:0,dShown:false,
   /* [G4.8] pass planet: pScene dirender sesudah pass atas (teleskop). plOn = A/B ?glplanet=0; pAct = planet dijadwalkan frame ini (di-reset glskyBegin); pChk = diagnosa shader belum dicek; pErr = galat prep */
   plOn:true,pScene:null,pAct:false,pChk:false,pErr:0,
+  /* [G4.9] efek planet di pass planet: plfxOn = A/B ?glplfx=0; pf = {au,ds,dl,db,...} mesh; pfOk = mesh berhasil dibangun; pdn/pln/pbn/pan = jumlah baris dicatat frame ini (di-reset glskyBegin) */
+  plfxOn:true,pf:null,pfOk:false,pdn:0,pln:0,pbn:0,pan:0,
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -75,6 +78,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glplei=0(&|#|$)/.test(location.search))GLSKY.pleiOn=false;   /* [PATCH G3g] A/B: Pleiades bintang tetap 2D */
     if(/[?&]glportal=0(&|#|$)/.test(location.search))GLSKY.portalOn=false;   /* [PATCH G4.2] A/B: portal cincin tetap 2D blit */
     if(/[?&]gldrone=0(&|#|$)/.test(location.search))GLSKY.drOn=false;   /* [G4.7] A/B: drone tetap blit 2D */
+    if(/[?&]glplfx=0(&|#|$)/.test(location.search))GLSKY.plfxOn=false;   /* [G4.9] A/B: efek planet tetap 2D di #sky */
     if(/[?&]glplanet=0(&|#|$)/.test(location.search))GLSKY.plOn=false;   /* [G4.8] A/B: planet tetap jalur lama (renderer 'big' + blit) */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
@@ -664,6 +668,114 @@ function glskyPlWait(){var S=GLSKY;return !!(S.on&&S.plOn&&S.lay&&!S.test&&S.err
 function glskyPlSet(v){GLSKY.pAct=!!v;}
 function glskyBhOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.bhOn&&S.ok&&S.r);}   /* [PATCH G4.3] true = body BH ke GL */
 
+
+/* ---------- [G4.9] EFEK PLANET di PASS PLANET (pScene, kamera y-ke-ATAS: y_pass = H - y_stage) ----------
+   Dicatat 17-planet3d.js (pl3dGlFx) SEBELUM glskyFlush, digambar sesudah permukaan (renderOrder 0): aurora 10, blob (flare) 11, titik (debris) 12, garis (debris/petir) 13.
+   Blend premultiplied source-over (ONE, 1-SRCA) = efek 'lighter' di kanvas transparan yang lalu ditumpuk normal di atas planet (cara 2D lama). Koordinat titik/garis/blob = ruang pass (planet-ruang sudah dipetakan JS).
+   AURORA = satu mesh instancing kolom (3 lapisan x ceil(PW/st) kolom). VS menghitung per titik-sudut kolom: limb, env, tinggi tirai, alpha dari fungsi waktu + fase (dikurangi mod 2pi di JS), lalu memetakan planet-ruang -> pass lewat affine
+   uPA/uPC. FS = gradien vertikal analitik (stop sama dgn sprite 1x64 lama). Tidak ada bake, keyframe, kanvas offscreen, drawImage. */
+var GLSKY_AU_VS='attribute vec2 iX;uniform vec4 uPA;uniform vec4 uPC;uniform vec4 uG;uniform vec4 uS;uniform vec4 uL0[3];uniform vec4 uL1[3];uniform vec4 uPh[3];uniform float uPm[3];varying float vV;varying float vAl;varying float vS;'+
+  'void main(){'+
+  'vec4 l0=iX.y<0.5?uL0[0]:(iX.y<1.5?uL0[1]:uL0[2]);vec4 l1=iX.y<0.5?uL1[0]:(iX.y<1.5?uL1[1]:uL1[2]);vec4 ph=iX.y<0.5?uPh[0]:(iX.y<1.5?uPh[1]:uPh[2]);float pm=iX.y<0.5?uPm[0]:(iX.y<1.5?uPm[1]:uPm[2]);'+
+  'float xv=iX.x+position.x*uS.w;float dx=xv-uG.x;float limb=uG.y-sqrt(max(uG.z*uG.z-dx*dx,0.0));'+
+  'float te=clamp((abs(xv-uS.x)/uG.w-0.08)/0.6,0.0,1.0);float env=te*te*(3.0-2.0*te);float TP=6.2831853/uG.w;'+
+  'float a1=l0.x*TP*xv+ph.x;float b1=l0.y*TP*xv+ph.y;float m=0.5+0.5*(0.62*sin(a1)+0.38*sin(b1));'+
+  'float ray=0.5+0.5*(0.6*sin(xv*0.20943951+ph.z)+0.4*sin(xv*0.36959914+ph.w));'+
+  'float mm=0.65+0.35*sin((1.7*l0.x+l0.y)*TP*xv+pm);float ry=l0.w;'+
+  'float al=uS.y*l0.z*env*mm*((1.0-ry*0.65)+ry*0.65*ray);float h=uS.z*l1.x*(0.3+0.7*m)*((1.0-ry*0.25)+ry*0.35*ray);'+
+  'float yb=limb-l1.y;float vv=0.5-position.y;float y=(yb-h)+vv*h*1.111;'+
+  'vV=vv;vAl=min(al,1.0)*uPC.z;vS=iX.y;'+
+  'vec2 q=vec2(uPA.x*xv+uPA.y*y+uPC.x,uPA.z*xv+uPA.w*y+uPC.y);'+
+  'gl_Position=projectionMatrix*modelViewMatrix*vec4(q,0.0,1.0);}';
+/* stop gradien = sprite lama (17-planet3d.js pl3dAurSpr): sprite 0 (kabut) warna atm, alpha 0/.08/.3/.6/.6/0 di v 0/.3/.6/.85/.9/1; sprite 1 (tirai) warna cT/cT/atm/cB/cB/cB, alpha 0/.16/.5/.85/.8/0 di v 0/.22/.5/.74/.9/1 */
+var GLSKY_AU_FS='precision highp float;uniform vec3 uCa;uniform vec3 uCb;uniform vec3 uCt;varying float vV;varying float vAl;varying float vS;'+
+  'void main(){float v=clamp(vV,0.0,1.0);vec3 c;float a;'+
+  'if(vS<0.5){c=uCa;'+
+  'if(v<0.3)a=mix(0.0,0.08,v/0.3);else if(v<0.6)a=mix(0.08,0.3,(v-0.3)/0.3);else if(v<0.85)a=mix(0.3,0.6,(v-0.6)/0.25);else if(v<0.9)a=0.6;else a=mix(0.6,0.0,(v-0.9)/0.1);}'+
+  'else{'+
+  'if(v<0.22){c=uCt;a=mix(0.0,0.16,v/0.22);}else if(v<0.5){c=mix(uCt,uCa,(v-0.22)/0.28);a=mix(0.16,0.5,(v-0.22)/0.28);}'+
+  'else if(v<0.74){c=mix(uCa,uCb,(v-0.5)/0.24);a=mix(0.5,0.85,(v-0.5)/0.24);}else{c=uCb;if(v<0.9)a=mix(0.85,0.8,(v-0.74)/0.16);else a=mix(0.8,0.0,(v-0.9)/0.1);}}'+
+  'a*=vAl;gl_FragColor=vec4(c*a,a);}';
+/* BLOB (flare): elips radial 3-stop. iB = cx,cy,rx,ry; iQ = rotasi (rad, ruang pass), p1 (posisi stop tengah), a0, a1 (alpha di 0 dan p1; 0 di tepi); iC0/iC1 = rgb di stop 0 dan stop tengah/tepi (non-premultiplied seperti gradien kanvas) */
+var GLSKY_BL_VS='attribute vec4 iB;attribute vec4 iQ;attribute vec4 iC0;attribute vec4 iC1;varying vec2 vQ;varying vec4 vK;varying vec3 vC0;varying vec3 vC1;'+
+  'void main(){vec2 q=position.xy*2.0;vec2 s=vec2(q.x*iB.z,q.y*iB.w);float c=cos(iQ.x);float sn=sin(iQ.x);vec2 p=iB.xy+vec2(s.x*c-s.y*sn,s.x*sn+s.y*c);'+
+  'vQ=q;vK=iQ;vC0=iC0.rgb;vC1=iC1.rgb;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,0.0,1.0);}';
+var GLSKY_BL_FS='precision highp float;varying vec2 vQ;varying vec4 vK;varying vec3 vC0;varying vec3 vC1;'+
+  'void main(){float d=length(vQ);if(d>=1.0){gl_FragColor=vec4(0.0);return;}float p1=max(vK.y,0.001);vec3 c;float a;'+
+  'if(d<p1){float s=d/p1;c=mix(vC0,vC1,s);a=mix(vK.z,vK.w,s);}else{c=vC1;a=mix(vK.w,0.0,(d-p1)/max(1.0-p1,0.001));}'+
+  'gl_FragColor=vec4(c*a,a);}';
+function glskyPfBuild(T){
+  var S=GLSKY,pf={},V4=function(){return new T.Vector4();},m,au,i;
+  au=glskyInstGeo(T,[['iX',2]],3000);
+  pf.au={B:au,cap:3000,N:0,key:'',uni:{uPA:{value:V4()},uPC:{value:V4()},uG:{value:V4()},uS:{value:V4()},uL0:{value:[V4(),V4(),V4()]},uL1:{value:[V4(),V4(),V4()]},uPh:{value:[V4(),V4(),V4()]},uPm:{value:[0,0,0]},
+    uCa:{value:[1,1,1]},uCb:{value:[1,1,1]},uCt:{value:[1,1,1]}}};
+  /* uCa/uCb/uCt: array 3 float -> uniform vec3 lewat three (array of numbers diterima sebagai vec3) */
+  m=GLSKY_T_MESH(T,au,GLSKY_AU_VS,GLSKY_AU_FS,pf.au.uni,10);pf.au.m=m;
+  pf.bb=glskyInstGeo(T,[['iB',4],['iQ',4],['iC0',4],['iC1',4]],24);
+  pf.mb=GLSKY_T_MESH(T,pf.bb,GLSKY_BL_VS,GLSKY_BL_FS,{},11);
+  pf.bs=glskyInstGeo(T,[['iA',4],['iG',4],['iC',4]],128);
+  pf.ms=GLSKY_T_MESH(T,pf.bs,GLSKY_STAR_VS,GLSKY_STAR_FS,{uS:{value:1}},12);
+  pf.bl=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],768);
+  pf.ml=GLSKY_T_MESH(T,pf.bl,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},13);
+  S.pScene.add(m);S.pScene.add(pf.mb);S.pScene.add(pf.ms);S.pScene.add(pf.ml);
+  S.pf=pf;S.pfOk=true;
+}
+function glskyPfOn(){var S=GLSKY;return !!(S.plfxOn&&S.pfOk&&S.pf&&glskyPlOn());}
+/* titik padat (debris, ujung): x,y = ruang pass, r = radius px, c = [r,g,b] 0..1, al = alpha */
+function glskyPfDot(x,y,r,c,al){
+  var S=GLSKY,B=S.pf&&S.pf.bs,n=S.pdn,a,o;
+  if(!B||n>=B.cap||!(al>.004))return;
+  a=B.a;o=n*4;
+  a.iA[o]=x;a.iA[o+1]=y;a.iA[o+2]=0;a.iA[o+3]=r;
+  a.iG[o]=0;a.iG[o+1]=0;a.iG[o+2]=0;a.iG[o+3]=0;
+  a.iC[o]=c[0];a.iC[o+1]=c[1];a.iC[o+2]=c[2];a.iC[o+3]=al>1?1:al;
+  S.pdn=n+1;
+}
+function glskyPfLine(x0,y0,x1,y1,w,c,al,soft){
+  var S=GLSKY,B=S.pf&&S.pf.bl,n=S.pln,a,o;
+  if(!B||n>=B.cap||!(al>.004))return;
+  a=B.a;o=n*4;
+  a.iP[o]=x0;a.iP[o+1]=y0;a.iP[o+2]=x1;a.iP[o+3]=y1;
+  a.iL[o]=c[0];a.iL[o+1]=c[1];a.iL[o+2]=c[2];a.iL[o+3]=al>1?1:al;
+  a.iW[n*2]=w;a.iW[n*2+1]=soft?1:0;
+  S.pln=n+1;
+}
+/* blob radial: c0 = warna stop 0, c1 = warna stop p1 (dan tepi); alpha a0 di 0, a1 di p1, 0 di tepi */
+function glskyPfBlob(x,y,rx,ry,rot,p1,a0,a1,c0,c1){
+  var S=GLSKY,B=S.pf&&S.pf.bb,n=S.pbn,a,o;
+  if(!B||n>=B.cap||!(a0>.004||a1>.004))return;
+  a=B.a;o=n*4;
+  a.iB[o]=x;a.iB[o+1]=y;a.iB[o+2]=rx;a.iB[o+3]=ry;
+  a.iQ[o]=rot;a.iQ[o+1]=p1;a.iQ[o+2]=a0;a.iQ[o+3]=a1;
+  a.iC0[o]=c0[0];a.iC0[o+1]=c0[1];a.iC0[o+2]=c0[2];a.iC0[o+3]=0;
+  a.iC1[o]=c1[0];a.iC1[o+1]=c1[1];a.iC1[o+2]=c1[2];a.iC1[o+3]=0;
+  S.pbn=n+1;
+}
+/* aurora: siapkan instance kolom (statis per PW/lapisan/lebar kolom) + jumlah yang digambar frame ini. nL = 3. Mengembalikan lebar kolom st yang dipakai (px planet-ruang). */
+function glskyPfAurPrep(PWv,nL){
+  var S=GLSKY,au=S.pf&&S.pf.au,st,N,i,j,k,arr,key;
+  if(!au)return 0;
+  st=Math.max(2,Math.ceil(PWv*nL/au.cap));N=Math.ceil(PWv/st);
+  key=PWv+'|'+nL+'|'+st;
+  if(au.key!==key){
+    arr=au.B.a.iX;k=0;
+    for(i=0;i<nL;i++)for(j=0;j<N;j++){arr[k++]=(j+.5)*st;arr[k++]=i;}
+    au.N=N*nL;au.key=key;au.dirty=true;
+  }
+  S.pan=au.N;
+  return st;
+}
+function glskyPfUpload(){
+  var S=GLSKY,pf=S.pf,au,at;
+  if(!pf)return;
+  if(!S.pfOk){pf.au.m.visible=false;pf.mb.visible=false;pf.ms.visible=false;pf.ml.visible=false;return;}   /* efek GL dimatikan (galat): sembunyikan sisa frame lalu */
+  pf.ms.material.uniforms.uS.value=S.S;pf.ml.material.uniforms.uS.value=S.S;pf.ml.material.uniforms.uSoft.value=S.soft?1:0;
+  au=pf.au;
+  au.m.visible=S.pan>0;au.B.g.instanceCount=S.pan>0?S.pan:0;
+  if(S.pan>0&&au.dirty){at=au.B.g.attributes.iX;try{at.clearUpdateRanges();at.addUpdateRange(0,au.N*2);}catch(e){}at.needsUpdate=true;au.dirty=false;}
+  glskyInstUpload(pf.bb,pf.mb,S.pbn);glskyInstUpload(pf.bs,pf.ms,S.pdn);glskyInstUpload(pf.bl,pf.ml,S.pln);
+}
+
 function glskyBuild(){
   var S=GLSKY,T=window.THREE,c,r;
   if(S.err>=3||S.r)return;
@@ -696,6 +808,7 @@ function glskyBuild(){
     S.layers=new T.Group();S.root.add(S.layers);
     S.geo=new T.PlaneGeometry(1,1);
     try{glskyInstBuild(T);}catch(eIn){S.inst=false;try{console.warn('[glsky] instancing gagal, bintang/garis tetap 2D:',eIn);}catch(e0){}}   /* gagal di sini TIDAK menjatuhkan GL: latar tetap jalan, bintang/garis 2D */
+    try{glskyPfBuild(T);}catch(ePf){S.pfOk=false;S.pf=null;try{console.warn('[glsky] efek planet GL gagal, tetap 2D:',ePf);}catch(e0b){}}   /* [G4.9] gagal di sini TIDAK menjatuhkan GL: efek planet tetap 2D */
     S.dummy=new T.DataTexture(new Uint8Array([0,0,0,0]),1,1,T.RGBAFormat);S.dummy.needsUpdate=true;
     if(S.test)S.root.add(glskyBuildTest(T));
     cv.parentNode.insertBefore(c,cv);   /* tepat SEBELUM #sky di dalam #stage => di bawahnya; urutan DOM lain tidak berubah */
@@ -728,7 +841,7 @@ function glskySize(){
    Penggambaran GL sendiri di glskyFlush() (setelah blok latar). */
 function glskyBegin(now,want){
   var S=GLSKY;
-  S.act=false;S.n=0;S.pAct=false;
+  S.act=false;S.n=0;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;
   if(!S.on||S.err>=3){glskyShow(false);glskyRestorePX();return false;}
   if(!S.init){glskyInit();return false;}
   if(!S.ok||!S.r)return false;
@@ -757,6 +870,7 @@ function glskyFlush(){
     for(i=0;i<S.n;i++){m=S.mesh[i]||glskyMesh(i);glskyApply(m,S.ops[i]);}
     for(;i<S.mesh.length;i++)S.mesh[i].visible=false;
     glskyInstFlush();
+    try{glskyPfUpload();}catch(ePfU){S.pfOk=false;}   /* [G4.9] efek planet: gagal -> hilang sampai frame berikut (pl3dGlFx kembali ke 2D karena pfOk false) */
     if(S.big){S.lay=false;glskyFail('texture melebihi batas GPU ('+S.maxTex+'px)');return;}   /* texture terlalu besar: tidak bisa jujur menggantikan 2D -> 2D penuh */
     S.r.setClearColor(0x050b12,S.want?1:0);   /* ColorManagement mati (threeLoad) => hex dipakai apa adanya = #050b12 */
     glskyRenderAll();
