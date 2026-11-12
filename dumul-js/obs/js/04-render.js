@@ -663,13 +663,15 @@ function drawFloatingTelescopeTop(now){
 /* [G4.5] ?glsky=1: teleskop = Group di scene GLSky (13-scope3d.js tele3dGl). Dipanggil frame() SEBELUM glskyFlush; true = sudah dijadwalkan ke GL dan jalur 2D di atas (drawFloatingTelescopeTop) dilewati.
    false (dive wormhole, potato/reduce, GL mati, ?glscope=0, error) = jalur 2D lama dengan badan 3D hasil blit, tidak berubah. */
 function drawFloatingTelescopeGl(now){
-  var D=TELE_DRAW,pts=[],ci,tq,cp;
+  var D=TELE_DRAW,pts=[],ci,tq,cp,hk;
   if(typeof tele3dGl!=='function'||typeof tele3dGlOk!=='function')return false;
   if(!D||!(TELESCOPE.al>.02)||TELESCOPE.dive||!tele3dGlOk()){tele3dGlLeave(1);return false;}   /* (1) = hanya pass atas GLSky; kalau Group sedang di overlay terowongan (tgt 2) jangan diganggu */
+  hk=(typeof glskyHoldK==='function')?glskyHoldK():1;   /* [B4h] teleskop ditahan sampai warm scp pasca-kapsul selesai, lalu fade-in (24-glsky.js glskyHoldK); <=0 = tidak digambar sama sekali (jalur 2D juga dilewati) */
+  if(hk<=0){TELE_DRAW=null;return true;}
   cp=D.copies;
   for(ci=0;ci<cp.length;ci++){tq=lens(TELESCOPE.x+cp[ci][0],TELESCOPE.y+cp[ci][1]);if(tq)pts.push([tq[0],tq[1]]);}
   if(!pts.length){tele3dGlLeave(1);TELE_DRAW=null;return true;}
-  try{if(tele3dGl(now,pts,D.sc,TELESCOPE.al,TELESCOPE.ang)){TELE_DRAW=null;return true;}}
+  try{if(tele3dGl(now,pts,D.sc,TELESCOPE.al*hk,TELESCOPE.ang)){TELE_DRAW=null;return true;}}
   catch(eTG){SCP3D_GL.err++;try{tele3dGlLeave(1);}catch(eTL){}}
   return false;
 }
