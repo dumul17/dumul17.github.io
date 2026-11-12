@@ -1410,6 +1410,7 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
       lpFired=true;
       var ok=false;
       try{if(lpTg==='drone'){if(typeof txLongPressDrone==='function')ok=!!txLongPressDrone();}else if(typeof txLongPressTele==='function')ok=!!txLongPressTele();}catch(er){}
+      try{var _sl=window.getSelection&&getSelection();if(_sl&&_sl.rangeCount)_sl.removeAllRanges();}catch(eS){}   /* buang seleksi yang sempat kebentuk sebelum 580 ms */
       if(ok)haptic(16);else lpFired=false;
     },580);
   },true);
@@ -1427,6 +1428,10 @@ $('#bh-clock').addEventListener('pointerdown',function(e){
   }
   document.addEventListener('pointerup',end,true);
   document.addEventListener('pointercancel',function(e){if(e.pointerId===lpPid)reset();},true);
+  /* Tahan teleskop/drone: cegah seleksi teks + menu long-press native (teks jam dkk ikut ter-seleksi Chrome/Brave Android). Aktif hanya selama jari menahan (lpPid != null); lepas = normal lagi. */
+  function noSel(e){if(lpPid!=null||lpFired){try{e.preventDefault();}catch(er){}}}
+  document.addEventListener('selectstart',noSel,true);
+  document.addEventListener('contextmenu',noSel,true);
 })();
 
 /* BFCache restore (back from dumul.html): force a fresh boot so the

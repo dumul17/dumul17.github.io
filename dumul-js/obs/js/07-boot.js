@@ -152,6 +152,8 @@ var DUMUL_CHARS=(function(){
   }
   if(bTitle)bTitle.addEventListener('pointerdown',bootGlitch);
   if(quoteEl)quoteEl.addEventListener('pointerdown',bootGlitch);
+  /* Tahan di layar boot (main hujan matrix): cegah seleksi teks + menu long-press native. Cadangan CSS user-select di #boot-screen. */
+  if(bs)['selectstart','contextmenu'].forEach(function(t){bs.addEventListener(t,function(e){try{e.preventDefault();}catch(er){}});});
   /* v126: panel status = kondisi NYATA (bukan frame telemetri palsu yang berputar). Tiap baris dibaca dari state asli: layout/gambar, modul 3D, antrean warm-up shader. */
   /* Quote fades in mid-boot, stays through the handoff. */
   setTimeout(function(){if(quoteEl)quoteEl.classList.add('on');},1600);
