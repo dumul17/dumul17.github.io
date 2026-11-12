@@ -141,7 +141,7 @@ function resize(){
   W=winW();H=winH();
   dpr=Math.min(window.devicePixelRatio||1,potato()?1:(WH_DPR||2));
   cv.width=Math.max(64,Math.round(W*dpr));cv.height=Math.max(64,Math.round(H*dpr));
-  bq=potato()?.3:.5;
+  bq=WH_BQ||(potato()?.3:.5);   /* [FLAG] ?whbq=0.75 = skala buffer feedback (dinding/nebula/debu) terhadap CSS px; default 0.5 (potato 0.3); alat ukur A/B ketajaman terowongan */
   nw=Math.max(32,Math.round(W*bq));nh=Math.max(32,Math.round(H*bq));
   if(!bA||nw!==bw||nh!==bh){
     bw=nw;bh=nh;bA=mkBuf();bB=mkBuf();gA=bA.getContext('2d');gB=bB.getContext('2d');
@@ -997,6 +997,7 @@ var WH_NOBLOOM=(function(){try{return !/[?&]whbloom=1/.test(location.search);}ca
 /* [v45] Statistik biaya per fase (zoom / tunnel / exit / close): frame, js drawFrame (ms), dt (ms), ukuran kanvas & dpr terakhir. Murah (satu objek, tanpa alokasi per frame). Dibaca bench: WORMHOLE.dbgStats(). */
 var WHS={};
 var WH_DPR=(function(){try{var m=/[?&]whdpr=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.5&&v<=3?v:0;}catch(e){return 0;}})();
+var WH_BQ=(function(){try{var m=/[?&]whbq=([0-9.]+)/.exec(location.search),v=m?parseFloat(m[1]):0;return v>=.25&&v<=1?v:0;}catch(e){return 0;}})();   /* [FLAG] 0 = default; nilai valid .25-1 */
 function ringFade(){
   if(state!=='travel'||!S||!S.ring)return 0;
   if(typeof SECT==='undefined'||!SECT.cur||WH_HANDOFF<=0)return 1;
