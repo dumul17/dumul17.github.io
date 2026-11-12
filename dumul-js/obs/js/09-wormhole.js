@@ -834,14 +834,18 @@ function whGlPortalDraw(cx,cy,Rp,now,a,opts){
       G.ptTex.flipY=true;
     }else{G.ptTex.image=cv;G.ptTex.needsUpdate=true;}
     if(!G.ptMesh){
-      mat=new T.MeshBasicMaterial({map:G.ptTex,transparent:true,depthTest:false,depthWrite:false,opacity:1,toneMapped:false});
+      /* [FIX portal pudar/abu-abu] MeshBasicMaterial di-encode sRGB lagi oleh renderer (outputColorSpace default) -> piksel gelap/semi-transparan hasil bake jadi abu-abu terang (selubung di mulut, kilau charge jadi cakram datar). Shader polos = nilai bake dipakai apa adanya, sama dgn drawImage 2D. */
+      mat=new T.ShaderMaterial({uniforms:{map:{value:G.ptTex},uOp:{value:1}},
+        vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+        fragmentShader:'precision highp float;uniform sampler2D map;uniform float uOp;varying vec2 vUv;void main(){vec4 c=texture2D(map,vUv);gl_FragColor=vec4(c.rgb,c.a*uOp);}',
+        transparent:true,depthTest:false,depthWrite:false,blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:WHG_GL_SRC_ALPHA,blendDst:WHG_GL_ONE_MINUS_SRC_ALPHA,blendSrcAlpha:WHG_GL_ONE,blendDstAlpha:WHG_GL_ONE_MINUS_SRC_ALPHA});
       G.ptMat=mat;
       G.ptMesh=new T.Mesh(new T.PlaneGeometry(1,1),mat);
       G.ptMesh.frustumCulled=false;
       if(!G.ptScene){G.ptScene=new T.Scene();G.ptCam=new T.OrthographicCamera(0,1,1,0,-10,10);G.ptCam.position.z=5;}
       G.ptScene.add(G.ptMesh);
     }
-    G.ptMat.map=G.ptTex;G.ptMat.opacity=a>1?1:a;G.ptMat.transparent=true;
+    G.ptMat.uniforms.map.value=G.ptTex;G.ptMat.uniforms.uOp.value=a>1?1:a;
     /* ukuran di layar: portal3dDraw radius Rp = outer; kanvas res mencakup ~2.4*Rp diameter → scale = res/2.4 in CSS px? 
        Kita menggambar di pusat 0,0 dengan Rp dalam px layar di context yang ditranslate res/2 — jadi diameter visual di texture ≈ 2*Rp*scale di mana scale=1 di unit px.
        Transform gx: unit = 1 px layar; texture width res px mewakili res layar-px → quad size = res (CSS px) */
