@@ -878,21 +878,21 @@ function glskySaDrone(){
 }
 
 function glskyRenderAll(){
-  var S=GLSKY,i,top=false,ex;
+  var S=GLSKY,i,top=false,ex,tg;
   S.sa.n=0;S.sa.px=0;
-  S.r.render(S.scene,S.cam);
+  tg=glsgT();S.r.render(S.scene,S.cam);glsgR('r.main',tg);
   for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){top=true;break;}
   if(!top&&!S.pAct&&!S.dpAct&&!S.hAct)return;
   S.r.autoClear=false;
   try{
-    if(S.hAct&&S.hScene){S.r.clearDepth();S.r.render(S.hScene,S.tCam);}   /* [G4.18] pass kepala komet: di atas scene utama, di bawah teleskop (urutan 2D lama: komet digambar sebelum teleskop/planet) */
-    if(top){S.r.clearDepth();if(!glskySaTop())S.r.render(S.tScene,S.tCam);}   /* pass atas: teleskop ([G4.15] lewat RT supersample; false = langsung) */
-    if(S.pAct&&S.pScene){S.r.clearDepth();S.r.render(S.pScene,S.tCam);}      /* [G4.8] pass planet: di atas teleskop (urutan 2D lama), di bawah #sky */
+    if(S.hAct&&S.hScene){S.r.clearDepth();tg=glsgT();S.r.render(S.hScene,S.tCam);glsgR('r.head',tg);}   /* [G4.18] pass kepala komet: di atas scene utama, di bawah teleskop (urutan 2D lama: komet digambar sebelum teleskop/planet) */
+    if(top){S.r.clearDepth();tg=glsgT();if(!glskySaTop())S.r.render(S.tScene,S.tCam);glsgR('r.top',tg);}   /* pass atas: teleskop ([G4.15] lewat RT supersample; false = langsung) */
+    if(S.pAct&&S.pScene){S.r.clearDepth();tg=glsgT();S.r.render(S.pScene,S.tCam);glsgR('r.pl',tg);}      /* [G4.8] pass planet: di atas teleskop (urutan 2D lama), di bawah #sky */
     if(S.dpAct&&S.dpOk&&S.dbScene){                                          /* [G4.10] pass drone: di atas planet + efek planet */
-      S.r.clearDepth();S.r.render(S.dbScene,S.tCam);                          /*   efek di BAWAH drone (garis/titik/blob: tanpa depth) */
+      S.r.clearDepth();tg=glsgT();S.r.render(S.dbScene,S.tCam);glsgR('r.dfx',tg);                          /*   efek di BAWAH drone (garis/titik/blob: tanpa depth) */
       try{if(typeof dr3dGlSync==='function')dr3dGlSync();}catch(eDs){}
       ex=S.r.toneMappingExposure;S.r.toneMappingExposure=1.05;                /*   exposure drone = renderer 'small' lama */
-      try{S.r.clearDepth();if(!glskySaDrone())S.r.render(S.mdScene,S.tCam);}finally{S.r.toneMappingExposure=ex;}   /*   Group drone + cincin tahan (di atas drone); [G4.15] drone lewat RT supersample */
+      try{S.r.clearDepth();tg=glsgT();if(!glskySaDrone())S.r.render(S.mdScene,S.tCam);glsgR('r.dmd',tg);}finally{S.r.toneMappingExposure=ex;}   /*   Group drone + cincin tahan (di atas drone); [G4.15] drone lewat RT supersample */
     }
   }finally{S.r.autoClear=true;}
   if(S.pAct&&S.pChk){S.pChk=false;try{if(typeof pl3dGlVerify==='function')pl3dGlVerify();}catch(eV){}}   /* diagnosa shader planet, sekali, sesudah render pertama */
@@ -1282,26 +1282,55 @@ function glskyBegin(now,want){
 }
 
 /* dipanggil sekali per frame SETELAH blok latar 2D: render daftar op yang dicatat plateBlit/sectDrawSky */
+/* [B0/F0] instrumentasi bench (hanya aktif kalau URL punya ?bench=1; produksi = no-op). Waktu per segmen glskyFlush + tiap r.render, jumlah upload tekstur, draw call, 6 flush pertama, spike >=8 ms. Keluar di dump bench sebagai "glseg" (glskySegOut). */
+var GLSG={on:/[?&]bench=1(&|$)/.test(location.search),s:{},ff:[],spk:[],t:0,fr:0,upTot:0,upFr:0,upMax:0,calls:0,tris:0};
+function glsgT(){return GLSG.on?performance.now():0;}
+function glsgBegin(){if(GLSG.on)GLSG.t=performance.now();}
+function glsgAdd(k,t0){
+  if(!GLSG.on)return 0;
+  var n=performance.now(),ms=n-t0,o=GLSG.s[k]||(GLSG.s[k]={n:0,ms:0,mx:0});
+  o.n++;o.ms+=ms;if(ms>o.mx)o.mx=ms;
+  if(ms>=8&&GLSG.spk.length<40)GLSG.spk.push([+n.toFixed(0),k,+ms.toFixed(1)]);
+  return ms;
+}
+function glsgLap(k){if(!GLSG.on)return;var n=performance.now();glsgAdd(k,GLSG.t);GLSG.t=n;}
+function glsgR(k,t0){   /* sesudah satu r.render: waktu + draw call/segitiga render itu (info autoReset per render) */
+  if(!GLSG.on)return;
+  glsgAdd(k,t0);
+  try{var f=GLSKY.r.info.render;GLSG.calls+=f.calls;GLSG.tris+=f.triangles;}catch(e){}
+}
+window.glskySegOut=function(){
+  if(!GLSG.on)return null;
+  var o={fr:GLSG.fr,seg:{},ff:GLSG.ff,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
+  for(k in GLSG.s){var g=GLSG.s[k];o.seg[k]=[g.n,+(g.ms/g.n).toFixed(2),+g.ms.toFixed(0),+g.mx.toFixed(1)];}
+  try{o.info={programs:GLSKY.r.info.programs?GLSKY.r.info.programs.length:null,geometries:GLSKY.r.info.memory.geometries,textures:GLSKY.r.info.memory.textures,pr:GLSKY.r.getPixelRatio(),w:GLSKY.pw,h:GLSKY.ph};}catch(e){}
+  return o;
+};
 function glskyFlush(){
-  var S=GLSKY,t0,ms,i,m;
+  var S=GLSKY,t0,ms,i,m,u0=S.st.up,tR;
   if(!S.act||!S.r)return;
   S.rec=false;   /* [FIX] op yang dicatat setelah flush tidak akan pernah digambar -> pemanggil harus jatuh ke 2D */
-  t0=performance.now();
+  t0=performance.now();glsgBegin();
   try{
     S.big=0;
     if(S.vig>0&&S.want&&S.lay&&!S.test){var vo=glskyOp();vo.k=2;vo.a=S.vig;vo.add=0;vo.cx=W*.5;vo.cy=H*.5;vo.w=W;vo.h=H;vo.rot=0;}   /* vignette: op terakhir => di atas latar GL, di bawah semua yang masih 2D */
     for(i=0;i<S.n;i++){m=S.mesh[i]||glskyMesh(i);glskyApply(m,S.ops[i]);}
     for(;i<S.mesh.length;i++)S.mesh[i].visible=false;
+    glsgLap('ops');
     glskyInstFlush();
+    glsgLap('inst');
     try{glskyDpUpload();}catch(eDpU){S.dpErr++;S.dpAct=false;if(S.dpErr>=3)S.dpOk=false;}   /* [G4.10] gagal x3 -> drone balik ke layer */
+    glsgLap('dpUp');
     try{glskyPfUpload();}catch(ePfU){S.pfOk=false;}   /* [G4.9] efek planet: gagal -> hilang sampai frame berikut (pl3dGlFx kembali ke 2D karena pfOk false) */
+    glsgLap('pfUp');
     if(S.big){S.lay=false;glskyFail('texture melebihi batas GPU ('+S.maxTex+'px)');return;}   /* texture terlalu besar: tidak bisa jujur menggantikan 2D -> 2D penuh */
     S.r.setClearColor(0x050b12,S.want?1:0);   /* ColorManagement mati (threeLoad) => hex dipakai apa adanya = #050b12 */
-    glskyRenderAll();
+    tR=glsgT();glskyRenderAll();glsgAdd('render',tR);
     S.st.fr++;
     if(S.st.fr%90===0)glskySweep();
   }catch(e){glskyFail(String(e&&e.message||e));return;}
   ms=performance.now()-t0;S.st.ms+=ms;if(ms>S.st.mx)S.st.mx=ms;
+  if(GLSG.on){var du=S.st.up-u0;GLSG.fr++;GLSG.upTot+=du;if(du>0)GLSG.upFr++;if(du>GLSG.upMax)GLSG.upMax=du;glsgAdd('flush',t0);if(GLSG.ff.length<6)GLSG.ff.push([+t0.toFixed(0),+ms.toFixed(1)]);}
   S.st.msAvg=S.st.fr?+(S.st.ms/S.st.fr).toFixed(3):0;S.st.msMax=+S.st.mx.toFixed(2);
 }
 
