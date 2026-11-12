@@ -1244,7 +1244,7 @@ function glskyInit(){
                frame pertama memakai snapshot itu, bukan render penuh 300+ ms.
    Tidak menggambar apa pun ke kanvas GL (tidak ada kedip di bawah layar boot). Berhenti begitu Blue (stop()). Gagal / dilewati -> perilaku lama persis (frame pertama membangun sendiri).
    Flag: ?glwarm=0 = nonaktif (A/B). Hasil: window.__glwarm {st 0 idle|1 jalan|2 selesai|3 gagal/lewat, why, ms{init,cmp,cmpOk|cmpTmo,plBuild,cmpDone,plDraw,end}, pl, plDraw, cmpTmo, n (scene dikompilasi)}. */
-var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,tx:null,texOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0}};   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
+var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,tx:null,texOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0},f:0};   /* [B5] f = progres warm pra-kapsul 0..1 (dibaca 07-boot: bar + baris log "Sentuhan akhir") */   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
 try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;if(/[?&]glwtex=0(&|#|$)/.test(location.search))GLW.texOn=false;var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
 /* [B4h] TAHAN + FADE teleskop. Warm scp/dr dipindah ke SESUDAH kapsul (glskyWarm.postArm), jadi di flush pertama teleskop belum boleh tergambar (first-use scp ±1,3 dtk: 12 sampai 370 ms per anak).
    hold 0 = tidak menahan | 1 = menahan (warm pasca-kapsul belum selesai) | 2 = fade-in (GLW.fade ms, smoothstep) | selesai -> 0.
@@ -1298,10 +1298,11 @@ function glskyWarm(stop,onPl,onDone){
   var S=GLSKY,Wm=GLW,T0=performance.now(),fin=false,tries=0,r=null,ps=[],cl=[],k=0,pg=false,post=false;
   if(Wm.st!==0)return;
   Wm.st=1;
-  function mk(n){Wm.ms[n]=Math.round(performance.now()-T0);}
+  var MKF={init:.25,cmp:.35,plBuild:.45,cmpOk:.6,cmpDone:.6,plDraw:.75};   /* [B5] batas tahap = 07-boot GLS_F: [0,.25) renderer, [.25,.6) shader, [.6,.75) planet, [.75,1) frame pertama */
+  function mk(n){Wm.ms[n]=Math.round(performance.now()-T0);if(MKF[n]&&MKF[n]>Wm.f)Wm.f=MKF[n];}
   function plDone(ok){var f=onPl;onPl=null;try{if(f)f(ok);}catch(e){}}
   function end(why){
-    if(fin)return;fin=true;Wm.st=why?3:2;Wm.why=why||'';mk('end');
+    if(fin)return;fin=true;Wm.st=why?3:2;Wm.why=why||'';mk('end');Wm.f=1;
     plDone(!why);
     try{if(onDone)onDone(!why,why||'');}catch(e){}
     try{postArm();}catch(eP){}
@@ -1426,6 +1427,7 @@ function glskyWarm(stop,onPl,onDone){
     }
     (function nr(){
       if(hlt())return;
+      if(!pq){var f5=.75+.22*Math.min(1,qi/Math.max(1,q.length));if(f5>Wm.f)Wm.f=f5;}   /* [B5] progres render pertama per item antrean */
       if(qi>=q.length){if(pq){setTimeout(cb,0);return;}mk('r1');setTimeout(s4,30);return;}
       var it=q[qi++],t1=performance.now();
       if(it[0]==='tex'){try{glskyTexWarm(Wm,function(){setTimeout(nr,30);});}catch(eTw){Wm.tx={ok:0,why:String(eTw&&eTw.message||eTw).slice(0,80)};setTimeout(nr,30);}return;}   /* [B4j] */

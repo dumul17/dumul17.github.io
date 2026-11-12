@@ -494,7 +494,10 @@ var DUMUL_CHARS=(function(){
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
   var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
   /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
-  var WT_PRE={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1600,gl:1400},PRE_KEYS=['ui','ast','pl','fb','sc','rg','gl'];   /* [v189] gl: build renderer GLSky + kirim ±9 scene ke compileAsync (sisi main thread ±300 ms di itel; tunggu async-nya masuk creep) */
+  /* [B5] bobot PRE dikalibrasi ulang ke waktu NYATA (dump 12 Nov, itel: ui/sc 0,05 dtk, ast 0,7, fb 0,8, rg 2,5, pl 2,9-3,0, gl 3,0 dari awal PRE; tiga terakhir = tiang gerbang). Dulu 2050 dari ±24600 (8%) dan gl cuma 300, jadi bar duduk di 97-99% selama ±1,5-3 dtk sementara log masih menampilkan langkah PRE. ?barw=0 = bobot lama (A/B). */
+  var WT_PRE_OLD={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},WT_PRE_NEW={ui:80,ast:300,pl:700,fb:250,sc:150,rg:600,gl:1200},WT_PRE=WT_PRE_NEW;
+  try{if(/[?&]barw=0(&|#|$)/.test(location.search))WT_PRE=WT_PRE_OLD;}catch(eBw){}
+  var WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1500,gl:1800},PRE_KEYS=['ui','ast','pl','fb','sc','rg','gl'];   /* [v189] gl: build renderer GLSky + kirim ±9 scene ke compileAsync (sisi main thread ±300 ms di itel; tunggu async-nya masuk creep) */
   function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg')+wtPre('gl');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
@@ -626,6 +629,8 @@ var DUMUL_CHARS=(function(){
   function logPoll(){
     if(!logEl)return;
     var thr=(typeof THREE!=='undefined'&&THREE.REVISION),cur='',h='',i,m,o,nm,tot,n,k,st,sx,au,ev=[],e,live,starTot=stars.length,bgmTot=audioList().length,decLive=false;
+    function gsTo(n5){while((logN.gs|0)<n5&&(logN.gs|0)<4){ev.push({k:'ok',g:'gs',s:T('bl.pre')+' \u00b7 '+T('bl.a.gls'+(logN.gs|0))+' \u00b7 '+((logN.gs|0)+1)+'/4'});logN.gs=(logN.gs|0)+1;}}   /* [B5] tahap glskyWarm yang selesai = baris log (foldable g:'gs') */
+    var gwS=glwOn(),bk='',bw=-1,w5;
     if(thr&&!logN.thr){logN.thr=1;ev.push({k:'ok',s:T('bl.engine')+' '+T('bl.ready')});}
     if(!thr)cur=T('bl.engine')+' \u00b7 '+T('bl.a.dl');
     for(i=0;i<LOG_M.length;i++){
@@ -651,7 +656,8 @@ var DUMUL_CHARS=(function(){
       else if(!cur)cur=T('bl.warm')+' \u00b7 '+T('bl.a.warm')+' \u00b7 '+wq.done+wy;
     }
     /* [PATCH v175] PRA-KAPSUL (preEv diisi preFin): suara tombol, gambar batu, hitungan pengamat. Yang timeout / gagal tidak dicatat; "siap" hanya kalau ketiganya beres tanpa masalah. */
-    while(preEv.length){pk=preEv.shift();ev.push({k:'ok',g:'pr',s:T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk)});}
+    if(gwS)gsTo(glwSg(glwF()));
+    while(preEv.length){pk=preEv.shift();if(pk==='gl'&&window.__glwarm&&glWarmOn()){gsTo(4);continue;}ev.push({k:'ok',g:'pr',s:T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk)});}   /* [B5] 'gl' selesai = tahap terakhir (4/4), bukan baris terpisah */
     if(pre.at>=0&&preAll()&&!pre.bad&&!logN.pre){logN.pre=1;ev.push({k:'ok',s:T('bl.pre')+' '+T('bl.ready')});}
     /* [PATCH v175] WARM NYATA v172-174 (window.__warmReal): bentuk batu 3D (ast: hasil baru ada saat selesai, tanpa pecahan) + warna nebula 4 sektor (tint: x/y naik satu-satu). Yang berhenti karena Blue (stop) tidak dicatat. */
     M2=window.__warmReal;
@@ -683,7 +689,11 @@ var DUMUL_CHARS=(function(){
     }
     /* [PATCH v175] LIVE prioritas terbawah (kalau BGM / bintang masih nunggu jaringan, itu yang tampil): pra-kapsul yang masih jalan, lalu warm nyata batu + nebula */
     if(!cur&&pre.at>=0&&!preAll()){
-      for(i=0;i<PRE_KEYS.length;i++){pk=PRE_KEYS[i];if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)&&!(pk==='sc'&&scOff())){cur=T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk);break;}}
+      for(i=0;i<PRE_KEYS.length;i++){   /* [B5] yang ditampilkan = langkah berjalan dengan sisa bobot bar TERBESAR (sama dgn yang menahan bar), bukan urutan tetap */
+        pk=PRE_KEYS[i];
+        if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)&&!(pk==='sc'&&scOff())){w5=wtPre(pk)*((pk==='gl'&&gwS)?(1-glwF()):1);if(w5>bw){bw=w5;bk=pk;}}
+      }
+      if(bk)cur=(bk==='gl'&&gwS)?T('bl.pre')+' \u00b7 '+T('bl.a.gls'+glwSg(glwF()))+' \u00b7 '+(glwSg(glwF())+1)+'/4':T('bl.pre')+' \u00b7 '+T('bl.a.p'+bk);
     }
     if(!cur&&M2&&!WR.entered){
       if(typeof AST3D!=='undefined'&&AST3D.warmReal&&!M2.ast)cur=T('bl.rock')+' \u00b7 '+T('bl.a.wast');
@@ -846,6 +856,11 @@ var DUMUL_CHARS=(function(){
     var age=elapsed-crpAt[key];
     return age>0?w*CREEP_CAP*(1-Math.exp(-age/est)):0;
   }
+  /* [B5] tahap glskyWarm (24-glsky.js GLW.f 0..1) dipakai BERSAMA oleh bar (bobot gl terisi sebanding f + rayapan per tahap) dan log (baris "Sentuhan akhir . tahap . n/4"), jadi angka % dan teks log selalu menunjuk pekerjaan yang sama. */
+  var GLS_F=[0,.25,.6,.75,1],GLS_EST=[500,1500,600,500];
+  function glwOn(){try{return !!(window.__glwarm&&glWarmOn()&&pre.gl===1);}catch(e){return false;}}
+  function glwF(){try{return glwOn()?Math.min(.99,window.__glwarm.f||0):0;}catch(e){return 0;}}
+  function glwSg(f){return f<.25?0:(f<.6?1:(f<.75?2:3));}
   function calc(elapsed){
     if(WT_MODS[4]&&glWarmOn())WT_MODS[4]=0;   /* [v189] planet GL: kerja planet = langkah pre 'pl' (bukan modul PL3D yang tidak pernah dibangun di boot) */
     var ready=pageReady(),th=threeStatus(elapsed),au=audioStatus(),sx=sfxStatus();
@@ -868,6 +883,8 @@ var DUMUL_CHARS=(function(){
     for(wi=0;wi<PRE_KEYS.length;wi++)if(pr[PRE_KEYS[wi]]===2)wDone+=wtPre(PRE_KEYS[wi]);   /* v181: langkah PRE selesai (sukses/gagal/timeout = gerbang kapsul juga lepas) */
     var astF=0;   /* v177: AST3D beririsan -> tahap selesai ikut mengisi bar (jujur: hanya tahap nyata), rayapan di bawah cuma untuk sisanya */
     try{if(!th.fins[0]&&th.st[0]===1&&window.__ast3dT){astF=Math.min(.95,window.__ast3dT.length/(LOG_M[0][3].length+1));wDone+=WT_MODS[0]*astF;}}catch(eAf){}
+    var glF=glwF();
+    if(glF>0)wDone+=wtPre('gl')*glF;   /* [B5] bagian gl yang NYATA selesai */
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])uD++;
     if(pr.ok)uD++;   /* v181: PRE = satu unit kilat */
@@ -877,7 +894,10 @@ var DUMUL_CHARS=(function(){
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi+(wi===0?'_'+((window.__ast3dT&&window.__ast3dT.length)|0):''),!th.fins[wi]&&th.st[wi]===1,wi===0?WT_MODS[0]*(1-astF):WT_MODS[wi],wi===0?WT_MODS[0]/6:WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
-    for(wi=0;wi<PRE_KEYS.length;wi++)wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),estPre(PRE_KEYS[wi]),elapsed);   /* v181 */
+    for(wi=0;wi<PRE_KEYS.length;wi++){
+      if(PRE_KEYS[wi]==='gl'&&glwOn()){var gs5=glwSg(glF);wc+=crp('pregl'+gs5,true,wtPre('gl')*(GLS_F[gs5+1]-glF),GLS_EST[gs5],elapsed);continue;}   /* [B5] rayapan per tahap, tidak melewati batas tahap berikutnya */
+      wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),estPre(PRE_KEYS[wi]),elapsed);   /* v181 */
+    }
     if(!sx.ok&&sx.total>0){
       var per=WT_SFX/sx.total;
       wc+=crp('s'+sx.n,warmed,per,per,elapsed);   /* v151: per langkah metadata selesai */
