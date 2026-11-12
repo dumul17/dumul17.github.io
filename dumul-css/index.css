@@ -243,7 +243,7 @@ body.owl-open #owl-panel,body.owl-open #owl-backdrop,body.owl-open #owl-source{p
 @keyframes snflash{0%{opacity:0}12%{opacity:1}30%{opacity:.78}100%{opacity:0}}
 body.konami #sky{filter:none}
 body.konami #title .big,body.konami #title .kicker{color:#ff7ad9;text-shadow:0 0 18px rgba(255,43,214,.7),0 0 10px rgba(34,230,255,.45)}
-body.konami #sky{animation:cyberGlitch .55s steps(2,end) 3}
+body.konami #sky,body.konami #glsky,body.konami #gldrone{animation:cyberGlitch .55s steps(2,end) 3}   /* [GL] glitch pink/hijau juga di kanvas GL (#glsky) + drone (#gldrone); dulu cuma #sky yang transparan */
 @keyframes cyberGlitch{0%,100%{transform:none;filter:none}20%{transform:translateX(-3px);filter:hue-rotate(-40deg) saturate(1.8)}45%{transform:translateX(4px);filter:hue-rotate(160deg) saturate(2.2)}70%{transform:translateX(-1px);filter:hue-rotate(-20deg) saturate(1.6)}}
 .portal .lab-open{display:block;margin-top:3px;font:600 7px/1 'Courier New',monospace;letter-spacing:.12em;color:rgba(110,229,255,.42);transition:color .2s,transform .2s}
 .portal:hover .lab-open,.portal.hot .lab-open,.portal:focus-visible .lab-open{color:#6ee5ff;transform:translateX(3px)}
