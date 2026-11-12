@@ -78,6 +78,7 @@ var WHG={on:true,ok:false,err:0,cv:null,r:null,rtA:null,rtB:null,scene:null,cam:
   teleScene:null,teleCam:null,teleGrp:null,
   fullW:0,fullH:0,compOk:false,skipTeleGl:false};
 try{if(/[?&]glwh=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGlw){}
+var WHG_AA=true;try{if(/[?&]glwhaa=0(&|#|$)/.test(location.search))WHG_AA=false;}catch(eGaa){}   /* [G5] ?glwhaa=0 = tanpa MSAA di #glwh (A/B) */
 try{if(/[?&]glsky=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGls){}   /* [PATCH G4.12f P0] rencana 0.1: ?glsky=0 = paksa 2D termasuk wormhole */
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
@@ -151,14 +152,14 @@ function resize(){
 /* ---------- [PATCH G4.12] feedback GL (WebGLRenderTarget ping-pong) ---------- */
 var WHG_FB_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
 var WHG_FB_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform sampler2D tPrev;uniform vec2 uC;uniform float uS;uniform float uR;uniform float uD;uniform vec3 uBg;uniform vec2 uRes;',
   'varying vec2 vUv;',
   'void main(){',
-  '  vec2 uv=vUv-uC;',
+  '  vec2 uv=(vUv-uC)*uRes;',   /* [G5] rotasi di ruang PIKSEL buffer (bw x bh), bukan ruang UV: di UV (0..1) buffer portrait memutar dengan geser anisotropik (swirl miring), 2D memutar murni */
   '  float c=cos(uR),s=sin(uR);',
   '  uv=vec2(c*uv.x-s*uv.y,s*uv.x+c*uv.y)/max(uS,1e-4);',
-  '  uv+=uC;',
+  '  uv=uv/uRes+uC;',
   '  if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){gl_FragColor=vec4(uBg,1.0);return;}',
   '  vec4 p=texture2D(tPrev,uv);',
   '  gl_FragColor=vec4(mix(uBg,p.rgb,uD),1.0);',
@@ -181,7 +182,7 @@ var WHG_IN_VS=[
   '}'
 ].join('\n');
 var WHG_IN_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform sampler2D tSpr;',
   'varying vec2 vUv;varying float vA;',
   'void main(){',
@@ -192,7 +193,7 @@ var WHG_IN_FS=[
 /* composite full: feedback + bloom uniform */
 var WHG_COMP_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
 var WHG_COMP_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform sampler2D tFb;uniform float uBloom;uniform vec3 uBg;',
   'varying vec2 vUv;',
   'void main(){',
@@ -201,32 +202,44 @@ var WHG_COMP_FS=[
   '  gl_FragColor=vec4(c,1.0);',
   '}'
 ].join('\n');
-/* streak lines: iP = x0,y0,x1,y1 (screen px); iC = rgb + alpha; iW = width */
+/* streak lines: iP = x0,y0,x1,y1 (px CSS); iC = rgb + alpha; iW = lebar (px CSS).
+   [G5 polish] tepi dihitung di fragment (cakupan piksel + ujung bulat), meniru stroke() kanvas 2D yang antialias + lineCap round.
+   Dulu quad polos tanpa AA: garis 0.5-2.2 px jadi bergerigi / putus-putus dan jauh lebih sedikit terlihat daripada ?glsky=0.
+   Semua jarak di sini dalam piksel PERANGKAT (uDpr = rasio CSS -> perangkat). */
 var WHG_ST_VS=[
   'attribute vec4 iP;attribute vec4 iC;attribute float iW;',
-  'varying vec4 vC;',
-  'uniform vec2 uRes;',
+  'varying vec4 vC;varying vec4 vE;',
+  'uniform vec2 uRes;uniform float uDpr;',
   'void main(){',
   '  vec2 a=iP.xy,b=iP.zw;',
   '  vec2 dir=b-a;float len=length(dir);',
   '  vec2 n=len>1e-4?dir/len:vec2(1.0,0.0);',
   '  vec2 perp=vec2(-n.y,n.x);',
-  '  float along=position.x*0.5+0.5;',
-  '  float side=position.y;',
-  '  vec2 p=mix(a,b,along)+perp*(side*iW*0.5);',
-  '  vC=iC;',
+  '  float lenD=len*uDpr;',
+  '  float hw=iW*uDpr*0.5;',
+  '  float pad=hw+1.0;',
+  '  float u=mix(-pad,lenD+pad,position.x*0.5+0.5);',
+  '  float v=position.y*pad;',
+  '  vec2 p=a+n*(u/uDpr)+perp*(v/uDpr);',
+  '  vC=iC;vE=vec4(u,v,hw,lenD);',
   '  gl_Position=vec4((p.x/uRes.x)*2.0-1.0,1.0-(p.y/uRes.y)*2.0,0.0,1.0);',
   '}'
 ].join('\n');
 var WHG_ST_FS=[
-  'precision mediump float;',
-  'varying vec4 vC;',
-  'void main(){gl_FragColor=vec4(vC.rgb*vC.a,vC.a);}'
+  'precision highp float;',
+  'varying vec4 vC;varying vec4 vE;',
+  'void main(){',
+  '  float dx=vE.x<0.0?-vE.x:(vE.x>vE.w?vE.x-vE.w:0.0);',
+  '  float d=length(vec2(dx,vE.y));',
+  '  float cov=min(clamp(vE.z+0.5-d,0.0,1.0),2.0*vE.z);',
+  '  float al=vC.a*cov;',
+  '  gl_FragColor=vec4(vC.rgb*al,al);',
+  '}'
 ].join('\n');
 /* hole + soft mask (radial) */
 /* [PATCH G4.12f P0] uC/uR/uRes = koordinat framebuffer (CSS×dpr). smoothstep edge0<edge1. */
 var WHG_HOLE_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform vec2 uC;uniform float uR;uniform float uA;uniform vec2 uRes;',
   'void main(){',
   '  vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
@@ -237,7 +250,7 @@ var WHG_HOLE_FS=[
 ].join('\n');
 /* uMode 0 = destination-in soft mouth (small/exit); 1 = vignette source-over full-screen [G4.12f P1] */
 var WHG_MASK_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform vec2 uC;uniform float uR;uniform float uEdge;uniform float uFade;uniform vec2 uRes;uniform vec4 uTm;',
   'uniform float uUseTm;uniform float uMode;',
   'void main(){',
@@ -316,7 +329,7 @@ function whGlEnsure(w,h){
       c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none;z-index:12;touch-action:none';
       if(cv&&cv.parentNode)cv.parentNode.insertBefore(c,cv);else document.body.appendChild(c);
       WHG.fullCv=c;WHG.cv=c;   /* cv = fullCv: handoff drawImage dari canvas yang sama */
-      r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:false,depth:true,stencil:false,preserveDrawingBuffer:true,powerPreference:'low-power'});
+      r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:WHG_AA,depth:true,stencil:false,preserveDrawingBuffer:true,powerPreference:'low-power'});
       r.setClearColor(0x02050d,1);r.autoClear=true;
       WHG.r=r;WHG.fullR=r;   /* [P2] satu konteks */
       WHG.cam=new T.OrthographicCamera(-1,1,1,-1,-1,1);
@@ -522,9 +535,9 @@ function whGlCompEnsure(){
       G.stGeo.setAttribute('iW',new T.InstancedBufferAttribute(new Float32Array(cap),1).setUsage(T.DynamicDrawUsage));
       G.stGeo.instanceCount=0;
       mat=new T.ShaderMaterial({
-        uniforms:{uRes:{value:new T.Vector2(W,H)}},
+        uniforms:{uRes:{value:new T.Vector2(W,H)},uDpr:{value:dpr||1}},
         vertexShader:WHG_ST_VS,fragmentShader:WHG_ST_FS,
-        transparent:true,depthTest:false,depthWrite:false,
+        transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,   /* [G5] VS membalik y (px y-bawah -> NDC y-atas) + basis (n,perp) = winding terbalik: FrontSide meng-cull SEMUA streak (sama dgn pelajaran G4.12k di sprite inject) */
         blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneFactor
       });
       G.stMesh=new T.Mesh(G.stGeo,mat);G.stMesh.frustumCulled=false;G.compScene.add(G.stMesh);
@@ -553,7 +566,7 @@ function whGlCompEnsure(){
     /* setSize drawing buffer = full window; RT feedback tetap half-res terpisah */
     G.fullCv.width=pw;G.fullCv.height=ph;G.fullR.setSize(pw,ph,false);
     G.fullW=pw;G.fullH=ph;
-    G.stMesh.material.uniforms.uRes.value.set(W,H);
+    G.stMesh.material.uniforms.uRes.value.set(W,H);G.stMesh.material.uniforms.uDpr.value=dpr||1;
     G.holeMat.uniforms.uRes.value.set(pw,ph);
     if(G.maskMat)G.maskMat.uniforms.uRes.value.set(pw,ph);
     if(G.teleCam){G.teleCam.left=0;G.teleCam.right=W;G.teleCam.top=H;G.teleCam.bottom=0;G.teleCam.updateProjectionMatrix();}
@@ -584,7 +597,7 @@ function whGlComposite(cx,cy,r,cvr,Rv,Rh,small,low,tmW){
     G.compMat.uniforms.tFb.value=G.rtA?G.rtA.texture:G.dummy;
     bloom=(!low&&WH_DBG.indexOf('nobloom')<0&&!(WH_NOBLOOM&&small))?.45:0;
     G.compMat.uniforms.uBloom.value=bloom;
-    G.stN=0;
+    G.stN=0;G.stMesh.material.uniforms.uDpr.value=dpr||1;
     n=ST.length;
     for(i=0;i<n;i++){
       c=ST[i];
@@ -700,7 +713,7 @@ function whGlTeleDetach(grp){
 }
 var WHG_CLIP_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
 var WHG_CLIP_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform sampler2D tMap;uniform vec2 uP;uniform vec2 uN;uniform float uUseClip;uniform float uA;',
   'varying vec2 vUv;',
   'void main(){',
@@ -714,7 +727,7 @@ var WHG_CLIP_FS=[
 ].join('\n');
 /* clip FS memakai gl_FragCoord (lebih andal daripada vUv flip) */
 var WHG_CLIP_FS2=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform sampler2D tMap;uniform vec2 uP;uniform vec2 uN;uniform float uUseClip;uniform float uA;uniform vec2 uRes;',
   'varying vec2 vUv;',
   'void main(){',
@@ -732,7 +745,7 @@ function whGlTeleEnsureClip(){
   if(G.teleRT&&G.clipMat)return true;
   try{
     T=THREE;pw=G.fullW||Math.max(64,Math.round(W*dpr));ph=G.fullH||Math.max(64,Math.round(H*dpr));
-    G.teleRT=new T.WebGLRenderTarget(pw,ph,{depthBuffer:true,stencilBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter});
+    G.teleRT=new T.WebGLRenderTarget(pw,ph,{depthBuffer:true,stencilBuffer:false,samples:WHG_AA?4:0,minFilter:T.LinearFilter,magFilter:T.LinearFilter});   /* [G5] MSAA badan teleskop saat keluar portal (jalur clip) */
     geo=new T.PlaneGeometry(2,2);
     mat=new T.ShaderMaterial({
       uniforms:{tMap:{value:G.dummy},uP:{value:new T.Vector2(0,0)},uN:{value:new T.Vector2(1,0)},uUseClip:{value:0},uA:{value:1},uRes:{value:new T.Vector2(W,H)}},
@@ -841,7 +854,7 @@ function whGlPortalDraw(cx,cy,Rp,now,a,opts){
 }
 /* [PATCH G4.12e] rim glow mulut + flash layar di #glwh (di BAWAH tele, di ATAS portal) — stacking = 2D */
 var WHG_RIM_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform vec2 uC;uniform float uR;uniform float uA;uniform vec2 uRes;',
   'void main(){',
   '  vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
@@ -852,7 +865,7 @@ var WHG_RIM_FS=[
   '}'
 ].join('\n');
 var WHG_FLASH_FS=[
-  'precision mediump float;',
+  'precision highp float;',
   'uniform float uA;',
   'void main(){gl_FragColor=vec4(0.894,0.976,1.0,1.0)*uA;}',
 ].join('\n');
