@@ -1112,6 +1112,11 @@ body.camera-mode .portal{opacity:0!important}
    munculin panel Contextual Search ("Touch to Search") yang nutupin area tap. */
 #bh-clock,#bh-clock *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #bh-clock{touch-action:manipulation}
+/* Tahan teleskop/drone di kanvas: tidak ada seleksi teks / callout native (cadangan JS: selectstart di 06-interaction.js). */
+#sky,#glsky,#gldrone{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* Layar boot: tahan/geser di hujan matrix tidak boleh menyeleksi teks (status, kutipan, judul) atau memunculkan callout. */
+#boot-screen,#boot-screen *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 
 /* ---------- Sector overview (idle) ---------- */
 #mode-sectors,#mode-bh{width:32px;height:32px;padding:0;display:none;place-items:center;border:1px solid rgba(110,229,255,.17);border-radius:5px;background:rgba(6,11,17,.34);color:rgba(214,228,240,.75);font:500 15px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
