@@ -18,7 +18,7 @@ var shell=sw.slice(sw.indexOf('const SHELL'));shell=shell.slice(0,shell.indexOf(
 /* index.js dipecah jadi js/*.js (script klasik berurutan, satu scope global): tiap file harus ada di index.html + SHELL, urutannya sama */
 var jsDir=path.join(dir,'js'),jsFiles=fs.existsSync(jsDir)?fs.readdirSync(jsDir).filter(function(f){return /\.js$/.test(f);}).sort():[];
 /* file lazy-debug: tidak ada <script src> di index.html & tidak di SHELL (nol biaya, dimuat loader inline hanya kalau ?debug=1) — dikecualikan dari cek urutan/SHELL, tapi loader-nya dicek di bawah */
-var LAZY=['19-auto-debug.js','20-layout-editor.js','21-bench.js','23-stargl.js','24-glsky.js'],lazyFiles=jsFiles.filter(function(f){return LAZY.indexOf(f)>=0;});jsFiles=jsFiles.filter(function(f){return LAZY.indexOf(f)<0;});
+var LAZY=['19-auto-debug.js','20-layout-editor.js','21-bench.js','23-stargl.js'],lazyFiles=jsFiles.filter(function(f){return LAZY.indexOf(f)>=0;});jsFiles=jsFiles.filter(function(f){return LAZY.indexOf(f)<0;});
 if(!jsFiles.length)P.push('folder js/ kosong / tidak ada');
 var jsTags=[],jsRe=/(?:<script[^>]*src="|import\('\.\/)dumul-js\/obs\/(js\/[^"'?]+\.js)\?v=\d+["']/g,jm; /* 11-live-count.js dimuat lewat import('./dumul-js/obs/js/...?v=N') di script inline, bukan tag <script src>: dua bentuk dikenali */
 while((jm=jsRe.exec(html)))jsTags.push(jm[1]);
