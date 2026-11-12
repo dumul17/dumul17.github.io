@@ -622,9 +622,9 @@ function tele3dTopDraw(now,x,y,sc,al,rot,tl,clip){
     try{scp3dUpdate(now,{a:ca,b:sa},true);}finally{SCP3D.tilt=null;SCP3D.altOK=0;SCP3D.last=-1e9;}
     if(S.hemi)S.hemi.position.set(sa,ca,0);
     pv.visible=true;pv.position.set(x,h-y,0);pv.rotation.z=-rot;pv.scale.set(sc,sc,sc);
-    if(S.mats){var ai=al<0?0:(al>1?1:al),i,r;for(i=0;i<S.mats.length;i++){r=S.mats[i];if(!r.dyn){r.m.opacity=r.bo*ai;r.m.transparent=ai<.995||r.bt;}}}
+    if(S.mats){var ai=al<0?0:(al>1?1:al),i,r;for(i=0;i<S.mats.length;i++){r=S.mats[i];if(useWh){r.m.opacity=(r.dyn?r.m.opacity:r.bo)*ai;r.m.transparent=ai<.995||r.bt||r.dyn;}else if(!r.dyn){r.m.opacity=r.bo*ai;r.m.transparent=ai<.995||r.bt;}}}   /* [FIX] #glwh: alpha ke SEMUA material (api/glow/LED ikut memudar); overlay lama = CSS opacity */
     if(useWh){
-      if(!whGlTeleDraw(al,clip||null)){tele3dGlLeave(3);return false;}
+      if(!whGlTeleDraw(1,clip||null)){tele3dGlLeave(3);return false;}
     }else{
       if(clip){
         Rc=Math.hypot(w,h)*2;nx=-clip.dy*Rc;ny=clip.dx*Rc;fx=clip.dx*Rc;fy=clip.dy*Rc;

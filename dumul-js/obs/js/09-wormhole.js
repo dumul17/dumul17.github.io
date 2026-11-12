@@ -331,6 +331,7 @@ function whGlEnsure(w,h){
       WHG.fullCv=c;WHG.cv=c;   /* cv = fullCv: handoff drawImage dari canvas yang sama */
       r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:WHG_AA,depth:true,stencil:false,preserveDrawingBuffer:true,powerPreference:'low-power'});
       r.setClearColor(0x02050d,1);r.autoClear=true;
+      r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;   /* [FIX kedip] sama dgn renderer GLSky/overlay: tanpa ini badan teleskop berganti warna saat serah-terima sky<->terowongan (shader raw + portal toneMapped:false tidak terpengaruh) */
       WHG.r=r;WHG.fullR=r;   /* [P2] satu konteks */
       WHG.cam=new T.OrthographicCamera(-1,1,1,-1,-1,1);
       WHG.scene=new T.Scene();
@@ -694,6 +695,16 @@ function whGlComposite(cx,cy,r,cvr,Rv,Rh,small,low,tmW){
     return false;
   }
 }
+/* [FIX kedip masuk] selama 'enter' belum ada composite, #glwh tersembunyi padahal teleskop sudah dipindah ke sana = teleskop HILANG ±1 dtk lalu muncul lagi. Sekarang #glwh ditampilkan + dibersihkan transparan tiap frame enter. */
+function whGlEnterPrep(){
+  var G=WHG,r;
+  if(!whGlWant()||!(G.ok||whGlEnsure(bw,bh))||!whGlCompEnsure())return false;
+  try{
+    r=G.fullR;r.setRenderTarget(null);r.setClearColor(0x000000,0);r.clear();
+    if(G.fullCv){G.fullCv.style.clipPath='none';G.fullCv.style.opacity='1';if(G.fullCv.style.display!=='block')G.fullCv.style.display='block';}
+    return true;
+  }catch(e){return false;}
+}
 function whGlCompHide(){
   if(WHG.fullCv)WHG.fullCv.style.display='none';
 }
@@ -736,7 +747,7 @@ var WHG_CLIP_FS2=[
   '    if(dot(p-uP,uN)<0.0)discard;',
   '  }',
   '  vec4 c=texture2D(tMap,vUv);',
-  '  gl_FragColor=vec4(c.rgb*c.a*uA,c.a*uA);',
+  '  gl_FragColor=vec4(c.rgb*uA,c.a*uA);',   /* [FIX] RT sudah premultiplied: jangan dikali alpha dua kali */
   '}'
 ].join('\n');
 function whGlTeleEnsureClip(){
@@ -745,7 +756,9 @@ function whGlTeleEnsureClip(){
   if(G.teleRT&&G.clipMat)return true;
   try{
     T=THREE;pw=G.fullW||Math.max(64,Math.round(W*dpr));ph=G.fullH||Math.max(64,Math.round(H*dpr));
-    G.teleRT=new T.WebGLRenderTarget(pw,ph,{depthBuffer:true,stencilBuffer:false,samples:WHG_AA?4:0,minFilter:T.LinearFilter,magFilter:T.LinearFilter});   /* [G5] MSAA badan teleskop saat keluar portal (jalur clip) */
+    G.teleRT=new T.WebGLRenderTarget(pw,ph,{depthBuffer:true,stencilBuffer:false,samples:WHG_AA?4:0,minFilter:T.LinearFilter,magFilter:T.LinearFilter});
+    {var _pr=G.fullR.getRenderTarget();G.fullR.setRenderTarget(G.teleRT);G.fullR.setRenderTarget(_pr);}   /* alokasi storage dulu, baru flag (pola glskySaAlloc): ACES + sRGB per fragmen = sama dgn jalur langsung */
+    G.teleRT.isXRRenderTarget=true;G.teleRT.texture.colorSpace=T.SRGBColorSpace;   /* [G5] MSAA badan teleskop saat keluar portal (jalur clip) */
     geo=new T.PlaneGeometry(2,2);
     mat=new T.ShaderMaterial({
       uniforms:{tMap:{value:G.dummy},uP:{value:new T.Vector2(0,0)},uN:{value:new T.Vector2(1,0)},uUseClip:{value:0},uA:{value:1},uRes:{value:new T.Vector2(W,H)}},
@@ -1062,7 +1075,9 @@ function go(dest,pos,R,onCover){
   S.chT=carry?Math.max(1,S.A-T_ENTER_TELE):S.A*.9;
   dens=1;env=0;state='enter';
   if(carry){try{TELESCOPE.dive=1;}catch(eT){}}   /* teleskop digambar di kanvas ini selama transisi (canvas #sky melewatinya) */
-  show();if(cv)cv.style.zIndex='13';kick();   /* kanvas di ATAS sky (penutup layar) */
+  show();if(cv)cv.style.zIndex='13';
+  try{if(carry&&whGlWant()&&(WHG.ok||whGlEnsure(bw,bh)))whGlCompEnsure();}catch(eGp){}   /* [FIX] siapkan #glwh sekarang, bukan di tengah animasi */
+  kick();   /* kanvas di ATAS sky (penutup layar) */
   try{if(typeof UIS!=='undefined'&&UIS.warpBegin)UIS.warpBegin(S.A,S.chT);}catch(eU){}
   return true;
 }
@@ -1535,6 +1550,7 @@ function tick(now){
     tt+=dt;
     g.setTransform(dpr,0,0,dpr,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.clearRect(0,0,W,H);
     if(S.carry){
+      WHG.skipTeleGl=false;try{whGlEnterPrep();}catch(eEp){}
       var fu=clamp((now-S.t0-S.tf0)/T_ENTER_TELE),b1=(justDive&&S.tb)?S.tb:teleBase(),fe=sm(fu);
       if(b1){
         if(chase3d())drawTele({x:lerp(b1.x,S.x,fe),y:lerp(b1.y,S.y,fe),s:lerp(1,.1,fe),a:1,w:0,sp:0,tilt:chasePose(fe,1)});   /* pesawat berbalik: hidung ke portal, mesin hijau menghadap kita, sambil mengecil masuk */
