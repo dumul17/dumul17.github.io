@@ -1278,9 +1278,10 @@ function glskyWarm(stop,onPl,onDone){
     var qi=0;
     function kidsRun(it,done){   /* [B4c] unit besar (scp/dr): satu anak per render, irisan <=24 ms per task + jeda 6 ms (bar tetap jalan); anak berat (>=15 ms) dicatat di GLW.r1c = [unit,nama,ms,tipe material,ukuran map] */
       var sc=it[1],cam=it[2],cont=sc,ch,i=0,tt=performance.now(),tot=0,dp,j,b;
-      for(dp=0;dp<4;dp++){   /* [B4d] 13 Nov: scene scp/dr hanya punya 1-3 anak langsung (satu grup akar) sehingga B4c tidak pernah jalan; turun ke anak yang punya >3 anak */
-        b=null;for(j=0;j<cont.children.length;j++)if(!b||cont.children[j].children.length>b.children.length)b=cont.children[j];
-        if(b&&b.children.length>3&&b.children.length>=cont.children.length)cont=b;else break;   /* [B4e] 13 Nov: scp punya 5 anak langsung (1 grup akar berat 1,4-1,6 dtk), dr 5 anak (grup 0,7-0,9 dtk): aturan <=3 anak tidak pernah turun */
+      function cnt(o){var n=0;o.traverse(function(){n++;});return n;}
+      for(dp=0;dp<6;dp++){   /* [B4f] turun ke anak dengan keturunan terbanyak selama ia memuat >=60% isi wadah (dr: grup akar <5 anak tapi 0,6-0,7 dtk dalam satu blok) */
+        b=null;var bn=0,tn=cnt(cont),cn;for(j=0;j<cont.children.length;j++){cn=cnt(cont.children[j]);if(cn>bn){bn=cn;b=cont.children[j];}}
+        if(b&&b.children.length>=2&&bn>=(tn-1)*.6)cont=b;else break;
       }
       ch=cont.children.slice();
       (function step(){
