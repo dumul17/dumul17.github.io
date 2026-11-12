@@ -398,7 +398,7 @@ var GLF_X=[],GLF_Y=[],GLF_A=[],GLF_PL=null;
 function glfArc(cx,cy,r,a0,a1,w,rgb,al){   /* goresan busur (ekuivalen g.arc + stroke) */
   var n,i,a;
   if(!(al>.004)||!(r>.5))return;
-  n=Math.max(6,Math.min(64,Math.ceil(Math.abs(a1-a0)*r/5)));
+  n=Math.max(8,Math.min(160,Math.ceil(Math.abs(a1-a0)*r/1.4)));   /* [FIX G5.2] ruas ~1,4 px (dulu 5 px, maks 64): cincin kecil (pulse sabuk Orion r 8-19) tampak bersudut + berkedip tiap n berganti; simpangan sekarang <0,03 px */
   for(i=0;i<=n;i++){a=a0+(a1-a0)*i/n;GLF_X[i]=cx+Math.cos(a)*r;GLF_Y[i]=cy+Math.sin(a)*r;GLF_A[i]=1;}
   glskyPoly(GLF_X,GLF_Y,GLF_A,n,w,rgb,al,0);
 }
