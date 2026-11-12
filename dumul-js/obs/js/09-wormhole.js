@@ -342,7 +342,7 @@ function whGlEnsure(w,h){
       mat=new T.ShaderMaterial({
         uniforms:{tSpr:{value:WHG.dummy},uRes:{value:new T.Vector2(w,h)}},
         vertexShader:WHG_IN_VS,fragmentShader:WHG_IN_FS,
-        transparent:true,depthTest:false,depthWrite:false,
+        transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,   /* [PATCH G4.12k] VS membalik y (px y-bawah -> NDC y-atas) = winding terbalik: FrontSide meng-cull SEMUA sprite inject */
         blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneFactor
       });
       WHG.injMesh=new T.Mesh(WHG.injGeo,mat);WHG.injMesh.frustumCulled=false;WHG.injScene.add(WHG.injMesh);
