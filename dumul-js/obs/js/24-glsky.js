@@ -43,7 +43,7 @@
    - Posisi / lensing / rotasi / zoom tetap dihitung JS (W,H = ruang stage, sama dgn #sky). Kamera ortho = piksel CSS ruang stage, y ke bawah.
    - Landscape (STG.rot) & letterbox desktop: kanvas GL anak #stage persis seperti #sky, jadi ikut diputar / di-scale CSS.
    - Transform/opacity inline yang dipasang wormhole ke #sky (kamera zoom) disalin ke kanvas GL lewat MutationObserver.
-   - Nol biaya untuk pengunjung biasa: file ini hanya dimuat kalau ?glsky=1|test (atau localStorage dumul_glsky=1). Loader inline di index.html, BUKAN di SHELL SW.
+   - DEFAULT NYALA (bukan lagi opt-in): script defer statis di index.html + SHELL SW. Mati lewat ?glsky=0, localStorage dumul_glsky=0, mode potato/low, atau reduced-motion (kecuali ?glsky=1 / localStorage=1 memaksa).
    Flag:  ?glsky=1 nyala | ?glsky=0 paksa 2D (menang atas localStorage) | ?glsky=test nyala + lapisan uji (gradien + 4 penanda sudut; latar 2D dimatikan supaya GL kelihatan)
           ?gllay=0 = G0 saja (latar tetap digambar 2D, GL cuma warna dasar) untuk A/B | ?glskydpr=1|1.5|2 batas DPR buffer GL (default: TIDAK dibatasi = ukuran piksel sama persis dgn kanvas 2D, round(W*DPR); dulu 1.5 -> Milky Way burik/berkilau karena di-upscale kompositor) | ?glmwsnap=1 tile Milky Way dibulatkan ke piksel perangkat (uji coba anti-kilau)
           ?glvig=0 matikan vignette (?glvig=0.5 kekuatan 0..1, default .34) | ?gldrift=1 nyalakan drift (default 0 = diam; ?gldrift=2 = 2x lebih lebar) | konsol: GLSKY.vig / GLSKY.drift boleh diubah langsung.
@@ -75,6 +75,12 @@ try{window.__glsky=GLSKY;}catch(eG0){}
   try{
     var m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(location.search),d=/[?&]glskydpr=([0-9.]+)/.exec(location.search);
     if(m){GLSKY.on=m[1]!=='0';GLSKY.test=m[1]==='test';}
+    /* [DEFAULT-ON] tanpa ?glsky= eksplisit: GL nyala, kecuali localStorage dumul_glsky=0, mode potato/low, atau prefers-reduced-motion (jalur itu tetap 2D lama). ?glsky=1|test atau localStorage=1 memaksa nyala; ?glsky=0 paksa 2D. */
+    if(!m){
+      var lsv=null;try{lsv=localStorage.getItem('dumul_glsky');}catch(eLs){}
+      if(lsv==='0'){GLSKY.on=false;GLSKY.why='ls-off';}
+      else if(lsv!=='1'&&((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))){GLSKY.on=false;GLSKY.why='default-low';}
+    }
     if(d&&parseFloat(d[1])>0)GLSKY.sCap=parseFloat(d[1]);
     if(/[?&]glmwsnap=1(&|#|$)/.test(location.search))GLSKY.mwSnap=1;
     if(/[?&]glstars=0(&|#|$)/.test(location.search))GLSKY.starOn=false;

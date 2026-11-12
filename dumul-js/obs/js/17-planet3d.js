@@ -265,7 +265,10 @@ function pl3dGeom(still,tgt,nolib){   /* tgt=true: pakai geometri TUJUAN (sektor
    (pl3dGlPrep: state!==0 -> keluar). Sekarang: kalau GLSky DIRAMALKAN dimuat (flag sama dgn loader index.html), tunggu; planet3dDraw memanggil pl3dLoad lagi tiap frame selama state 0, jadi begitu glskyPlWait ada (atau batas 25 dtk lewat) keputusan diambil ulang. */
 function pl3dGlExpect(){
   try{
-    var ls=location.search,m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(ls),e=m?m[1]!=='0':localStorage.getItem('dumul_glsky')==='1';
+    var ls=location.search,m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(ls),sv=null,e;
+    try{sv=localStorage.getItem('dumul_glsky');}catch(x0){}
+    e=m?m[1]!=='0':sv!=='0';   /* [DEFAULT-ON] sama dgn 24-glsky.js: nyala kecuali ls=0 / potato / reduced-motion (kecuali dipaksa) */
+    if(e&&!m&&sv!=='1'&&((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce)))e=false;
     if(!e||(m&&m[1]==='test')||/[?&]glplanet=0(&|#|$)/.test(ls)||/[?&]gllay=0(&|#|$)/.test(ls)||/[?&]off=/.test(ls))return false;
     return performance.now()<25000;
   }catch(x){return false;}

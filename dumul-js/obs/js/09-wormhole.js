@@ -79,7 +79,7 @@ var WHG={on:true,ok:false,err:0,cv:null,r:null,rtA:null,rtB:null,scene:null,cam:
   fullW:0,fullH:0,compOk:false,skipTeleGl:false};
 try{if(/[?&]glwh=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGlw){}
 var WHG_AA=true;try{if(/[?&]glwhaa=0(&|#|$)/.test(location.search))WHG_AA=false;}catch(eGaa){}   /* [G5] ?glwhaa=0 = tanpa MSAA di #glwh (A/B) */
-try{if(/[?&]glsky=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGls){}   /* [PATCH G4.12f P0] rencana 0.1: ?glsky=0 = paksa 2D termasuk wormhole */
+try{if(/[?&]glsky=0(&|#|$)/.test(location.search)||(!/[?&]glsky=/.test(location.search)&&localStorage.getItem('dumul_glsky')==='0'))WHG.on=false;}catch(eGls){}   /* [PATCH G4.12f P0] rencana 0.1: ?glsky=0 = paksa 2D termasuk wormhole */
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
 function usable(){return ok&&!(reduceMq&&reduceMq.matches);}
