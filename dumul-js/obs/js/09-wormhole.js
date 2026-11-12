@@ -262,8 +262,9 @@ var WHG_MASK_FS=[
   '  gl_FragColor=vec4(0.0,0.0,0.0,a);',
   '}'
 ].join('\n');
-/* WebGL blend constants (three custom r186 tidak export ZeroFactor/SrcAlphaFactor) */
-var WHG_GL_ZERO=0,WHG_GL_SRC_ALPHA=770,WHG_GL_ONE=1,WHG_GL_ONE_MINUS_SRC_ALPHA=771;
+/* [PATCH G4.12j] konstanta blend INTERNAL three (bukan nilai GL mentah): ZeroFactor=200, OneFactor=201, SrcAlphaFactor=204, OneMinusSrcAlphaFactor=205.
+   (three custom r186 tidak meng-export ZeroFactor/SrcAlphaFactor, tapi factorToGL tetap memetakan angka ini. Nilai GL mentah 0/770/1/771 -> undefined -> faktor 0 -> mask menghapus SELURUH #glwh = terowongan hilang.) */
+var WHG_GL_ZERO=200,WHG_GL_SRC_ALPHA=204,WHG_GL_ONE=201,WHG_GL_ONE_MINUS_SRC_ALPHA=205;
 function whGlWant(){
   return !!(WHG.on&&!potato()&&usable()&&typeof THREE!=='undefined'&&THREE.WebGLRenderTarget&&THREE.WebGLRenderer);
 }
