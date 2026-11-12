@@ -1180,7 +1180,7 @@ function glskyWarmOne(r,sc,cam,only,cont){   /* [B4d] cont = wadah tempat 'only'
     }else{   /* default: HANYA akar scene/unit dipaksa visible, anak tetap sesuai keadaan bawaan = yang benar-benar tergambar di flush pertama */
       sc.visible=true;
       if(only){
-        ch=(cont||sc).children;for(i=0;i<ch.length;i++)if(ch[i]!==only)ch[i].visible=false;only.visible=true;
+        ch=(cont||sc).children;for(i=0;i<ch.length;i++)if(ch[i]!==only&&!ch[i].isLight)ch[i].visible=false;only.visible=true;   /* [B4e] lampu JANGAN disembunyikan: jumlah lampu ikut kunci program three, tanpa lampu program yang dihangatkan beda dgn yang dipakai flush asli (ff[0] balik ~500 ms di B4c) */
         if(cont&&cont!==sc){pa=cont;while(pa&&pa!==sc){pa.visible=true;pa=pa.parent;}}
       }
     }
@@ -1280,7 +1280,7 @@ function glskyWarm(stop,onPl,onDone){
       var sc=it[1],cam=it[2],cont=sc,ch,i=0,tt=performance.now(),tot=0,dp,j,b;
       for(dp=0;dp<4;dp++){   /* [B4d] 13 Nov: scene scp/dr hanya punya 1-3 anak langsung (satu grup akar) sehingga B4c tidak pernah jalan; turun ke anak yang punya >3 anak */
         b=null;for(j=0;j<cont.children.length;j++)if(!b||cont.children[j].children.length>b.children.length)b=cont.children[j];
-        if(cont.children.length<=3&&b&&b.children.length>3)cont=b;else break;
+        if(b&&b.children.length>3&&b.children.length>=cont.children.length)cont=b;else break;   /* [B4e] 13 Nov: scp punya 5 anak langsung (1 grup akar berat 1,4-1,6 dtk), dr 5 anak (grup 0,7-0,9 dtk): aturan <=3 anak tidak pernah turun */
       }
       ch=cont.children.slice();
       (function step(){
