@@ -364,15 +364,37 @@ var DUMUL_CHARS=(function(){
      Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
      [PATCH v175] Masuk LOG BOOT ("Persiapan akhir"). [PATCH v181] Sekarang juga masuk bobot bar (WT_PRE) dan baris status ke-7 (boot.pre.*): bar tidak lagi tertahan di 99% menunggu PRE. */
-  var PRE_MAX=3000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
+  var PRE_MAX=3000,PRE_MAX_GL=5000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,gl:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
   /* [PATCH v186] sc (tampilan teleskop) cuma kerja kalau SCP3D_WF nyala (?scwf=1). Kalau mati, preFin('sc') selesai 0 ms tanpa kerja apa pun: jangan dicatat di log boot dan jangan ikut bobot bar. */
   function scOff(){return typeof SCP3D_WF!=='undefined'&&!SCP3D_WF;}
-  function wtPre(k){return (k==='sc'&&scOff())?0:WT_PRE[k];}
-  function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO)&&!(k==='sc'&&scOff()))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
+  /* [PATCH v189] gl = WARM GL PRA-KAPSUL (24-glsky.js glskyWarm): renderer GLSky + compile semua program + strip planet pertama dibayar di sini, bukan di frame pertama sesudah Blue
+     (dump 12 Nov: longtask 972 ms / LoAF 1238 ms tepat sesudah entered). Di mode GL planet TIDAK punya jalur boot lama (PL3D state 0 -> dianggap selesai), jadi langkah 'pl' = bagian planet glskyWarm,
+     dan bobot modul PL3D (WT_MODS[4]) dinolkan di calc() supaya kerja planet tidak dihitung dua kali. ?glwarm=0 = perilaku lama (langkah gl dilewati, pl jalur lama). */
+  var GLW_ON=null;
+  function glWarmPred(){   /* tebakan sebelum 24-glsky.js dimuat: aturan sama dgn GLSKY (default nyala; ?glsky=0 / localStorage=0 / potato / reduce mematikan) + ?glwarm=0 / ?gllay=0 */
+    try{
+      var ls=location.search,m=/[?&]glsky=(0|1|test)(&|#|$)/.exec(ls),sv=null,e;
+      try{sv=localStorage.getItem('dumul_glsky');}catch(x0){}
+      e=m?m[1]!=='0':sv!=='0';
+      if(e&&!m&&sv!=='1'&&(IS_POTATO||(typeof reduce!=='undefined'&&reduce)))e=false;
+      if(m&&m[1]==='test')e=false;
+      if(/[?&](glwarm|gllay)=0(&|#|$)/.test(ls)||/[?&]off=/.test(ls))e=false;
+      return !!e;
+    }catch(x){return false;}
+  }
+  function glWarmOn(){
+    if(GLW_ON!==null)return GLW_ON;
+    if(typeof glskyWarmWant==='function'){try{GLW_ON=!!glskyWarmWant();}catch(eW){GLW_ON=false;}return GLW_ON;}   /* 24-glsky sudah ada: jawaban pasti, dikunci */
+    return glWarmPred();
+  }
+  function plGlOn(){return glWarmOn()&&!/[?&]glplanet=0(&|#|$)/.test(location.search);}   /* planet dibangun di scene GL (bukan renderer 'big') */
+  function estPre(k){return (k==='pl'&&plGlOn())?1800:WT_PRE_EST[k];}   /* planet GL: compile async + render penuh pertama, wall ±1,5-2,5 dtk di itel */
+  function wtPre(k){return ((k==='sc'&&scOff())||(k==='gl'&&!glWarmOn()))?0:WT_PRE[k];}
+  function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO)&&!(k==='sc'&&scOff())&&!(k==='gl'&&!glWarmOn()))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
     try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
   function preStart(){
     if(pre.at>=0)return;
-    pre.at=performance.now();pre.ui=pre.ast=pre.fb=pre.pl=pre.sc=pre.rg=1;
+    pre.at=performance.now();pre.ui=pre.ast=pre.fb=pre.pl=pre.sc=pre.rg=1;pre.gl=glWarmOn()?1:2;   /* [v189] gl mati = langsung selesai, tidak ikut log/bobot */
     setTimeout(function(){
       try{if(!IS_POTATO&&typeof UIS!=='undefined'&&UIS.warm)UIS.warm();}catch(eU){}
       preFin('ui');
@@ -385,7 +407,9 @@ var DUMUL_CHARS=(function(){
       };
       try{if(typeof ensureAsteroidSpritesSliced==='function')ensureAsteroidSpritesSliced(fin);else{ensureAsteroidSprites();fin();}}catch(eA){fin();}
     },300);
-    setTimeout(function(){   /* [v180] pl = render penuh planet pertama (17-planet3d pl3dWarmFirst) DI DALAM gerbang: dulu opportunistik (+2,8 dtk) dan di jaringan normal kapsul-tap bisa keburu sebelum jalan. ±130 ms di itel, sinkron; gagal/dilewati = tetap selesai */
+    setTimeout(function(){
+      if(plGlOn())return;   /* [v189] mode GL: planet dibangun + dirender penuh di konteks GLSky oleh glskyWarm (langkah gl di bawah), yang melepas 'pl'. pl3dWarmFirst/Aur jalur renderer 'big' tidak berlaku (PL3D state 0) */
+      /* [v180] pl = render penuh planet pertama (17-planet3d pl3dWarmFirst) DI DALAM gerbang: dulu opportunistik (+2,8 dtk) dan di jaringan normal kapsul-tap bisa keburu sebelum jalan. ±130 ms di itel, sinkron; gagal/dilewati = tetap selesai */
       try{if(!WR.entered&&typeof pl3dWarmFirst==='function')pl3dWarmFirst(function(){return WR.entered;});}catch(eP){}
       setTimeout(function(){   /* [v181b] aurora planet (keyframe pertama + kanvas + sprite) di task sendiri, supaya tidak satu long task dgn render penuh di atas */
         try{if(!WR.entered&&typeof pl3dWarmAur==='function')pl3dWarmAur(function(){return WR.entered;});}catch(eA2){}
@@ -408,6 +432,17 @@ var DUMUL_CHARS=(function(){
         else{clearTimeout(tm);preFin('fb',pr?0:1);}
       }catch(eL){clearTimeout(tm);preFin('fb',1);}
     },600);
+    setTimeout(function(){   /* [v189] gl = glskyWarm (24-glsky.js G5.1): init GLSky -> compileAsync semua scene -> planet build + render penuh pertama. Jeda 1,2 dtk: sesudah langkah ui/ast/fb/sc/rg mulai, supaya CPU-nya tidak menumpuk */
+      if(pre.gl!==1)return;
+      var tm=0,rel=function(bad){clearTimeout(tm);preFin('gl',bad);if(plGlOn())preFin('pl',bad);};
+      try{
+        if(WR.entered||typeof glskyWarm!=='function'){rel(1);return;}
+        tm=setTimeout(function(){preFin('gl',1);preFin('pl',1);},PRE_MAX_GL);   /* macet: gerbang kapsul dilepas; glskyWarm tetap berhenti sendiri saat Blue (stop) */
+        glskyWarm(function(){return WR.entered;},
+          function(ok){if(plGlOn())preFin('pl',ok?0:1);},
+          function(ok,why){clearTimeout(tm);preFin('gl',ok?0:1);if(plGlOn())preFin('pl',ok?0:1);});
+      }catch(eGw){rel(1);}
+    },1200);
   }
   /* [PATCH v172] WARM NYATA pra-kapsul (jendela idle antara __bootVis dan kapsul: bench 5 Nov = 18 dtk (repeat) / 45 dtk (pertama) di HP lemah, CPU nyaris menganggur).
        ast  = ast3dWarmReal (12-ast3d.js v28): render tiap mesh varian batu sekali (mesh varian visible=false, tidak ikut warm lama).
@@ -436,8 +471,8 @@ var DUMUL_CHARS=(function(){
     setTimeout(warmRealTint,1500);
     setTimeout(function(){try{if(!WR.entered&&typeof ast3dWarmReal==='function')ast3dWarmReal(function(){return WR.entered;});}catch(eA){}},300);   /* [v180] dimajukan 1100 -> 300 ms: jendela kapsul di jaringan normal pendek. Planet pertama (pl3dWarmFirst) pindah ke gerbang PRE (preStart, langkah 'pl') */   /* [v173] mesh batu 3D: shader + buffer varian (12-ast3d.js v28) */
   }
-  function preAll(){return pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2&&pre.sc===2&&pre.rg===2;}
-  function preStatus(){return {ok:preAll(),ui:pre.ui,ast:pre.ast,fb:pre.fb,pl:pre.pl,sc:pre.sc,rg:pre.rg};}
+  function preAll(){return pre.ui===2&&pre.ast===2&&pre.fb===2&&pre.pl===2&&pre.sc===2&&pre.rg===2&&pre.gl===2;}
+  function preStatus(){return {ok:preAll(),ui:pre.ui,ast:pre.ast,fb:pre.fb,pl:pre.pl,sc:pre.sc,rg:pre.rg,gl:pre.gl};}
   /* Unit pekerjaan boot (progres bar = unit selesai / total, tanpa komponen waktu):
        1 unit  halaman : DOMContentLoaded sudah lewat (semua <script defer> sudah dieksekusi) + layout() jalan (W>0) + gambar nebula/milky-way tidak sedang di-fetch.
        5 unit  modul 3D: AST3D, SCP3D, DR3D, PT3D, PL3D, masing-masing state 2 (siap) atau 3 (gagal/nonaktif). PL3D sudah termasuk shader warm-up sendiri.
@@ -459,8 +494,8 @@ var DUMUL_CHARS=(function(){
      bukan 1/7. Yang dipakai proporsinya, bukan angka mutlak, jadi di HP kencang tetap benar. Urutan mods = MODS. */
   var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
   /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
-  var WT_PRE={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300},WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1600},PRE_KEYS=['ui','ast','pl','fb','sc','rg'];
-  function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
+  var WT_PRE={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1600,gl:1400},PRE_KEYS=['ui','ast','pl','fb','sc','rg','gl'];   /* [v189] gl: build renderer GLSky + kirim ±9 scene ke compileAsync (sisi main thread ±300 ms di itel; tunggu async-nya masuk creep) */
+  function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg')+wtPre('gl');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
   function threeStatus(elapsed){
     var settled=0,pend=0,st=[],fins=[],i,o,s,fin;
     for(i=0;i<MODS.length;i++){
@@ -812,6 +847,7 @@ var DUMUL_CHARS=(function(){
     return age>0?w*CREEP_CAP*(1-Math.exp(-age/est)):0;
   }
   function calc(elapsed){
+    if(WT_MODS[4]&&glWarmOn())WT_MODS[4]=0;   /* [v189] planet GL: kerja planet = langkah pre 'pl' (bukan modul PL3D yang tidak pernah dibangun di boot) */
     var ready=pageReady(),th=threeStatus(elapsed),au=audioStatus(),sx=sfxStatus();
     bootTh=th;   /* [PATCH v175] snapshot threeStatus terbaru, dibaca logPoll (baris Lensa) */
     warmRestEarly(th,au);   /* v146: isi gap — SFX begitu ≥2 modul settle ATAU BGM siap / semua modul settle */
@@ -841,7 +877,7 @@ var DUMUL_CHARS=(function(){
     for(wi=0;wi<WT_MODS.length;wi++)wc+=crp('m'+wi+(wi===0?'_'+((window.__ast3dT&&window.__ast3dT.length)|0):''),!th.fins[wi]&&th.st[wi]===1,wi===0?WT_MODS[0]*(1-astF):WT_MODS[wi],wi===0?WT_MODS[0]/6:WT_MODS[wi],elapsed);
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
-    for(wi=0;wi<PRE_KEYS.length;wi++)wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),WT_PRE_EST[PRE_KEYS[wi]],elapsed);   /* v181 */
+    for(wi=0;wi<PRE_KEYS.length;wi++)wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),estPre(PRE_KEYS[wi]),elapsed);   /* v181 */
     if(!sx.ok&&sx.total>0){
       var per=WT_SFX/sx.total;
       wc+=crp('s'+sx.n,warmed,per,per,elapsed);   /* v151: per langkah metadata selesai */

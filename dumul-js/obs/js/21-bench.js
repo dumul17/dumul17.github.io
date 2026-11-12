@@ -1479,6 +1479,8 @@ var DK_CSS =
     try { if (T) o.pt = { spin: T.spin, alt: T.alt, ovAlt: T.ovAlt, resMin: T.resMin, resMax: T.resMax, dpr: typeof DPR !== 'undefined' ? DPR : null, ptw: typeof window.__pttwStat === 'function' ? window.__pttwStat() : null }; } catch (e2) {}
     try { o.hr = HRK == null ? null : { k: HRS.k, wrapped: HRS.wrapped, calls: HRS.calls, scaled: HRS.scaled, err: HRS.err }; } catch (eHc) {}
     try { o.gl = { mode: typeof GLMODE !== 'undefined' ? GLMODE : null, on: typeof SKY3D_ON !== 'undefined' ? SKY3D_ON : null, why: typeof SKY3D_WHY !== 'undefined' ? SKY3D_WHY : null, aa: typeof SKY3D_CFG !== 'undefined' ? SKY3D_CFG.antialias : null, pr: typeof SKY3D_CFG !== 'undefined' ? SKY3D_CFG.pixelRatio : null, cmpHold: window.GLCMP ? !!window.GLCMP.hold : null }; } catch (eGlc) {}
+    /* [v11.29zu] cfg.gl di atas membaca GLMODE/SKY3D_* (P0, usang: selalu 'flag-off' sejak GLSky default nyala). Status GLSky yang sebenarnya + hasil warm pra-kapsul (glskyWarm). */
+    try { var G5 = window.GLSKY; o.glsky = G5 ? { on: G5.on, ok: G5.ok, init: G5.init, err: G5.err, why: G5.why, lay: G5.lay, plOn: G5.plOn, tex: G5.st && G5.st.tex, warm: window.__glwarm || null, pl: (typeof PL3D !== 'undefined') ? { glm: PL3D.glm, state: PL3D.state, rt: PL3D.glRtOn, v: PL3D.glV, err: PL3D.glErr || PL3D.glRtErr || '', renders: PL3D.renders } : null } : null; } catch (eGls) {}
     return o;
   }
   function fsOut() {

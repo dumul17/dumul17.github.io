@@ -1150,6 +1150,105 @@ function glskyInit(){
   threeLoad(glskyBuild,function(m){glskyFail(m);});
 }
 
+/* ================= [G5.1] WARM GL PRA-KAPSUL =================
+   Masalah (dump 12 Nov, itel A6610L, ?glsky=1 default): renderer GLSky, 21 program shader, 20 texture dan strip planet pertama baru dibangun di frame() PERTAMA sesudah Blue
+   (glNew GLSMALL +480 ms sesudah entered, compile 103 ms + render 334 ms, longtask 972 ms / LoAF 1238 ms di 05-sector-ui frame). Warm lama jalan di renderer 'big'/'small' yang di mode GL
+   dibuang / tidak dipakai (PL3D state 0 = tidak pernah dibangun di boot), jadi konteks yang benar-benar menggambar tetap dingin.
+   Sekarang 07-boot preStart (langkah 'gl' + 'pl') memanggil glskyWarm() di jendela idle pra-kapsul, DI konteks GLSky sendiri, tiap tahap di task terpisah:
+     init    : glskyInit() (build renderer + scene + mesh instancing + pass fx + uji supersample) lebih awal dari frame pertama.
+     compile : compileAsync() tiap scene (utama, kepala, atas, planet, drone bawah/atas) + scene unit yang sudah dibangun renderer lamanya (AST3D/SCP3D/DR3D: program yang sama dikompilasi ulang
+               di renderer GLSky). compileAsync = traverse (bukan traverseVisible), jadi mesh yang visible=false ikut; dengan KHR_parallel_shader_compile tidak memblok main thread.
+     planet  : pl3dGlBuild() (mesh + render target + compileAsync internalnya) lalu render PENUH strip pertama ke render target + sinkron GPU (pl3dGlRtFull), sama dgn pl3dWarmFirst jalur lama:
+               frame pertama memakai snapshot itu, bukan render penuh 300+ ms.
+   Tidak menggambar apa pun ke kanvas GL (tidak ada kedip di bawah layar boot). Berhenti begitu Blue (stop()). Gagal / dilewati -> perilaku lama persis (frame pertama membangun sendiri).
+   Flag: ?glwarm=0 = nonaktif (A/B). Hasil: window.__glwarm {st 0 idle|1 jalan|2 selesai|3 gagal/lewat, why, ms{init,cmp,cmpOk|cmpTmo,plBuild,cmpDone,plDraw,end}, pl, plDraw, cmpTmo, n (scene dikompilasi)}. */
+var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0};
+try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;window.__glwarm=GLW;}catch(eGw0){}
+function glskyWarmWant(){var S=GLSKY;return !!(GLW.on&&S.on&&S.lay&&!S.test&&S.err<3&&!/[?&]off=/.test(location.search));}
+/* stop() = true -> berhenti (Blue sudah terjadi). onPl(ok) dipanggil begitu bagian planet selesai/dilewati, onDone(ok,why) saat semuanya selesai. Keduanya idempotent di sisi pemanggil. */
+function glskyWarm(stop,onPl,onDone){
+  var S=GLSKY,Wm=GLW,T0=performance.now(),fin=false,tries=0,r=null,ps=[],cl=[],k=0,pg=false;
+  if(Wm.st!==0)return;
+  Wm.st=1;
+  function mk(n){Wm.ms[n]=Math.round(performance.now()-T0);}
+  function plDone(ok){var f=onPl;onPl=null;try{if(f)f(ok);}catch(e){}}
+  function end(why){
+    if(fin)return;fin=true;Wm.st=why?3:2;Wm.why=why||'';mk('end');
+    plDone(!why);
+    try{if(onDone)onDone(!why,why||'');}catch(e){}
+  }
+  function halt(){if(fin)return true;if(stop&&stop()){end('entered');return true;}return false;}
+  function s0(){   /* init: renderer GLSky lebih awal dari frame pertama */
+    if(halt())return;
+    if(!glskyWarmWant()||typeof glskyInit!=='function'){end('skip');return;}
+    if(S.err>=3){end('gl-err');return;}
+    if(!S.init)glskyInit();
+    if(S.ok&&S.r){mk('init');setTimeout(s1,40);return;}
+    if(++tries>130){end('init-timeout');return;}   /* ±8 dtk */
+    setTimeout(s0,60);
+  }
+  function s1(){   /* compile: tiap scene di task sendiri (sisi main thread compileAsync = membuat + mengirim shader, ±3-30 ms) */
+    if(halt())return;
+    r=S.r;
+    try{glskySize();}catch(eSz){}
+    try{if(!S.mesh.length)glskyMesh(0);}catch(eM0){}   /* pool quad latar: material op ikut terkompilasi (frame() memakai S.mesh[i]||glskyMesh(i), jadi aman) */
+    cl=[[S.scene,S.cam],[S.hScene,S.tCam],[S.tScene,S.tCam],[S.pScene,S.tCam],[S.dbScene,S.tCam],[S.mdScene,S.tCam]];
+    try{if(S.astOn&&typeof AST3D!=='undefined'&&AST3D.state===2&&AST3D.sc)cl.push([AST3D.sc,S.cam]);}catch(eA){}
+    try{if(typeof SCP3D_GL!=='undefined'&&SCP3D_GL.on&&SCP3D_GL.err<3&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&SCP3D.sc)cl.push([SCP3D.sc,S.tCam]);}catch(eS){}
+    try{if(S.drOn&&S.dpOn&&typeof DR3D!=='undefined'&&DR3D.state===2&&DR3D.sc)cl.push([DR3D.sc,S.tCam]);}catch(eD){}
+    nx();
+  }
+  function nx(){
+    if(halt())return;
+    if(k>=cl.length){mk('cmp');setTimeout(s2,30);return;}
+    var p=cl[k++];
+    try{if(p[0]&&p[1]){Wm.n++;var q=r.compileAsync?r.compileAsync(p[0],p[1]):(r.compile(p[0],p[1]),Promise.resolve());try{q.catch(function(){});}catch(eQ){}ps.push(q);}}catch(eC){}   /* catch kosong: reject sebelum Promise.all dipasang tidak jadi 'Uncaught (in promise)' */
+    setTimeout(nx,30);
+  }
+  function s2(){   /* planet: build mesh + RT (pl3dGlBuild memulai compileAsync-nya sendiri), lalu tunggu semua program siap */
+    if(halt())return;
+    try{
+      if(S.plOn&&typeof pl3dGlBuild==='function'&&typeof PL3D!=='undefined'&&PL3D.glm===0&&PL3D.state===0&&typeof glskyPlWait==='function'&&glskyPlWait()
+         &&PL3D_CFG.on&&!PL3D_CFG.force2d&&!(typeof IS_POTATO!=='undefined'&&IS_POTATO)&&!(typeof reduce!=='undefined'&&reduce)){   /* syarat sama dgn pl3dGlPrep */
+        pl3dSync();
+        if(PW&&PH)pg=!!pl3dGlBuild();
+      }
+    }catch(ePb){pg=false;}
+    Wm.pl=pg?1:0;mk('plBuild');
+    var pr=false,t1=performance.now();
+    try{Promise.all(ps).then(function(){pr=true;},function(){pr=true;});}catch(eP){pr=true;}
+    (function poll(){
+      if(halt())return;
+      var plOk=!pg||PL3D.glm===2||PL3D.glm<0;   /* 2 = siap (fin compile / 4 dtk), <0 = pl3dGlFail */
+      if(pr&&plOk){mk('cmpOk');mk('cmpDone');setTimeout(s3,30);return;}
+      if(performance.now()-t1>5500){Wm.cmpTmo=1;mk('cmpTmo');mk('cmpDone');setTimeout(s3,30);return;}
+      setTimeout(poll,40);
+    })();
+  }
+  function s3(){   /* render PENUH strip planet pertama ke render target + sinkron GPU (readback di pl3dGlRtFull), di task sendiri */
+    if(halt())return;
+    if(pg&&PL3D.glm===2&&PL3D.glRtOn&&PL3D.glRt&&!document.hidden){
+      try{
+        var t0=performance.now(),bp,lx,ly;
+        pl3dSync();pl3dPalUpdate();pl3dPhase(t0);
+        PL3D.curNow=t0;
+        bp=pl3dLightPos();lx=bp[0];ly=PH-bp[1];
+        pl3dGlRtAlloc();
+        if(pl3dGlRtFull(t0,lx,ly,false))Wm.plDraw=Math.round(performance.now()-t0);
+      }catch(ePd){Wm.plErr=String(ePd&&ePd.message||ePd).slice(0,120);}
+      mk('plDraw');
+    }
+    plDone(!!(pg&&PL3D.glm===2));   /* jujur: planet yang tidak sempat dibangun GL = bukan 'selesai' (gerbang tetap lepas, frame pertama membangun sendiri seperti dulu) */
+    setTimeout(s4,40);
+  }
+  function s4(){
+    if(halt())return;
+    try{if(r&&S.dummy&&r.initTexture)r.initTexture(S.dummy);}catch(eT){}
+    end('');
+  }
+  setTimeout(s0,0);
+}
+
 function glskySize(){
   var S=GLSKY,s=Math.min(DPR||1,S.sCap),pw=Math.max(2,Math.round(W*s)),ph=Math.max(2,Math.round(H*s));   /* round = sama dgn layout() 2D (cv.width=round(W*DPR)): satu piksel GL = satu piksel kanvas 2D, tidak ada resampling kompositor */
   if(pw!==S.pw||ph!==S.ph){S.r.setSize(pw,ph,false);S.pw=pw;S.ph=ph;S.S=s;}   /* false = jangan sentuh style CSS (100% dari #stage) */
