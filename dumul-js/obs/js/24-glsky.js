@@ -921,6 +921,44 @@ function glskySaWarm(wm){
   finally{try{r.setRenderTarget(pr);r.setClearColor(sa.cc,ca);r.autoClear=ac;r.setScissorTest(!!sT);if(sr)r.setScissor(sr.x,sr.y,sr.z,sr.w);}catch(e2){}}
   o.ms=Math.round(performance.now()-t0);
 }
+/* [B4j] warm tekstur Milky Way (2048x768 mipmap, dump 13 Nov: ffd[2] r.main 98-153 ms = upload + mipmap pertama, ada di 6 dari 6 run A/B). Pasca-kapsul, sebelum item 'sa':
+   muat MW.img kalau belum (mwAlpha membuat Image), tunggu _ok (maks 4 dtk), im.decode() (di luar main thread), lalu glskyTex(glskyMWSrc(im)) + renderer.initTexture (upload + mipmap sekarang, bukan di flush ke-3).
+   Texture dipakai ulang glskyMW (kunci cache S.tx = objek sumber yang sama; glskyLive menjaga dari sapuan). Flag ?glwtex=0 = mati. Hasil: glseg.w1.tx = {ok, why, ms, list:[[tag,w,h,ms]], cand:[[nama,w,h]]}.
+   cand = ukuran kanvas kandidat sumber tekstur 615x1026 / 64x8 di ffd[0] (diagnostik saja, tidak diunggah). */
+function glskyTexWarm(wm,cb){
+  var S=GLSKY,r=S.r,o={ok:0,why:'',list:[],cand:[]},t0=performance.now(),n=0,im,done=false;
+  wm.tx=o;
+  function fin(){if(done)return;done=true;o.ms=Math.round(performance.now()-t0);try{cb();}catch(e){}}
+  function go(){
+    var c,t1,tx;
+    try{
+      c=glskyMWSrc(im);
+      if(!c){o.why='mw-src';return fin();}
+      t1=performance.now();
+      tx=glskyTex(c);
+      if(tx&&r.initTexture){r.initTexture(tx);o.ok=1;}else o.why='no-init';
+      o.list.push(['mw',c.width||c.naturalWidth|0,c.height||c.naturalHeight|0,Math.round(performance.now()-t1)]);
+    }catch(e){o.why=String(e&&e.message||e).slice(0,80);}
+    fin();
+  }
+  try{
+    [['plateDeep',typeof plateDeep!=='undefined'&&plateDeep],['bgCanvas',typeof bgCanvas!=='undefined'&&bgCanvas],['gridCanvas',typeof gridCanvas!=='undefined'&&gridCanvas]].forEach(function(a){if(a[1])o.cand.push([a[0],a[1].width|0,a[1].height|0]);});
+  }catch(eC){}
+  if(typeof MW==='undefined'||!MW.on){o.why='mw-off';return fin();}
+  try{if(!MW.img&&typeof mwAlpha==='function')mwAlpha(performance.now());}catch(eM){}
+  (function wt(){
+    if(done)return;
+    im=MW.img;
+    if(!im){o.why='no-img';return fin();}
+    if(im._ok){
+      if(im.decode){try{im.decode().then(go,go);return;}catch(eD){}}
+      go();return;
+    }
+    if(!MW.on){o.why='mw-off';return fin();}
+    if(++n>40){o.why='img-timeout';return fin();}
+    setTimeout(wt,100);
+  })();
+}
 function glskyRenderAll(){
   var S=GLSKY,i,top=false,ex,tg;
   S.sa.n=0;S.sa.px=0;
@@ -1206,8 +1244,8 @@ function glskyInit(){
                frame pertama memakai snapshot itu, bukan render penuh 300+ ms.
    Tidak menggambar apa pun ke kanvas GL (tidak ada kedip di bawah layar boot). Berhenti begitu Blue (stop()). Gagal / dilewati -> perilaku lama persis (frame pertama membangun sendiri).
    Flag: ?glwarm=0 = nonaktif (A/B). Hasil: window.__glwarm {st 0 idle|1 jalan|2 selesai|3 gagal/lewat, why, ms{init,cmp,cmpOk|cmpTmo,plBuild,cmpDone,plDraw,end}, pl, plDraw, cmpTmo, n (scene dikompilasi)}. */
-var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0}};   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
-try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
+var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,tx:null,texOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0}};   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
+try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;if(/[?&]glwtex=0(&|#|$)/.test(location.search))GLW.texOn=false;var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
 /* [B4h] TAHAN + FADE teleskop. Warm scp/dr dipindah ke SESUDAH kapsul (glskyWarm.postArm), jadi di flush pertama teleskop belum boleh tergambar (first-use scp ±1,3 dtk: 12 sampai 370 ms per anak).
    hold 0 = tidak menahan | 1 = menahan (warm pasca-kapsul belum selesai) | 2 = fade-in (GLW.fade ms, smoothstep) | selesai -> 0.
    Pemakai: 04-render.js drawFloatingTelescopeGl (kalau <=0 teleskop tidak digambar sama sekali, jalur 2D juga dilewati). Pengaman: tahan paling lama GLW.holdMax ms sejak teleskop pertama minta gambar. ?glwarmpost=0 = perilaku B4g (tanpa tahan). */
@@ -1390,6 +1428,7 @@ function glskyWarm(stop,onPl,onDone){
       if(hlt())return;
       if(qi>=q.length){if(pq){setTimeout(cb,0);return;}mk('r1');setTimeout(s4,30);return;}
       var it=q[qi++],t1=performance.now();
+      if(it[0]==='tex'){try{glskyTexWarm(Wm,function(){setTimeout(nr,30);});}catch(eTw){Wm.tx={ok:0,why:String(eTw&&eTw.message||eTw).slice(0,80)};setTimeout(nr,30);}return;}   /* [B4j] */
       if(it[0]==='sa'){try{glskySaWarm(Wm);}catch(eSw){Wm.sa={ok:0,why:String(eSw&&eSw.message||eSw).slice(0,80)};}setTimeout(nr,30);return;}   /* [B4i] */
       if(it[4]&&it[1]&&it[1].children&&it[1].children.length){kidsRun(it,function(){setTimeout(nr,30);});return;}
       try{if(it[1]&&it[2]){glskyWarmOne(r,it[1],it[2],it[3]);Wm.r1n++;if(Wm.r1t.length<24)Wm.r1t.push([it[0],Math.round(performance.now()-t1)]);}}catch(eN){}
@@ -1406,6 +1445,7 @@ function glskyWarm(stop,onPl,onDone){
     r=S.r;
     try{if(typeof SCP3D_GL!=='undefined'&&SCP3D_GL.on&&SCP3D_GL.err<3&&!SCP3D_GL.act&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&SCP3D.sc&&SCP3D.sc.parent!==S.tScene)it.push(['scp',SCP3D.sc,S.tCam,null,1]);}catch(eS2){}
     try{if(S.drOn&&S.dpOn&&typeof DR3D!=='undefined'&&DR3D.state===2&&DR3D.sc&&!DR3D.glIn&&DR3D.sc.parent!==S.mdScene)it.push(['dr',DR3D.sc,S.tCam,null,1]);}catch(eD2){}
+    try{if(Wm.texOn&&typeof MW!=='undefined'&&MW.on&&S.ok&&S.r&&S.r.initTexture)it.push(['tex',null,null,null,2]);}catch(eTx){}   /* [B4j] tekstur MW dulu, lalu RT teleskop */
     try{if(Wm.saOn&&S.saOn&&S.sa&&S.sa.ok&&S.sa.qs&&S.tScene)it.push(['sa',null,null,null,2]);}catch(eSa){}   /* [B4i] terakhir: RT teleskop + quad tempel */
     if(!it.length){postFin('none');return;}
     post=true;Wm.p.t0=performance.now();Wm.p.n=it.length;
@@ -1509,7 +1549,7 @@ window.glskySegOut=function(){
   if(!GLSG.on)return null;
   var o={fr:GLSG.fr,seg:{},ff:GLSG.ff,ffd:GLSG.fd,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; ffd[i]={t,ms,n=jumlah op,ops={kind:jumlah},s={segmen:ms},sc={pass:{m=material,p=material tanpa program,t=[[w,h,mip,jenis] tekstur belum di-upload]}},tx/pg/ge=delta tekstur/program/geometri three,up=upload dinamis,calls,tris,sa={n,px,rt0,rt1,al=[[w,h,ms] alokasi RT],tm=[ms render RT,ms tempel quad]},q0=quad tempel sudah punya program};  spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
   for(k in GLSG.s){var g=GLSG.s[k];o.seg[k]=[g.n,+(g.ms/g.n).toFixed(2),+g.ms.toFixed(0),+g.mx.toFixed(1)];}
-  try{o.w1={r1:GLW.r1,f:GLW.r1f,n:GLW.r1n,t:GLW.r1t,c:GLW.r1c,ms:GLW.ms,st:GLW.st,post:GLW.post,defer:GLW.defer,hold:GLW.hold,p:GLW.p,fade:GLW.fade,sa:GLW.sa};}catch(eW1){}
+  try{o.w1={r1:GLW.r1,f:GLW.r1f,n:GLW.r1n,t:GLW.r1t,c:GLW.r1c,ms:GLW.ms,st:GLW.st,post:GLW.post,defer:GLW.defer,hold:GLW.hold,p:GLW.p,fade:GLW.fade,sa:GLW.sa,tx:GLW.tx};}catch(eW1){}
   try{o.info={programs:GLSKY.r.info.programs?GLSKY.r.info.programs.length:null,geometries:GLSKY.r.info.memory.geometries,textures:GLSKY.r.info.memory.textures,pr:GLSKY.r.getPixelRatio(),w:GLSKY.pw,h:GLSKY.ph};}catch(e){}
   return o;
 };
