@@ -1180,8 +1180,11 @@ function glskyWarmOne(r,sc,cam,only,cont){   /* [B4d] cont = wadah tempat 'only'
     }else{   /* default: HANYA akar scene/unit dipaksa visible, anak tetap sesuai keadaan bawaan = yang benar-benar tergambar di flush pertama */
       sc.visible=true;
       if(only){
-        ch=(cont||sc).children;for(i=0;i<ch.length;i++)if(ch[i]!==only&&!ch[i].isLight)ch[i].visible=false;only.visible=true;   /* [B4e] lampu JANGAN disembunyikan: jumlah lampu ikut kunci program three, tanpa lampu program yang dihangatkan beda dgn yang dipakai flush asli (ff[0] balik ~500 ms di B4c) */
-        if(cont&&cont!==sc){pa=cont;while(pa&&pa!==sc){pa.visible=true;pa=pa.parent;}}
+        pa=only;   /* [B4g] jalur only -> sc: di tiap level saudara non-lampu disembunyikan, leluhur dipaksa visible (cont sekarang hanya petunjuk, jalur dihitung dari parent) */
+        while(pa&&pa!==sc){
+          ch=pa.parent?pa.parent.children:[];for(i=0;i<ch.length;i++)if(ch[i]!==pa&&!ch[i].isLight)ch[i].visible=false;
+          pa.visible=true;pa=pa.parent;
+        }   /* [B4e] lampu JANGAN disembunyikan: jumlah lampu ikut kunci program three, tanpa lampu program yang dihangatkan beda dgn yang dipakai flush asli (ff[0] balik ~500 ms di B4c) */
       }
     }
     r.setScissorTest(true);r.setScissor(0,0,1,1);
@@ -1276,24 +1279,33 @@ function glskyWarm(stop,onPl,onDone){
     try{if(typeof SCP3D_GL!=='undefined'&&SCP3D_GL.on&&SCP3D_GL.err<3&&typeof SCP3D!=='undefined'&&SCP3D.state===2&&SCP3D.sc&&SCP3D.sc.parent!==S.tScene)q.push(['scp',SCP3D.sc,S.tCam,null,1]);}catch(eS1){}
     try{if(S.drOn&&S.dpOn&&typeof DR3D!=='undefined'&&DR3D.state===2&&DR3D.sc&&DR3D.sc.parent!==S.mdScene)q.push(['dr',DR3D.sc,S.tCam,null,1]);}catch(eD1){}
     var qi=0;
-    function kidsRun(it,done){   /* [B4c] unit besar (scp/dr): satu anak per render, irisan <=24 ms per task + jeda 6 ms (bar tetap jalan); anak berat (>=15 ms) dicatat di GLW.r1c = [unit,nama,ms,tipe material,ukuran map] */
+    function kidsRun(it,done){   /* [B4g: antrean rekursif, w1.c[5]=kedalaman] [B4c] unit besar (scp/dr): satu anak per render, irisan <=24 ms per task + jeda 6 ms (bar tetap jalan); anak berat (>=15 ms) dicatat di GLW.r1c = [unit,nama,ms,tipe material,ukuran map] */
       var sc=it[1],cam=it[2],cont=sc,ch,i=0,tt=performance.now(),tot=0,dp,j,b;
       function cnt(o){var n=0;o.traverse(function(){n++;});return n;}
-      for(dp=0;dp<6;dp++){   /* [B4f] turun ke anak dengan keturunan terbanyak selama ia memuat >=60% isi wadah (dr: grup akar <5 anak tapi 0,6-0,7 dtk dalam satu blok) */
+      /* [B4g] turun ke anak terbesar (>=60%) dengan menciutkan rantai satu-anak (dr: sc>yaw>lean>mdl); lalu antrean irisan dibuka rekursif: anak dgn >=8 turunan diganti anak-anaknya (scp: Group 0,5 dtk) */
+      for(dp=0;dp<6;dp++){
         b=null;var bn=0,tn=cnt(cont),cn;for(j=0;j<cont.children.length;j++){cn=cnt(cont.children[j]);if(cn>bn){bn=cn;b=cont.children[j];}}
+        while(b&&b.children.length===1&&!b.children[0].isLight)b=b.children[0];
         if(b&&b.children.length>=2&&bn>=(tn-1)*.6)cont=b;else break;
       }
-      ch=cont.children.slice();
+      ch=[];
+      (function ex(n,d){   /* [B4g] Group/Object3D dgn >=8 turunan & >=2 anak dibuka jadi anak-anaknya (maks 6 level, maks 160 irisan); sisanya satu irisan */
+        var k=n.children.slice(),q;
+        for(q=0;q<k.length;q++){
+          if(ch.length<160&&d<6&&(k[q].type==='Group'||k[q].type==='Object3D')&&k[q].children.length>=2&&cnt(k[q])-1>=8)ex(k[q],d+1);
+          else ch.push({n:k[q],d:d});
+        }
+      })(cont,0);
       (function step(){
         if(halt())return;
-        var t0=performance.now(),c,t1,m,mp,im;
+        var t0=performance.now(),c,t1,m,mp,im,dd=0;
         while(i<ch.length&&performance.now()-t0<24){
-          c=ch[i++];t1=performance.now();
+          c=ch[i++];dd=c.d;c=c.n;t1=performance.now();
           try{glskyWarmOne(r,sc,cam,c,cont);}catch(eK){}
           t1=performance.now()-t1;tot+=t1;
           if(t1>=15&&GLW.r1c.length<40){
             try{m=c.material;if(m&&m.length)m=m[0];mp=m&&m.map;im=mp&&mp.image;}catch(eM){}
-            GLW.r1c.push([it[0],String(c.name||c.type||'?').slice(0,24),Math.round(t1),(m&&m.type)||'',im&&im.width?(im.width+'x'+im.height):'']);
+            GLW.r1c.push([it[0],String(c.name||c.type||'?').slice(0,24),Math.round(t1),(m&&m.type)||'',im&&im.width?(im.width+'x'+im.height):'',dd]);
           }
         }
         if(i<ch.length){setTimeout(step,6);return;}
