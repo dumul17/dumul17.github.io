@@ -734,13 +734,13 @@ function ast3dDraw(now,half){
    Memakai renderer GL 'big' + kamera ortho AST3D, scene SENDIRI (AST3D.sc tidak tersentuh, cache batu sabuk aman). Bagian depan (arah gerak) + tepi menyala
    warna kepala, sisi belakang tetap batu gelap berkawah. Dirender langsung (tanpa cache) karena cuma 2 objek + hanya ~5 dtk setelah Konami.
    Gagal / belum siap -> return false: pemanggil menggambar bulatan putih 2D seperti dulu. Satu kali gagal = berhenti mencoba (D.bad). */
-var AST3D_HD={built:false,bad:false,sc:null,mat:null,m:[]};
+var AST3D_HD={built:false,bad:false,sc:null,gr:null,mat:null,m:[]};   /* [G4.18] gr = Group berisi 2 mesh kepala: pindah antara D.sc (renderer 'big' + blit) dan GLSKY.hScene (pass kepala GL, tanpa blit) */
 function ast3dHeadsBuild(){
   var D=AST3D_HD,T,i,geo,ig,v;
   if(D.built)return true;
   if(D.bad||AST3D.state!==2||typeof THREE==='undefined')return false;
   T=THREE;
-  D.sc=new T.Scene();
+  D.sc=new T.Scene();D.gr=new T.Group();D.sc.add(D.gr);
   D.mat=new T.ShaderMaterial({
     transparent:true,depthTest:true,depthWrite:true,
     blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor,
@@ -782,7 +782,7 @@ function ast3dHeadsBuild(){
     ig.setAttribute('iA',v.A);ig.setAttribute('iB',v.B);ig.setAttribute('iC',v.C);ig.setAttribute('iD',v.D);
     ig.instanceCount=0;
     v.geo=ig;v.mesh=new T.Mesh(ig,D.mat);v.mesh.frustumCulled=false;v.mesh.visible=false;
-    D.sc.add(v.mesh);D.m.push(v);
+    D.gr.add(v.mesh);D.m.push(v);
   }
   D.built=true;return true;
 }
@@ -805,7 +805,8 @@ function ast3dHeads(list,now){
   if((typeof IS_POTATO!=='undefined'&&IS_POTATO)||(typeof reduce!=='undefined'&&reduce))return false;
   try{
     if(!ast3dHeadsBuild())return false;
-    ast3dResize();
+    var glH=(typeof glskyHeadsOn==='function')&&glskyHeadsOn()&&glskyHeadsAttach(D.gr);   /* [G4.18] ?glsky=1: kepala di pass kepala GL (shader memakai projectionMatrix saja, kamera pass GL = AST3D.cam: ortho 0..W, H..0) */
+    if(!glH){if(D.gr.parent!==D.sc)D.sc.add(D.gr);ast3dResize();}
     for(i=0;i<D.m.length;i++){D.m[i].mesh.visible=false;D.m[i].geo.instanceCount=0;}
     for(i=0;i<list.length;i++){
       h=list[i];v=D.m[h.k];if(!v)continue;
@@ -823,6 +824,7 @@ function ast3dHeads(list,now){
       if(h.x-hf<bx0)bx0=h.x-hf;if(h.x+hf>bx1)bx1=h.x+hf;if(h.y-hf<by0)by0=h.y-hf;if(h.y+hf>by1)by1=h.y+hf;
     }
     if(!n)return true;   /* kepala di luar layar: tidak ada yang digambar, tapi 3D "siap" (bukan fallback) */
+    if(glH){GLSKY.hAct=true;return true;}   /* [G4.18] digambar glskyRenderAll (pass kepala), tanpa render 'big' dan tanpa blit */
     threeGLBegin(AST3D.gl);
     AST3D.r.render(D.sc,AST3D.cam);
     var cvA=AST3D.r.domElement,kx=AST3D.pw/W,ky=AST3D.ph/H,

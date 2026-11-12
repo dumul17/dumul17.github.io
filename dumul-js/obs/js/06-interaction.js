@@ -710,6 +710,54 @@ function cometHeadsFlush(now){
   }
   L.length=0;
 }
+/* [G4.18] KOMET/KONAMI di GL (?glsky=1): sama dengan drawAurora/drawComet 2D, tapi jadi op GL (aditif, urutan sama dengan 2D = di bawah garis+bintang GL).
+   Aurora = 14 irisan quad, tiap irisan sub-rect UV dari sprite 1024x96 (uUV, glskyImg arg ke-11); pusat irisan = pusat rect tujuan 2D dalam bingkai (x,y) yang diputar ang. */
+function drawAuroraGl(spr,L,hr,x,y,ang,a,now,seed){
+  var NS=14,sw=512/NS,dw=L/NS,dh=hr*9,w=dw+1,uw=(sw+1)/(spr.width||1024),sc=(now*.045+seed*211)%512,ca=Math.cos(ang),sa=Math.sin(ang),j,p,f,al,sx,lx,ly;
+  for(j=0;j<NS;j++){
+    p=j/NS;f=Math.min(1,p/.8);f=f*f*(3-2*f);
+    al=a*f*(.78+.22*Math.sin(now*.0031+j*.8+seed*7));
+    if(!(al>.004))continue;
+    sx=(j*sw+sc)%512;
+    ly=Math.sin(now*.0019+p*6+seed*6)*hr*1.7*(1-p*.55);
+    lx=-L+j*dw+w*.5;
+    glskyImg(spr,al,x+lx*ca-ly*sa,y+lx*sa+ly*ca,w,dh,ang,1,0,null,[sx/(spr.width||1024),0,uw,1]);
+  }
+}
+function cometGlowGl(x,y,r,rgb,al){
+  var sp,half;
+  if(!(al>.01)||!(r>0)||typeof getStarSprite!=='function')return;
+  sp=getStarSprite(rgb);half=sp.pad*(r*5/sp.R);
+  glskyImg(sp.c,Math.min(1,al),x,y,half*2,half*2,0,1,0);
+}
+function drawCometGl(s,now,u,x,y,a,red,mix,hr,L,ang){
+  var ca=Math.cos(ang),sa=Math.sin(ang),ux=-ca,uy=-sa,nx=-uy,ny=ux,N=9,k,p,d,lat,c1=red?'255,120,110':'160,240,255',c2=red?'255,190,120':'255,120,170',ang2,q;
+  if(mix||!red)drawAuroraGl(COMET_SPR.aurB,L,hr,x,y,ang+(mix?.04:.02),a*(mix?.85:1),now,s.seed);
+  if(mix||red)drawAuroraGl(COMET_SPR.aurR,L,hr,x,y,ang-(mix?.05:.0),a*(mix?.6:1),now,s.seed+1);
+  if(mix){   /* ekor debu pink */
+    ang2=ang+s.bend+.02*Math.sin(now*.002+s.seed*6);
+    glskyImg(COMET_SPR.pink,a*.8,x-Math.cos(ang2)*L*.525,y-Math.sin(ang2)*L*.525,L*1.05,hr*6.4,ang2,1,0);
+  }
+  glskyImg(red?COMET_SPR.red:COMET_SPR.cyan,a,x-ca*L*.5,y-sa*L*.5,L,hr*3,ang,1,0);   /* ekor ion */
+  for(k=0;k<N;k++){   /* percikan di sepanjang ekor */
+    p=((k/N)+(now*.00045+s.seed))%1;d=p*L*.95;lat=Math.sin(p*17+k*2.3+s.seed*9)*hr*(.6+p*2.2);
+    glfDot(x+ux*d+nx*lat,y+uy*d+ny*lat,Math.max(.5,hr*.22*(1-p*.6)),(k&1)?c2:c1,a*(1-p)*.75);
+  }
+  var pulse=.88+.12*Math.sin(now*.011+s.seed*9);
+  cometGlowGl(x,y,hr*1.5,red?'255,60,60':'255,70,120',a*.5*pulse);
+  cometGlowGl(x,y,hr*1.05,red?'255,170,150':'150,240,255',a*.95);
+  q=red?'255,215,205':'225,250,255';
+  glfLine(x-hr*2.8,y,x+hr*2.8,y,.9,q,.55*a);
+  glfLine(x,y-hr*2.8,x,y+hr*2.8,.9,q,.55*a);
+  COMET_HEADS.push({x:x,y:y,vx:s.vx,vy:s.vy,r:hr,a:a,red:red,k:red?1:0,seed:s.seed,pulse:pulse});
+  if(s.split){   /* cincin kejut saat pecah */
+    var qq=(now-s.splitT)/650;
+    if(qq>=0&&qq<1){
+      glfArc(s.sx,s.sy,hr*(3+24*qq),0,6.283,1.5,'255,90,140',.8*(1-qq));
+      glfArc(s.sx,s.sy,hr*(2+15*qq),0,6.283,1.5,'120,235,255',.7*(1-qq));
+    }
+  }
+}
 function drawComet(s,now,u,x,y){
   if(!COMET_SPR)bakeCometSprites();
   var a=Math.min(1,u/.07)*Math.min(1,(1-u)/.22);
@@ -720,6 +768,7 @@ function drawComet(s,now,u,x,y){
   var pal=s.pal,red=pal==='red',mix=pal==='mix',hr=s.hr,k;
   var L=s.L*(s.grow?(.3+.7*Math.min(1,(now-s.t)/s.grow)):1);
   var ang=Math.atan2(s.vy,s.vx);
+  if(typeof glskyCometOn==='function'&&glskyCometOn()){drawCometGl(s,now,u,x,y,a,red,mix,hr,L,ang);return;}   /* [G4.18] ?glsky=1: efek komet jadi op GL */
   g.save();g.globalCompositeOperation='lighter';
   /* aurora (di bawah ekor ion). Sebelum pecah: biru + merah menyatu, setelah pecah: masing-masing. */
   if(mix||!red)drawAurora(COMET_SPR.aurB,L,hr,x,y,ang+(mix?.04:.02),a*(mix?.85:1),now,s.seed);

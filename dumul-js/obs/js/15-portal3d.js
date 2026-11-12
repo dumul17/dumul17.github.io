@@ -1119,8 +1119,7 @@ function portal3dGlRing(now){
     /* tip denyut idle (petunjuk tap) ikut GL */
     if(!OVSEL.seen&&!op.hid&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
       var ph=(now%2600)/2600,tipR=Rd*(1.04+.26*ph);
-      try{GLSKY.hiOv=5104;drawRipple(px,py,tipR,ptCol(),.38*(1-ph),false);}catch(eT){}
-      GLSKY.hiOv=0;
+      try{ptGlRipple(0,0,tipR,ptCol(),.38*(1-ph),false,px,py,tm,ang,5104);}catch(eT){}   /* [G4.18] denyut ikut miring cincin (tm) + rotasi layar, sama dgn 2D (g.transform(tm)) */
     }
 
     PT3D.glRingT=now;PT3D.ovR=Rp;PT3D.ovT=now;PT3D.ovX=px;PT3D.ovY=py;PT3D.ovHid=op.hid;

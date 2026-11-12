@@ -34,6 +34,7 @@
    G4.7: DRONE TX/RX 3D (14-drone3d.js) = Group di LAYER DRONE (kanvas #gldrone di ATAS #sky, kanvas GL ketiga, malas), tanpa blit/drawImage; halo lembut tetap 2D di bawahnya. Di atas #sky karena planet masih blit 2D dan drone digambar sesudah planet. Planet pindah GL => drone pindah ke pass atas, layer dihapus. Flag ?gldrone=0 A/B | konsol GLSKY.drOn.
    G4.8: PLANET full GL (17-planet3d.js pl3dGlPrep): shader strip yang sama digambar langsung di PASS PLANET (pScene + tCam y-ke-atas), dirender sesudah pass teleskop dan sebelum #sky (urutan 2D lama). Tanpa renderer 'big', tanpa blit. Efek 2D planet (aurora/debris/flare/petir) tetap di #sky. Flag ?glplanet=0 A/B | konsol GLSKY.plOn, PL3D.glm.
    G4.9: EFEK PLANET (aurora/debris/flare/petir, 17-planet3d.js pl3dGlFx) pindah ke PASS PLANET (pScene) sesudah permukaan: aurora = mesh kolom instancing (VS menghitung tinggi/alpha tirai per kolom dari fungsi waktu, tanpa bake/keyframe/kanvas offscreen), debris = titik+garis, flare = blob radial 3-stop, petir = ruas garis (glow awan tetap shader uBolt planet). Titik planet-ruang -> pass planet lewat affine (ayunan libr + rotasi stage + balik y) dari JS. Blend source-over premultiplied (sama dgn 'lighter' di kanvas transparan lalu ditumpuk normal). Flag ?glplfx=0 A/B | konsol GLSKY.pfOn, PL3D.fxGl.
+   G4.18: KOMET/KONAMI ke GL (06-interaction.js drawCometGl + 12-ast3d.js ast3dHeads): aurora = irisan quad dengan sub-rect UV (uUV, glskyImg arg ke-11), ekor ion/debu = quad texture, percikan/silang/cincin kejut = titik/garis GL, glow kepala = sprite bintang; kepala batu 3D = Group di PASS KEPALA (hScene, sesudah scene utama, sebelum pass teleskop = urutan 2D lama), tanpa renderer 'big', tanpa blit. Flag ?glcomet=0 A/B | konsol GLSKY.cometOn, GLSKY.hAct.
    G4.15: SUPERSAMPLE UNIT KECIL (teleskop di pass atas + drone di pass drone): tiap unit dirender dulu ke WebGLRenderTarget seukuran kotaknya saja (2x piksel layar, tanpa MSAA; ?glssms=N untuk MSAA target), lalu ditempel sebagai quad bertekstur di renderer utama.
        RT dibuat 'seperti kanvas': flag isXRRenderTarget + texture.colorSpace sRGB membuat three menerapkan ACES + enkode sRGB per fragmen (sama dgn jalur langsung), jadi warna identik dan glow toneMapped:false tidak ikut ter-ACES. Blend aditif di RT tidak menyentuh kanal alpha (supaya quad tidak meredupkan latar).
        Swa-uji sekali di glskyBuild (abu-abu .5 harus terbaca ~188 + ACES harus beda); gagal/tidak didukung/galat = jalur langsung lama otomatis. Flag ?glssaa=0 A/B, ?glssk=2 (faktor), ?glssms=0|2|4 | konsol GLSKY.sa.
@@ -55,6 +56,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   vig:.34,drift:0,rec:false,fxOn:true,starOn:true,lineOn:true,ssOn:true,soft:1,inst:false,sn:0,ln:0,ln2:0,ln3:0,hiOv:0,bs:null,bl:null,bl2:null,bl3:null,ms:null,ml:null,ml2:null,ml3:null,now:0,ops:[],n:0,mesh:[],geo:null,dummy:null,tx:new Map(),col:Object.create(null),sw:0,maxTex:2048,
   /* [PATCH G4.1] unit 3D yang di-attach ke scene bersama (batu belakang dulu); astOn = A/B ?glast=0 */
   /* [PATCH G3d] bhShockOn = A/B ?glbhshock=0 */
+  /* [G4.18] komet/Konami: cometOn = A/B ?glcomet=0; hScene = pass kepala batu komet; hAct = ada kepala yang digambar frame ini */
+  cometOn:true,hScene:null,hAct:false,
   units:[],tScene:null,tCam:null,tUnits:[],oR:null,oCv:null,oScene:null,oCam:null,oOk:false,oErr:0,oPw:0,oPh:0,astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
   /* [G4.7] layer drone: kanvas GL ketiga (#gldrone) DI ATAS #sky, anak #stage; dibuat malas saat drone pertama muncul. drOn = A/B ?gldrone=0 */
   drOn:true,dR:null,dCv:null,dScene:null,dCam:null,dOk:false,dErr:0,dPw:0,dPh:0,dShown:false,
@@ -77,6 +80,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glstars=0(&|#|$)/.test(location.search))GLSKY.starOn=false;
     if(/[?&]gllines=0(&|#|$)/.test(location.search))GLSKY.lineOn=false;
     if(/[?&]glss=0(&|#|$)/.test(location.search))GLSKY.ssOn=false;
+    if(/[?&]glcomet=0(&|#|$)/.test(location.search))GLSKY.cometOn=false;   /* [G4.18] */
     if(/[?&]glsoft=0(&|#|$)/.test(location.search))GLSKY.soft=0;
     if(/[?&]gllay=0(&|#|$)/.test(location.search))GLSKY.lay=false;
     if(/[?&]glast=0(&|#|$)/.test(location.search))GLSKY.astOn=false;   /* [PATCH G4.1] A/B: batu belakang tetap 2D */
@@ -172,6 +176,8 @@ function glskyLayoutTest(){
 
 /* ---------- G1: daftar op + texture ---------- */
 var GLSKY_VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+/* [G4.18] varian dengan sub-rect UV (uUV = offset xy, skala zw): irisan aurora komet. Dipakai HANYA material quad op (glskyMesh); material supersample (sa.q) tetap GLSKY_VS tanpa uUV. */
+var GLSKY_VS_UV='varying vec2 vUv;uniform vec4 uUV;void main(){vUv=uv*uUV.zw+uUV.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
 /* highp WAJIB: uv di quad ~1800 px, mediump (10 bit) menggeser sampling beberapa piksel. uTex 0 = isi warna (uC sudah premultiplied), 1 = texture premultiplied x alpha (uC.a), 2 = vignette (hitam, alpha uC.a x kurva jarak dari pusat), 3 = MULTIPLY (texture premultiplied; faktor = 1 - a*(tex.a - tex.rgb), blend ZERO,SRC_COLOR = canvas 'multiply' di atas backdrop opak; uC.a = alpha) */
 var GLSKY_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uC;uniform float uTex;uniform float uB;void main(){if(uTex>2.5){vec4 t=texture2D(uMap,vUv,uB);gl_FragColor=vec4(vec3(1.0)-uC.a*(vec3(t.a)-t.rgb),1.0);}else if(uTex>1.5){vec2 p=(vUv-0.5)*2.0;gl_FragColor=vec4(0.0,0.0,0.0,uC.a*smoothstep(0.5,1.4,length(p)));}else gl_FragColor=uTex>0.5?texture2D(uMap,vUv,uB)*uC.a:uC;}';
 
@@ -181,7 +187,7 @@ function glskyCol(str){
   a=String(str).split(',');
   return (GLSKY.col[str]=[(+a[0]||0)/255,(+a[1]||0)/255,(+a[2]||0)/255]);
 }
-function glskyOp(){var S=GLSKY,o=S.ops[S.n];if(!o)o=S.ops[S.n]={};o.b=0;o.hi=0;S.n++;return o;}   /* [FIX] hi di-reset: objek op dipakai ulang antar frame, hi=1 sisa frame lalu bikin op lain (fill/vignette) ikut renderOrder 5100 */   /* b = bias LOD texture (0 = normal) */
+function glskyOp(){var S=GLSKY,o=S.ops[S.n];if(!o)o=S.ops[S.n]={};o.b=0;o.hi=0;o.uv=null;o.aff=null;S.n++;return o;}   /* [G4.18] uv/aff juga di-reset: glskyMW dkk tidak mengisinya, dulu bisa mewarisi sisa op lain di index yang sama */   /* [FIX] hi di-reset: objek op dipakai ulang antar frame, hi=1 sisa frame lalu bikin op lain (fill/vignette) ikut renderOrder 5100 */   /* b = bias LOD texture (0 = normal) */
 /* isi layar penuh (pengganti g.fillRect(0,0,W,H) berwarna 'r,g,b' dgn globalAlpha a) */
 function glskyFill(rgb,a){
   var o=glskyOp();o.k=0;o.c=glskyCol(rgb);o.a=a;o.add=0;o.cx=W*.5;o.cy=H*.5;o.w=W;o.h=H;o.rot=0;
@@ -216,8 +222,8 @@ function glskyDrift(o,c){
 }
 /* gambar canvas c: pusat (cx,cy), ukuran w x h (px stage), rotasi rad (searah canvas.rotate), add=1 'lighter', add=2 'multiply' */
 /* aff (opsional) = [a,b,c,d] affine 2x2 gaya g.transform/ptTiltMat (x'=a*x+c*y, y'=b*x+d*y) yang dikenakan pada quad SEBELUM rotasi rot, mis. mulut portal yang ikut kemiringan cincin */
-function glskyImg(c,a,cx,cy,w,h,rot,add,hi,aff){
-  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;o.hi=GLSKY.hiOv?GLSKY.hiOv:(hi>=1000?hi:(hi?1:0));o.aff=aff||null;   /* [G4.16] hi >= 1000 = renderOrder literal (urutan di dalam portal: mulut 5100 < petir 5101 < cincin 5102 < kilau+percikan 5103); GLSKY.hiOv (sementara) menimpa hi untuk efek kecil yang dipanggil lewat drawRipple   /* [PATCH G3d] hi=1 -> renderOrder 5100 */
+function glskyImg(c,a,cx,cy,w,h,rot,add,hi,aff,uv){
+  var o=glskyOp();o.k=1;o.t=c;o.a=a;o.add=add===2?2:(add?1:0);o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;o.hi=GLSKY.hiOv?GLSKY.hiOv:(hi>=1000?hi:(hi?1:0));o.aff=aff||null;o.uv=uv||null;   /* [G4.18] uv = [u0,v0,du,dv] sub-rect texture (irisan aurora komet) */   /* [G4.16] hi >= 1000 = renderOrder literal (urutan di dalam portal: mulut 5100 < petir 5101 < cincin 5102 < kilau+percikan 5103); GLSKY.hiOv (sementara) menimpa hi untuk efek kecil yang dipanggil lewat drawRipple   /* [PATCH G3d] hi=1 -> renderOrder 5100 */
   glskyDrift(o,c);
 }
 /* ekuivalen plateBlit(c,m,pw,ph,z,ox,oy) 02-sky-logic.js: zoom z di sekitar pusat layar + offset (ox,oy); alpha = g.globalAlpha saat dipanggil */
@@ -258,6 +264,7 @@ function glskyLive(c){
   if(typeof MW!=='undefined'&&MW.img&&(c===MW.img||c===MW.img.__glc))return true;   /* texture Milky Way: jangan ikut tersapu */
   for(i=0;i<plateDust.length;i++)if(plateDust[i].c===c)return true;
   if(typeof SS_SPR!=='undefined')for(k in SS_SPR)if(SS_SPR[k]===c)return true;   /* sprite goresan meteor (04-render.js ssSprite): jangan ikut tersapu, kalau tidak di-upload ulang tiap sapuan */
+  try{if(typeof COMET_SPR!=='undefined'&&COMET_SPR){for(k in COMET_SPR)if(COMET_SPR[k]===c)return true;}}catch(eCs){}   /* [G4.18] sprite komet (aurora/ekor): jangan ikut tersapu */
   if(typeof BH_SHOCK_SPR!=='undefined'&&(c===BH_SHOCK_SPR.c0||c===BH_SHOCK_SPR.c1))return true;   /* [PATCH G3d] sprite cincin BH shock */
   if(typeof SNFX!=='undefined'&&SNFX.spr){for(var _sk in SNFX.spr){var _ss=SNFX.spr[_sk];if(_ss&&(c===_ss.core||c===_ss.ring||c===_ss.streak||c===_ss.flash))return true;}}   /* [PATCH G3e] sprite supernova snBake */
   if(typeof RING_SPRITE_CACHE!=='undefined'){for(var _rk in RING_SPRITE_CACHE){var _rs=RING_SPRITE_CACHE[_rk];if(_rs&&_rs.c===c)return true;}}   /* [PATCH G3f] sprite cincin trigger/ripple */
@@ -511,8 +518,8 @@ function glskyInstFlush(){
 function glskyMesh(i){
   var S=GLSKY,T=window.THREE,m;
   m=new T.Mesh(S.geo,new T.ShaderMaterial({
-    uniforms:{uMap:{value:S.dummy},uC:{value:new T.Vector4(0,0,0,1)},uTex:{value:0},uB:{value:0}},
-    vertexShader:GLSKY_VS,fragmentShader:GLSKY_FS,
+    uniforms:{uMap:{value:S.dummy},uC:{value:new T.Vector4(0,0,0,1)},uTex:{value:0},uB:{value:0},uUV:{value:new T.Vector4(0,0,1,1)}},
+    vertexShader:GLSKY_VS_UV,fragmentShader:GLSKY_FS,
     transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,
     blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));
   m.frustumCulled=false;m.renderOrder=10+i;m.__ro=10+i;
@@ -521,6 +528,7 @@ function glskyMesh(i){
 }
 function glskyApply(m,o){
   var S=GLSKY,T=window.THREE,u=m.material.uniforms,a=o.a,tx;
+  if(o.uv)u.uUV.value.set(o.uv[0],o.uv[1],o.uv[2],o.uv[3]);else u.uUV.value.set(0,0,1,1);   /* [G4.18] */
   if(o.k===2){u.uTex.value=2;u.uC.value.set(0,0,0,a);}
   else if(o.k){
     tx=glskyTex(o.t);
@@ -868,9 +876,10 @@ function glskyRenderAll(){
   S.sa.n=0;S.sa.px=0;
   S.r.render(S.scene,S.cam);
   for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){top=true;break;}
-  if(!top&&!S.pAct&&!S.dpAct)return;
+  if(!top&&!S.pAct&&!S.dpAct&&!S.hAct)return;
   S.r.autoClear=false;
   try{
+    if(S.hAct&&S.hScene){S.r.clearDepth();S.r.render(S.hScene,S.tCam);}   /* [G4.18] pass kepala komet: di atas scene utama, di bawah teleskop (urutan 2D lama: komet digambar sebelum teleskop/planet) */
     if(top){S.r.clearDepth();if(!glskySaTop())S.r.render(S.tScene,S.tCam);}   /* pass atas: teleskop ([G4.15] lewat RT supersample; false = langsung) */
     if(S.pAct&&S.pScene){S.r.clearDepth();S.r.render(S.pScene,S.tCam);}      /* [G4.8] pass planet: di atas teleskop (urutan 2D lama), di bawah #sky */
     if(S.dpAct&&S.dpOk&&S.dbScene){                                          /* [G4.10] pass drone: di atas planet + efek planet */
@@ -882,6 +891,10 @@ function glskyRenderAll(){
   }finally{S.r.autoClear=true;}
   if(S.pAct&&S.pChk){S.pChk=false;try{if(typeof pl3dGlVerify==='function')pl3dGlVerify();}catch(eV){}}   /* diagnosa shader planet, sekali, sesudah render pertama */
 }
+/* [G4.18] komet/Konami: efek (aurora, ekor, percikan, glow, cincin kejut) dicatat sebagai op GL sebelum flush; kepala batu 3D = Group di pass kepala */
+function glskyCometOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.ssOn&&S.cometOn&&S.ok&&S.r&&typeof glfDot==='function');}
+function glskyHeadsOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.cometOn&&S.ok&&S.r&&S.hScene&&S.err<3);}
+function glskyHeadsAttach(grp){var S=GLSKY;if(!S.hScene||!grp)return false;try{if(grp.parent!==S.hScene)S.hScene.add(grp);return true;}catch(e){return false;}}
 function glskyAstOn(){var S=GLSKY;return !!(S.act&&S.astOn&&S.ok&&S.r);}   /* [PATCH G4.1] true = batu belakang boleh ikut scene GL */
 function glskyBhShockOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.bhShockOn&&S.ok&&S.r);}   /* [PATCH G3d] true = BH shockwaves digambar di GL */
 function glskySnOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.snOn&&S.ok&&S.r);}   /* [PATCH G3e] true = supernova/belt digambar di GL */
@@ -1105,6 +1118,7 @@ function glskyBuild(){
     S.tCam=new T.OrthographicCamera(0,1,1,0,-600,600);S.tCam.position.z=5;   /* [FIX G4.5] y-ke-ATAS (top=H, bottom=0) */
     S.tScene=new T.Scene();S.tUnits=[];
     S.pScene=new T.Scene();   /* [G4.8] pass planet */
+    S.hScene=new T.Scene();   /* [G4.18] pass kepala komet (di bawah pass teleskop) */
     S.dbScene=new T.Scene();S.mdScene=new T.Scene();   /* [G4.10] pass drone: bawah + (drone, atas) */
     S.root=new T.Group();S.scene.add(S.root);
     S.layers=new T.Group();S.root.add(S.layers);
@@ -1145,7 +1159,7 @@ function glskySize(){
    Penggambaran GL sendiri di glskyFlush() (setelah blok latar). */
 function glskyBegin(now,want){
   var S=GLSKY;
-  S.act=false;S.n=0;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;S.dpAct=false;S.dbn=0;S.dln=0;S.dsn=0;S.dtn=0;
+  S.act=false;S.n=0;S.hAct=false;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;S.dpAct=false;S.dbn=0;S.dln=0;S.dsn=0;S.dtn=0;
   if(!S.on||S.err>=3){glskyShow(false);glskyRestorePX();return false;}
   if(!S.init){glskyInit();return false;}
   if(!S.ok||!S.r)return false;
