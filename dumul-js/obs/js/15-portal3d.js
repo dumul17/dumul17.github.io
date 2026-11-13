@@ -182,6 +182,7 @@ function* pt3dBuildG(){
   yield;   /* ---- tahap 4 selesai: setSize pra-ukur ---- */
   PT3D.state=2;
   if(typeof threeWarm==='function')threeWarm(r,sc,cam,null,gl);
+  try{if(typeof glskyPtWarm==='function')glskyPtWarm();}catch(ePW){}   /* [B4p] kompilasi program cincin di renderer GLSky (kalau GLSky sudah siap; kalau belum, antrean warm 'ptrt' / render pertama) */
 }
 /* Build dipecah jadi 6 tahap (generator, yield di batas tahap), pola sama dgn dr3dBuildG / scp3dBuildG. Tiap tahap jalan satu giliran di THREE_Q lalu menunggu satu frame;
    tahap berikut di-unshift sehingga urutan antar modul tidak berubah. Waktu tiap tahap (ms) -> window.__pt3dT, dicatat bench (R.pt3dT).
@@ -272,7 +273,7 @@ function ptTiltMat(an){
   var exx=cy*cz-sy*sx*sz,exy=cy*sz+sy*sx*cz,eyx=-cx*sz,eyy=cx*cz;
   return [exx,-exy,-eyx,eyy];   /* y three ke atas, y kanvas ke bawah */
 }
-function pt3dRender(now,Rp,playing,tk){
+function pt3dRender(now,Rp,playing,tk,glRt){   /* [B4p] glRt = pemanggil jalur GLSky: boleh render ke RT GLSky (tanpa kanvas 2D sn) */
   var T=THREE,r=PT3D.r,res=pt3dRes(Rp);
   if(PT3D.big&&res<PT3D_CFG.resMax)res=PT3D_CFG.resMax;   /* sudah pernah charge / dive: tetap resolusi penuh (zoom-in nggak buram, nggak realokasi di tengah animasi) */
   if(res!==PT3D.res){PT3D.res=res;threeGLSize(PT3D.gl,res,res);}
@@ -290,6 +291,8 @@ function pt3dRender(now,Rp,playing,tk){
   if(PT3D.tilt){var an=ptTiltAng(now,tk);PT3D.tilt.rotation.set(an[0],an[1],an[2]);}
   PT3D.grp.rotation.x=(tk>0||still)?0:.06*Math.sin(t*.5);PT3D.grp.rotation.y=(tk>0||still)?0:.08*Math.sin(t*.37+1);   /* goyangan dikecilkan: cincin tampak bulat (kalau miring, goyangannya sudah ada di ptTiltAng) */
   PT3D.grp.rotation.z=PT3D.rz;
+  PT3D.rtOk=0;
+  if(glRt&&typeof glskyPtRt==='function'&&glskyPtRt(PT3D.sc,PT3D.cam,PT3D.res,PT3D.gl.ex)){PT3D.rtOk=1;PT3D.snN=(PT3D.snN|0)+1;return;}   /* [B4p] cincin dirender renderer GLSky ke RT: tidak ada render grup 'small', tidak ada threeGLSnap (drawImage ke kanvas 2D), tidak ada upload ptsn */
   threeGLBegin(PT3D.gl);
   r.render(PT3D.sc,PT3D.cam);
   if(window.__gpuP)glProbe(PT3D.gl,'pt.sub','pt.gpu');   /* [v37] probe GPU (?bench=1&gpup=1) */
@@ -1057,8 +1060,9 @@ function portal3dGlRing(now){
         reuse=alt&&PT3D.ccOK&&PT3D.ccRes===want&&(ova?(fsn%(ova>1?ova:2))!==0:(fsn&1)===1),rendered=false;
     if(!reuse&&(now!==PT3D.lastNow||Math.abs(tk-PT3D.lastTilt)>.001)){
       rendered=true;
-      PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rd,playing,tk);
-      if(alt){
+      PT3D.lastNow=now;PT3D.lastTilt=tk;pt3dRender(now,Rd,playing,tk,1);
+      if(alt&&PT3D.rtOk){PT3D.ccSn=0;PT3D.ccOK=1;PT3D.ccRes=PT3D.res;PT3D.ccT=now;}   /* [B4p] RT GLSky: texture selalu isi render terakhir, frame reuse tinggal menggambar op yang sama (tanpa salinan cc/sn) */
+      else if(alt){
         var rs=PT3D.res;
         if(PT3D_CFG.ptcc&&PT3D.gl.sn&&threeGLSrc(PT3D.gl)===PT3D.gl.sn){PT3D.ccSn=1;PT3D.ccSnN=PT3D.snN;}
         else{
@@ -1073,8 +1077,10 @@ function portal3dGlRing(now){
     var S=2*PT3D_CFG.half*Rd;
     var _cs=PT3D.ccSn?((PT3D.ccSnN===PT3D.snN&&threeGLSrc(PT3D.gl)===PT3D.gl.sn)?PT3D.gl.sn:null):PT3D.cc;
     var _src=((reuse||(ova&&PT3D.ccOK))&&_cs)?_cs:threeGLSrc(PT3D.gl);
-    _src.__gldyn=(rendered||!reuse)?1:0;   /* [FIX] kanvas cincin 3D berubah tiap RENDER -> upload ulang; frame reuse (isi sama persis) tidak upload lagi (dulu upload tiap frame) */
-    glskyImg(_src,1,px,py,S,S,ang,0,5102);   /* [G4.16] cincin 5102: di atas mulut (5100) + petir (5101), di bawah kilau charge + percikan (5103) */
+    var _uvr=null;
+    if(PT3D.rtOk&&GLW.pt.rt){_src=GLW.pt.src;_uvr=[0,1,1,-1];}   /* [B4p] RT: sumber = pengganti ber-__glpt; baris RT 0 = bawah, jadi v dibalik */
+    else _src.__gldyn=(rendered||!reuse)?1:0;   /* [FIX] kanvas cincin 3D berubah tiap RENDER -> upload ulang; frame reuse (isi sama persis) tidak upload lagi (dulu upload tiap frame) */
+    glskyImg(_src,1,px,py,S,S,ang,0,5102,null,_uvr);   /* [G4.16] cincin 5102: di atas mulut (5100) + petir (5101), di bawah kilau charge + percikan (5103) */
 
     /* --- kilau charge di atas cincin --- */
     if(!PXo.ptb&&ch>0){
