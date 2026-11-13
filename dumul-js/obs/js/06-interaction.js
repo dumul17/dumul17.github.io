@@ -368,8 +368,14 @@ function moveBHDrag(e){
     BH.x=drag.bx+Math.max(-limX,Math.min(limX,dx));
     BH.y=drag.by+Math.max(-limY,Math.min(limY,dy));
     var bm=BH.R*BHSC*1.15*Math.max(1,bhSizeMul());
+    if(!SECT.cur&&drag.pr0>0&&(skyZoom||1)<=1.02){   /* [FIX drag] overview: batas layar berlaku untuk PORTAL (posisi orbit = BH + offset), bukan titik jangkar BH. Dulu BH dijepit ke layar, jadi portal berhenti sebesar offset orbit sebelum tepi (terasa mentok di tengah kalau orbit ada di sisi berlawanan). Margin = .6 radius cincin. */
+      var pmg=Math.max(bm,drag.pr0*.6),ppx=drag.px0+(BH.x-drag.bx),ppy=drag.py0+(BH.y-drag.by);
+      BH.x+=Math.max(pmg,Math.min(W-pmg,ppx))-ppx;
+      BH.y+=Math.max(pmg,Math.min(H-pmg,ppy))-ppy;
+    }else{
     BH.x=Math.max(bm,Math.min(W-bm,BH.x));
     BH.y=Math.max(bm,Math.min(H-bm,BH.y));
+    }
     if(SECT.cur&&typeof planetBhClamp==='function'){var pcl=planetBhClamp(BH.x,BH.y,bm/1.15);BH.x=pcl[0];BH.y=pcl[1];}   /* planet: BH mini boleh terbenam sedikit di balik limb, tidak sampai hilang */
     if(!SECT.cur&&drag.pr0>0&&typeof planetObjClamp==='function'){   /* overview: portal ikut jari tapi maksimal tenggelam PL3D_CFG.ptSink (1 = 50%, pusat di limb) di balik limb planet; geser BH sebesar koreksi supaya portal ikut tertahan */
       var pcx=drag.px0+(BH.x-drag.bx),pcy=drag.py0+(BH.y-drag.by),pco=planetObjClamp(pcx,pcy,drag.pr0,PL3D_CFG.ptSink);
