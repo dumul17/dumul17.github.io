@@ -1700,7 +1700,10 @@ function glskyBegin(now,want){
 
 /* dipanggil sekali per frame SETELAH blok latar 2D: render daftar op yang dicatat plateBlit/sectDrawSky */
 /* [B0/F0] instrumentasi bench (hanya aktif kalau URL punya ?bench=1; produksi = no-op). Waktu per segmen glskyFlush + tiap r.render, jumlah upload tekstur, draw call, 6 flush pertama, spike >=8 ms. Keluar di dump bench sebagai "glseg" (glskySegOut). */
-var GLSG={on:/[?&]bench=1(&|$)/.test(location.search),s:{},ff:[],fd:[],cur:null,spk:[],t:0,fr:0,upTot:0,upFr:0,upMax:0,calls:0,tris:0,fu:[],pf:{},ua:{},ut:{},mkN:0,mkF:[],ui:{},ug:{},pk:null,pt:0};
+var GLSG={on:/[?&]bench=1(&|$)/.test(location.search),s:{},ff:[],fd:[],cur:null,spk:[],t:0,fr:0,upTot:0,upFr:0,upMax:0,calls:0,tris:0,fu:[],pf:{},ua:{},ut:{},mkN:0,mkF:[],ui:{},ug:{},pk:null,pt:0,hide:{},od:{},odF:0,odTot:0,odBig:0,odMx:0,gp:[],gt:null,gqa:false};
+/* [B4v] diagnostik GPU (hanya ?bench=1): glseg.od = overdraw per jenis op (rata-rata per frame: jumlah op, luas / luas layar), glseg.gt = timer query GPU per pass (EXT_disjoint_timer_query_webgl2, null kalau HP tidak punya), ?glhide=a,b = sembunyikan jenis layer untuk A/B diagnostik (BUKAN untuk dipakai):
+   op: fill (k0), vig (k2), awalan tag sumber (deep, bg, grid, dust, mw, ss, star, ring, comet, bh, tint, sn, skyt, pt, glfpl), add1 / add2 (semua op aditif / multiply); pass: p:head p:top p:pl p:dfx p:dmd (render dilewati); inst = mesh bintang/garis instanced; ast = unit di root scene utama. */
+try{if(GLSG.on){var _gh=/[?&]glhide=([A-Za-z0-9_:,.\-]+)/.exec(location.search);if(_gh)_gh[1].split(',').forEach(function(k){if(k)GLSG.hide[k]=1;});}}catch(eGh){}
 function glsgT(){return GLSG.on?performance.now():0;}
 function glsgBegin(){if(GLSG.on)GLSG.t=performance.now();}
 function glsgAdd(k,t0){
@@ -1713,6 +1716,65 @@ function glsgAdd(k,t0){
   return ms;
 }
 function glsgLap(k){if(!GLSG.on)return;var n=performance.now();glsgAdd(k,GLSG.t);GLSG.t=n;}
+/* [B4v] overdraw: tiap op GL yang tampil -> kunci (jenis + tag sumber), jumlah dan luas (bounding box terpotong layar / luas layar). Dipanggil sekali per flush sesudah loop apply. Juga menerapkan ?glhide untuk op. */
+function glsgOd(){
+  var S=GLSKY,i,o,m,w,h,cx,cy,c,sn,ww,hh,x0,x1,y0,y1,fr,key,tg,e,tot=0,big=0,k,hd=GLSG.hide,any=false;
+  if(!GLSG.on||!W||!H)return;
+  for(k in hd){any=true;break;}
+  GLSG.odF++;
+  for(i=0;i<S.n;i++){
+    o=S.ops[i];m=S.mesh[i];
+    if(!o||!m||!m.visible)continue;
+    w=o.w;h=o.h;cx=o.cx;cy=o.cy;
+    c=o.rot?Math.abs(Math.cos(o.rot)):1;sn=o.rot?Math.abs(Math.sin(o.rot)):0;
+    ww=w*c+h*sn;hh=w*sn+h*c;
+    x0=Math.max(0,cx-ww*.5);x1=Math.min(W,cx+ww*.5);y0=Math.max(0,cy-hh*.5);y1=Math.min(H,cy+hh*.5);
+    fr=x1>x0&&y1>y0?(x1-x0)*(y1-y0)/(W*H):0;
+    if(o.k===2)tg='vig';else if(!o.k)tg='fill';else{tg=o.t&&(o.t.__gltg||(o.t.__gltg=glsgTag(o.t)))||'?';}
+    key=tg+(o.add===1?'+':(o.add===2?'x':''));
+    e=GLSG.od[key]||(GLSG.od[key]=[0,0,0]);
+    e[0]++;e[1]+=fr;if(fr>e[2])e[2]=fr;
+    tot+=fr;if(fr>=.5)big++;
+    if(any){
+      for(k in hd){if(k===tg||(k.length>1&&tg.indexOf(k)===0)||(k==='add1'&&o.add===1)||(k==='add2'&&o.add===2)){m.visible=false;break;}}
+    }
+  }
+  GLSG.odTot+=tot;GLSG.odBig+=big;if(tot>GLSG.odMx)GLSG.odMx=tot;
+}
+/* [B4v] timer query GPU per pass: bungkus S.r.render (satu kali), nama pass dari identitas scene. Hanya satu query aktif sekaligus (gqa). Hasil dibaca beberapa frame kemudian (glsgGpuPoll), batch dibuang kalau GPU_DISJOINT. */
+function glsgGpuInit(){
+  var S=GLSKY,r=S.r,gl,ext,orig,g;
+  g=GLSG.gt={ext:false,why:'',n:0,dis:0,drop:0,res:{}};
+  try{
+    gl=r.getContext();ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    g.ext=!!ext;if(!ext)g.why='no EXT_disjoint_timer_query_webgl2';
+    orig=r.render;
+    r.render=function(sc,cam){
+      var nm=sc===S.scene?'main':sc===S.hScene?'head':sc===S.tScene?'top':sc===S.pScene?'pl':sc===S.dbScene?'dfx':sc===S.mdScene?'dmd':'other',q=null;
+      if(GLSG.hide['p:'+nm])return;
+      if(ext&&!GLSG.gqa&&GLSG.gp.length<48){try{q=gl.createQuery();gl.beginQuery(ext.TIME_ELAPSED_EXT,q);GLSG.gqa=true;}catch(eQ){q=null;GLSG.gqa=false;}}
+      try{return orig.call(r,sc,cam);}
+      finally{if(q){try{gl.endQuery(ext.TIME_ELAPSED_EXT);GLSG.gp.push([nm,q]);}catch(eE){}GLSG.gqa=false;}}
+    };
+  }catch(e){g.why=String(e&&e.message||e).slice(0,60);}
+}
+function glsgGpuPoll(){
+  var S=GLSKY,g=GLSG.gt,gl,ext,e,q,nm,ms,r,dis;
+  if(!g||!g.ext||!GLSG.gp.length)return;
+  try{
+    gl=S.r.getContext();ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    dis=!!gl.getParameter(ext.GPU_DISJOINT_EXT);
+    while(GLSG.gp.length){
+      e=GLSG.gp[0];q=e[1];
+      if(!gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE))break;
+      GLSG.gp.shift();
+      if(dis){g.dis++;gl.deleteQuery(q);continue;}
+      ms=gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6;gl.deleteQuery(q);
+      nm=e[0];r=g.res[nm]||(g.res[nm]=[0,0,0]);r[0]++;r[1]+=ms;if(ms>r[2])r[2]=ms;g.n++;
+    }
+    if(GLSG.gp.length>=40){while(GLSG.gp.length>8){try{gl.deleteQuery(GLSG.gp.shift()[1]);}catch(eD){}g.drop++;}}
+  }catch(eP){g.why=String(eP&&eP.message||eP).slice(0,60);}
+}
 function glsgR(k,t0){   /* sesudah satu r.render: waktu + draw call/segitiga render itu (info autoReset per render) */
   if(!GLSG.on)return;
   glsgAdd(k,t0);
@@ -1794,6 +1856,12 @@ window.glskySegOut=function(){
   if(!GLSG.on)return null;
   var o={fr:GLSG.fr,seg:{},ff:GLSG.ff,ffd:GLSG.fd,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; ffd[i]={t,ms,n=jumlah op,ops={kind:jumlah},s={segmen:ms},sc={pass:{m=material,p=material tanpa program,t=[[w,h,mip,jenis,sumber] tekstur belum di-upload],g=[[tipe objek,nama,tipe geometri,vertex,instance,index,renderOrder] geometri belum dikenal renderer; renderOrder 5000 ml, 5001 ms, 5101 ml2, 5103 ml3, 10 aurora planet, 0/1/2/10 efek drone],ge=jumlah geometri three saat scan (banding dgn d: selisih = dibuat di dalam render itu)}},opd=[[kind,sumber,w,h]] op flush ini,d={pass:[delta geometri,tekstur,program]} perubahan memori three per pass,tx/pg/ge=delta tekstur/program/geometri three,up=upload dinamis,calls,tris,sa={n,px,rt0,rt1,al=[[w,h,ms] alokasi RT],tm=[ms render RT,ms tempel quad]},q0=quad tempel sudah punya program};  spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
   for(k in GLSG.s){var g=GLSG.s[k];o.seg[k]=[g.n,+(g.ms/g.n).toFixed(2),+g.ms.toFixed(0),+g.mx.toFixed(1)];}
+  try{var _h=[],_k,_od={},_gtp={},_n=GLSG.odF||1,_t=0;for(_k in GLSG.hide)_h.push(_k);o.hide=_h;
+    for(_k in GLSG.od){_od[_k]=[+(GLSG.od[_k][0]/_n).toFixed(2),+(GLSG.od[_k][1]/_n).toFixed(3),+GLSG.od[_k][2].toFixed(3)];}
+    o.od={fr:GLSG.odF,tot:+(GLSG.odTot/_n).toFixed(3),big:+(GLSG.odBig/_n).toFixed(2),mx:+GLSG.odMx.toFixed(2),k:_od,_cols:'k[kunci]=[rata2 jumlah op per frame, rata2 luas/layar per frame (=lapisan overdraw), maks luas satu op]; tot = rata2 total lapisan per frame; big = rata2 op >=50% layar; kunci akhiran + = aditif, x = multiply'};
+    if(GLSG.gt){var _g=GLSG.gt,_f=GLSG.fr||1;for(_k in _g.res){_gtp[_k]=[_g.res[_k][0],+(_g.res[_k][1]/_g.res[_k][0]).toFixed(2),+_g.res[_k][2].toFixed(1),+(_g.res[_k][1]/_f).toFixed(2)];_t+=_g.res[_k][1]/_f;}
+      o.gt={ext:_g.ext,why:_g.why,n:_g.n,dis:_g.dis,drop:_g.drop,perFrame:+_t.toFixed(2),pass:_gtp,_cols:'pass[nama]=[jumlah query, rata2 ms GPU per panggilan, maks ms, ms GPU per flush]; perFrame = jumlah semua pass per flush'};}
+  }catch(eOd){}
   try{o.w1={r1:GLW.r1,f:GLW.r1f,n:GLW.r1n,t:GLW.r1t,c:GLW.r1c,ms:GLW.ms,st:GLW.st,post:GLW.post,defer:GLW.defer,hold:GLW.hold,p:GLW.p,fade:GLW.fade,sa:GLW.sa,tx:GLW.tx,pre:GLW.pre,pd:GLW.pd,its:GLW.its,f:GLW.f,inst:GLW.inst,instOn:GLW.instOn,q:GLW.q,qN:GLW.qN,ring:GLW.ring,rot:GLW.rot,ptNo:GLW.ptNo,uiT:GLW.uiT};}catch(eW1){}
   try{var kk,uo={};for(kk in GLSG.ua){var g2=GLSG.ua[kk];uo[kk]=[g2[0],+(g2[1]/g2[0]).toFixed(1),+g2[2].toFixed(1),+(g2[3]/g2[0]).toFixed(1),+g2[4].toFixed(1)];}var ug={},ui={};for(kk in GLSG.ug){var g3=GLSG.ug[kk];ug[kk]=[g3[0],g3[0]?+(g3[1]/g3[0]).toFixed(1):0];}for(kk in GLSG.ui){var g4=GLSG.ui[kk];ui[kk]=[g4[0],g4[0]?+(g4[1]/g4[0]).toFixed(2):0,+g4[2].toFixed(1)];}o.ug=ug;o.ui=ui;o.ua=uo;o.ut=GLSG.ut;try{var Pp=GLW.pt;o.pt={on:Pp.on,ok:Pp.ok,n:Pp.n,al:Pp.al,err:Pp.err,why:Pp.why,ms:Pp.ms,rw:Pp.rw,avg:Pp.n?+(Pp.t/Pp.n).toFixed(2):0,mx:+Pp.mx.toFixed(1),w:Pp.w};}catch(ePp){}   /* [B4p] */o.mk={n:GLSG.mkN,f:GLSG.mkF,len:GLSKY.mesh?GLSKY.mesh.length:0};try{var Sq=GLSKY.sa;o.st={n:GLSKY.saTopN,fr:Sq.fr,hit:Sq.hit,rd:Sq.rd};}catch(eSq){}try{o.plx=window.__plfxN||null;}catch(ePx){}   /* [B4r] frame efek planet aktif per jenis */}catch(eUa){}   /* [B4m] [B4q] st = pass atas: n (tiap N frame), fr frame, hit tempel saja, rd render segar */
   try{o.info={programs:GLSKY.r.info.programs?GLSKY.r.info.programs.length:null,geometries:GLSKY.r.info.memory.geometries,textures:GLSKY.r.info.memory.textures,pr:GLSKY.r.getPixelRatio(),w:GLSKY.pw,h:GLSKY.ph};}catch(e){}
@@ -1830,8 +1898,10 @@ function glskyFlush(){
     if(S.vig>0&&S.want&&S.lay&&!S.test){var vo=glskyOp();vo.k=2;vo.a=S.vig;vo.add=0;vo.cx=W*.5;vo.cy=H*.5;vo.w=W;vo.h=H;vo.rot=0;}   /* vignette: op terakhir => di atas latar GL, di bawah semua yang masih 2D */
     for(i=0;i<S.n;i++){m=S.mesh[i]||glskyMesh(i);glskyApply(m,S.ops[i]);}
     for(;i<S.mesh.length;i++)S.mesh[i].visible=false;
+    if(GLSG.on){if(!GLSG.gt)glsgGpuInit();glsgGpuPoll();glsgOd();if(S.root)S.root.visible=!GLSG.hide.ast;}   /* [B4v] */
     glsgLap('ops');
     glskyInstFlush();
+    if(GLSG.on&&GLSG.hide.inst&&S.inst){S.ml.visible=false;S.ms.visible=false;if(S.ml2){S.ml2.visible=false;S.ml3.visible=false;}}   /* [B4v] ?glhide=inst */
     glsgLap('inst');
     try{glskyDpUpload();}catch(eDpU){S.dpErr++;S.dpAct=false;if(S.dpErr>=3)S.dpOk=false;}   /* [G4.10] gagal x3 -> drone balik ke layer */
     glsgLap('dpUp');
