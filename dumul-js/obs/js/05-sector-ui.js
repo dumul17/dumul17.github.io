@@ -1076,21 +1076,21 @@ function frame(now){
     try{if(!PX.pulse&&typeof drawTxLines==='function')drawTxLines(now);}catch(eTx2){}
     }
     pmk('cons+stars');
-    if(_glk)try{drawBHShockwaves(now);}catch(eBhS){}   /* [PATCH G3d] antre cincin BH shock ke op GL SEBELUM flush (setelah bintang/garis tercatat) */
-    if(_glk)try{drawSupernovaBursts(now);}catch(eSnG){}   /* [PATCH G3e] antre supernova ke op GL sebelum flush */
-    if(_glk&&BELT)try{drawBeltFx(now);}catch(eBfG){}   /* [PATCH G3e] antre belt FX ke op GL sebelum flush */
-    if(_glk)try{drawTriggerVisuals(now);}catch(eTrG){}   /* [PATCH G3f] antre trigger ripple ke op GL sebelum flush */
+    if(_glk)try{drawBHShockwaves(now);}catch(eBhS){}pmk('pre.shk');   /* [PATCH G3d] antre cincin BH shock ke op GL SEBELUM flush (setelah bintang/garis tercatat) */
+    if(_glk)try{drawSupernovaBursts(now);}catch(eSnG){}pmk('pre.sn');   /* [PATCH G3e] antre supernova ke op GL sebelum flush */
+    if(_glk&&BELT)try{drawBeltFx(now);}catch(eBfG){}pmk('pre.belt');   /* [PATCH G3e] antre belt FX ke op GL sebelum flush */
+    if(_glk)try{drawTriggerVisuals(now);}catch(eTrG){}pmk('pre.trg');   /* [PATCH G3f] antre trigger ripple ke op GL sebelum flush */
     var _glfx=_glk&&typeof glskyFxOn==='function'&&glskyFxOn();   /* [PATCH G3h] efek kecil (urutan 2D lama: avail, focus, dust, lock) dicatat ke GL sebelum BH body/portal; drawSectFlash sengaja tetap 2D (paling atas) */
     if(_glfx){
-      try{ofxSafe(ofxDrawAvail,now);}catch(eAvG){}
-      try{drawFocusFx(now);}catch(eFfG){}
-      try{ofxSafe(ofxDrawDust,now);}catch(eDuG){}
-      try{drawTargetLock(now);}catch(eTlG){}   /* hanya reticle; teks telemetri digambar di panggilan 2D sesudah flush */
+      try{ofxSafe(ofxDrawAvail,now);}catch(eAvG){}pmk('pre.avail');
+      try{drawFocusFx(now);}catch(eFfG){}pmk('pre.focus');
+      try{ofxSafe(ofxDrawDust,now);}catch(eDuG){}pmk('pre.dust');
+      try{drawTargetLock(now);}catch(eTlG){}pmk('pre.lock');   /* hanya reticle; teks telemetri digambar di panggilan 2D sesudah flush */
     }
-    if(_glk)try{if(typeof portal3dGlRing==='function')portal3dGlRing(now);}catch(ePtG){}   /* [PATCH G4.2] antre cincin portal overview ke op GL sebelum flush */
-    if(_glk)try{if(typeof drawHoleGl==='function')drawHoleGl(now,age);}catch(eBhG){}   /* [PATCH G4.3] antre body BH ke op GL sebelum flush */
-    if(_glk)try{drawAsteroids(now,1);}catch(eAfG){}   /* [PATCH G4.4] batu depan dual-mesh sebelum flush */
-    if(_glk)try{drawFloatingTelescopeGl(now);}catch(eTlG){}   /* [PATCH G4.5] teleskop 3D ke scene GL sebelum flush (jalur 2D teleTop dilewati kalau true) */
+    if(_glk)try{if(typeof portal3dGlRing==='function')portal3dGlRing(now);}catch(ePtG){}pmk('pre.ptr');   /* [PATCH G4.2] antre cincin portal overview ke op GL sebelum flush */
+    if(_glk)try{if(typeof drawHoleGl==='function')drawHoleGl(now,age);}catch(eBhG){}pmk('pre.hole');   /* [PATCH G4.3] antre body BH ke op GL sebelum flush */
+    if(_glk)try{drawAsteroids(now,1);}catch(eAfG){}pmk('pre.astF');   /* [PATCH G4.4] batu depan dual-mesh sebelum flush */
+    if(_glk)try{drawFloatingTelescopeGl(now);}catch(eTlG){}pmk('pre.tele');   /* [PATCH G4.5] teleskop 3D ke scene GL sebelum flush (jalur 2D teleTop dilewati kalau true) */
     if(_glk)try{if(typeof pl3dGlPrep==='function')pl3dGlPrep(now);}catch(ePlGl){}   /* [G4.8] planet full GL: jadwalkan permukaan ke pass planet sebelum flush (planet3dDraw di bawah hanya efek 2D kalau true) */
     var _gdt=false,_gpt=false;
     if(_glk)try{_gpt=(typeof glskyPortalRingsOn==='function')&&glskyPortalRingsOn();if(_gpt)drawPortals(age,now);}catch(ePtR){_gpt=false;window.__hub.renderError='drawPortals(GL): '+(ePtR&&ePtR.message||ePtR);}   /* [G4.11] cincin sabuk Orion + garis penghubung ke mesh garis GL sebelum flush (DOM/logika drawPortals ikut jalan di sini, jadi pemanggilan 2D di bawah dilewati) */

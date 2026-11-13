@@ -1736,6 +1736,7 @@ function pl3dGlPrep(now){
     if(typeof pageHidden!=='undefined'&&pageHidden)return false;
     if(!pl3dGate(now))return false;
     cp=pl3dPar();
+    pl3dMk('pre.plh');   /* [B4s] sisa kepala pl3dGlPrep (pl3dSync/PalUpdate/Phase/Gate/Par) sejak marker pre.tele */
     try{pl3dGlFx(now,cp);}catch(eFxG){PL3D.fxGl=false;}   /* [G4.9] efek planet ke pass planet (sebelum pl3dUniforms: PL3D.bu petir terbaca frame yang sama) */
     var rtOk=false;
     if(PL3D.glRtOn){   /* [G4.8b] strip ke render target + quad tampil; galat/render kosong = pl3dGlRtKill lalu jalur langsung di bawah (frame yang sama) */
