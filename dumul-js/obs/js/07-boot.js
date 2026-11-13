@@ -364,7 +364,7 @@ var DUMUL_CHARS=(function(){
      Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
      [PATCH v175] Masuk LOG BOOT ("Persiapan akhir"). [PATCH v181] Sekarang juga masuk bobot bar (WT_PRE) dan baris status ke-7 (boot.pre.*): bar tidak lagi tertahan di 99% menunggu PRE. */
-  var PRE_MAX=3000,PRE_MAX_GL=5000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,gl:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
+  var PRE_MAX=3000,PRE_MAX_GL=16000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,gl:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
   /* [PATCH v186] sc (tampilan teleskop) cuma kerja kalau SCP3D_WF nyala (?scwf=1). Kalau mati, preFin('sc') selesai 0 ms tanpa kerja apa pun: jangan dicatat di log boot dan jangan ikut bobot bar. */
   function scOff(){return typeof SCP3D_WF!=='undefined'&&!SCP3D_WF;}
   /* [PATCH v189] gl = WARM GL PRA-KAPSUL (24-glsky.js glskyWarm): renderer GLSky + compile semua program + strip planet pertama dibayar di sini, bukan di frame pertama sesudah Blue
@@ -495,7 +495,7 @@ var DUMUL_CHARS=(function(){
   var WT_PAGE=500,WT_MODS=[700,1600,2150,800,800],WT_WARM=5000,WT_AUDIO=4000,WT_SFX=7000;   /* [PATCH v157] WT_SFX 2800→7000 biar fase metadata 16 bintang punya ruang bar lebih panjang; gate tetap 16/16 */
   /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
   /* [B5] bobot PRE dikalibrasi ulang ke waktu NYATA (dump 12 Nov, itel: ui/sc 0,05 dtk, ast 0,7, fb 0,8, rg 2,5, pl 2,9-3,0, gl 3,0 dari awal PRE; tiga terakhir = tiang gerbang). Dulu 2050 dari ±24600 (8%) dan gl cuma 300, jadi bar duduk di 97-99% selama ±1,5-3 dtk sementara log masih menampilkan langkah PRE. ?barw=0 = bobot lama (A/B). */
-  var WT_PRE_OLD={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},WT_PRE_NEW={ui:80,ast:300,pl:700,fb:250,sc:150,rg:600,gl:1200},WT_PRE=WT_PRE_NEW;
+  var WT_PRE_OLD={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},GL_PRE=!/[?&]glwpre=0(&|#|$)/.test(location.search),WT_PRE_NEW={ui:80,ast:300,pl:700,fb:250,sc:150,rg:600,gl:GL_PRE?3600:1200},WT_PRE=WT_PRE_NEW;
   try{if(/[?&]barw=0(&|#|$)/.test(location.search))WT_PRE=WT_PRE_OLD;}catch(eBw){}
   var WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1500,gl:1800},PRE_KEYS=['ui','ast','pl','fb','sc','rg','gl'];   /* [v189] gl: build renderer GLSky + kirim ±9 scene ke compileAsync (sisi main thread ±300 ms di itel; tunggu async-nya masuk creep) */
   function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg')+wtPre('gl');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
@@ -857,7 +857,7 @@ var DUMUL_CHARS=(function(){
     return age>0?w*CREEP_CAP*(1-Math.exp(-age/est)):0;
   }
   /* [B5] tahap glskyWarm (24-glsky.js GLW.f 0..1) dipakai BERSAMA oleh bar (bobot gl terisi sebanding f + rayapan per tahap) dan log (baris "Sentuhan akhir . tahap . n/4"), jadi angka % dan teks log selalu menunjuk pekerjaan yang sama. */
-  var GLS_F=[0,.25,.6,.75,1],GLS_EST=[500,1500,600,500];
+  var GLS_F=[0,.25,.6,.75,1],GLS_EST=[500,1500,600,GL_PRE?4500:500];   /* [B4k] tahap 4 (render pertama) sekarang memuat scp/dr/tex/plateDeep/sa pra-kapsul: ±4-5 dtk di itel */
   function glwOn(){try{return !!(window.__glwarm&&glWarmOn()&&pre.gl===1);}catch(e){return false;}}
   function glwF(){try{return glwOn()?Math.min(.99,window.__glwarm.f||0):0;}catch(e){return 0;}}
   function glwSg(f){return f<.25?0:(f<.6?1:(f<.75?2:3));}
