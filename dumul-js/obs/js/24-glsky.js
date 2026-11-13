@@ -1350,10 +1350,14 @@ function glskyDpUpload(){
 function glskyBuild(){
   var S=GLSKY,T=window.THREE,c,r;
   if(S.err>=3||S.r)return;
+  S.opq=/[?&]glalpha=0(&|#|$)/.test(location.search);   /* [B4z] kanvas #glsky opak (alpha:false): compositor tidak perlu blending lapisan GL; hanya A/B (default mati), cek mata dulu */
   try{
     c=document.createElement('canvas');c.id='glsky';c.setAttribute('aria-hidden','true');
     c.style.cssText='position:fixed;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;touch-action:none';
-    r=new T.WebGLRenderer({canvas:c,alpha:true,premultipliedAlpha:true,antialias:!!S.aa,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});   /* [PATCH G4.1] depth:true supaya unit 3D (batu) bisa depthTest; lapisan 2D-style tetap depthTest:false */
+    var cx=null,ro;
+    if(S.opq){try{cx=c.getContext('webgl2',{alpha:false,premultipliedAlpha:true,antialias:!!S.aa,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'});}catch(eOq){cx=null;}if(!cx)S.opq=false;}   /* [B4z] three r163+ SELALU minta konteks alpha:true (alpha:false hanya mengatur clear alpha), jadi opak harus lewat konteks buatan sendiri */
+    ro={canvas:c,alpha:!S.opq,premultipliedAlpha:true,antialias:!!S.aa,depth:true,stencil:false,preserveDrawingBuffer:false,powerPreference:'low-power'};if(cx)ro.context=cx;
+    r=new T.WebGLRenderer(ro);   /* [PATCH G4.1] depth:true supaya unit 3D (batu) bisa depthTest; lapisan 2D-style tetap depthTest:false */
     r.setPixelRatio(1);
     r.autoClear=true;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.0;   /* [G4.5] sama dgn renderer 'small' (threeGLGet tone): teleskop 3D di scene ini; ShaderMaterial GLSky tanpa chunk tonemapping tidak terpengaruh */
     c.addEventListener('webglcontextlost',function(e){
@@ -1704,7 +1708,7 @@ var GLSG={on:/[?&]bench=1(&|$)/.test(location.search),s:{},ff:[],fd:[],cur:null,
 /* [B4v] diagnostik GPU (hanya ?bench=1): glseg.od = overdraw per jenis op (rata-rata per frame: jumlah op, luas / luas layar), glseg.gt = timer query GPU per pass (EXT_disjoint_timer_query_webgl2, null kalau HP tidak punya), ?glhide=a,b = sembunyikan jenis layer untuk A/B diagnostik (BUKAN untuk dipakai):
    op: fill (k0), vig (k2), awalan tag sumber (deep, bg, grid, dust, mw, ss, star, ring, comet, bh, tint, sn, skyt, pt, glfpl), add1 / add2 (semua op aditif / multiply); pass: p:head p:top p:pl p:dfx p:dmd (render dilewati); inst = mesh bintang/garis instanced; ast = unit di root scene utama. */
 try{if(GLSG.on){var _gh=/[?&]glhide=([A-Za-z0-9_:,.~\-]+)/.exec(location.search);   /* [B4w] pemisah , . ~ - (autoabq memecah ',' jadi param terpisah dan hanya meloloskan A-Za-z0-9_=.,-, jadi pakai '.' di autoabq); alias tanpa ':' phead ptop ppl pdfx pdmd = p:head dst */
-  var HS=[],HC={portal:'.portal',hit:'.hit',bhclock:'#bh-clock',mpnp:'#mp-now-playing',footer:'footer',skypill:'#sky-pill',header:'#header',modec:'#mode-cluster',musicp:'#music-player',musict:'#music-toggle',livec:'#live-count',cgbtn:'#cg-btn',sscan:'#sector-scan',owlsrc:'#owl-source',owlpanel:'#owl-panel',bhpanel:'#bh-panel'};
+  var HS=[],HC={portal:'.portal',hit:'.hit',bhclock:'#bh-clock',mpnp:'#mp-now-playing',footer:'footer',skypill:'#sky-pill',glsky:'#glsky',skycv:'#sky',header:'#header',modec:'#mode-cluster',musicp:'#music-player',musict:'#music-toggle',livec:'#live-count',cgbtn:'#cg-btn',sscan:'#sector-scan',owlsrc:'#owl-source',owlpanel:'#owl-panel',bhpanel:'#bh-panel'};
   if(_gh)_gh[1].split(/[,.~\-]/).forEach(function(k){if(!k)return;var m=/^p(head|top|pl|dfx|dmd)$/.exec(k);GLSG.hide[m?'p:'+m[1]:k]=1;if(/^(hud|hudA|hudB|hudC|hudD|skyhide|dstage|dstx|dcl)$/.test(k))document.documentElement.classList.add('__bo-'+k);if(HC[k])HS.push(HC[k]);});
   if(HS.length){var _st=document.createElement('style');_st.id='__glhide_css';_st.textContent=HS.join(',')+'{visibility:hidden!important}';(document.head||document.documentElement).appendChild(_st);}}}catch(eGh){}   /* [B4y] alias elemen HUD per satu (visibility:hidden): portal hit bhclock mpnp footer skypill | header modec musicp musict livec cgbtn sscan owlsrc owlpanel bhpanel (pemisah '.' di autoabq) */   /* [B4x] ?glhide=hud|hudA..hudD|skyhide|dstage|dstx|dcl = kelas CSS bench (style #__bench_off_css selalu terpasang di ?bench=1) TANPA ?off=, karena ?off= mematikan jalur GL (GLSKY.on=false 'bench-off') dan membuat A/B autoab=hud/skyhide tidak sebanding (§6.21) */
 function glsgT(){return GLSG.on?performance.now():0;}
@@ -1857,7 +1861,7 @@ function glsgScan(k,sc){
 }
 window.glskySegOut=function(){
   if(!GLSG.on)return null;
-  var o={fr:GLSG.fr,seg:{},ff:GLSG.ff,ffd:GLSG.fd,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; ffd[i]={t,ms,n=jumlah op,ops={kind:jumlah},s={segmen:ms},sc={pass:{m=material,p=material tanpa program,t=[[w,h,mip,jenis,sumber] tekstur belum di-upload],g=[[tipe objek,nama,tipe geometri,vertex,instance,index,renderOrder] geometri belum dikenal renderer; renderOrder 5000 ml, 5001 ms, 5101 ml2, 5103 ml3, 10 aurora planet, 0/1/2/10 efek drone],ge=jumlah geometri three saat scan (banding dgn d: selisih = dibuat di dalam render itu)}},opd=[[kind,sumber,w,h]] op flush ini,d={pass:[delta geometri,tekstur,program]} perubahan memori three per pass,tx/pg/ge=delta tekstur/program/geometri three,up=upload dinamis,calls,tris,sa={n,px,rt0,rt1,al=[[w,h,ms] alokasi RT],tm=[ms render RT,ms tempel quad]},q0=quad tempel sudah punya program};  spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
+  var o={opq:GLSKY.opq?1:0,fr:GLSG.fr,seg:{},ff:GLSG.ff,ffd:GLSG.fd,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; ffd[i]={t,ms,n=jumlah op,ops={kind:jumlah},s={segmen:ms},sc={pass:{m=material,p=material tanpa program,t=[[w,h,mip,jenis,sumber] tekstur belum di-upload],g=[[tipe objek,nama,tipe geometri,vertex,instance,index,renderOrder] geometri belum dikenal renderer; renderOrder 5000 ml, 5001 ms, 5101 ml2, 5103 ml3, 10 aurora planet, 0/1/2/10 efek drone],ge=jumlah geometri three saat scan (banding dgn d: selisih = dibuat di dalam render itu)}},opd=[[kind,sumber,w,h]] op flush ini,d={pass:[delta geometri,tekstur,program]} perubahan memori three per pass,tx/pg/ge=delta tekstur/program/geometri three,up=upload dinamis,calls,tris,sa={n,px,rt0,rt1,al=[[w,h,ms] alokasi RT],tm=[ms render RT,ms tempel quad]},q0=quad tempel sudah punya program};  spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
   for(k in GLSG.s){var g=GLSG.s[k];o.seg[k]=[g.n,+(g.ms/g.n).toFixed(2),+g.ms.toFixed(0),+g.mx.toFixed(1)];}
   try{var _h=[],_k,_od={},_gtp={},_n=GLSG.odF||1,_t=0;for(_k in GLSG.hide)_h.push(_k);o.hide=_h;
     for(_k in GLSG.od){_od[_k]=[+(GLSG.od[_k][0]/_n).toFixed(2),+(GLSG.od[_k][1]/_n).toFixed(3),+GLSG.od[_k][2].toFixed(3)];}
@@ -1911,7 +1915,7 @@ function glskyFlush(){
     try{glskyPfUpload();}catch(ePfU){S.pfOk=false;}   /* [G4.9] efek planet: gagal -> hilang sampai frame berikut (pl3dGlFx kembali ke 2D karena pfOk false) */
     glsgLap('pfUp');
     if(S.big){S.lay=false;glskyFail('texture melebihi batas GPU ('+S.maxTex+'px)');return;}   /* texture terlalu besar: tidak bisa jujur menggantikan 2D -> 2D penuh */
-    S.r.setClearColor(0x050b12,S.want?1:0);   /* ColorManagement mati (threeLoad) => hex dipakai apa adanya = #050b12 */
+    S.r.setClearColor(0x050b12,(S.want||S.opq)?1:0);   /* [B4z] opq: alpha selalu 1 */   /* ColorManagement mati (threeLoad) => hex dipakai apa adanya = #050b12 */
     tR=glsgT();glskyRenderAll();glsgAdd('render',tR);
     S.st.fr++;
     if(S.st.fr%90===0)glskySweep();
