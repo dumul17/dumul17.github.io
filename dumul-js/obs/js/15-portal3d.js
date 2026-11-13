@@ -1023,13 +1023,29 @@ function portal3dGlRing(now){
     try{
       if(typeof updateAVColor==='function')updateAVColor(now);
       if(playing&&typeof avbUpdate==='function')avbUpdate(now);
-      if(!PXo.ptb&&!still){
+      if(!PXo.ptb&&!(typeof reduce!=='undefined'&&reduce)){   /* [FIX flash] sama dgn jalur 2D (ptBoltsDraw dipanggil kalau !reduce); dulu !still ikut menutup potato */
         ptBoltTick(now,playing,still&&!playing);
         var B=PT3D.bolts,bc=glskyCol(PT3D_CFG.boltCol||'255,255,255'),BW=PT3D_CFG.boltW,GL=Math.max(0,Math.min(1,PT3D_CFG.boltGlow==null?1:PT3D_CFG.boltGlow));
         var i,j,b,u,fl,al,P,sc,mf,f,e,sk=(now-PT3D.spkT)/180;
         if(sk>=0&&sk<1){
           /* kilat mulut: soft fill via ring sprite */
           try{ptGlRipple(0,0,Rin,PT3D_CFG.boltCol||'255,255,255',.2*(1-sk)*(1-sk),true,px,py,tm,ang,1);}catch(eSk){}   /* [G4.17] elips mengikuti mulut miring (dulu bulatan penuh di px,py) */
+        }
+        /* [FIX flash] kilau tepi per pita + flash onset (port ptBoltsDraw 2D, 'rim'): dulu cuma ada di 2D, jalur GL tidak menggambarnya -> flash putih di mulut hilang saat visualizer aktif. Garis tebal per pita (kord 3 ruas), level 2 (5101: di atas mulut, di bawah cincin), warna boltCol. */
+        if(PT3D.rim&&PT3D.fl&&typeof AVB!=='undefined'&&AVB.v&&AVB.n===PT3D.fl.length){
+          try{
+            var rN=AVB.n,rw=6.2832/rN,rFa=PT3D.fl,rVv=AVB.v,rA,rTh,rK,rS,rt0,rt1,rp0,rp1,rR=Rin*.97,rLw=Math.max(2,Rin*.14);
+            for(rK=0;rK<rN;rK++){
+              rA=.18*rVv[rK]+.55*(rFa[rK]||0);if(rA<.03)continue;if(rA>.8)rA=.8;
+              rTh=(rK+.5)/rN*6.2832-1.5708;
+              for(rS=0;rS<3;rS++){
+                rt0=rTh-rw*.5+rw*rS/3;rt1=rTh-rw*.5+rw*(rS+1)/3;
+                rp0=ptGlMap(Math.cos(rt0)*rR,Math.sin(rt0)*rR,px,py,tm,ang);
+                rp1=ptGlMap(Math.cos(rt1)*rR,Math.sin(rt1)*rR,px,py,tm,ang);
+                glskySegL(2,rp0[0],rp0[1],rp1[0],rp1[1],rLw,bc,rA,0);
+              }
+            }
+          }catch(eRim){}
         }
         for(i=B.length-1;i>=0;i--){
           b=B[i];e=now-b.t0;u=e/b.d;mf=e>=b.g?1:e/b.g;
@@ -1099,7 +1115,7 @@ function portal3dGlRing(now){
     }
 
     /* --- percikan di atas cincin (hi texture) --- */
-    if(!PXo.ptb&&!still){
+    if(!PXo.ptb&&!(typeof reduce!=='undefined'&&reduce)){   /* [FIX flash] sama dgn 2D (ptSparksDraw: !reduce) */
       try{
         var Sp=PT3D.sparks,si2,s,uu,t,t2,pA,pB,al2,scC=glskyCol(PT3D_CFG.sparkCol||'255,214,140'),bc2=glskyCol(PT3D_CFG.boltCol||'255,255,255');
         for(si2=Sp.length-1;si2>=0;si2--){
