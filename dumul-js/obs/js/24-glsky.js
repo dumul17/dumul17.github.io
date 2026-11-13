@@ -1703,7 +1703,8 @@ function glskyBegin(now,want){
 var GLSG={on:/[?&]bench=1(&|$)/.test(location.search),s:{},ff:[],fd:[],cur:null,spk:[],t:0,fr:0,upTot:0,upFr:0,upMax:0,calls:0,tris:0,fu:[],pf:{},ua:{},ut:{},mkN:0,mkF:[],ui:{},ug:{},pk:null,pt:0,hide:{},od:{},odF:0,odTot:0,odBig:0,odMx:0,gp:[],gt:null,gqa:false};
 /* [B4v] diagnostik GPU (hanya ?bench=1): glseg.od = overdraw per jenis op (rata-rata per frame: jumlah op, luas / luas layar), glseg.gt = timer query GPU per pass (EXT_disjoint_timer_query_webgl2, null kalau HP tidak punya), ?glhide=a,b = sembunyikan jenis layer untuk A/B diagnostik (BUKAN untuk dipakai):
    op: fill (k0), vig (k2), awalan tag sumber (deep, bg, grid, dust, mw, ss, star, ring, comet, bh, tint, sn, skyt, pt, glfpl), add1 / add2 (semua op aditif / multiply); pass: p:head p:top p:pl p:dfx p:dmd (render dilewati); inst = mesh bintang/garis instanced; ast = unit di root scene utama. */
-try{if(GLSG.on){var _gh=/[?&]glhide=([A-Za-z0-9_:,.\-]+)/.exec(location.search);if(_gh)_gh[1].split(',').forEach(function(k){if(k)GLSG.hide[k]=1;});}}catch(eGh){}
+try{if(GLSG.on){var _gh=/[?&]glhide=([A-Za-z0-9_:,.~\-]+)/.exec(location.search);   /* [B4w] pemisah , . ~ - (autoabq memecah ',' jadi param terpisah dan hanya meloloskan A-Za-z0-9_=.,-, jadi pakai '.' di autoabq); alias tanpa ':' phead ptop ppl pdfx pdmd = p:head dst */
+  if(_gh)_gh[1].split(/[,.~\-]/).forEach(function(k){if(!k)return;var m=/^p(head|top|pl|dfx|dmd)$/.exec(k);GLSG.hide[m?'p:'+m[1]:k]=1;});}}catch(eGh){}
 function glsgT(){return GLSG.on?performance.now():0;}
 function glsgBegin(){if(GLSG.on)GLSG.t=performance.now();}
 function glsgAdd(k,t0){
