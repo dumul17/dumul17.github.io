@@ -1462,6 +1462,7 @@ function pl3dFxAuroraGl(F){
 /* true = efek planet frame ini ditangani GL (planet3dDraw melewati pl3dFx). Dipanggil pl3dGlPrep sesudah pl3dGate lolos. */
 function pl3dGlFx(now,cp){
   var C=PL3D_CFG,F,gm,lp,S=(typeof GLSKY!=='undefined')?GLSKY:null;
+  pl3dMk('fxg.pre');   /* [B4r] pecah pl.fxgl: tiap marker = waktu sejak marker sebelumnya (hanya ?bench=1 / PERF) */
   PL3D.fxGl=false;
   if(!S||typeof glskyPfOn!=='function'||!glskyPfOn())return false;
   if(PL3D.fxOff||(typeof reduce!=='undefined'&&reduce)||(window.__offB&&window.__offB.plfx))return false;
@@ -1469,17 +1470,22 @@ function pl3dGlFx(now,cp){
   F=PL3D.fx;
   if(!F)F=PL3D.fx={t:now,dt:0,gm:null,lx:0,ly:0,pal:null,lc:C.lightCol,pot:false,frames:0,aur:0,flv:0};
   F.dt=Math.min(.05,Math.max(0,(now-F.t)/1000));F.t=now;
-  gm=pl3dGeom(false,false,true);lp=pl3dLightPos();
+  gm=pl3dGeom(false,false,true);lp=pl3dLightPos();pl3dMk('fxg.gm');
   F.gm=gm;F.lx=lp[0];F.ly=lp[1];F.cp=cp;F.lc=C.lightCol;F.pot=false;
-  pl3dPalUpdate();F.pal=C.pal;
+  pl3dPalUpdate();F.pal=C.pal;pl3dMk('fxg.pal');
   F.frames++;PL3D.fxFrames=F.frames;
-  pl3dFxAffine(gm,cp,S.H,PLF.M);
+  pl3dFxAffine(gm,cp,S.H,PLF.M);pl3dMk('fxg.aff');
+  try{if(window.__pmB){var X=window.__plfxN||(window.__plfxN={n:0,aur:0,deb:0,fl:0,bolt:0,cfg:null});X.n++;if(C.auroraOn||F.aur>.001)X.aur++;if(C.debrisOn||(F.deb&&F.deb.length))X.deb++;if(C.flareOn||F.flv>.001)X.fl++;if(C.boltOn||F.bolt)X.bolt++;if(!X.cfg)X.cfg=[C.auroraOn?1:0,C.debrisOn?1:0,C.flareOn?1:0,C.boltOn?1:0];}}catch(eX){}   /* [B4r] frame mana yang efeknya aktif */
   F.gl=true;
   try{
     if(C.auroraOn||F.aur>.001)pl3dFxAuroraGl(F);
+    pl3dMk('fxg.aur');
     if(C.debrisOn||(F.deb&&F.deb.length))pl3dFxDebris(null,F);
+    pl3dMk('fxg.deb');
     if(C.flareOn||F.flv>.001)pl3dFxFlare(null,F);
+    pl3dMk('fxg.fl');
     if(C.boltOn||F.bolt)pl3dFxBolt(null,F);
+    pl3dMk('fxg.bolt');
   }catch(e){
     F.gl=false;S.pfOk=false;PL3D.fxGl=false;S.pan=0;S.pdn=0;S.pln=0;S.pbn=0;   /* efek GL gagal: balik ke 2D (planet tetap GL) */
     try{console.warn('[planet3d] efek GL gagal, kembali ke efek 2D:',e&&e.message||e);}catch(e2){}
