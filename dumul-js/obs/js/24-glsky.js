@@ -68,7 +68,7 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   /* [G4.10] PASS DRONE di renderer utama: dbScene (efek di BAWAH drone: trail/tether/kaki/halo/ping) lalu mdScene (Group drone + cincin tahan di ATAS). dpOn = A/B ?gldpass=0 (drone balik ke layer #gldrone); dpOk = mesh efek berhasil dibangun; dpAct = ada yang dijadwalkan frame ini; dbn/dln/dsn/dtn = jumlah blob/garis/titik/garis-atas dicatat frame ini (di-reset glskyBegin); aa = antialias renderer utama (?glaa=1) */
   dpOn:true,dp:null,dpOk:false,dpErr:0,dpAct:false,dbn:0,dln:0,dsn:0,dtn:0,mdScene:null,dbScene:null,aa:false,
   /* [G4.15] supersample unit kecil. saOn = A/B ?glssaa=0; saK = faktor resolusi RT (2 = 2x2 piksel per piksel layar); saMs = samples MSAA RT (0 = mati); saM / saMd = margin kotak teleskop / drone terhadap radius model; sa = status (ok, test, why, n, px, fr, err, sl). Catatan: ssOn di atas = meteor (?glss=0), BUKAN ini */
-  saOn:true,saK:2,saMs:0,saM:1.45,saMd:1.08,sa:{ok:false,tried:false,err:0,why:'',test:null,cap:2048,cc:null,cam:null,qs:null,q:null,u:null,sl:[null,null],n:0,px:0,fr:0},
+  saOn:true,saK:2,saMs:0,saM:1.45,saMd:1.08,saTopN:2,saFresh:false,sa:{ok:false,tried:false,err:0,why:'',test:null,cap:2048,cc:null,cam:null,qs:null,q:null,u:null,sl:[null,null],n:0,px:0,fr:0,hit:0,rd:0},   /* [B4q] saTopN = render RT pass atas tiap N frame, frame lain hanya tempel quad (?satop=N, 1 = mati = perilaku v522); saFresh = paksa render segar (glskySnap) */
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
 try{window.__glsky=GLSKY;}catch(eG0){}
 (function(){
@@ -103,6 +103,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     var sk=/[?&]glssk=([0-9.]+)/.exec(location.search),sm=/[?&]glssms=([0-9]+)/.exec(location.search);
     if(sk&&isFinite(parseFloat(sk[1])))GLSKY.saK=Math.max(1.2,Math.min(4,parseFloat(sk[1])));   /* [G4.15] faktor resolusi RT (default 2) */
     if(sm)GLSKY.saMs=Math.min(8,parseInt(sm[1],10)||0);   /* [G4.15] samples MSAA RT (default 0) */
+    var stN=/[?&]satop=(\d+)(&|#|$)/.exec(location.search);if(stN)GLSKY.saTopN=Math.max(1,Math.min(4,parseInt(stN[1],10)||1));   /* [B4q] A/B: ?satop=1 = RT pass atas dirender tiap frame (v522) */
     if(/[?&]glaa=1(&|#|$)/.test(location.search))GLSKY.aa=true;   /* [G4.10] antialias MSAA renderer utama (drone kecil jadi halus; lebih berat) */
     if(/[?&]glplanet=0(&|#|$)/.test(location.search))GLSKY.plOn=false;   /* [G4.8] A/B: planet tetap jalur lama (renderer 'big' + blit) */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
@@ -882,6 +883,13 @@ function glskySaAddOff(){
   for(k=0;k<L.length;k++){m=L[k];m.blending=2;m.blendSrc=V[k*5];m.blendDst=V[k*5+1];m.blendEquation=V[k*5+2];m.blendSrcAlpha=V[k*5+3];m.blendDstAlpha=V[k*5+4];}
   L.length=0;V.length=0;
 }
+/* [B4q] tempel isi RT (sub-viewport vw x vh) ke kanvas utama di kotak layar `box`. Dipakai glskySaUnit (RT baru dirender) dan glskySaTop (RT lama dipakai ulang). */
+function glskySaPaste(box,vw,vh,rt){
+  var S=GLSKY,sa=S.sa,u=sa.u,sx=S.pw/S.W,sy=S.ph/S.H;
+  u.uMap.value=rt.texture;u.uUV.value.set(0,0,vw/rt.width,vh/rt.height);
+  sa.q.position.set((box.x0+box.w*.5)/sx,(box.y0+box.h*.5)/sy,0);sa.q.scale.set(box.w/sx,box.h/sy,1);
+  S.r.render(sa.qs,S.tCam);
+}
 /* render scene ke RT (sub-viewport kotak) lalu tempel quad ke kanvas utama. Dipanggil di tengah glskyRenderAll (autoClear sudah false). */
 function glskySaUnit(T,slot,scene,box){
   var S=GLSKY,sa=S.sa,r=S.r,k=box.k,vw=Math.round(box.w*k),vh=Math.round(box.h*k),sx=S.pw/S.W,sy=S.ph/S.H,cam=sa.cam,rt=glskySaFit(T,slot,vw,vh),pr=r.getRenderTarget(),ca,ac=r.autoClear,u=sa.u,tm0=GLSG.cur?performance.now():0,tm1=0;
@@ -893,9 +901,7 @@ function glskySaUnit(T,slot,scene,box){
   try{r.render(scene,cam);}
   finally{glskySaAddOff();r.setRenderTarget(pr);r.setClearColor(sa.cc,ca);r.autoClear=ac;}
   if(tm0)tm1=performance.now();
-  u.uMap.value=rt.texture;u.uUV.value.set(0,0,vw/rt.width,vh/rt.height);
-  sa.q.position.set((box.x0+box.w*.5)/sx,(box.y0+box.h*.5)/sy,0);sa.q.scale.set(box.w/sx,box.h/sy,1);
-  r.render(sa.qs,S.tCam);
+  glskySaPaste(box,vw,vh,rt);
   if(tm0&&GLSG.cur){var tmc=GLSG.cur.tm||(GLSG.cur.tm=[0,0]);tmc[0]+=tm1-tm0;tmc[1]+=performance.now()-tm1;}   /* [B4i] [ms render RT, ms tempel quad] */
   sa.n++;sa.px+=vw*vh;
 }
@@ -914,6 +920,21 @@ function glskySaTop(){
       if(b)bx.push(b);
     }
     for(i=0;i<bx.length;i++)for(j=i+1;j<bx.length;j++){a=bx[i];c=bx[j];if(a.x0<c.x0+c.w&&c.x0<a.x0+a.w&&a.y0<c.y0+c.h&&c.y0<a.y0+a.h)return false;}   /* kotak tumpang tindih: unit tetangga ikut tergambar dua kali; langsung saja */
+    /* [B4q] satu kotak (kasus umum): RT slot 0 dipakai ulang N-1 frame berturut-turut selama kotak (posisi/ukuran) dan RT sama; hanya tempel quad (±0.5 ms) tanpa render ulang teleskop (±8 ms). Kotak berubah / RT dialokasi ulang / paksa segar = render segar. */
+    if(bx.length===1&&S.saTopN>1&&!S.saFresh){
+      b=bx[0];c=sa.sl[0];
+      j=Math.round(b.w*b.k);i=Math.round(b.h*b.k);
+      a=c&&c.c;
+      if(a&&c.rt&&a.rt===c.rt&&a.x0===b.x0&&a.y0===b.y0&&a.w===b.w&&a.h===b.h&&a.vw===j&&a.vh===i&&a.age<S.saTopN-1){
+        a.age++;glskySaPaste(b,j,i,c.rt);sa.n++;sa.px+=j*i;sa.fr++;sa.hit++;
+        return true;
+      }
+      glskySaUnit(T,0,S.tScene,b);sa.rd++;
+      c=sa.sl[0];if(c)c.c={rt:c.rt,x0:b.x0,y0:b.y0,w:b.w,h:b.h,vw:j,vh:i,age:0};
+      sa.fr++;
+      return true;
+    }
+    if(sa.sl[0])sa.sl[0].c=null;   /* slot 0 dipakai jalur lain (beberapa kotak / mode segar): isi RT tidak lagi sah */
     for(i=0;i<bx.length;i++){glskySaUnit(T,0,S.tScene,bx[i]);done++;}
     if(done)sa.fr++;
     return true;
@@ -981,6 +1002,7 @@ function glskySaWarm(wm){
     r.render(sa.qs,S.tCam);
     o.qMs=Math.round(performance.now()-t1);
     o.ok=1;
+    if(sa.sl[0])sa.sl[0].c=null;   /* [B4q] warm menimpa slot 0 (scissor 1x1) */
   }catch(e){o.why=String(e&&e.message||e).slice(0,80);}
   finally{try{r.setRenderTarget(pr);r.setClearColor(sa.cc,ca);r.autoClear=ac;r.setScissorTest(!!sT);if(sr)r.setScissor(sr.x,sr.y,sr.z,sr.w);}catch(e2){}}
   o.ms=Math.round(performance.now()-t0);
@@ -1773,7 +1795,7 @@ window.glskySegOut=function(){
   var o={fr:GLSG.fr,seg:{},ff:GLSG.ff,ffd:GLSG.fd,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; ffd[i]={t,ms,n=jumlah op,ops={kind:jumlah},s={segmen:ms},sc={pass:{m=material,p=material tanpa program,t=[[w,h,mip,jenis,sumber] tekstur belum di-upload],g=[[tipe objek,nama,tipe geometri,vertex,instance,index,renderOrder] geometri belum dikenal renderer; renderOrder 5000 ml, 5001 ms, 5101 ml2, 5103 ml3, 10 aurora planet, 0/1/2/10 efek drone],ge=jumlah geometri three saat scan (banding dgn d: selisih = dibuat di dalam render itu)}},opd=[[kind,sumber,w,h]] op flush ini,d={pass:[delta geometri,tekstur,program]} perubahan memori three per pass,tx/pg/ge=delta tekstur/program/geometri three,up=upload dinamis,calls,tris,sa={n,px,rt0,rt1,al=[[w,h,ms] alokasi RT],tm=[ms render RT,ms tempel quad]},q0=quad tempel sudah punya program};  spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
   for(k in GLSG.s){var g=GLSG.s[k];o.seg[k]=[g.n,+(g.ms/g.n).toFixed(2),+g.ms.toFixed(0),+g.mx.toFixed(1)];}
   try{o.w1={r1:GLW.r1,f:GLW.r1f,n:GLW.r1n,t:GLW.r1t,c:GLW.r1c,ms:GLW.ms,st:GLW.st,post:GLW.post,defer:GLW.defer,hold:GLW.hold,p:GLW.p,fade:GLW.fade,sa:GLW.sa,tx:GLW.tx,pre:GLW.pre,pd:GLW.pd,its:GLW.its,f:GLW.f,inst:GLW.inst,instOn:GLW.instOn,q:GLW.q,qN:GLW.qN,ring:GLW.ring,rot:GLW.rot,ptNo:GLW.ptNo,uiT:GLW.uiT};}catch(eW1){}
-  try{var kk,uo={};for(kk in GLSG.ua){var g2=GLSG.ua[kk];uo[kk]=[g2[0],+(g2[1]/g2[0]).toFixed(1),+g2[2].toFixed(1),+(g2[3]/g2[0]).toFixed(1),+g2[4].toFixed(1)];}var ug={},ui={};for(kk in GLSG.ug){var g3=GLSG.ug[kk];ug[kk]=[g3[0],g3[0]?+(g3[1]/g3[0]).toFixed(1):0];}for(kk in GLSG.ui){var g4=GLSG.ui[kk];ui[kk]=[g4[0],g4[0]?+(g4[1]/g4[0]).toFixed(2):0,+g4[2].toFixed(1)];}o.ug=ug;o.ui=ui;o.ua=uo;o.ut=GLSG.ut;try{var Pp=GLW.pt;o.pt={on:Pp.on,ok:Pp.ok,n:Pp.n,al:Pp.al,err:Pp.err,why:Pp.why,ms:Pp.ms,rw:Pp.rw,avg:Pp.n?+(Pp.t/Pp.n).toFixed(2):0,mx:+Pp.mx.toFixed(1),w:Pp.w};}catch(ePp){}   /* [B4p] */o.mk={n:GLSG.mkN,f:GLSG.mkF,len:GLSKY.mesh?GLSKY.mesh.length:0};}catch(eUa){}   /* [B4m] */
+  try{var kk,uo={};for(kk in GLSG.ua){var g2=GLSG.ua[kk];uo[kk]=[g2[0],+(g2[1]/g2[0]).toFixed(1),+g2[2].toFixed(1),+(g2[3]/g2[0]).toFixed(1),+g2[4].toFixed(1)];}var ug={},ui={};for(kk in GLSG.ug){var g3=GLSG.ug[kk];ug[kk]=[g3[0],g3[0]?+(g3[1]/g3[0]).toFixed(1):0];}for(kk in GLSG.ui){var g4=GLSG.ui[kk];ui[kk]=[g4[0],g4[0]?+(g4[1]/g4[0]).toFixed(2):0,+g4[2].toFixed(1)];}o.ug=ug;o.ui=ui;o.ua=uo;o.ut=GLSG.ut;try{var Pp=GLW.pt;o.pt={on:Pp.on,ok:Pp.ok,n:Pp.n,al:Pp.al,err:Pp.err,why:Pp.why,ms:Pp.ms,rw:Pp.rw,avg:Pp.n?+(Pp.t/Pp.n).toFixed(2):0,mx:+Pp.mx.toFixed(1),w:Pp.w};}catch(ePp){}   /* [B4p] */o.mk={n:GLSG.mkN,f:GLSG.mkF,len:GLSKY.mesh?GLSKY.mesh.length:0};try{var Sq=GLSKY.sa;o.st={n:GLSKY.saTopN,fr:Sq.fr,hit:Sq.hit,rd:Sq.rd};}catch(eSq){}}catch(eUa){}   /* [B4m] [B4q] st = pass atas: n (tiap N frame), fr frame, hit tempel saja, rd render segar */
   try{o.info={programs:GLSKY.r.info.programs?GLSKY.r.info.programs.length:null,geometries:GLSKY.r.info.memory.geometries,textures:GLSKY.r.info.memory.textures,pr:GLSKY.r.getPixelRatio(),w:GLSKY.pw,h:GLSKY.ph};}catch(e){}
   return o;
 };
@@ -1833,5 +1855,5 @@ function glskyFlush(){
 function glskySnap(x,dx,dy,dw,dh){
   var S=GLSKY;
   if(!S.act||!S.r||!S.ok)return false;
-  try{glskyRenderAll();x.drawImage(S.cv,dx,dy,dw,dh);return true;}catch(e){return false;}
+  try{S.saFresh=true;glskyRenderAll();x.drawImage(S.cv,dx,dy,dw,dh);return true;}catch(e){return false;}finally{S.saFresh=false;}   /* [B4q] snapshot = pass atas segar */
 }
