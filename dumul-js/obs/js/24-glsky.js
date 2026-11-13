@@ -282,15 +282,30 @@ function glskyLive(c){
   if(typeof SKYT!=='undefined')for(k in SKYT)if(SKYT[k]&&(SKYT[k].spr===c||SKYT[k].spr2===c))return true;
   return false;
 }
+/* [B4n] pembuatan texture dari kanvas + pembebasan (entri S.tx bisa punya cincin texture e.r). */
+function glskyTexNew(c){
+  var T=window.THREE,t=new T.CanvasTexture(c);
+  t.flipY=false;t.premultiplyAlpha=true;t.generateMipmaps=false;t.minFilter=T.LinearFilter;t.magFilter=T.LinearFilter;
+  if(c.__glmip){t.generateMipmaps=true;t.minFilter=T.LinearMipmapLinearFilter;}   /* gambar besar yang diperkecil (Milky Way): mipmap supaya tidak berkilau saat bergulir */
+  return t;
+}
+function glskyTexFree(e){var a=e.r||[e.t],i;for(i=0;i<a.length;i++){try{a[i].dispose();}catch(x){}}}
 function glskyTex(c){
   var S=GLSKY,T=window.THREE,e=S.tx.get(c),v=c.__glv|0,t;
-  if(e&&(e.v!==v||e.w!==c.width||e.h!==c.height)){e.t.dispose();S.tx.delete(c);e=null;}   /* isi/ukuran berubah (grid bake ulang): texture baru, jangan timpa storage lama */
-  if(e&&c.__gldyn&&e.f!==S.st.fr){e.t.needsUpdate=true;e.f=S.st.fr;S.st.up++;if(GLSG.on)glsgUp(c,'d');}   /* [FIX] kanvas dinamis (mulut/cincin portal, ditandai __gldyn): isi berubah tiap frame -> upload ulang sekali per frame, texture dipakai ulang */
+  if(e&&(e.v!==v||e.w!==c.width||e.h!==c.height)){glskyTexFree(e);S.tx.delete(c);e=null;}   /* isi/ukuran berubah (grid bake ulang): texture baru, jangan timpa storage lama */
+  if(e&&c.__gldyn&&e.f!==S.st.fr){
+    /* [B4n] CINCIN TEXTURE: kanvas dinamis kecil (cincin portal 128x128, `ptsn`) di-upload ±tiap 2-3 frame ke texture YANG SAMA yang masih dipakai frame GPU sebelumnya. Dump B4m: frame dgn upload ptsn r.main ±31 ms vs ±2 ms tanpa upload (±130 dari 350 frame = ±3,8 dtk dari 8 dtk flush).
+       Dugaan (BELUM terbukti): GPU tile-based memaksa menunggu frame yang masih membaca texture itu. Di sini upload bergilir ke GLW.ring texture (default 3) supaya yang ditimpa tidak sedang dipakai frame berjalan. ?glring=1 = perilaku lama. */
+    if(GLW.ring>1&&c.width*c.height<=GLW.ringMax){
+      if(!e.r){e.r=[e.t];e.ri=0;}
+      if(e.r.length<GLW.ring)e.r.push(glskyTexNew(c));
+      e.ri=(e.ri+1)%e.r.length;e.t=e.r[e.ri];GLW.rot++;
+    }
+    e.t.needsUpdate=true;e.f=S.st.fr;S.st.up++;if(GLSG.on)glsgUp(c,'d');
+  }   /* [FIX] kanvas dinamis (mulut/cincin portal, ditandai __gldyn): isi berubah tiap frame -> upload ulang sekali per frame, texture dipakai ulang */
   if(!e){
     if(c.width>S.maxTex||c.height>S.maxTex){S.big=1;return null;}
-    t=new T.CanvasTexture(c);
-    t.flipY=false;t.premultiplyAlpha=true;t.generateMipmaps=false;t.minFilter=T.LinearFilter;t.magFilter=T.LinearFilter;
-    if(c.__glmip){t.generateMipmaps=true;t.minFilter=T.LinearMipmapLinearFilter;}   /* gambar besar yang diperkecil (Milky Way): mipmap supaya tidak berkilau saat bergulir */
+    t=glskyTexNew(c);
     e={t:t,v:v,w:c.width,h:c.height,f:S.st.fr};S.tx.set(c,e);S.st.up++;if(GLSG.on)glsgUp(c,'n');
   }
   return e.t;
@@ -298,7 +313,7 @@ function glskyTex(c){
 function glskySweep(){   /* buang texture yang canvas-nya sudah tidak dipakai (bake ulang / resize); dipanggil jarang */
   var S=GLSKY,dead=[];
   S.tx.forEach(function(e,c){if(!glskyLive(c))dead.push(c);});
-  dead.forEach(function(c){try{S.tx.get(c).t.dispose();}catch(e){}S.tx.delete(c);});
+  dead.forEach(function(c){try{glskyTexFree(S.tx.get(c));}catch(e){}S.tx.delete(c);});
   S.st.tex=S.tx.size;
 }
 /* ---------- G2+G3: bintang & garis rasi (instancing) ----------
@@ -1279,7 +1294,7 @@ function glskyBuild(){
     },false);
     c.addEventListener('webglcontextrestored',function(){
       if(S.err>=3)return;
-      S.tx.forEach(function(e){try{e.t.dispose();}catch(x){}});S.tx.clear();   /* texture lama hilang bersama konteks: unggah ulang saat dipakai */
+      S.tx.forEach(function(e){try{glskyTexFree(e);}catch(x){}});S.tx.clear();   /* texture lama hilang bersama konteks: unggah ulang saat dipakai */
       S.W=S.H=S.pw=S.ph=0;S.ok=true;glskyShow(true);
       try{glskySaReset();}catch(eSaR){}   /* [G4.15] RT lama tidak sah: bangun ulang + uji lagi */   /* three memasang ulang state sendiri; ukuran dipaksa dihitung ulang */
     },false);
@@ -1329,8 +1344,8 @@ function glskyInit(){
                frame pertama memakai snapshot itu, bukan render penuh 300+ ms.
    Tidak menggambar apa pun ke kanvas GL (tidak ada kedip di bawah layar boot). Berhenti begitu Blue (stop()). Gagal / dilewati -> perilaku lama persis (frame pertama membangun sendiri).
    Flag: ?glwarm=0 = nonaktif (A/B). Hasil: window.__glwarm {st 0 idle|1 jalan|2 selesai|3 gagal/lewat, why, ms{init,cmp,cmpOk|cmpTmo,plBuild,cmpDone,plDraw,end}, pl, plDraw, cmpTmo, n (scene dikompilasi)}. */
-var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,tx:null,texOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0},f:0,pre:true,pdOn:true,pd:null,its:[],instOn:true,inst:[],q:[],qN:16};   /* [B4m] q = hasil warm pool mesh quad [nama, jumlah, ms]; qN = ukuran pool yang dipanaskan (?glwq=N, 0 = mati) */   /* [B4k] pre = SEMUA warm (scp, dr, tex MW, plateDeep+sprite meteor, sa) pra-kapsul (?glwpre=0 = pasca-kapsul seperti B4j/v516); pdOn = warm plateDeep + sprite meteor (?glwpd=0 mati); pd/its = hasil + waktu per item (dump) */   /* [B5] f = progres warm pra-kapsul 0..1 (dibaca 07-boot: bar + baris log "Sentuhan akhir") */   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
-try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;if(/[?&]glwtex=0(&|#|$)/.test(location.search))GLW.texOn=false;if(/[?&]glwpre=0(&|#|$)/.test(location.search))GLW.pre=false;if(/[?&]glwpd=0(&|#|$)/.test(location.search))GLW.pdOn=false;if(/[?&]glwinst=0(&|#|$)/.test(location.search))GLW.instOn=false;var mQ=/[?&]glwq=(\d+)(&|#|$)/.exec(location.search);if(mQ)GLW.qN=Math.max(0,Math.min(64,+mQ[1]));var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
+var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,tx:null,texOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0},f:0,pre:true,pdOn:true,pd:null,its:[],instOn:true,inst:[],q:[],qN:12,ring:3,ringMax:65536,rot:0};   /* [B4n] ring = jumlah texture bergilir untuk kanvas dinamis kecil (?glring=N, 1 = perilaku lama); ringMax = batas piksel kanvas (w*h) */   /* [B4m] q = hasil warm pool mesh quad [nama, jumlah, ms]; qN = ukuran pool yang dipanaskan (?glwq=N, 0 = mati) */   /* [B4k] pre = SEMUA warm (scp, dr, tex MW, plateDeep+sprite meteor, sa) pra-kapsul (?glwpre=0 = pasca-kapsul seperti B4j/v516); pdOn = warm plateDeep + sprite meteor (?glwpd=0 mati); pd/its = hasil + waktu per item (dump) */   /* [B5] f = progres warm pra-kapsul 0..1 (dibaca 07-boot: bar + baris log "Sentuhan akhir") */   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
+try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;if(/[?&]glwtex=0(&|#|$)/.test(location.search))GLW.texOn=false;if(/[?&]glwpre=0(&|#|$)/.test(location.search))GLW.pre=false;if(/[?&]glwpd=0(&|#|$)/.test(location.search))GLW.pdOn=false;if(/[?&]glwinst=0(&|#|$)/.test(location.search))GLW.instOn=false;var mR=/[?&]glring=(\d+)(&|#|$)/.exec(location.search);if(mR)GLW.ring=Math.max(1,Math.min(4,+mR[1]));var mQ=/[?&]glwq=(\d+)(&|#|$)/.exec(location.search);if(mQ)GLW.qN=Math.max(0,Math.min(64,+mQ[1]));var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
 /* [B4h] TAHAN + FADE teleskop. Warm scp/dr dipindah ke SESUDAH kapsul (glskyWarm.postArm), jadi di flush pertama teleskop belum boleh tergambar (first-use scp ±1,3 dtk: 12 sampai 370 ms per anak).
    hold 0 = tidak menahan | 1 = menahan (warm pasca-kapsul belum selesai) | 2 = fade-in (GLW.fade ms, smoothstep) | selesai -> 0.
    Pemakai: 04-render.js drawFloatingTelescopeGl (kalau <=0 teleskop tidak digambar sama sekali, jalur 2D juga dilewati). Pengaman: tahan paling lama GLW.holdMax ms sejak teleskop pertama minta gambar. ?glwarmpost=0 = perilaku B4g (tanpa tahan). */
@@ -1705,7 +1720,7 @@ window.glskySegOut=function(){
   if(!GLSG.on)return null;
   var o={fr:GLSG.fr,seg:{},ff:GLSG.ff,ffd:GLSG.fd,spk:GLSG.spk,upTot:GLSG.upTot,upFr:GLSG.upFr,upMax:GLSG.upMax,callsPerFr:GLSG.fr?+(GLSG.calls/GLSG.fr).toFixed(1):0,trisPerFr:GLSG.fr?Math.round(GLSG.tris/GLSG.fr):0,_cols:'seg[k]=[n,avgMs,totMs,maxMs]; ff=[abs ms,ms] 6 flush pertama; ffd[i]={t,ms,n=jumlah op,ops={kind:jumlah},s={segmen:ms},sc={pass:{m=material,p=material tanpa program,t=[[w,h,mip,jenis,sumber] tekstur belum di-upload],g=[[tipe objek,nama,tipe geometri,vertex,instance,index,renderOrder] geometri belum dikenal renderer; renderOrder 5000 ml, 5001 ms, 5101 ml2, 5103 ml3, 10 aurora planet, 0/1/2/10 efek drone],ge=jumlah geometri three saat scan (banding dgn d: selisih = dibuat di dalam render itu)}},opd=[[kind,sumber,w,h]] op flush ini,d={pass:[delta geometri,tekstur,program]} perubahan memori three per pass,tx/pg/ge=delta tekstur/program/geometri three,up=upload dinamis,calls,tris,sa={n,px,rt0,rt1,al=[[w,h,ms] alokasi RT],tm=[ms render RT,ms tempel quad]},q0=quad tempel sudah punya program};  spk=[abs ms,seg,ms>=8]; upTot=total upload tekstur dinamis, upFr=jumlah frame yang ada upload, upMax=max per frame; callsPerFr/trisPerFr = rata2 draw call/segitiga semua render per flush'},k;
   for(k in GLSG.s){var g=GLSG.s[k];o.seg[k]=[g.n,+(g.ms/g.n).toFixed(2),+g.ms.toFixed(0),+g.mx.toFixed(1)];}
-  try{o.w1={r1:GLW.r1,f:GLW.r1f,n:GLW.r1n,t:GLW.r1t,c:GLW.r1c,ms:GLW.ms,st:GLW.st,post:GLW.post,defer:GLW.defer,hold:GLW.hold,p:GLW.p,fade:GLW.fade,sa:GLW.sa,tx:GLW.tx,pre:GLW.pre,pd:GLW.pd,its:GLW.its,f:GLW.f,inst:GLW.inst,instOn:GLW.instOn,q:GLW.q,qN:GLW.qN};}catch(eW1){}
+  try{o.w1={r1:GLW.r1,f:GLW.r1f,n:GLW.r1n,t:GLW.r1t,c:GLW.r1c,ms:GLW.ms,st:GLW.st,post:GLW.post,defer:GLW.defer,hold:GLW.hold,p:GLW.p,fade:GLW.fade,sa:GLW.sa,tx:GLW.tx,pre:GLW.pre,pd:GLW.pd,its:GLW.its,f:GLW.f,inst:GLW.inst,instOn:GLW.instOn,q:GLW.q,qN:GLW.qN,ring:GLW.ring,rot:GLW.rot};}catch(eW1){}
   try{var kk,uo={};for(kk in GLSG.ua){var g2=GLSG.ua[kk];uo[kk]=[g2[0],+(g2[1]/g2[0]).toFixed(1),+g2[2].toFixed(1),+(g2[3]/g2[0]).toFixed(1),+g2[4].toFixed(1)];}o.ua=uo;o.ut=GLSG.ut;o.mk={n:GLSG.mkN,f:GLSG.mkF,len:GLSKY.mesh?GLSKY.mesh.length:0};}catch(eUa){}   /* [B4m] */
   try{o.info={programs:GLSKY.r.info.programs?GLSKY.r.info.programs.length:null,geometries:GLSKY.r.info.memory.geometries,textures:GLSKY.r.info.memory.textures,pr:GLSKY.r.getPixelRatio(),w:GLSKY.pw,h:GLSKY.ph};}catch(e){}
   return o;
