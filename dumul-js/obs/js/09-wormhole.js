@@ -1044,7 +1044,9 @@ function whGlFlash(al){
    Hasil: WHW (masuk whCfg.whw di dump bench: st 2 = selesai, 3 = berhenti, ms, steps = [[langkah, ms]]). Program tiap target (layar / RT linear / RT XR-sRGB) diwarm di target YANG SAMA dgn jalur produksinya. */
 var WHW_LVL=2;try{var _mWw=/[?&]whwarm=([0-9])/.exec(location.search);if(_mWw)WHW_LVL=Math.min(2,+_mWw[1]);}catch(eWw){}
 var WHW_MAX=6000;   /* ms: batas total; lewat itu sisa langkah dibuang (dive tetap jalan, sisanya lazy seperti v544) */
-var WHW={lvl:WHW_LVL,st:0,ok:false,ms:0,why:'',err:'',steps:[]};
+var WHW={lvl:WHW_LVL,st:0,ok:false,ms:0,why:'',err:'',steps:[],f:0};   /* f = progres 0..1 (bobot per langkah di WW), dibaca bar boot lewat WORMHOLE.warmF */
+/* [B10.1] bobot progres per langkah (perkiraan relatif biaya di itel; kalibrasi dari whCfg.whw.steps di dump). Dipakai bar boot: bobot warm = tahap ke-5 langkah gl. */
+var WW={ensure:.2,fb:.1,comp:.2,rim:.08,portal:.06,paste:.06,tele0:.02,tele:.28};
 function whWarmDraw(r,sc,cam,rt){   /* render 1 px: compile + link + upload buffer/tekstur objek yang tampil; hasil piksel diabaikan */
   var ac=r.autoClear,pr=r.getRenderTarget(),st=r.getScissorTest(),rs=null,rv=false;
   r.autoClear=false;
@@ -1054,10 +1056,11 @@ function whWarmDraw(r,sc,cam,rt){   /* render 1 px: compile + link + upload buff
   finally{r.setRenderTarget(pr);if(rt)rt.scissorTest=rs;else r.setScissorTest(st);r.autoClear=ac;}
 }
 function whWarm(done,stop){
-  var T0=performance.now(),fin=false,k=0,G=WHG,steps=[],TS=null,tele=null;
+  var T0=performance.now(),fin=false,k=0,G=WHG,steps=[],TS=null,tele=null,acc=0,tot=1;
+  function prog(x){WHW.f=Math.max(WHW.f,Math.min(.99,(acc+(x||0))/tot));}   /* monoton: tidak pernah turun */
   function end(ok,why){
     if(fin)return;fin=true;
-    WHW.st=ok?2:3;WHW.ok=!!ok;WHW.why=why||'';WHW.ms=Math.round(performance.now()-T0);
+    WHW.f=1;WHW.st=ok?2:3;WHW.ok=!!ok;WHW.why=why||'';WHW.ms=Math.round(performance.now()-T0);
     try{if(done)done(!!ok,why||'');}catch(eD){}
   }
   if(WHW.st!==0){try{if(done)done(WHW.ok,'again');}catch(eA){}return;}
@@ -1140,6 +1143,7 @@ function whWarm(done,stop){
       for(i=0;i<ob.length;i++)ob[i].visible=false;
     });
   }
+  tot=0;for(var _i=0;_i<steps.length;_i++)tot+=WW[steps[_i][0]]||0;if(WHW_LVL>=2)tot+=WW.tele;if(!(tot>0))tot=1;
   function runStep(){
     var t,nm,sl;
     if(fin)return;
@@ -1156,8 +1160,9 @@ function whWarm(done,stop){
         }
       }catch(eT){WHW.err='tele:'+String(eT&&eT.message||eT).slice(0,60);tele.i=tele.ob.length;}
       sl=Math.round(performance.now()-t);
+      prog(WW.tele*(tele.ob.length?tele.i/tele.ob.length:1));
       if(tele.i<tele.ob.length){WHW.steps.push(['tele~',sl]);setTimeout(runStep,0);return;}
-      WHW.steps.push(['tele',sl]);
+      WHW.steps.push(['tele',sl]);acc+=WW.tele;prog(0);
       try{for(t=0;t<tele.ob.length;t++)tele.ob[t].visible=tele.vis[t];}catch(eV){}
       tele=null;
     }
@@ -1168,9 +1173,12 @@ function whWarm(done,stop){
       WHW.err=nm+':'+String(e&&e.message||e).slice(0,60);
       WHW.steps.push([nm+'!',Math.round(performance.now()-t)]);
       if(nm==='ensure'){end(false,'ensure');return;}
+      acc+=WW[nm]||0;if(nm==='tele0'&&!tele)tot-=WW.tele;prog(0);
       k++;setTimeout(runStep,0);return;
     }
     WHW.steps.push([nm,Math.round(performance.now()-t)]);
+    acc+=WW[nm]||0;if(nm==='tele0'&&!tele)tot-=WW.tele;   /* teleskop dilewati (belum siap / sedang dipakai / SSAA mati): bobotnya ikut dibuang */
+    prog(0);
     k++;setTimeout(runStep,0);
   }
   setTimeout(runStep,0);
@@ -1845,7 +1853,8 @@ window.WORMHOLE={
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
   warm:whWarm,   /* [B10] warm #glwh di boot: WORMHOLE.warm(done(ok,why), stop()) */
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why,aa:WHG_AA,tss:WHG_TSS,tssN:(WHG.tss?WHG.tss.n:0),tssK:(WHG.tss?+WHG.tss.k.toFixed(2):0),tssFb:(WHG.tss?WHG.tss.fb:0),tssErr:(WHG.tss?WHG.tss.err:0),tssWhy:(WHG.tss?WHG.tss.why:''),whw:{lvl:WHW.lvl,st:WHW.st,ok:WHW.ok,ms:WHW.ms,why:WHW.why,err:WHW.err,steps:WHW.steps}};},
+  warmF:function(){return WHW.f;},   /* [B10.1] progres warm 0..1 untuk bar boot */
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why,aa:WHG_AA,tss:WHG_TSS,tssN:(WHG.tss?WHG.tss.n:0),tssK:(WHG.tss?+WHG.tss.k.toFixed(2):0),tssFb:(WHG.tss?WHG.tss.fb:0),tssErr:(WHG.tss?WHG.tss.err:0),tssWhy:(WHG.tss?WHG.tss.why:''),whw:{lvl:WHW.lvl,st:WHW.st,ok:WHW.ok,ms:WHW.ms,f:+WHW.f.toFixed(2),why:WHW.why,err:WHW.err,steps:WHW.steps}};},
   dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;},
   /* [PATCH G4.12] status feedback GL */
   get gl(){return !!(WHG.ok&&WHG.on);},

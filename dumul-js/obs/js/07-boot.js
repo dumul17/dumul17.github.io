@@ -297,7 +297,7 @@ var DUMUL_CHARS=(function(){
         sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
         bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
         sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
-        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null),glwd:(typeof GLWD!=='undefined'?GLWD:null)
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null),glwd:(typeof GLWD==='undefined'?null:GLWD),whwb:(typeof whwW==='function'?whwW():null),whwMs:(window.__whwMs!=null?window.__whwMs:null)
       };
     }catch(eBi){}
   }
@@ -389,7 +389,16 @@ var DUMUL_CHARS=(function(){
   }
   function plGlOn(){return glWarmOn()&&!/[?&]glplanet=0(&|#|$)/.test(location.search);}   /* planet dibangun di scene GL (bukan renderer 'big') */
   function estPre(k){return (k==='pl'&&plGlOn())?1800:WT_PRE_EST[k];}   /* planet GL: compile async + render penuh pertama, wall ±1,5-2,5 dtk di itel */
-  function wtPre(k){return ((k==='sc'&&scOff())||(k==='gl'&&!glWarmOn()))?0:WT_PRE[k];}
+  function wtPre(k){return ((k==='sc'&&scOff())||(k==='gl'&&!glWarmOn()))?0:WT_PRE[k]+(k==='gl'?whwW():0);}
+  /* [B10.1] warm #glwh (09-wormhole.js WORMHOLE.warm, dipanggil di callback selesai glskyWarm) = TAHAP KE-5 langkah gl: punya bobot sendiri di bar + progres nyata (WORMHOLE.warmF), supaya bar tidak mentok 99% selama warm jalan.
+     Bobot = ?whwb=N ms (default 900, perkiraan; 0 = tanpa bobot = perilaku B10) x 2,85 unit/ms (laju bar fase sebelum PRE, lihat B6.1). Hanya di bobot B6 (barw=6) + glwpre. Predikat di bawah harus sejalan dgn syarat whWarm: ?whwarm=0 / ?glwh=0 / potato / glskyWarm mati = tanpa bobot.
+     Kalau warm ternyata dilewati (done ok=false) bobotnya dibuang (whwSkip): penyebut ikut mengecil, bar maju sedikit, tidak mundur. */
+  var WHW_MS=(function(){var m=/[?&]whwb=(\d+)(&|#|$)/.exec(location.search);var n=m?parseInt(m[1],10):900;return isNaN(n)?900:Math.max(0,Math.min(4000,n));})(),whwRun=false,whwSkip=false;
+  function whwOn(){try{return !whwSkip&&WHW_MS>0&&glWarmOn()&&!IS_POTATO&&!/[?&](whwarm|glwh)=0(&|#|$)/.test(location.search);}catch(e){return false;}}
+  function whwW(){return (whwOn()&&BARW==='6'&&GL_PRE)?Math.round(WHW_MS*2.85):0;}
+  function whwF(){try{return (typeof WORMHOLE!=='undefined'&&typeof WORMHOLE.warmF==='function')?Math.max(0,Math.min(1,WORMHOLE.warmF()||0)):0;}catch(e){return 0;}}
+  function glBase(){return wtPre('gl')-whwW();}   /* bobot gl TANPA warm wormhole (yang dipetakan glwW(f)) */
+  function glwT(f){var w=whwW(),bs=glBase();return w>0?(bs*glwW(f)+w*(whwRun?whwF():0))/(bs+w):glwW(f);}   /* pecahan bobot gl yang NYATA selesai: glskyWarm (f) + warm wormhole (whwF) */
   function preFin(k,bad){if(pre[k]===2)return;pre[k]=2;if(bad)pre.bad=1;else if(!(k==='ui'&&IS_POTATO)&&!(k==='sc'&&scOff())&&!(k==='gl'&&!glWarmOn()))preEv.push(k);   /* [PATCH v175] bad = timeout / gagal: tidak dicatat ke log boot sbg selesai */
     try{pre.ms[k]=Math.round(performance.now()-pre.at);window.__preMs=pre.ms;}catch(eF){}}
   function preStart(){
@@ -446,8 +455,9 @@ var DUMUL_CHARS=(function(){
             try{
               if(ok&&!WR.entered&&typeof WORMHOLE!=='undefined'&&typeof WORMHOLE.warm==='function'){
                 var w0=performance.now();
-                WORMHOLE.warm(function(){try{window.__whwMs=Math.round(performance.now()-w0);}catch(eWm){}fin();},function(){return WR.entered;});
-              }else fin();
+                whwRun=true;   /* [B10.1] tahap ke-5 bar/log aktif */
+                WORMHOLE.warm(function(okW){try{window.__whwMs=Math.round(performance.now()-w0);}catch(eWm){}whwRun=false;if(!okW)whwSkip=true;fin();},function(){return WR.entered;});
+              }else{whwSkip=true;fin();}
             }catch(eWh){fin();}
           });
       }catch(eGw){rel(1);}
@@ -641,7 +651,7 @@ var DUMUL_CHARS=(function(){
   function logPoll(){
     if(!logEl)return;
     var thr=(typeof THREE!=='undefined'&&THREE.REVISION),cur='',h='',i,m,o,nm,tot,n,k,st,sx,au,ev=[],e,live,starTot=stars.length,bgmTot=audioList().length,decLive=false;
-    function gsTo(n5){while((logN.gs|0)<n5&&(logN.gs|0)<4){ev.push({k:'ok',g:'gs',s:T('bl.pre')+' \u00b7 '+T('bl.a.gls'+(logN.gs|0))+' \u00b7 '+((logN.gs|0)+1)+'/4'});logN.gs=(logN.gs|0)+1;}}   /* [B5] tahap glskyWarm yang selesai = baris log (foldable g:'gs') */
+    function gsTo(n5){var gN=whwW()>0?5:4;while((logN.gs|0)<n5&&(logN.gs|0)<gN){ev.push({k:'ok',g:'gs',s:T('bl.pre')+' \u00b7 '+T('bl.a.gls'+(logN.gs|0))+' \u00b7 '+((logN.gs|0)+1)+'/'+gN});logN.gs=(logN.gs|0)+1;}}   /* [B5] tahap glskyWarm yang selesai = baris log (foldable g:'gs') */
     var gwS=glwOn(),bk='',bw=-1,w5;
     if(thr&&!logN.thr){logN.thr=1;ev.push({k:'ok',s:T('bl.engine')+' '+T('bl.ready')});}
     if(!thr)cur=T('bl.engine')+' \u00b7 '+T('bl.a.dl');
@@ -668,8 +678,8 @@ var DUMUL_CHARS=(function(){
       else if(!cur)cur=T('bl.warm')+' \u00b7 '+T('bl.a.warm')+' \u00b7 '+wq.done+wy;
     }
     /* [PATCH v175] PRA-KAPSUL (preEv diisi preFin): suara tombol, gambar batu, hitungan pengamat. Yang timeout / gagal tidak dicatat; "siap" hanya kalau ketiganya beres tanpa masalah. */
-    if(gwS)gsTo(glwSg(glwF()));
-    while(preEv.length){pk=preEv.shift();if(pk==='gl'&&window.__glwarm&&glWarmOn()){gsTo(4);continue;}ev.push({k:'ok',g:'pr',s:T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk)});}   /* [B5] 'gl' selesai = tahap terakhir (4/4), bukan baris terpisah */
+    if(gwS)gsTo(whwRun?4:glwSg(glwF()));
+    while(preEv.length){pk=preEv.shift();if(pk==='gl'&&window.__glwarm&&glWarmOn()){gsTo(5);continue;}ev.push({k:'ok',g:'pr',s:T('bl.pre')+' \u00b7 '+T('bl.a.p'+pk)});}   /* [B5] 'gl' selesai = tahap terakhir (4/4), bukan baris terpisah */
     if(pre.at>=0&&preAll()&&!pre.bad&&!logN.pre){logN.pre=1;ev.push({k:'ok',s:T('bl.pre')+' '+T('bl.ready')});}
     /* [PATCH v175] WARM NYATA v172-174 (window.__warmReal): bentuk batu 3D (ast: hasil baru ada saat selesai, tanpa pecahan) + warna nebula 4 sektor (tint: x/y naik satu-satu). Yang berhenti karena Blue (stop) tidak dicatat. */
     M2=window.__warmReal;
@@ -703,9 +713,9 @@ var DUMUL_CHARS=(function(){
     if(!cur&&pre.at>=0&&!preAll()){
       for(i=0;i<PRE_KEYS.length;i++){   /* [B5] yang ditampilkan = langkah berjalan dengan sisa bobot bar TERBESAR (sama dgn yang menahan bar), bukan urutan tetap */
         pk=PRE_KEYS[i];
-        if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)&&!(pk==='sc'&&scOff())){w5=wtPre(pk)*((pk==='gl'&&gwS)?(1-glwF()):1);if(w5>bw){bw=w5;bk=pk;}}
+        if(pre[pk]===1&&!(pk==='ui'&&IS_POTATO)&&!(pk==='sc'&&scOff())){w5=wtPre(pk)*((pk==='gl'&&gwS)?(1-glwT(glwF())):1);if(w5>bw){bw=w5;bk=pk;}}
       }
-      if(bk)cur=(bk==='gl'&&gwS)?T('bl.pre')+' \u00b7 '+T('bl.a.gls'+glwSg(glwF()))+' \u00b7 '+(glwSg(glwF())+1)+'/4':T('bl.pre')+' \u00b7 '+T('bl.a.p'+bk);
+      if(bk)cur=(bk==='gl'&&gwS)?T('bl.pre')+' \u00b7 '+T('bl.a.gls'+(whwRun?4:glwSg(glwF())))+' \u00b7 '+((whwRun?4:glwSg(glwF()))+1)+'/'+(whwW()>0?5:4):T('bl.pre')+' \u00b7 '+T('bl.a.p'+bk);
     }
     if(!cur&&M2&&!WR.entered){
       if(typeof AST3D!=='undefined'&&AST3D.warmReal&&!M2.ast)cur=T('bl.rock')+' \u00b7 '+T('bl.a.wast');
@@ -900,7 +910,7 @@ var DUMUL_CHARS=(function(){
     var astF=0;   /* v177: AST3D beririsan -> tahap selesai ikut mengisi bar (jujur: hanya tahap nyata), rayapan di bawah cuma untuk sisanya */
     try{if(!th.fins[0]&&th.st[0]===1&&window.__ast3dT){astF=Math.min(.95,window.__ast3dT.length/(LOG_M[0][3].length+1));wDone+=WT_MODS[0]*astF;}}catch(eAf){}
     var glF=glwF();
-    if(glF>0)wDone+=wtPre('gl')*glwW(glF);   /* [B5] bagian gl yang NYATA selesai */
+    if(glF>0)wDone+=wtPre('gl')*glwT(glF);   /* [B5] bagian gl yang NYATA selesai ([B10.1] + warm wormhole) */
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])uD++;
     if(pr.ok)uD++;   /* v181: PRE = satu unit kilat */
@@ -911,7 +921,7 @@ var DUMUL_CHARS=(function(){
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
     for(wi=0;wi<PRE_KEYS.length;wi++){
-      if(PRE_KEYS[wi]==='gl'&&glwOn()){var gs5=glwSg(glF);wc+=crp('pregl'+gs5,true,wtPre('gl')*(GLS_W[gs5+1]-glwW(glF)),GLS_EST[gs5],elapsed);continue;}   /* [B5] rayapan per tahap, tidak melewati batas tahap berikutnya */
+      if(PRE_KEYS[wi]==='gl'&&glwOn()){var gs5=glwSg(glF);wc+=crp('pregl'+gs5,!whwRun,glBase()*(GLS_W[gs5+1]-glwW(glF)),GLS_EST[gs5],elapsed);continue;}   /* [B5] rayapan per tahap, tidak melewati batas tahap berikutnya */
       wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),estPre(PRE_KEYS[wi]),elapsed);   /* v181 */
     }
     if(!sx.ok&&sx.total>0){
