@@ -1497,9 +1497,27 @@ function glskyDpUpload(){
   glskyInstUpload(dp.bb,dp.mb,S.dbn);glskyInstUpload(dp.bl,dp.ml,S.dln);glskyInstUpload(dp.bs,dp.ms,S.dsn);glskyInstUpload(dp.tl,dp.mt,S.dtn);
 }
 
+/* [B12] glskyBuild dipecah 5 tahap (generator + yield, pola sama dgn pt3dBuildG / ast3dBuildG), satu tahap per giliran THREE_Q. Dump itel 15 Nov: satu giliran 'AST?' (label tak dikenal = glskyBuild) 810 ms
+   (renderer 314 ms + instancing/pf/dp + uji supersample) = plateau bar ±0,9 dtk + long task. Tahap: 0 renderer+listener, 1 scene+geo, 2 instancing, 3 pf+dp+DOM, 4 uji supersample (S.ok=true di akhir).
+   Urutan dan isi sama persis dgn versi sinkron; S.ok baru true di tahap terakhir (konsumen menunggu S.ok, lihat glskyWarm s0). ?glbs=0 = satu blok seperti dulu. Waktu tahap (ms) -> window.__glbT (dump). */
+var GLB_SLICE=!/[?&]glbs=0(&|#|$)/.test(location.search);
 function glskyBuild(){
-  var S=GLSKY,T=window.THREE,c,r;
+  var S=GLSKY;
   if(S.err>=3||S.r)return;
+  glskyBuildDrive(glskyBuildG(),[]);
+}
+function glskyBuildDrive(it,tm){
+  var S=GLSKY,t0=performance.now(),r;
+  try{r=it.next();}catch(e){glskyFail(String(e&&e.message||e));return;}
+  try{tm.push(Math.round(performance.now()-t0));window.__glbT=tm;}catch(eT){}
+  if(r.done||S.err>=3)return;
+  if(GLB_SLICE&&typeof THREE_Q!=='undefined'){
+    THREE_Q.q.unshift(function(){if(S.err>=3)return;glskyBuildDrive(it,tm);});
+    if(!THREE_Q.run){THREE_Q.run=true;if(typeof threeQWait==='function')threeQWait();}   /* aman kalau dipanggil di luar giliran antrean */
+  }else glskyBuildDrive(it,tm);
+}
+function* glskyBuildG(){
+  var S=GLSKY,T=window.THREE,c,r;
   S.dsy=/[?&]gldesync=1(&|#|$)/.test(location.search);   /* [B4aa] konteks #glsky desynchronized:true (Chrome Android: jalur tampil langsung, lewati compositor kalau memungkinkan); hanya A/B, default mati */
   S.opq=/[?&]glalpha=0(&|#|$)/.test(location.search);   /* [B4z] kanvas #glsky opak (alpha:false): compositor tidak perlu blending lapisan GL; hanya A/B (default mati), cek mata dulu */
   try{
@@ -1525,6 +1543,7 @@ function glskyBuild(){
     },false);
     S.cv=c;S.r=r;
     try{S.maxTex=r.capabilities.maxTextureSize||2048;}catch(eM0){}
+    yield;   /* ---- tahap 0: renderer + listener ---- */
     S.scene=new T.Scene();
     S.cam=new T.OrthographicCamera(0,1,0,1,-600,600);   /* [PATCH G4.1] near/far sama dgn AST3D (iZ batu ~±120*sz); dulu 0.1..10 cukup utk quad 2D saja */
     S.cam.position.z=5;
@@ -1537,7 +1556,9 @@ function glskyBuild(){
     S.root=new T.Group();S.scene.add(S.root);
     S.layers=new T.Group();S.root.add(S.layers);
     S.geo=new T.PlaneGeometry(1,1);
+    yield;   /* ---- tahap 1: scene + geo ---- */
     try{glskyInstBuild(T);}catch(eIn){S.inst=false;try{console.warn('[glsky] instancing gagal, bintang/garis tetap 2D:',eIn);}catch(e0){}}   /* gagal di sini TIDAK menjatuhkan GL: latar tetap jalan, bintang/garis 2D */
+    yield;   /* ---- tahap 2: instancing ---- */
     try{glskyPfBuild(T);}catch(ePf){S.pfOk=false;S.pf=null;try{console.warn('[glsky] efek planet GL gagal, tetap 2D:',ePf);}catch(e0b){}}   /* [G4.9] gagal di sini TIDAK menjatuhkan GL: efek planet tetap 2D */
     try{glskyDpBuild(T);}catch(eDp){S.dpOk=false;S.dp=null;try{console.warn('[glsky] pass drone gagal, drone tetap layer #gldrone:',eDp);}catch(e0c){}}   /* [G4.10] gagal di sini TIDAK menjatuhkan GL */
     S.dummy=new T.DataTexture(new Uint8Array([0,0,0,0]),1,1,T.RGBAFormat);S.dummy.needsUpdate=true;
@@ -1545,6 +1566,7 @@ function glskyBuild(){
     cv.parentNode.insertBefore(c,cv);   /* tepat SEBELUM #sky di dalam #stage => di bawahnya; urutan DOM lain tidak berubah */
     glskyMirror();
     try{S.mo=new MutationObserver(glskyMirror);S.mo.observe(cv,{attributes:true,attributeFilter:['style']});}catch(eM){}
+    yield;   /* ---- tahap 3: pf + dp + DOM ---- */
     try{if(S.saOn)glskySaInit(T);}catch(eSa){S.sa.ok=false;S.sa.why=String(eSa&&eSa.message||eSa);}   /* [G4.15] swa-uji RT; gagal = jalur langsung */
     S.ok=true;
   }catch(e){glskyFail(String(e&&e.message||e));}
