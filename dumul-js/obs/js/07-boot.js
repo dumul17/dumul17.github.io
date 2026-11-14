@@ -391,9 +391,9 @@ var DUMUL_CHARS=(function(){
   function estPre(k){return (k==='pl'&&plGlOn())?1800:WT_PRE_EST[k];}   /* planet GL: compile async + render penuh pertama, wall ±1,5-2,5 dtk di itel */
   function wtPre(k){return ((k==='sc'&&scOff())||(k==='gl'&&!glWarmOn()))?0:WT_PRE[k]+(k==='gl'?whwW():0);}
   /* [B10.1] warm #glwh (09-wormhole.js WORMHOLE.warm, dipanggil di callback selesai glskyWarm) = TAHAP KE-5 langkah gl: punya bobot sendiri di bar + progres nyata (WORMHOLE.warmF), supaya bar tidak mentok 99% selama warm jalan.
-     Bobot = ?whwb=N ms (default 900, perkiraan; 0 = tanpa bobot = perilaku B10) x 2,85 unit/ms (laju bar fase sebelum PRE, lihat B6.1). Hanya di bobot B6 (barw=6) + glwpre. Predikat di bawah harus sejalan dgn syarat whWarm: ?whwarm=0 / ?glwh=0 / potato / glskyWarm mati = tanpa bobot.
+     Bobot = ?whwb=N ms (default 3900 = median durasi warm di itel, dump 15 Nov; 2000 kalau ?whwarm=1; 0 = tanpa bobot = perilaku B10) x 2,85 unit/ms (laju bar fase sebelum PRE, lihat B6.1). Hanya di bobot B6 (barw=6) + glwpre. Predikat di bawah harus sejalan dgn syarat whWarm: ?whwarm=0 / ?glwh=0 / potato / glskyWarm mati = tanpa bobot.
      Kalau warm ternyata dilewati (done ok=false) bobotnya dibuang (whwSkip): penyebut ikut mengecil, bar maju sedikit, tidak mundur. */
-  var WHW_MS=(function(){var m=/[?&]whwb=(\d+)(&|#|$)/.exec(location.search);var n=m?parseInt(m[1],10):900;return isNaN(n)?900:Math.max(0,Math.min(4000,n));})(),whwRun=false,whwSkip=false;
+  var WHW_MS=(function(){var m=/[?&]whwb=(\d+)(&|#|$)/.exec(location.search);var d0=/[?&]whwarm=1(&|#|$)/.test(location.search)?2000:3900,n=m?parseInt(m[1],10):d0;return isNaN(n)?d0:Math.max(0,Math.min(6000,n));})(),whwRun=false,whwSkip=false;
   function whwOn(){try{return !whwSkip&&WHW_MS>0&&glWarmOn()&&!IS_POTATO&&!/[?&](whwarm|glwh)=0(&|#|$)/.test(location.search);}catch(e){return false;}}
   function whwW(){return (whwOn()&&BARW==='6'&&GL_PRE)?Math.round(WHW_MS*2.85):0;}
   function whwF(){try{return (typeof WORMHOLE!=='undefined'&&typeof WORMHOLE.warmF==='function')?Math.max(0,Math.min(1,WORMHOLE.warmF()||0)):0;}catch(e){return 0;}}
@@ -1025,7 +1025,7 @@ var DUMUL_CHARS=(function(){
     if(c.complete&&gateAt<0)gateAt=elapsed;
     if(c.complete&&(pV>=100||elapsed-gateAt>2500)){window.__bootFinish='gate';finish(c);}   /* [PATCH v167] tunggu bar tampil 100% (sapuan animator), pengaman 2,5 dtk */
     else if(elapsed>=HARD_CAP){window.__bootFinish='cap3d';finish(c);}
-    else if(elapsed>=cap3dNow(elapsed)&&!c.vis){
+    else if(elapsed>=cap3dNow(elapsed)&&!c.vis&&!window.__bootVis){   /* [B10.2] __bootVis = 3D + warm SUDAH pernah beres (preStart jalan). vis bisa turun lagi karena modul lazy (PL3D, dihitung settled saat state 0 > 4 dtk) baru mulai memuat sesudahnya; itu BUKAN modul macet. Dump 15 Nov: run 1 dan 4 kapsul muncul di bar 64-66 % lewat jalur ini (cap3d, PL3D st 1), dan warm wormhole ikut terpotong/ketinggalan di belakang kapsul. Anti hang tetap HARD_CAP. */
       var modsDone=c.th&&c.th.mods>=c.th.total;
       if(modsDone)requestAnimationFrame(tick);   /* nunggu warmOk + SFX */
       else{window.__bootFinish='cap3d';finish(c);}
