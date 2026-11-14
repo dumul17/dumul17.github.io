@@ -78,7 +78,11 @@ var WHG={on:true,ok:false,err:0,cv:null,r:null,rtA:null,rtB:null,scene:null,cam:
   teleScene:null,teleCam:null,teleGrp:null,
   fullW:0,fullH:0,compOk:false,skipTeleGl:false};
 try{if(/[?&]glwh=0(&|#|$)/.test(location.search))WHG.on=false;}catch(eGlw){}
-var WHG_AA=true;try{if(/[?&]glwhaa=0(&|#|$)/.test(location.search))WHG_AA=false;}catch(eGaa){}   /* [G5] ?glwhaa=0 = tanpa MSAA di #glwh (A/B) */
+/* [B8] SSAA teleskop di #glwh: badan teleskop digambar ke RT kecil (kotaknya saja, faktor WHG_TSS, tanpa MSAA) lalu ditempel ke #glwh, pola sama dgn supersample idle (glskySaUnit).
+   MSAA layar penuh (kanvas + teleRT) = biaya GPU terbesar di dive (A/B itel 14 Nov: glwhaa=0 zoom 15.7 -> 23.8 fps, exit 20.7 -> 30.2) tapi bikin tepi teleskop tajam; SSAA kotak kecil mengembalikan tepi halus.
+   ?whtss=N : faktor supersample 1.2-3 (default 2); ?whtss=0 = SSAA mati DAN MSAA kembali menyala (perilaku v542 persis). ?glwhaa=0 / ?glwhaa=1 memaksa MSAA mati / nyala (menang atas default). */
+var WHG_TSS=2;try{var _mTs=/[?&]whtss=([0-9.]+)/.exec(location.search);if(_mTs){var _vTs=parseFloat(_mTs[1]);WHG_TSS=(_vTs>=1.2)?Math.min(3,_vTs):0;}}catch(eTss){}
+var WHG_AA=(WHG_TSS>0)?false:true;try{if(/[?&]glwhaa=0(&|#|$)/.test(location.search))WHG_AA=false;else if(/[?&]glwhaa=1(&|#|$)/.test(location.search))WHG_AA=true;}catch(eGaa){}   /* [G5] ?glwhaa=0 = tanpa MSAA di #glwh (A/B); [B8] default mati kalau SSAA teleskop aktif */
 try{if(/[?&]glsky=0(&|#|$)/.test(location.search)||(!/[?&]glsky=/.test(location.search)&&localStorage.getItem('dumul_glsky')==='0'))WHG.on=false;}catch(eGls){}   /* [PATCH G4.12f P0] rencana 0.1: ?glsky=0 = paksa 2D termasuk wormhole */
 var reduceMq=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):null;
 function potato(){return typeof IS_POTATO!=='undefined'&&IS_POTATO;}
@@ -406,6 +410,7 @@ function whGlKill(){
   WHG.scene=null;WHG.injScene=null;WHG.compScene=null;WHG.teleScene=null;
   WHG.fbMat=null;WHG.fbMesh=null;WHG.injMesh=null;WHG.injGeo=null;WHG.sprTex=null;
   WHG.compMesh=null;WHG.stMesh=null;WHG.holeMesh=null;WHG.maskMesh=null;
+  try{if(WHG.tss&&WHG.tss.rt)WHG.tss.rt.dispose();}catch(e5){}WHG.tss=null;   /* [B8] */
 }
 /* [PATCH G4.12b] x,y,len,w buffer-px; ang = sudut radial (sama dot 2D) */
 function whGlPush(x,y,len,w,ang,ci,al){
@@ -772,6 +777,92 @@ function whGlTeleEnsureClip(){
     return true;
   }catch(e){return false;}
 }
+/* [B8] SSAA teleskop: fragment shader tempel (sama dgn WHG_CLIP_FS2 + uUV sub-rect RT) */
+var WHG_TSS_FS=[
+  'precision highp float;',
+  'uniform sampler2D tMap;uniform vec2 uP;uniform vec2 uN;uniform float uUseClip;uniform float uA;uniform vec2 uRes;uniform vec4 uUV;',
+  'varying vec2 vUv;',
+  'void main(){',
+  '  if(uUseClip>0.5){',
+  '    vec2 p=gl_FragCoord.xy;p.y=uRes.y-p.y;',
+  '    if(dot(p-uP,uN)<0.0)discard;',
+  '  }',
+  '  vec4 c=texture2D(tMap,mix(uUV.xy,uUV.zw,vUv));',
+  '  gl_FragColor=vec4(c.rgb*uA,c.a*uA);',
+  '}'
+].join('\n');
+function whTssState(){var G=WHG;return G.tss||(G.tss={rt:null,cw:0,ch:0,hw:0,hh:0,t:0,q:null,qs:null,qc:null,cam:null,u:null,cc:null,vp:null,err:0,why:'',n:0,px:0,k:0,fb:0,cap:2048});}
+/* RT kotak: tumbuh seketika, menyusut pelan (pola glskySaFit); storage dialokasi SEBELUM flag XR supaya RGBA8 biasa + ACES/sRGB per fragmen (pola glskySaAlloc / whGlTeleEnsureClip) */
+function whTssFit(T,rdr,TS,vw,vh){
+  var nw=0,nh=0,old,pr,rt;
+  if(vw>TS.hw)TS.hw=vw;if(vh>TS.hh)TS.hh=vh;
+  if(!TS.rt||vw>TS.cw||vh>TS.ch){nw=vw;nh=vh;}
+  else if(++TS.t>=150){if(TS.cw>=TS.hw*2.5&&TS.ch>=TS.hh*2.5){nw=TS.hw;nh=TS.hh;}TS.hw=TS.hh=0;TS.t=0;}
+  if(nw>0&&nh>0){
+    nw=Math.min(TS.cap,Math.max(32,Math.ceil(nw*1.25/32)*32));nh=Math.min(TS.cap,Math.max(32,Math.ceil(nh*1.25/32)*32));
+    pr=rdr.getRenderTarget();
+    rt=new T.WebGLRenderTarget(nw,nh,{depthBuffer:true,stencilBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter,samples:0});
+    rdr.setRenderTarget(rt);rdr.setRenderTarget(pr);
+    rt.isXRRenderTarget=true;rt.texture.colorSpace=T.SRGBColorSpace;
+    old=TS.rt;TS.rt=rt;TS.cw=nw;TS.ch=nh;TS.t=0;
+    if(old){try{old.dispose();}catch(eD){}}
+  }
+  return TS.rt;
+}
+/* hasil: 1 = digambar lewat RT, -1 = kotak di luar layar (tidak ada yang digambar), 0 = pakai jalur lama (langsung / teleRT) */
+function whGlTeleSS(opacity,clip){
+  var G=WHG,T=THREE,rdr=G.fullR,pv=G.teleGrp,TS=whTssState(),sa,hf,R,sx,sy,cx,cy,x0,y0,x1,y1,bw,bh,k,m,vw,vh,rt,pr,ac,ca,u,cam,addOn=false;
+  if(!(WHG_TSS>0)||TS.err>=3||!rdr||!pv||!G.fullW||!G.fullH)return 0;
+  try{
+    sa=(typeof GLSKY!=='undefined'&&GLSKY)?GLSKY.sa:null;
+    if(!sa||!sa.tried||!sa.ok){TS.why='sa tidak ok';return 0;}   /* swa-uji ACES/sRGB GLSky (G4.15) belum/tidak lulus (?glssaa=0 juga mematikan ini): jalur lama */
+    TS.cap=Math.min((rdr.capabilities&&rdr.capabilities.maxTextureSize)||2048,2048);
+    hf=(typeof SCP3D_CFG!=='undefined'&&SCP3D_CFG.half)||64;
+    R=hf*Math.abs(pv.scale.x)*((typeof GLSKY!=='undefined'&&GLSKY.saM)||1.45);
+    sx=G.fullW/W;sy=G.fullH/H;cx=pv.position.x;cy=pv.position.y;
+    x0=Math.max(0,Math.floor((cx-R)*sx));x1=Math.min(G.fullW,Math.ceil((cx+R)*sx));
+    y0=Math.max(0,Math.floor((cy-R)*sy));y1=Math.min(G.fullH,Math.ceil((cy+R)*sy));
+    bw=x1-x0;bh=y1-y0;
+    if(!(bw>0&&bh>0)||pv.visible===false)return -1;
+    k=WHG_TSS;m=Math.max(bw,bh);if(m*k>TS.cap)k=TS.cap/m;
+    if(bw*bh*k*k>2.2e6)k=Math.min(k,Math.sqrt(2.2e6/(bw*bh)));
+    if(!(k>=1.15)){TS.fb++;return 0;}
+    vw=Math.round(bw*k);vh=Math.round(bh*k);
+    rt=whTssFit(T,rdr,TS,vw,vh);if(!rt)return 0;
+    if(!TS.q){
+      TS.u={tMap:{value:G.dummy},uP:{value:new T.Vector2(0,0)},uN:{value:new T.Vector2(1,0)},uUseClip:{value:0},uA:{value:1},uRes:{value:new T.Vector2(1,1)},uUV:{value:new T.Vector4(0,0,1,1)}};
+      TS.q=new T.Mesh(new T.PlaneGeometry(2,2),new T.ShaderMaterial({uniforms:TS.u,vertexShader:WHG_CLIP_VS,fragmentShader:WHG_TSS_FS,transparent:true,depthTest:false,depthWrite:false,
+        blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));   /* premultiplied source-over, sama dgn clipMat */
+      TS.q.frustumCulled=false;TS.qs=new T.Scene();TS.qs.add(TS.q);TS.qc=new T.OrthographicCamera(-1,1,1,-1,-1,1);
+      TS.cam=new T.OrthographicCamera(0,1,1,0,-600,600);TS.cam.position.z=5;
+      TS.cc=new T.Color();TS.vp=new T.Vector4();
+    }
+    cam=TS.cam;cam.left=x0/sx;cam.right=(x0+bw)/sx;cam.bottom=y0/sy;cam.top=(y0+bh)/sy;cam.updateProjectionMatrix();
+    /* 1) render badan teleskop ke RT sub-viewport (glow aditif: alpha tidak ikut berubah, sama dgn idle) */
+    pr=rdr.getRenderTarget();ac=rdr.autoClear;ca=rdr.getClearAlpha();rdr.getClearColor(TS.cc);
+    rt.viewport.set(0,0,vw,vh);rt.scissor.set(0,0,vw,vh);rt.scissorTest=true;
+    if(typeof glskySaAddOn==='function'){glskySaAddOn(G.teleScene);addOn=true;}
+    rdr.setRenderTarget(rt);rdr.setClearColor(0x000000,0);rdr.autoClear=true;
+    try{rdr.render(G.teleScene,cam);}
+    finally{if(addOn&&typeof glskySaAddOff==='function')glskySaAddOff();rdr.setRenderTarget(pr);rdr.setClearColor(TS.cc,ca);rdr.autoClear=ac;}
+    /* 2) tempel ke #glwh di kotak layar (viewport = kotak, quad NDC penuh; clip setengah-bidang tetap lewat gl_FragCoord) */
+    u=TS.u;u.tMap.value=rt.texture;u.uUV.value.set(0,0,vw/rt.width,vh/rt.height);
+    if(clip&&clip.dx!=null&&clip.dy!=null){
+      u.uUseClip.value=1;u.uP.value.set(clip.x*(dpr||1),clip.y*(dpr||1));u.uN.value.set(clip.dx,clip.dy);
+    }else u.uUseClip.value=0;
+    u.uA.value=opacity<0?0:(opacity>1?1:opacity);u.uRes.value.set(G.fullW,G.fullH);
+    rdr.getViewport(TS.vp);
+    rdr.setRenderTarget(null);rdr.autoClear=false;rdr.setViewport(x0,y0,bw,bh);
+    try{rdr.render(TS.qs,TS.qc);}
+    finally{rdr.setViewport(TS.vp);rdr.autoClear=ac;rdr.setRenderTarget(pr);}
+    TS.n++;TS.px+=vw*vh;TS.k=k;
+    return 1;
+  }catch(e){
+    TS.err++;TS.why=String(e&&e.message||e).slice(0,80);
+    try{console.warn('[wormhole] SSAA teleskop gagal, jalur lama:',TS.why);}catch(e2){}
+    return 0;
+  }
+}
 function whGlTeleDraw(opacity,clip){
   var G=WHG,rdr,pr,ac,pw,ph,useClip;
   if(!whGlTeleWant()||!G.teleGrp)return false;
@@ -780,6 +871,7 @@ function whGlTeleDraw(opacity,clip){
     if(G.teleCam.right!==W||G.teleCam.top!==H){
       G.teleCam.left=0;G.teleCam.right=W;G.teleCam.top=H;G.teleCam.bottom=0;G.teleCam.updateProjectionMatrix();
     }
+    if(WHG_TSS>0){var _ss=whGlTeleSS(opacity,clip);if(_ss!==0)return true;}   /* [B8] SSAA kotak kecil; 0 = jalur lama di bawah */
     useClip=!!(clip&&clip.dx!=null&&clip.dy!=null);
     if(useClip){
       if(!whGlTeleEnsureClip())return false;
@@ -1608,7 +1700,7 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why};},
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why,aa:WHG_AA,tss:WHG_TSS,tssN:(WHG.tss?WHG.tss.n:0),tssK:(WHG.tss?+WHG.tss.k.toFixed(2):0),tssFb:(WHG.tss?WHG.tss.fb:0),tssErr:(WHG.tss?WHG.tss.err:0),tssWhy:(WHG.tss?WHG.tss.why:'')};},
   dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;},
   /* [PATCH G4.12] status feedback GL */
   get gl(){return !!(WHG.ok&&WHG.on);},
