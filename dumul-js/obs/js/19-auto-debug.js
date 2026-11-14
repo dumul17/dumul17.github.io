@@ -236,6 +236,7 @@
         ['aurora OFF', function () { PL3D_CFG.auroraOn = false; }],
         ['efek planet OFF (4)', function () { var C = PL3D_CFG; C.auroraOn = C.flareOn = C.debrisOn = C.boltOn = false; }],
         ['rotasi planet OFF', function () { PL3D_CFG.rotK = 0; }],
+        ['planet DIAM (3)', function () { var C = PL3D_CFG; C.rotK = 0; C.cloudDrift = 0; C.cityTw = 0; }],   /* [B14] rotasi + awan hanyut + kerlip semuanya 0 = tidak ada render periodik tanah (15 Nov: sektor 32,0 -> 18,2 ms) */
         ['drone 3D OFF', function () { if (typeof DR3D_CFG !== 'undefined') DR3D_CFG.on = false; }],
         ['PLANET OFF total', function () { PL3D_CFG.on = false; }],
         ['asteroid OFF', function () { PX.ast = 1; }],
@@ -258,6 +259,9 @@
         ['bands 3', function () { PL3D_CFG.bands = 3; }],
         ['bands 1', function () { PL3D_CFG.bands = 1; }],
         ['fps 30', function () { PL3D_CFG.fps = 30; }],
+        ['fps 8', function () { PL3D_CFG.fps = 8; }],   /* [B14] 15 Nov: 'fps 30' tak berefek karena rf/s (4,6 sampai 5,7) sudah jauh di bawah plafon default 15; tes yang benar = plafon LEBIH RENDAH */
+        ['fps 4', function () { PL3D_CFG.fps = 4; }],
+        ['fps 2', function () { PL3D_CFG.fps = 2; }],
         ['aurora OFF', function () { PL3D_CFG.auroraOn = false; }],
         ['PLANET OFF total', function () { PL3D_CFG.on = false; }]
       ];
@@ -267,6 +271,8 @@
         ['portal mulut OFF', function () { PX.ptm = 1; }],
         ['portal petir+kilau OFF', function () { PX.ptb = 1; }],
         ['asteroid OFF', function () { PX.ast = 1; }],
+        ['PLANET OFF total', function () { PL3D_CFG.on = false; }],   /* [B14] overview dulu tidak punya tes planet: SEMUA OFF +8 ms, portal+asteroid <=1,6 ms, sisa ±7 ms tak terjelaskan */
+        ['planet DIAM (3)', function () { var C = PL3D_CFG; C.rotK = 0; C.cloudDrift = 0; C.cityTw = 0; }],
         ['SEMUA OFF (kosong)', function () { PX.all = 1; }]
       ];
       window.PROBE_TESTS_SEC = PROBE_TESTS_SEC;
