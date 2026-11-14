@@ -1,5 +1,6 @@
 'use strict';
 /* BENCH v11.29 (?bench=1) — v11.29zt: P0 migrasi three: cfg.gl = {mode, on, why, aa, pr, cmpHold} di semua dump (GLMODE/SKY3D_* dari 01-core ?v=150) supaya baseline self-describing; ?gl=cmp memasang tombol 'banding' (tahan = window.GLCMP.hold true = tampil 2D, lepas = GL). Belum ada jalur GL, jadi tombol hanya mengubah GLCMP.hold + label. v11.29zs: ?hr=0.5 = skala RADIUS halo bintang di drawStars (r*K sebelum drawStarGlow; 0.5 = halo 1/4 piksel, jumlah drawImage SAMA). Tes submit vs fill-rate: kalau fps naik mirip token sglow = bottleneck fill; kalau tidak naik = jumlah draw / bukan halo. Hanya halo di dalam drawStars (pulse, pleiades, shoot, dll tidak ikut); inti tidak berubah. Pakai: ?bench=1&debug=1&plhint=1&autoab=none&autoabq=hr=0.5&autoabn=3 (+ &autoabrev=1). Dump: cfg.hr = {k, wrapped, calls, scaled}. Bench-only (wrapper window.drawStars/drawStarGlow), file produksi tidak berubah; tanpa ?hr nilai null. v11.29zr: FASE 0 plan "Static bg bake" (?skyp=1, bench-only, TANPA ubah file produksi): dump memuat skyP (R.skyP + post.skyP) = hitung PER FRAME STEADY sektor (!SECT.on, SECT.cur, !SECT.busy): (a) stack plate murni = fillRect dasar(1, dari kode) + plateDeep + plateDust[i] + bgCanvas yang benar-benar di-blit; (b) isi sectDrawSky = fillRect layar penuh + blit nebula tint + sprite 'lighter' + ms sectDrawSky; plus status bgEmpty / plateDust.length / SKY_DRIFT / NEB.DRIFT / NEB.on / NEB.base / SKYT[cur].v dan verdict otomatis sesuai ambang plan ((a)<=2 tutup A1, (a)>=4 lanjut A1). Tanpa ?skyp=1 nilainya null dan tidak ada yang dibungkus. v11.29zq: dump memuat cfg.pt.ptw + R.pttw (window.__pttwStat dari 15-portal3d ?v=51: prewarm pttInit, ?pttw=0 = lama) = {on, w, n, ok, sl, ms, by, syncMs, pre, delay, bud, skip, doneAt}. v11.29zp: dump post memuat plPr (window.__plPr dari 04-render, hanya kalau ?plpr=1) = rincian ms drawPleiades per segmen (6 panggilan pertama + panggilan >= 2 ms); tanpa ?plpr=1 nilainya null. v11.29zo: ?autoabrev=1 = urutan A/B dibalik (BABABA) utk kontrol bias urutan; ringkasan mencocokkan pasangan lewat label A/B; export memuat rev + plan; tanpa param = ABABAB seperti biasa.
+    v11.29zw: (B7) mode autoab SEKTOR merekam FASE dive -> sektor dalam satu dump: label ov | pre | d.enter d.zoom d.tunnel d.exit | sect | in0_3 in3_6 in6_10 | steady; fps/p50/p95/maks/>33/>50/>100 per fase, long task per fase, upload tekstur (GLSG.upTot) per fase, biaya bagian per fase wormhole (WORMHOLE.dbgAttach ringan, tidak menimpa ?whperf). Hasil di runs[i].ph + export phTab/phTxt. ?autoabph=0 = mati. Tanpa ?autoab tidak ada yang berubah.
     v11.29zn: dump.swarm = probe dt rAF per frame di jendela fase-in sektor (ring timestamp rAF di watcher za) + stat antrean skyWarmStars (q0 / left / sp / ms / calls; swarm jadi default ON di v455, ?swarm=0 = A) . v11.29zm: byFn juga membungkus planetBhOkFn / planetBhParkFn (geometri limb sekali per sumSpot; planetBhOk / planetBhPark tidak dipanggil lagi dari sumSpot); whMk memuat sumSpot[hdr pts hud grid] (ms). Bench-only. v11.29zl: byFn juga membungkus drawCons, drawPulses, drawStars, drawPleiades, drawTxLines, skyWarmStars (pecah cons+stars). Bench-only. v11.29zk: byFn (dump post) juga membungkus sumSpot, sumPlace, hudRects, planetBhOk, planetBhPark (05-sector-ui / 17-planet3d): total ms + jumlah panggilan masing-masing, supaya kelihatan berat di grid Math.hypot, planetBhOk, atau pembacaan layout hudRects. Bench-only. v11.29zj: byFn (dump post) juga membungkus sectSet, fxSectSync, applyObserveIcon (05-sector-ui / 06-interaction / 02-sky-logic) untuk memecah biaya sectSet ±32 ms saat masuk sektor; selisih sectSet - fxSectSync - applyObserveIcon = toggle kelas body. Bench-only. v11.29zi: dump post memuat whMk (string terakhir) dan whMkH ([[abs ms performance.now, string]], maks 12 kunjungan terakhir) = rincian blok akhir fase-in sectStep (restore+ui / sectSet / focus / panHits / lisArrive, ms per langkah; window.__whMk dari 05-sector-ui). Bench-only: accessor di window dipasang saat ?bench=1, 05-sector-ui dan service-worker TIDAK berubah, tanpa ?bench=1 tidak ada efek. v11.29zf: ?off=dstx (sembunyikan isi #stage KECUALI #sky); inventaris juga mendata anak langsung #stage (g='st', rec.cv = ukuran buffer kanvas). v11.29ze: tambah ?off=dstage (sembunyikan #stage, isi hudD) dan ?off=dcl (matikan animasi #cat-lock::before) utk bisect lanjutan hudD. v11.29zd: ?off=hudA|hudB|hudC|hudD = bisect HUD per kelompok elemen (A+B+C+D = ?off=hud); autoab membaca raFps s9_14 + dt k>=9 dan menyimpan INVENTARIS HUD read-only (inv) tiap run. Tanpa ?autoab / ?off tidak ada yang berubah.
     v11.29zh: ?autoabboot=1 = autoab MODE BOOT (reload -> boot -> obs-entered -> diam ±12 dtk -> snapshot() full-boot, bukan __benchPost; metrik CPU pra-kapsul per run: longtask, preMs, threeQ, LoAF, frame1). Dipasangkan dgn ?autoabq=gs=0 dst.
     v11.29zg: ?autoabov=1 = autoab MODE OVERVIEW (tanpa masuk sektor; rekam ov saja, metrik fps/dt/teleTop/pt.copy/sc.sub per run) + ?autoabq=a=1,b=2 (param tambahan khusus sisi B; ?autoab=none = tanpa ?off=). Tanpa ?autoab tidak mengubah apa pun.
@@ -2234,6 +2235,100 @@ var DK_CSS =
       (function tick() { var r = false; try { r = cond(); } catch (e) { r = false; } if (r) return ok(); if (Date.now() - t0 > timeout) return fail(); setTimeout(tick, every); })();
     }
     function isBusy() { var w = typeof WORMHOLE !== 'undefined' && WORMHOLE.busy, s = typeof SECT !== 'undefined' && SECT.busy; return !!(w || s); }
+    /* ---- v11.29zw (B7): perekam FASE dive -> sektor, hanya mode sektor (bukan ?autoabov / ?autoabboot); ?autoabph=0 mematikan.
+       Pasif: satu rAF native (tanpa bungkus rAF) + PerformanceObserver longtask + perekam ringan WORMHOLE.dbgAttach (kalau ?whperf tidak aktif).
+       Label frame: ov (diam di overview) | pre (sectJumpTo dipanggil, belum busy) | d.enter d.zoom d.tunnel d.exit (WORMHOLE.busy, fase dari 09) | sect (SECT.busy tanpa wormhole)
+       | in0_3 in3_6 in6_10 (0-3, 3-6, 6-10 dtk sesudah busy selesai) | steady (>=10 dtk sesudah busy selesai sampai save).
+       Hasil per run di runs[i].ph, tabel gabungan A/B di export: phTab + phTxt. ---- */
+    var PHON = !OVM && !BTM && !/[?&]autoabph=0(&|$)/.test(location.search);
+    var PH = (function () {
+      var o = { on: false, stop: false, last: 0, t0: 0, tEnter: 0, tBE: 0, tq: 0, quiet: 0, seen: false, lbl: 'ov' };
+      var D = {}, TL = [], LT = [], CK = [], FSS = {}, WX = null;
+      function up() { try { return typeof GLSG !== 'undefined' && GLSG ? [GLSG.upTot | 0, GLSG.upFr | 0] : [0, 0]; } catch (e) { return [0, 0]; } }
+      function ck(name, t) { var u = up(); CK.push([name, Math.round(t == null ? performance.now() : t), u[0], u[1]]); }
+      function fsSnap(lb) {
+        try { var f = typeof FS !== 'undefined' ? FS : null; if (f) FSS[lb] = [r1(f.ema), f.js == null ? null : r1(f.js), f.wait == null ? null : r1(f.wait)]; } catch (e) {}
+      }
+      function mkA() { return { n: 0, dt: 0, js: 0, sk: 0, max: 0, o33: 0, o50: 0, p: {} }; }
+      function attachWX() {
+        try {
+          if (window.__WH_AD_instWP) return;   /* ?whperf aktif: perekam lengkap sudah terpasang, jangan ditimpa */
+          var WH = window.WORMHOLE; if (!WH || typeof WH.dbgAttach !== 'function') return;
+          var A = {};
+          WX = { r: [], t: 0, ph: '', s: {}, l: 0, sk: 0, A: A };
+          WX.m = function (n, ph) { var t = performance.now(), a = A[ph] || (A[ph] = mkA()), c = a.p[n] || (a.p[n] = [0, 0]); if (WX.l) c[0] += t - WX.l; c[1]++; WX.l = t; };
+          WX.rec = function (now, ph, q, js, sky, lead) {
+            if (WX.t) { var d = now - WX.t, a = A[ph] || (A[ph] = mkA()); a.n++; a.dt += d; a.js += js || 0; a.sk += sky || 0; if (d > a.max) a.max = d; if (d > 33.5) a.o33++; if (d > 50) a.o50++; }
+            WX.t = now; WX.ph = ph;
+          };
+          WX.end = function () {};
+          WH.dbgAttach(WX);
+        } catch (e) { WX = null; }
+      }
+      function label(now) {
+        if (!o.tEnter) return 'ov';
+        var wb = false, sb = false;
+        try { wb = typeof WORMHOLE !== 'undefined' && !!WORMHOLE.busy; sb = typeof SECT !== 'undefined' && !!SECT.busy; } catch (e) {}
+        if (wb || sb) { o.seen = true; o.quiet = 0; o.tq = 0; o.tBE = 0; return wb ? ('d.' + (WX && WX.ph ? WX.ph : 'x')) : 'sect'; }
+        if (!o.seen) {
+          if (now - o.tEnter > 4000 && typeof SECT !== 'undefined' && SECT.cur) o.seen = true;   /* sama dgn fallback poll doEnter */
+          else return 'pre';
+        }
+        if (!o.tBE) { if (!o.tq) o.tq = now; if (++o.quiet < 3) return o.lbl; o.tBE = o.tq; }
+        var e = now - o.tBE;
+        return e < 3000 ? 'in0_3' : e < 6000 ? 'in3_6' : e < 10000 ? 'in6_10' : 'steady';
+      }
+      function tick(ts) {
+        if (o.stop) return;
+        if (o.last) {
+          var dt = ts - o.last, lb = label(ts);
+          if (lb !== o.lbl) { fsSnap(o.lbl); TL.push([Math.round(ts), lb]); ck(lb, ts); o.lbl = lb; }
+          (D[lb] || (D[lb] = [])).push(Math.round(dt * 10) / 10);
+        }
+        o.last = ts;
+        requestAnimationFrame(tick);
+      }
+      function pc(a, q) { return a[Math.min(a.length - 1, Math.floor(a.length * q))]; }
+      function summarize() {
+        var ph = {}, lt = {}, upd = {}, wx = {}, ks = Object.keys(D), i, j, k;
+        for (i = 0; i < ks.length; i++) {
+          k = ks[i]; var a = D[k].slice().sort(function (x, y) { return x - y; }), n = a.length, sum = 0, o33 = 0, o50 = 0, o100 = 0;
+          for (j = 0; j < n; j++) { sum += a[j]; if (a[j] > 33.5) o33++; if (a[j] > 50) o50++; if (a[j] > 100) o100++; }
+          ph[k] = { n: n, ms: Math.round(sum), fps: r1(1000 * n / Math.max(1, sum)), p50: r1(pc(a, .5)), p95: r1(pc(a, .95)), max: r1(a[n - 1]), o33: o33, o50: o50, o100: o100 };
+          if (FSS[k]) ph[k].fs = FSS[k];
+        }
+        for (i = 0; i < LT.length; i++) {
+          var st = LT[i][0], lb = 'ov';
+          for (j = 0; j < TL.length; j++) { if (TL[j][0] <= st) lb = TL[j][1]; else break; }
+          var c = lt[lb] || (lt[lb] = [0, 0, 0]); c[0]++; c[1] += LT[i][1]; if (LT[i][1] > c[2]) c[2] = LT[i][1];   /* [jumlah, total ms, maks ms] */
+        }
+        for (i = 0; i + 1 < CK.length; i++) { var u = upd[CK[i][0]] || (upd[CK[i][0]] = [0, 0]); u[0] += CK[i + 1][2] - CK[i][2]; u[1] += CK[i + 1][3] - CK[i][3]; }   /* [upload tekstur dinamis, frame berupload] */
+        if (WX) Object.keys(WX.A).forEach(function (p) {
+          var a = WX.A[p], pp = {}; Object.keys(a.p).forEach(function (n) { if (a.p[n][1]) pp[n] = r1(a.p[n][0] / a.p[n][1]); });
+          wx[p] = { n: a.n, fps: r1(1000 * a.n / Math.max(1, a.dt)), js: a.n ? r1(a.js / a.n) : 0, sk: a.n ? r1(a.sk / a.n) : 0, max: r1(a.max), o33: a.o33, o50: a.o50, parts: pp };
+        });
+        var tl = TL.map(function (x) { return [Math.round(x[0] - (o.tEnter || o.t0)), x[1]]; });
+        return { v: 1, ph: ph, lt: lt, up: upd, wx: wx, tl: tl, ltN: LT.length, wxOn: !!WX };
+      }
+      return {
+        start: function () {
+          if (o.on) return; o.on = true; o.t0 = performance.now(); TL.push([Math.round(o.t0), 'ov']); ck('ov', o.t0);
+          try {
+            var ty = (window.PerformanceObserver && PerformanceObserver.supportedEntryTypes) || [];
+            if (ty.indexOf('longtask') >= 0) new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { if (LT.length < 300) LT.push([Math.round(e.startTime), Math.round(e.duration)]); }); }).observe({ type: 'longtask' });
+          } catch (e) {}
+          requestAnimationFrame(tick);
+        },
+        enter: function () { if (!o.on || o.tEnter) return; attachWX(); o.tEnter = performance.now(); },
+        stop: function () {
+          if (!o.on || o.stop) return null;
+          o.stop = true; fsSnap(o.lbl); ck('end'); var r;
+          try { r = summarize(); } catch (e) { r = { err: String(e && e.message || e) }; }
+          return r;
+        },
+        kill: function () { o.stop = true; }
+      };
+    })();
     /* ---- alur satu run ---- */
     /* v11.29zo: halaman pertama dibuka dari URL tanpa param B; kalau urutan run ke-S.i meminta varian lain (mis. ?autoabrev=1 -> B dulu, atau URL dibuka dgn off= padahal run A), alihkan SEKALI ke URL varian yang benar sebelum run mulai */
     function curIsB() {
@@ -2254,6 +2349,7 @@ var DK_CSS =
       var thisI = S.i;
       setTimeout(function () { if (!finished && S.i === thisI) finishRun(false, 'watchdog 6 mnt'); }, 360000);
       poll(function () { return typeof window.__enteredAt === 'number'; }, 250, 150000, function () {
+        if (PHON) PH.start();   /* v11.29zw: rekam label ov sejak settle */
         if (BTM) { setPhase('hold', HOLD); setTimeout(saveRun, HOLD); return; }
         setPhase('settle', SETTLE); setTimeout(OVM ? doOvHold : doEnter, SETTLE);
       }, function () { finishRun(false, 'obs-entered tdk muncul 150 dtk'); });
@@ -2269,6 +2365,7 @@ var DK_CSS =
         S.sec = s.k || s.name || '?';
         try { if (!SECT.cur && typeof drawSectorOverview === 'function') drawSectorOverview(performance.now(), 0); } catch (e0) {}
         if (typeof sectJumpTo !== 'function') throw new Error('sectJumpTo tidak ada');
+        if (PHON) PH.enter();   /* v11.29zw: pasang perekam dive + tandai waktu masuk */
         if (sectJumpTo(s, true, true) === false) throw new Error('sectJumpTo ditolak');
       } catch (e) { err = String(e && e.message || e); }
       if (err) return finishRun(false, err);
@@ -2289,9 +2386,10 @@ var DK_CSS =
       if (finished) return; finished = true;
       setPhase('save');
       var s = null, d = null, ok = true, note = '', inv = null;
+      var phs = PHON ? PH.stop() : null;   /* v11.29zw: ringkasan fase (sebelum snapshot supaya sampler berhenti) */
       if (!OVM && !BTM) try { inv = hudInventory(); } catch (eI) { inv = { err: String(eI && eI.message || eI) }; }   /* read-only, di akhir fase diam (jendela rekam 15 dtk sudah lewat) */
       try { if (BTM) { s = snapshot(); if (typeof s !== 'string') s = JSON.stringify(s); } else s = window.__benchPost(); d = JSON.parse(s); } catch (e) { ok = false; note = 'snapshot gagal'; }
-      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null, ra914: d ? ra914(d) : null, dt9: d ? dt9(d) : null, invS: inv && inv.short ? String(inv.short).slice(0, 400) : '', ov: (OVM && d) ? ovMetrics(d) : null, bt: (BTM && d) ? btMetrics(d) : null };
+      var r = { i: S.i, v: plan[S.i], url: location.href, ok: ok, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: d ? dt03(d) : null, ra48: d ? ra48(d) : null, ra914: d ? ra914(d) : null, dt9: d ? dt9(d) : null, invS: inv && inv.short ? String(inv.short).slice(0, 400) : '', ov: (OVM && d) ? ovMetrics(d) : null, bt: (BTM && d) ? btMetrics(d) : null, ph: phs };
       idbPut(S.i, { meta: r, dump: s, inv: inv }, function (okp, kind) {
         if (!okp) { r.ok = false; r.note = (r.note ? r.note + ' ' : '') + 'simpan gagal'; }
         r.store = kind; S.runs.push(r); S.i++; saveS(); nextOrDone();
@@ -2299,6 +2397,7 @@ var DK_CSS =
     }
     function finishRun(ok, note) {
       if (finished) return; finished = true;
+      if (PHON) PH.kill();
       var r = { i: S.i, v: plan[S.i], url: location.href, ok: false, note: note, sec: S.sec || '', ms: Date.now() - runT0, dt03: null, ra48: null };
       S.runs.push(r); S.i++; saveS(); nextOrDone();
     }
@@ -2307,10 +2406,38 @@ var DK_CSS =
       setPhase('next', 4000);
       setTimeout(function () { location.replace(urlFor(S.i)); }, 4000);
     }
+    function phTable() {   /* v11.29zw: gabung runs[i].ph per varian (A/B): rata-rata + rentang fps antar-run; baris teks siap baca */
+      var ORD = ['ov', 'pre', 'd.enter', 'd.zoom', 'd.tunnel', 'd.exit', 'sect', 'in0_3', 'in3_6', 'in6_10', 'steady'], ks = {}, rs = S.runs.filter(function (r) { return r && r.ph && r.ph.ph; }), tab = {}, txt = [], i, j;
+      rs.forEach(function (r) { Object.keys(r.ph.ph).forEach(function (k) { ks[k] = 1; }); });
+      var keys = ORD.filter(function (k) { return ks[k]; }).concat(Object.keys(ks).filter(function (k) { return ORD.indexOf(k) < 0; }));
+      function agg(vs, label) {
+        var m = {}, a = vs.map(function (r) { return r.ph.ph[label]; }).filter(Boolean);
+        if (!a.length) return null;
+        function mean(f) { var s = 0; a.forEach(function (x) { s += x[f] || 0; }); return r1(s / a.length); }
+        var fp = a.map(function (x) { return x.fps; });
+        var lt = vs.map(function (r) { return (r.ph.lt && r.ph.lt[label]) || [0, 0, 0]; }), ltn = 0, lts = 0, ltm = 0;
+        lt.forEach(function (x) { ltn += x[0]; lts += x[1]; if (x[2] > ltm) ltm = x[2]; });
+        var ud = vs.map(function (r) { return (r.ph.up && r.ph.up[label]) || [0, 0]; }), us = 0, uf = 0;
+        ud.forEach(function (x) { us += x[0]; uf += x[1]; });
+        return { runs: a.length, ms: Math.round(mean('ms')), fps: [r1(Math.min.apply(null, fp)), mean('fps'), r1(Math.max.apply(null, fp))], p50: mean('p50'), p95: mean('p95'), max: mean('max'), o33: mean('o33'), o50: mean('o50'), o100: mean('o100'), lt: [r1(ltn / a.length), r1(lts / a.length), ltm], up: [r1(us / a.length), r1(uf / a.length)] };
+      }
+      ['A', 'B'].forEach(function (v) {
+        var vs = rs.filter(function (r) { return r.v === v; }); if (!vs.length) return;
+        tab[v] = {}; keys.forEach(function (k) { var g = agg(vs, k); if (g) tab[v][k] = g; });
+      });
+      txt.push('kolom: label | n run | dur ms | fps [min mean max] | p50 | p95 | maks | >33 | >50 | >100 per run | longtask [jml, total ms, maks] per run | upload tekstur [jml, frame] per run');
+      ['A', 'B'].forEach(function (v) {
+        if (!tab[v]) return;
+        keys.forEach(function (k) { var g = tab[v][k]; if (!g) return; txt.push(v + ' ' + k + ' | ' + g.runs + ' | ' + g.ms + ' | ' + JSON.stringify(g.fps) + ' | ' + g.p50 + ' | ' + g.p95 + ' | ' + g.max + ' | ' + g.o33 + ' | ' + g.o50 + ' | ' + g.o100 + ' | ' + JSON.stringify(g.lt) + ' | ' + JSON.stringify(g.up)); });
+      });
+      if (tab.A && tab.B) keys.forEach(function (k) { var a = tab.A[k], b = tab.B[k]; if (a && b) txt.push('B-A ' + k + ' | fps ' + r1(b.fps[1] - a.fps[1]) + ' | p95 ' + r1(b.p95 - a.p95) + ' | maks ' + r1(b.max - a.max) + ' | >50 ' + r1(b.o50 - a.o50)); });
+      return { tab: tab, txt: txt };
+    }
     function exportAll() {
       idbAll(function (arr) {
         arr.sort(function (a, b) { return a.meta.i - b.meta.i; });
         var out = { kind: 'autoab', rev: REV, plan: plan.join(''), ov: OVM, bt: BTM, q: QS, tok: TOK, n: N, holdMs: HOLD, settleMs: SETTLE, secIdx: SECI, started: new Date(S.t0).toISOString(), ended: S.tEnd ? new Date(S.tEnd).toISOString() : null, ua: navigator.userAgent, runs: S.runs, dumps: arr.map(function (x) { var d = null; try { d = JSON.parse(x.dump); } catch (e) {} return { i: x.meta.i, v: x.meta.v, url: x.meta.url, inv: x.inv || null, dump: d }; }) };
+        try { var pt = phTable(); out.phTab = pt.tab; out.phTxt = pt.txt; } catch (ePh) { out.phTab = { err: String(ePh && ePh.message || ePh) }; }   /* v11.29zw: tabel fase A/B */
         out.hudGroups = { hudA: HUD_G.hudA, hudB: HUD_G.hudB, hudC: HUD_G.hudC, hudD: 'sisanya (anak <body> di luar A-C dan di luar HUD_EXC)', exclude: HUD_EXC };
         try {
           var blob = new Blob([JSON.stringify(out)], { type: 'application/json' }), a = document.createElement('a');
