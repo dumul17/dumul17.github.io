@@ -1621,7 +1621,8 @@ function glskyWarmOne(r,sc,cam,only,cont){   /* [B4d] cont = wadah tempat 'only'
   return ok;
 }
 function glskyWarm(stop,onPl,onDone){
-  var S=GLSKY,Wm=GLW,T0=performance.now(),fin=false,tries=0,r=null,ps=[],cl=[],k=0,pg=false,post=false;
+  var S=GLSKY,Wm=GLW,T0=performance.now(),fin=false,tries=0,r=null,ps=[],cl=[],k=0,pg=false,post=false,
+      PLSL=(function(){var m=/[?&]plslice=(\d+)(&|#|$)/.exec(location.search);var n=m?parseInt(m[1],10):4;return isNaN(n)?4:Math.max(0,Math.min(8,n));})();   /* [B11] jumlah pita warm planet (default 4) */
   if(Wm.st!==0)return;
   Wm.st=1;
   var MKF={init:.25,cmp:.35,plBuild:.45,cmpOk:.6,cmpDone:.6,plDraw:.75};   /* [B5] batas tahap = 07-boot GLS_F: [0,.25) renderer, [.25,.6) shader, [.6,.75) planet, [.75,1) frame pertama */
@@ -1684,19 +1685,30 @@ function glskyWarm(stop,onPl,onDone){
   }
   function s3(){   /* render PENUH strip planet pertama ke render target + sinkron GPU (readback di pl3dGlRtFull), di task sendiri */
     if(halt())return;
+    function s3End(){
+      mk('plDraw');
+      plDone(!!(pg&&PL3D.glm===2));   /* jujur: planet yang tidak sempat dibangun GL = bukan 'selesai' (gerbang tetap lepas, frame pertama membangun sendiri seperti dulu) */
+      setTimeout(sR,40);
+    }
     if(pg&&PL3D.glm===2&&PL3D.glRtOn&&PL3D.glRt&&!document.hidden){
+      var t0=performance.now(),bp,lx,ly,sl=PLSL;
       try{
-        var t0=performance.now(),bp,lx,ly;
         pl3dSync();pl3dPalUpdate();pl3dPhase(t0);
         PL3D.curNow=t0;
         bp=pl3dLightPos();lx=bp[0];ly=PH-bp[1];
         pl3dGlRtAlloc();
+        if(sl>1&&typeof pl3dGlRtFullSliced==='function'){   /* [B11] diiris: satu pita per task (?plslice=N, 0/1 = satu blok seperti sebelumnya) */
+          pl3dGlRtFullSliced(t0,lx,ly,false,sl,8,halt,function(ok,why){
+            if(ok)Wm.plDraw=Math.round(performance.now()-t0);else if(why)Wm.plErr='slice:'+why;
+            Wm.plSl=sl;
+            s3End();
+          });
+          return;
+        }
         if(pl3dGlRtFull(t0,lx,ly,false))Wm.plDraw=Math.round(performance.now()-t0);
       }catch(ePd){Wm.plErr=String(ePd&&ePd.message||ePd).slice(0,120);}
-      mk('plDraw');
     }
-    plDone(!!(pg&&PL3D.glm===2));   /* jujur: planet yang tidak sempat dibangun GL = bukan 'selesai' (gerbang tetap lepas, frame pertama membangun sendiri seperti dulu) */
-    setTimeout(sR,40);
+    s3End();
   }
   function sR(pq,cb){   /* [B4] render pertama per scene/unit, tiap satu di task sendiri. [B4h] pq/cb = fase pasca-kapsul (hanya scp/dr, tanpa s4) */
     if(hlt())return;

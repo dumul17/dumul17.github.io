@@ -1627,9 +1627,34 @@ function pl3dGlRtDraw(rt,y0,y1){
   finally{r.setRenderTarget(pr);r.setClearColor(cc,ca);r.autoClear=ac;rt.scissorTest=false;}
 }
 function pl3dGlRtFull(now,lx,ly,bolt){
-  var R=PL3D.glRt,t,bf;
   pl3dUniforms(now,!bolt);PL3D.uni.uGlA.value=1;   /* petir: kilau ikut dibake selagi kilat aktif (render penuh tiap frame, hanya beberapa frame) */
-  pl3dGlRtDraw(R[2],0,PL3D.gRh);
+  pl3dGlRtDraw(PL3D.glRt[2],0,PL3D.gRh);
+  return pl3dGlRtFullEnd(now,lx,ly,bolt);
+}
+/* [B11] render penuh DIIRIS jadi n pita (scissor, sama dgn pl3dGlRtCycStep), satu pita per task: dipakai warm pra-kapsul (24-glsky s3). Dulu satu blok sinkron ±1 dtk (4x CPU headless; GPU lemah lebih lama)
+   = bar boot diam ~1,2 dtk di ±54%. Hasil piksel identik dgn pl3dGlRtFull (uniform di-set SEKALI, target scratch R[2] yang ditulis, tukar + status lewat pl3dGlRtFullEnd yang sama).
+   stop() true / ukuran target berubah di tengah jalan = batal tanpa menyentuh R[0] (jalur frame biasa nanti render penuh sendiri). done(ok, why). */
+var pl3dBnd=null;
+function pl3dGlRtFullSliced(now,lx,ly,bolt,n,gap,stop,done){
+  var R=PL3D.glRt,rh=PL3D.gRh,rw=PL3D.gRw,k=0;
+  n=Math.max(1,Math.min(8,n|0));
+  try{pl3dUniforms(now,!bolt);PL3D.uni.uGlA.value=1;}catch(eU){done(false,'uni');return;}
+  (function step(){
+    var y0,y1;
+    if(stop&&stop()){done(false,'stop');return;}
+    if(PL3D.glRt!==R||PL3D.gRh!==rh||PL3D.gRw!==rw||!PL3D.glRtOn){done(false,'resized');return;}
+    y0=Math.round(rh*k/n);y1=Math.round(rh*(k+1)/n);
+    try{if(y1>y0)pl3dGlRtDraw(R[2],y0,y1);}catch(eD){done(false,'draw');return;}
+    if(++k<n){
+      /* sinkron GPU per pita (baca 1 piksel dari pita yang baru digambar): tanpa ini draw cuma diantre dan SELURUH kerja GPU jatuh di readback pl3dGlRtFullEnd = blok yang sama (dump headless: draw 41 ms, FullEnd 972 ms) */
+      try{if(!pl3dBnd)pl3dBnd=new Uint8Array(4);GLSKY.r.readRenderTargetPixels(R[2],rw>>1,Math.min(rh-1,y0),1,1,pl3dBnd);}catch(eS){}
+      setTimeout(step,gap);return;
+    }
+    try{done(pl3dGlRtFullEnd(now,lx,ly,bolt));}catch(eE){done(false,'end');}
+  })();
+}
+function pl3dGlRtFullEnd(now,lx,ly,bolt){
+  var R=PL3D.glRt,t,bf;
   t=R[0];R[0]=R[2];R[2]=t;
   PL3D.gRox=PL3D.rox;PL3D.gRoy=PL3D.roy;PL3D.gRf=PL3D.rf;PL3D.gBo=PL3D.bo;
   PL3D.gLastR=now;PL3D.gLx=lx;PL3D.gLy=ly;PL3D.dirty=false;PL3D.full=false;PL3D.gcyc=null;PL3D.gFadeT=null;PL3D.gBoltWas=!!bolt;PL3D.gHave++;PL3D.renders++;
