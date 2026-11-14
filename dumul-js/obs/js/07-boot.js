@@ -297,7 +297,7 @@ var DUMUL_CHARS=(function(){
         sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
         bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
         sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
-        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null)
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null),glwd:(typeof GLWD!=='undefined'?GLWD:null)
       };
     }catch(eBi){}
   }
@@ -442,7 +442,7 @@ var DUMUL_CHARS=(function(){
           function(ok){if(plGlOn())preFin('pl',ok?0:1);},
           function(ok,why){clearTimeout(tm);preFin('gl',ok?0:1);if(plGlOn())preFin('pl',ok?0:1);});
       }catch(eGw){rel(1);}
-    },1200);
+    },(typeof GLWD==='number'?GLWD:1200));   /* [B6.2 v541] jeda dari ?glwd=N (ms, 0-3000); default 1200 = perilaku v189 */
   }
   /* [PATCH v172] WARM NYATA pra-kapsul (jendela idle antara __bootVis dan kapsul: bench 5 Nov = 18 dtk (repeat) / 45 dtk (pertama) di HP lemah, CPU nyaris menganggur).
        ast  = ast3dWarmReal (12-ast3d.js v28): render tiap mesh varian batu sekali (mesh varian visible=false, tidak ikut warm lama).
@@ -498,7 +498,7 @@ var DUMUL_CHARS=(function(){
   var WT_PRE_OLD={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},GL_PRE=!/[?&]glwpre=0(&|#|$)/.test(location.search),WT_PRE_NEW={ui:80,ast:300,pl:700,fb:250,sc:150,rg:600,gl:GL_PRE?3600:1200},WT_PRE=WT_PRE_NEW;
   /* [B6.1] bobot PRE sebanding WAKTU NYATA. Baseline 14 Nov (itel, v538, 6 run): bar 70-78% saat PRE mulai (visAt 7,7-8,5 dtk), lalu PRE 7,6-8,1 dtk cuma 5680 dari ±28200 bobot (20%), jadi laju bar jatuh dari ±10 %/dtk ke ±0,6 %/dtk (97->98% 1,4-1,7 dtk, 98%->kapsul 2,4-2,9 dtk).
      Fase sebelum PRE: 22550 bobot / ±7,9 dtk = ±2,85 unit/ms; PRE dibuat ±22500 (gl 6,5 dtk x 2,85 = 17500 + sisanya yang tumpang tindih 0-3,2 dtk). ?barw=5 = bobot B5 (v516-v538), ?barw=0 = bobot lama (v181). Dump: bootInfo.barw. */
-  var BARW=(/[?&]barw=(\d)(&|#|$)/.exec(location.search)||[0,'6'])[1],WT_PRE_B6={ui:100,ast:800,pl:1500,fb:400,sc:50,rg:2200,gl:GL_PRE?17500:3100};
+  var GLWD=(function(){var m=/[?&]glwd=(\d+)(&|#|$)/.exec(location.search);var n=m?parseInt(m[1],10):1200;return isNaN(n)?1200:Math.max(0,Math.min(3000,n));})(),BARW=(/[?&]barw=(\d)(&|#|$)/.exec(location.search)||[0,'6'])[1],WT_PRE_B6={ui:100,ast:800,pl:1500,fb:400,sc:50,rg:2200,gl:GL_PRE?17500:3100};
   try{WT_PRE=BARW==='0'?WT_PRE_OLD:(BARW==='5'?WT_PRE_NEW:WT_PRE_B6);window.__barw=BARW;}catch(eBw){}
   var WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1500,gl:1800},PRE_KEYS=['ui','ast','pl','fb','sc','rg','gl'];   /* [v189] gl: build renderer GLSky + kirim ±9 scene ke compileAsync (sisi main thread ±300 ms di itel; tunggu async-nya masuk creep) */
   function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg')+wtPre('gl');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
@@ -951,8 +951,8 @@ var DUMUL_CHARS=(function(){
     if(vis>=0){
       var ld=0;
       if(BG_ON&&v<99&&pTgt<100){ld=Math.min(BG_LEAD_MAX,bgRate(performance.now())*BG_HZ/1000,99-v);if(ld<.15)ld=0;}
-      if(ld>0){fill.style.transition='transform '+BG_HZ+'ms linear';if(bgLead.length<80)bgLead.push([Math.round(performance.now()),v,Math.round(ld*100)/100]);}
-      else if(fill.style.transition)fill.style.transition='';
+      if(ld>0){fill.style.transition='transform '+BG_HZ+'ms linear';if(bgLead.length<200)bgLead.push([Math.round(performance.now()),v,Math.round(ld*100)/100]);}   /* [B6.1b v541] batas 80 -> 200; sampel lead=0 ikut dicatat di cabang else (elemen ke-3 = 0) */
+      else{if(fill.style.transition)fill.style.transition='';if(bgLead.length<200)bgLead.push([Math.round(performance.now()),v,0]);}
       fill.style.transform='translateX('+(v+ld-100)+'%)';
     }
     fill.setAttribute('data-v',v);pct.textContent=v+'%';
