@@ -1377,9 +1377,10 @@ var LOCK_RGB='140,220,255';
 function drawLockedSignal(c,age,now,ox,oy,focus){
   var seq=alignmentSequence(c),n=seq.length,i,s,q;
   if(!n)return;
+  var gfx=(typeof glskyFxOn==='function')&&glskyFxOn();   /* [G5.3] ?glsky=1: cincin + titik cahaya sinyal terkunci ke GL (glfx=0 = 2D) */
   if(reduce||IS_POTATO){
     s=c.stars[seq[0]];q=gSkyC(s.x+ox,s.y+oy,72);
-    if(q&&q[2]<1){g.strokeStyle='rgba('+LOCK_RGB+','+(.38*(1-.85*q[2]))+')';g.lineWidth=1;g.beginPath();g.arc(q[0],q[1],7,0,6.283);g.stroke();}
+    if(q&&q[2]<1){if(gfx)glskyLensArc(q[0],q[1],7,0,6.283,1,glskyCol(LOCK_RGB),.38*(1-.85*q[2])*g.globalAlpha,0);else{g.strokeStyle='rgba('+LOCK_RGB+','+(.38*(1-.85*q[2]))+')';g.lineWidth=1;g.beginPath();g.arc(q[0],q[1],7,0,6.283);g.stroke();}}
     return;
   }
   var fa=.5+.5*focus;
@@ -1403,8 +1404,9 @@ function drawLockedSignal(c,age,now,ox,oy,focus){
   if(!qd||qd[2]>=1)return;
   var kd=1-.85*qd[2];
   g.save();g.globalCompositeOperation='lighter';
-  drawStarGlow(qd[0],qd[1],4.2,'190,235,255',.95*kd*fa);
-  g.fillStyle='rgba(255,255,255,'+(.9*kd)+')';g.beginPath();g.arc(qd[0],qd[1],1.5,0,6.283);g.fill();
+  drawStarGlowFx(qd[0],qd[1],4.2,'190,235,255',.95*kd*fa);   /* [G5.3] drawStarGlowFx: GL aditif kalau glskyFxOn, kalau tidak = drawStarGlow 2D */
+  if(gfx)glfDot(qd[0],qd[1],1.5,'255,255,255',.9*kd*g.globalAlpha);
+  else{g.fillStyle='rgba(255,255,255,'+(.9*kd)+')';g.beginPath();g.arc(qd[0],qd[1],1.5,0,6.283);g.fill();}
   g.restore();
 }
 function nebulaIn(x,y,r){var t=skyXF(x,y);CULL.tot++;if(cullIn(t[0],t[1],r)){CULL.drawn++;return true;}CULL.saved+=2;return false;}
@@ -1576,9 +1578,12 @@ function drawCons(c,age,now){
   if(c.nebula&&!PX.cname){
     var na=clamp((age-c.delay-1.2)/1.5);
     if(na>0&&nebulaIn(c.nebula.x+ox,c.nebula.y+oy,c.scale*1.5)){var nt=skyXF(c.nebula.x+ox,c.nebula.y+oy),nx=nt[0],ny=nt[1],nr=c.scale*1.5;
+      if(typeof glskyFxOn==='function'&&glskyFxOn())glskyImg(glfNebula(),na*g.globalAlpha,nx,ny,nr*2,nr*2,0,0,0);   /* [G5.3] glow nebula rasi = op GL di bawah garis+bintang (dulu #sky: tergambar DI ATAS isi GL) */
+      else{
       var gr=g.createRadialGradient(nx,ny,0,nx,ny,nr);
       gr.addColorStop(0,'rgba(255,122,217,'+(.34*na)+')');gr.addColorStop(.5,'rgba(110,229,255,'+(.12*na)+')');gr.addColorStop(1,'rgba(110,229,255,0)');
       g.fillStyle=gr;g.beginPath();g.arc(nx,ny,nr,0,6.283);g.fill();}
+    }
   }
   if(!PX.cname)drawConsName(c,age,now,ox,oy,focus,locked); /* [bench ?off=cname] teks nama rasi: lapisan paling bawah, di bawah garis & bintang */
   g.lineCap='round';
@@ -1887,6 +1892,7 @@ function stLodK(now){   /* 1 = halo penuh, 0 = halo kecil/sedang mati; diperbaru
 function drawStars(c,age,now){
   var tn=now-(TD.lag[c.id]||0);
   var glOn=!!(window.STGL&&STGL.act);   /* ?stargl=1 (23-stargl.js): halo+inti lewat WebGL, di-flush sekali per frame */
+  var gfxS=(typeof glskyFxOn==='function')&&glskyFxOn();   /* [G5.3] tanda alignment + silang retikel ke GL (lv 2 = di atas inti bintang, urutan sama dgn 2D) */
   var gsOn=(typeof glskyStarsOn==='function')&&glskyStarsOn();   /* ?glsky=1 (24-glsky.js): halo+inti di kanvas GL di bawah #sky (mesh instancing), menang atas StarGL */
   c._vis=0;
   var k2=W<500?.95:1.2;
@@ -1981,12 +1987,18 @@ function drawStars(c,age,now){
     }
     var am=(ALIGN.cid&&!PX.smark)?alignMark(c,k):null;
     if(am==='lit'){
+      if(gfxS)glskyLensArc(x,y,Math.max(3.2,r*2.1),0,6.283,1,glskyCol('110,229,255'),.55*a*g.globalAlpha,0);
+      else{
       g.strokeStyle='rgba(110,229,255,'+(.55*a)+')';g.lineWidth=1;
       g.beginPath();g.arc(x,y,Math.max(3.2,r*2.1),0,6.283);g.stroke();
+      }
     }else if(am==='next'){
       var hp=.5+.5*Math.sin(tn*.008);
+      if(gfxS)glskyLensArc(x,y,Math.max(5,r*2.6)+2*hp,0,6.283,1.1,glskyCol('255,226,140'),(.45+.4*hp)*a*g.globalAlpha,0);
+      else{
       g.strokeStyle='rgba(255,226,140,'+((.45+.4*hp)*a)+')';g.lineWidth=1.1;
       g.beginPath();g.arc(x,y,Math.max(5,r*2.6)+2*hp,0,6.283);g.stroke();
+      }
     }
     /* Label bintang (+ reticle silang + spektrum) tersembunyi dulu:
        - bintang ber-SFX: tampil pas SFX-nya main, cuma di bintang yang lagi aktif
@@ -2014,7 +2026,9 @@ function drawStars(c,age,now){
          menjauh ke LUAR cincin terluar lensa (1.42*(3*rc+4)) mengikuti fade lensa (az); tanpa lensa = silang penuh seperti semula. */
       var azR=(CAMERA_MODE&&s.name&&s.r>=ringR())?clamp((skyZoom-2.5)/3):0,lensOut=1.42*(3*Math.max(.9,r*camZK()*.62)+4),
           rG=azR*lensOut*CAM_RET_GAP,rL=r*2.2+azR*(lensOut*CAM_RET_GAP+Math.max(CAM_RET_ARM,lensOut*.45)-r*2.2);
-      g.beginPath();g.moveTo(x-rL,y);g.lineTo(x-rG,y);g.moveTo(x+rG,y);g.lineTo(x+rL,y);g.moveTo(x,y-rL);g.lineTo(x,y-rG);g.moveTo(x,y+rG);g.lineTo(x,y+rL);g.stroke();
+      if(gfxS){var rc=glskyCol(s.rgb),ra=.4*(a/focusK)*tw*Math.min(1,lblA*1.6)*g.globalAlpha;   /* [G5.3] 4 lengan silang = 4 ruas lv 2 */
+        glskySegL(2,x-rL,y,x-rG,y,.8,rc,ra,0);glskySegL(2,x+rG,y,x+rL,y,.8,rc,ra,0);glskySegL(2,x,y-rL,x,y-rG,.8,rc,ra,0);glskySegL(2,x,y+rG,x,y+rL,.8,rc,ra,0);}
+      else{g.beginPath();g.moveTo(x-rL,y);g.lineTo(x-rG,y);g.moveTo(x+rG,y);g.lineTo(x+rL,y);g.moveTo(x,y-rL);g.lineTo(x,y-rG);g.moveTo(x,y+rG);g.lineTo(x,y+rL);g.stroke();}
     }
     if(!PX.slbl && lblA>.02){
       /* Audio-trigger labels: each one inherits its own pulse color. */
@@ -2221,6 +2235,7 @@ function plBand(st){
 }
 function drawPleiades(age,now){
   var tn=now-(TD.lag.pleiades||0);
+  var gfxP=(typeof glskyFxOn==='function')&&glskyFxOn();   /* [G5.3] pulse Pleione + garis penghubung label klaster ke GL */
   if(!PLEIADES.ready)return;
   var _P=PLPR?{t0:performance.now(),t:0}:null;if(_P)_P.t=_P.t0;
   function plM(k){var n=performance.now();_P[k]=(_P[k]||0)+n-_P.t;_P.t=n;}
@@ -2321,6 +2336,15 @@ function drawPleiades(age,now){
       var pulseR=base+2.2+6.5*phase;
       var outerR=base+5.5+7.5*phase;
       var coreR=base*(.92+.10*breathe);
+      if(gfxP){   /* [G5.3] sama dgn blok 2D di bawah: 4 busur + glow radial (aditif) + 4 tick, semua lv 2 / di atas bintang */
+        var ga=g.globalAlpha,pc=glskyCol(tr.rgb),pa=(1-phase)*(.56+.22*strength)*fade,phase2=(phase+.42)%1,pa2=(1-phase2)*.34*strength*fade,tk=.55*strength*fade*ga;
+        glskyLensArc(x,y,coreR,0,6.283,.8,pc,.20*strength*fade*ga,0);
+        glskyLensArc(x,y,base+2.8*breathe,0,6.283,1.05+.35*breathe,pc,(.56+.18*breathe)*strength*fade*ga,0);
+        glskyLensArc(x,y,pulseR,0,6.283,.95,pc,pa*ga,0);
+        glskyLensArc(x,y,base+4.5+7*phase2,0,6.283,.7,pc,pa2*ga,0);
+        if(selected)glskyImg(glfRadial(tr.rgb,.12,.045,0),strength*fade*ga,x,y,(outerR+3)*2,(outerR+3)*2,0,1,1);
+        glskySegL(2,x-base-1.5,y,x-base+.8,y,.7,pc,tk,0);glskySegL(2,x+base-.8,y,x+base+1.5,y,.7,pc,tk,0);glskySegL(2,x,y-base-1.5,x,y-base+.8,.7,pc,tk,0);glskySegL(2,x,y+base-.8,x,y+base+1.5,.7,pc,tk,0);
+      }else{
       g.save();g.globalCompositeOperation='lighter';
       g.strokeStyle='rgba('+tr.rgb+','+(.20*strength*fade)+')';g.lineWidth=.8;g.beginPath();g.arc(x,y,coreR,0,6.283);g.stroke();
       g.strokeStyle='rgba('+tr.rgb+','+((.56+.18*breathe)*strength*fade)+')';g.lineWidth=1.05+.35*breathe;g.beginPath();g.arc(x,y,base+2.8*breathe,0,6.283);g.stroke();
@@ -2338,6 +2362,7 @@ function drawPleiades(age,now){
       g.strokeStyle='rgba('+tr.rgb+','+(.55*strength*fade)+')';g.lineWidth=.7;
       g.beginPath();g.moveTo(x-base-1.5,y);g.lineTo(x-base+.8,y);g.moveTo(x+base-.8,y);g.lineTo(x+base+1.5,y);g.moveTo(x,y-base-1.5);g.lineTo(x,y-base+.8);g.moveTo(x,y+base-.8);g.lineTo(x,y+base+1.5);g.stroke();
       g.restore();
+      }
       if(selected&&age>3.5&&q[2]<.25){ /* label Pleione cuma pas SFX-nya main (di mode apa pun) */
         var _upP=uprBegin(x,y);
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
@@ -2384,8 +2409,13 @@ function drawPleiades(age,now){
       for(_vi=0;_vi<_vs.length;_vi++)_cp.push([_vs[_vi][0]*_vs[_vi][2]+(_vs[_vi][0]<0?-3:3),_vs[_vi][1]*_vs[_vi][2]+3,_vs[_vi][0]<0?'r':'l']);
       var _pf=lblFit(now,x,y,Math.max(_wN,_wS2)+4,spL?21:12,_cp),lax=x+_pf[0]+(_pf[2]==='r'?3:-3),lay=y+_pf[1]-3,
           _lx=lax-x,_ly=lay-y,_ll=Math.hypot(_lx,_ly)||1;
+      if(gfxP){   /* [G5.3] garis putus-putus [2,3] lebar .7: titik-titik di kerangka layar tegak -> ruang stage (putar upAng() di sekitar x,y seperti uprBegin) */
+        var _th=STG.rot?upAng():0,_cs=Math.cos(_th),_sn=Math.sin(_th),_o0x=_lx/_ll*(r*1.6+4),_o0y=_ly/_ll*(r*1.6+4);
+        glfDash(x+_o0x*_cs-_o0y*_sn,y+_o0x*_sn+_o0y*_cs,x+_lx*_cs-_ly*_sn,y+_lx*_sn+_ly*_cs,.7,(bandOn?bandCol:'150,170,196'),ala*.55*g.globalAlpha,2,3,0,0,0);
+      }else{
       g.save();g.setLineDash([2,3]);g.lineWidth=.7;g.strokeStyle='rgba('+(bandOn?bandCol:'150,170,196')+','+(ala*.55)+')';
       g.beginPath();g.moveTo(x+_lx/_ll*(r*1.6+4),y+_ly/_ll*(r*1.6+4));g.lineTo(lax,lay);g.stroke();g.restore();
+      }
       g.textAlign=_pf[2]==='r'?'right':'left';
       var tx=x+_pf[0],ty=y+_pf[1];
       g.fillStyle=bandOn?'rgba('+bandCore+','+ala+')':'rgba(184,198,214,'+ala+')';g.fillText(nmL,tx,ty);

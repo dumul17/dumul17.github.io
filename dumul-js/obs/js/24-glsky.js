@@ -471,6 +471,26 @@ function glfPlSprite(){   /* gradien glow bintang Pleiades fokus (sama stop dgn 
   x.fillStyle=gr;x.fillRect(0,0,64,64);
   return (GLF_PL=c);
 }
+/* [G5.3] sprite glow radial untuk sisa 2D non-teks: glfRadial = satu warna, tiga stop alpha (0, .55, 1) (pulse Pleione); glfNebula = glow nebula rasi (merah muda -> cyan). Dibuat sekali per kunci; alpha global dikalikan lewat glskyImg. */
+var GLF_RS={};
+function glfRadial(rgb,a0,a1,a2){
+  var k=rgb+'|'+a0+'|'+a1+'|'+a2,c,x,gr;
+  if(GLF_RS[k])return GLF_RS[k];
+  c=document.createElement('canvas');c.width=c.height=64;x=c.getContext('2d');
+  gr=x.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba('+rgb+','+a0+')');gr.addColorStop(.55,'rgba('+rgb+','+a1+')');gr.addColorStop(1,'rgba('+rgb+','+a2+')');
+  x.fillStyle=gr;x.fillRect(0,0,64,64);
+  return (GLF_RS[k]=c);
+}
+function glfNebula(){
+  var k='neb',c,x,gr;
+  if(GLF_RS[k])return GLF_RS[k];
+  c=document.createElement('canvas');c.width=c.height=64;x=c.getContext('2d');
+  gr=x.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,122,217,.34)');gr.addColorStop(.5,'rgba(110,229,255,.12)');gr.addColorStop(1,'rgba(110,229,255,0)');
+  x.fillStyle=gr;x.fillRect(0,0,64,64);
+  return (GLF_RS[k]=c);
+}
 /* reticle drawTargetLock: cincin putus-putus (dash 3/3 mulai sudut 0) + 4 bracket sudut diputar rot; teks telemetri tetap 2D */
 function glskyLockReticle(x,y,sz,rot,rgb){
   var R=sz+5,n=Math.max(6,Math.floor(6.2832*R/6)),k,i,a0,a1,L=5,ca=Math.cos(rot),sa=Math.sin(rot),p,q0x,q0y,q1x,q1y,c=glskyCol(rgb),cw=glskyCol('234,246,255');

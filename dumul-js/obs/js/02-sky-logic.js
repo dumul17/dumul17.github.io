@@ -1059,12 +1059,20 @@ function drawHud(){
   g.save();
   g.strokeStyle='rgba(110,229,255,0.22)';g.fillStyle='rgba(110,229,255,0.18)';g.lineWidth=1;
   g.font='600 8px "Courier New",monospace';
+  if(typeof glskyFxOn==='function'&&glskyFxOn()){   /* [G5.3] 4 bracket sudut = 8 ruas GL (2 per sudut, ujung sudut diperpanjang setengah lebar supaya tidak bertakik); teks tetap 2D di bawah */
+    var hc='110,229,255',ha=.22;
+    glfLine(m,t+len,m,t-.5,1,hc,ha);glfLine(m-.5,t,m+len,t,1,hc,ha);
+    glfLine(W-m-len,t,W-m+.5,t,1,hc,ha);glfLine(W-m,t-.5,W-m,t+len,1,hc,ha);
+    glfLine(m,b-len,m,b+.5,1,hc,ha);glfLine(m-.5,b,m+len,b,1,hc,ha);
+    glfLine(W-m-len,b,W-m+.5,b,1,hc,ha);glfLine(W-m,b+.5,W-m,b-len,1,hc,ha);
+  }else{
   g.beginPath();
   g.moveTo(m,t+len);g.lineTo(m,t);g.lineTo(m+len,t);
   g.moveTo(W-m-len,t);g.lineTo(W-m,t);g.lineTo(W-m,t+len);
   g.moveTo(m,b-len);g.lineTo(m,b);g.lineTo(m+len,b);
   g.moveTo(W-m-len,b);g.lineTo(W-m,b);g.lineTo(W-m,b-len);
   g.stroke();
+  }
   var T={tl:'[ LAT 00\u00b000\u2032N ]',tr:'[ LON 000\u00b000\u2032E ]',bl:'[ AZ 000\u00b0 ]',br:'[ EL 00\u00b0 ]'};
   if(!STG.rot){
     g.textBaseline='top';g.textAlign='left';g.fillText(T.tl,m+4,t+4);
