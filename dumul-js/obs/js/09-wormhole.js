@@ -1043,7 +1043,7 @@ function whGlFlash(al){
    Level (?whwarm=N): 0 mati (= v544) | 1 renderer + program milik wormhole | 2 (default) + material teleskop lewat klon Group ke RT SSAA.
    Hasil: WHW (masuk whCfg.whw di dump bench: st 2 = selesai, 3 = berhenti, ms, steps = [[langkah, ms]]). Program tiap target (layar / RT linear / RT XR-sRGB) diwarm di target YANG SAMA dgn jalur produksinya. */
 var WHW_LVL=2;try{var _mWw=/[?&]whwarm=([0-9])/.exec(location.search);if(_mWw)WHW_LVL=Math.min(2,+_mWw[1]);}catch(eWw){}
-var WHW_MAX=6000;   /* ms: batas total; lewat itu sisa langkah dibuang (dive tetap jalan, sisanya lazy seperti v544) */
+var WHW_MAX=(function(){var m=/[?&]whwmax=(\d+)(&|#|$)/.exec(location.search),n=m?parseInt(m[1],10):20000;return isNaN(n)?20000:Math.max(3000,Math.min(60000,n));})();   /* [B13] 6000 -> 20000 ms (?whwmax=N): dump 15 Nov warm 4,68 dtk, sisa cuma 1,3 dtk; lewat batas, sisa langkah dibuang = dive pertama bayar sendiri (belum siap saat Blue). Lama: 6000 */
 var WHW={lvl:WHW_LVL,st:0,ok:false,ms:0,why:'',err:'',steps:[],f:0};   /* f = progres 0..1 (bobot per langkah di WW), dibaca bar boot lewat WORMHOLE.warmF */
 /* [B10.1] bobot progres per langkah (perkiraan relatif biaya di itel; kalibrasi dari whCfg.whw.steps di dump). Dipakai bar boot: bobot warm = tahap ke-5 langkah gl. */
 var WW={ensure:.2,fb:.1,comp:.2,rim:.08,portal:.06,paste:.06,tele0:.02,tele:.28};

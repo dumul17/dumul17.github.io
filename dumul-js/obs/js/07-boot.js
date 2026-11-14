@@ -297,7 +297,7 @@ var DUMUL_CHARS=(function(){
         sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
         bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
         sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
-        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null),glwd:(typeof GLWD==='undefined'?null:GLWD),whwb:(typeof whwW==='function'?whwW():null),whwMs:(window.__whwMs!=null?window.__whwMs:null)
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null),glwd:(typeof GLWD==='undefined'?null:GLWD),whwb:(typeof whwW==='function'?whwW():null),whwMs:(window.__whwMs!=null?window.__whwMs:null),capw:CAPW,prestall:PRE_STALL,capHit:capHit.slice(),bgmErr:cntErr(audioList()),sfxErr:cntErr(sfxList())
       };
     }catch(eBi){}
   }
@@ -350,6 +350,7 @@ var DUMUL_CHARS=(function(){
     if(au&&au.ok){warmTrig='bgm';warmRest();}
   }
   /* v156: cacheBgm() dihapus. Audio tidak lagi disimpan otomatis (warm cukup metadata, hemat bandwidth); simpan hanya lewat unduh offline (PRECACHE_AUDIO). */
+  function cntErr(l){var n=0,i;try{for(i=0;i<l.length;i++)if(l[i].error)n++;}catch(eCe){}return n;}   /* [B13] audio yang dihitung 'siap' karena error (readyState<1) */
   function audioStatus(){
     var l=audioList(),n=0,i;
     for(i=0;i<l.length;i++){try{if(l[i].readyState>=1||l[i].error)n++;}catch(eS){n++;}}
@@ -364,6 +365,11 @@ var DUMUL_CHARS=(function(){
      Mulai SEKALI saat vis pertama true (3D + warm shader selesai = GPU/main thread sepi), tiap langkah di task sendiri (jarak ±300 ms) supaya tidak jadi satu long task.
      Tiap langkah dibatasi PRE_MAX: yang macet (mis. gstatic lambat di VPN) dilepas dan TIDAK menahan gerbang kapsul; importnya tetap lanjut di latar. IS_POTATO: ui dilewati (sama dgn warm sesudah gestur di 05-sector-ui).
      [PATCH v175] Masuk LOG BOOT ("Persiapan akhir"). [PATCH v181] Sekarang juga masuk bobot bar (WT_PRE) dan baris status ke-7 (boot.pre.*): bar tidak lagi tertahan di 99% menunggu PRE. */
+  /* [B13] Plafon waktu TOTAL tidak boleh melepas kapsul selama warm masih maju (kriteria pemilik: boot selama apa pun boleh, tapi saat Blue semuanya sudah siap). ?capw=0 = perilaku lama (v549): plafon tetap 16 dtk (gl) dan HARD_CAP.
+     Baru: langkah 'gl' (glskyWarm + warm wormhole) dan HARD_CAP hanya dilepas kalau TIDAK ada kemajuan nyata selama PRE_STALL ms (?prestall=N, default 15000) atau kalau plafon mutlak HARD_ABS terlewati. Dump 15 Nov: gl 13,68 dtk vs plafon 16 dtk (sisa 2,3 dtk); repeat 23,2 dtk vs HARD_CAP 32 dtk. */
+  var CAPW=/[?&]capw=0(&|#|$)/.test(location.search)?'0':'1';
+  var PRE_STALL=(function(){var m=/[?&]prestall=(\d+)(&|#|$)/.exec(location.search),n=m?parseInt(m[1],10):15000;return isNaN(n)?15000:Math.max(3000,Math.min(60000,n));})();
+  var capHit=[];   /* [B13] plafon yang menembak (dibaca bootInfoSnap -> dump) */
   var PRE_MAX=3000,PRE_MAX_GL=16000,pre={at:-1,ui:0,ast:0,fb:0,pl:0,sc:0,rg:0,gl:0,bad:0,ms:{}},preEv=[];   /* 0 belum mulai | 1 jalan | 2 selesai (sukses / gagal / timeout) */
   /* [PATCH v186] sc (tampilan teleskop) cuma kerja kalau SCP3D_WF nyala (?scwf=1). Kalau mati, preFin('sc') selesai 0 ms tanpa kerja apa pun: jangan dicatat di log boot dan jangan ikut bobot bar. */
   function scOff(){return typeof SCP3D_WF!=='undefined'&&!SCP3D_WF;}
@@ -446,7 +452,18 @@ var DUMUL_CHARS=(function(){
       var tm=0,rel=function(bad){clearTimeout(tm);preFin('gl',bad);if(plGlOn())preFin('pl',bad);};
       try{
         if(WR.entered||typeof glskyWarm!=='function'){rel(1);return;}
-        tm=setTimeout(function(){preFin('gl',1);preFin('pl',1);},PRE_MAX_GL);   /* macet: gerbang kapsul dilepas; glskyWarm tetap berhenti sendiri saat Blue (stop) */
+        if(CAPW==='0')tm=setTimeout(function(){capHit.push('gl-max@'+Math.round(performance.now()-t0));preFin('gl',1);preFin('pl',1);},PRE_MAX_GL);   /* macet: gerbang kapsul dilepas; glskyWarm tetap berhenti sendiri saat Blue (stop) */
+        else{   /* [B13] pengawas kemacetan: lepas hanya kalau progres glskyWarm + warm wormhole tidak bergerak PRE_STALL ms; plafon mutlak = HARD_ABS (di tick) */
+          var wdTok='',wdAt=performance.now();
+          var wd=function(){
+            var g=window.__glwarm,tk;
+            try{tk=[g&&g.f,g&&g.st,g&&g.ms?Object.keys(g.ms).length:0,Math.round(whwF()*200)].join('|');}catch(eTk){tk='x';}
+            if(tk!==wdTok){wdTok=tk;wdAt=performance.now();}
+            if(performance.now()-wdAt>=PRE_STALL){capHit.push('gl-stall@'+Math.round(performance.now()-t0));preFin('gl',1);preFin('pl',1);return;}
+            tm=setTimeout(wd,500);
+          };
+          tm=setTimeout(wd,500);
+        }
         glskyWarm(function(){return WR.entered;},
           function(ok){if(plGlOn())preFin('pl',ok?0:1);},
           function(ok,why){
@@ -1004,8 +1021,14 @@ var DUMUL_CHARS=(function(){
       if(c.all){clearInterval(postT);postT=0;try{window.__bootAudioAll=Math.round(performance.now());}catch(eB){}}
     },250);
   }
+  var capTok='',capTokAt=0;   /* [B13] token kemajuan boot: berubah = ada kerja nyata maju (modul 3D, warm, audio, SFX, langkah PRE, glskyWarm, warm wormhole) */
+  var HARD_ABS=HARD_CAP*2.5;   /* [B13] plafon mutlak anti-hang kalau terus 'maju' tapi tak pernah selesai */
   function tick(){
     var elapsed=performance.now()-t0,c=calc(elapsed);
+    try{
+      var tk=[c.th.mods,Math.round((c.th.warmFrac||0)*100),c.au.n,c.sx.n,pre.ui,pre.ast,pre.fb,pre.pl,pre.sc,pre.rg,pre.gl,Math.round(glwF()*100),Math.round(whwF()*200)].join('|');
+      if(tk!==capTok){capTok=tk;capTokAt=elapsed;}
+    }catch(eCt){capTokAt=elapsed;}
     /* [PATCH v157] jangan anggap "macet" kalau 3D+BGM sudah siap (atau BGM via cap) dan yang tersisa cuma metadata SFX */
     if(!chSlow&&!chRdy&&elapsed>(isRepeatVisit?5000:8000)){
       var onlySfx=false;
@@ -1024,7 +1047,7 @@ var DUMUL_CHARS=(function(){
        - HARD_CAP → paksa apapun (anti hang) */
     if(c.complete&&gateAt<0)gateAt=elapsed;
     if(c.complete&&(pV>=100||elapsed-gateAt>2500)){window.__bootFinish='gate';finish(c);}   /* [PATCH v167] tunggu bar tampil 100% (sapuan animator), pengaman 2,5 dtk */
-    else if(elapsed>=HARD_CAP){window.__bootFinish='cap3d';finish(c);}
+    else if(elapsed>=HARD_CAP&&(CAPW==='0'||elapsed>=HARD_ABS||elapsed-capTokAt>=PRE_STALL)){capHit.push((CAPW==='0'?'hard':(elapsed>=HARD_ABS?'hard-abs':'hard-stall'))+'@'+Math.round(elapsed));window.__bootFinish='cap3d';finish(c);}   /* [B13] HARD_CAP hanya melepas kalau tak ada kemajuan PRE_STALL ms atau plafon mutlak */
     else if(elapsed>=cap3dNow(elapsed)&&!c.vis&&!window.__bootVis){   /* [B10.2] __bootVis = 3D + warm SUDAH pernah beres (preStart jalan). vis bisa turun lagi karena modul lazy (PL3D, dihitung settled saat state 0 > 4 dtk) baru mulai memuat sesudahnya; itu BUKAN modul macet. Dump 15 Nov: run 1 dan 4 kapsul muncul di bar 64-66 % lewat jalur ini (cap3d, PL3D st 1), dan warm wormhole ikut terpotong/ketinggalan di belakang kapsul. Anti hang tetap HARD_CAP. */
       var modsDone=c.th&&c.th.mods>=c.th.total;
       if(modsDone)requestAnimationFrame(tick);   /* nunggu warmOk + SFX */
