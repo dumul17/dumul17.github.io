@@ -297,7 +297,7 @@ var DUMUL_CHARS=(function(){
         sfxViaCap:!!x.sfxViaCap,bgmViaCap:!!x.bgmViaCap,
         bar:x.bar!=null?x.bar:(typeof pV!=='undefined'?pV:null),
         sfxN:x.sx?x.sx.n:null,sfxTot:x.sx?x.sx.total:null,sfxOk:x.sx?!!x.sx.ok:null,
-        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null
+        vis:x.vis!=null?!!x.vis:null,complete:x.complete!=null?!!x.complete:null,barw:(typeof BARW!=='undefined'?BARW:null)
       };
     }catch(eBi){}
   }
@@ -496,7 +496,10 @@ var DUMUL_CHARS=(function(){
   /* [v181] PRE (persiapan akhir) ikut bar: bobot per langkah ~ biaya di itel (ui kecil, batu ~420 ms, planet ~130 ms + jadwal, Firebase ~600 ms). Dulu bar berhenti di 99% sampai PRE selesai (sampai PRE_MAX 3 dtk di VPN) = terlihat bohong. */
   /* [B5] bobot PRE dikalibrasi ulang ke waktu NYATA (dump 12 Nov, itel: ui/sc 0,05 dtk, ast 0,7, fb 0,8, rg 2,5, pl 2,9-3,0, gl 3,0 dari awal PRE; tiga terakhir = tiang gerbang). Dulu 2050 dari ±24600 (8%) dan gl cuma 300, jadi bar duduk di 97-99% selama ±1,5-3 dtk sementara log masih menampilkan langkah PRE. ?barw=0 = bobot lama (A/B). */
   var WT_PRE_OLD={ui:100,ast:400,pl:450,fb:350,sc:150,rg:300,gl:300},GL_PRE=!/[?&]glwpre=0(&|#|$)/.test(location.search),WT_PRE_NEW={ui:80,ast:300,pl:700,fb:250,sc:150,rg:600,gl:GL_PRE?3600:1200},WT_PRE=WT_PRE_NEW;
-  try{if(/[?&]barw=0(&|#|$)/.test(location.search))WT_PRE=WT_PRE_OLD;}catch(eBw){}
+  /* [B6.1] bobot PRE sebanding WAKTU NYATA. Baseline 14 Nov (itel, v538, 6 run): bar 70-78% saat PRE mulai (visAt 7,7-8,5 dtk), lalu PRE 7,6-8,1 dtk cuma 5680 dari ±28200 bobot (20%), jadi laju bar jatuh dari ±10 %/dtk ke ±0,6 %/dtk (97->98% 1,4-1,7 dtk, 98%->kapsul 2,4-2,9 dtk).
+     Fase sebelum PRE: 22550 bobot / ±7,9 dtk = ±2,85 unit/ms; PRE dibuat ±22500 (gl 6,5 dtk x 2,85 = 17500 + sisanya yang tumpang tindih 0-3,2 dtk). ?barw=5 = bobot B5 (v516-v538), ?barw=0 = bobot lama (v181). Dump: bootInfo.barw. */
+  var BARW=(/[?&]barw=(\d)(&|#|$)/.exec(location.search)||[0,'6'])[1],WT_PRE_B6={ui:100,ast:800,pl:1500,fb:400,sc:50,rg:2200,gl:GL_PRE?17500:3100};
+  try{WT_PRE=BARW==='0'?WT_PRE_OLD:(BARW==='5'?WT_PRE_NEW:WT_PRE_B6);window.__barw=BARW;}catch(eBw){}
   var WT_PRE_EST={ui:150,ast:450,pl:700,fb:700,sc:1000,rg:1500,gl:1800},PRE_KEYS=['ui','ast','pl','fb','sc','rg','gl'];   /* [v189] gl: build renderer GLSky + kirim ±9 scene ke compileAsync (sisi main thread ±300 ms di itel; tunggu async-nya masuk creep) */
   function wtSum(){return WT_PAGE+WT_WARM+WT_AUDIO+WT_SFX+WT_MODS.reduce(function(a,b){return a+b;},0)+wtPre('ui')+wtPre('ast')+wtPre('pl')+wtPre('fb')+wtPre('sc')+wtPre('rg')+wtPre('gl');}   /* v186: fungsi (bukan konstanta) karena SCP3D_WF baru ada sesudah 13-scope3d dimuat */
   function threeStatus(elapsed){
@@ -857,7 +860,11 @@ var DUMUL_CHARS=(function(){
     return age>0?w*CREEP_CAP*(1-Math.exp(-age/est)):0;
   }
   /* [B5] tahap glskyWarm (24-glsky.js GLW.f 0..1) dipakai BERSAMA oleh bar (bobot gl terisi sebanding f + rayapan per tahap) dan log (baris "Sentuhan akhir . tahap . n/4"), jadi angka % dan teks log selalu menunjuk pekerjaan yang sama. */
-  var GLS_F=[0,.25,.6,.75,1],GLS_EST=[500,1500,600,GL_PRE?4500:500];   /* [B4k] tahap 4 (render pertama) sekarang memuat scp/dr/tex/plateDeep/sa pra-kapsul: ±4-5 dtk di itel */
+  var GLS_F=[0,.25,.6,.75,1],GLS_EST=[500,1500,600,GL_PRE?4500:500];
+  /* [B6.1] GLW.f (batas tahap GLS_F) bukan waktu: init .25 hanya ±0,6 dtk, tahap 4 (.75->.97) ±4,4 dtk dari ±6,5 dtk. GLS_W = pecahan WAKTU (=pecahan bobot gl) di tiap batas GLS_F: init .09, compile+planet .26, planet digambar .32, render pertama (scp/dr/tex/pd/sa) sisanya. glwW(f) memetakan f -> pecahan bobot, linear di dalam tahap. */
+  var GLS_W=(BARW==='6'&&GL_PRE)?[0,.09,.26,.32,1]:GLS_F;
+  if(BARW==='6'&&GL_PRE)GLS_EST=[400,700,250,3000];
+  function glwW(f){var g=f<.25?0:(f<.6?1:(f<.75?2:3));return GLS_W[g]+(f-GLS_F[g])/(GLS_F[g+1]-GLS_F[g])*(GLS_W[g+1]-GLS_W[g]);}   /* [B4k] tahap 4 (render pertama) sekarang memuat scp/dr/tex/plateDeep/sa pra-kapsul: ±4-5 dtk di itel */
   function glwOn(){try{return !!(window.__glwarm&&glWarmOn()&&pre.gl===1);}catch(e){return false;}}
   function glwF(){try{return glwOn()?Math.min(.99,window.__glwarm.f||0):0;}catch(e){return 0;}}
   function glwSg(f){return f<.25?0:(f<.6?1:(f<.75?2:3));}
@@ -884,7 +891,7 @@ var DUMUL_CHARS=(function(){
     var astF=0;   /* v177: AST3D beririsan -> tahap selesai ikut mengisi bar (jujur: hanya tahap nyata), rayapan di bawah cuma untuk sisanya */
     try{if(!th.fins[0]&&th.st[0]===1&&window.__ast3dT){astF=Math.min(.95,window.__ast3dT.length/(LOG_M[0][3].length+1));wDone+=WT_MODS[0]*astF;}}catch(eAf){}
     var glF=glwF();
-    if(glF>0)wDone+=wtPre('gl')*glF;   /* [B5] bagian gl yang NYATA selesai */
+    if(glF>0)wDone+=wtPre('gl')*glwW(glF);   /* [B5] bagian gl yang NYATA selesai */
     var uD=(ready?1:0)+(th.warmOk?1:0)+(au.ok?1:0)+(sx.ok?1:0);
     for(wi=0;wi<WT_MODS.length;wi++)if(th.fins[wi])uD++;
     if(pr.ok)uD++;   /* v181: PRE = satu unit kilat */
@@ -895,7 +902,7 @@ var DUMUL_CHARS=(function(){
     if(!th.warmOk&&th.wTot>0&&th.exp>0)wc+=crp('w'+th.wDone,true,(WT_WARM/th.exp)*(1-th.part),WT_WARM/th.exp,elapsed);
     if(!au.ok&&au.total>0)wc+=crp('a'+au.n,true,WT_AUDIO/au.total,WT_AUDIO/au.total,elapsed);
     for(wi=0;wi<PRE_KEYS.length;wi++){
-      if(PRE_KEYS[wi]==='gl'&&glwOn()){var gs5=glwSg(glF);wc+=crp('pregl'+gs5,true,wtPre('gl')*(GLS_F[gs5+1]-glF),GLS_EST[gs5],elapsed);continue;}   /* [B5] rayapan per tahap, tidak melewati batas tahap berikutnya */
+      if(PRE_KEYS[wi]==='gl'&&glwOn()){var gs5=glwSg(glF);wc+=crp('pregl'+gs5,true,wtPre('gl')*(GLS_W[gs5+1]-glwW(glF)),GLS_EST[gs5],elapsed);continue;}   /* [B5] rayapan per tahap, tidak melewati batas tahap berikutnya */
       wc+=crp('pre'+PRE_KEYS[wi],pr[PRE_KEYS[wi]]===1,wtPre(PRE_KEYS[wi]),estPre(PRE_KEYS[wi]),elapsed);   /* v181 */
     }
     if(!sx.ok&&sx.total>0){
