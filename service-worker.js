@@ -7,7 +7,7 @@
    - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
      Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v549'; /* [B12: glskyBuild (renderer GLSky + instancing + pf/dp + uji supersample) diiris 5 tahap per giliran THREE_Q, ?glbs=0 = satu blok; 24-glsky ?v=58] [B11: warm planet pra-kapsul diiris per pita + sinkron GPU per pita (blok ±1 dtk di bar ±54% jadi 3-4 task), ?plslice=N (0/1 = satu blok); 17-planet3d ?v=69, 24-glsky ?v=57] [B10.2: cap3d tidak menembak sesudah __bootVis (kapsul muncul di bar 64-66 %), bobot warm wormhole default 3900 ms; 07-boot ?v=196] [B10.1: warm #glwh = tahap ke-5 bar/log boot (bobot ?whwb=N ms, progres nyata WORMHOLE.warmF), ekor bar 99% hilang; 07-boot ?v=195, 09-wormhole ?v=66, i18n ?v=54] [B10: warm #glwh di boot (renderer + program wormhole + material teleskop), ?whwarm=0/1/2; 09-wormhole ?v=65, 07-boot ?v=194] [B9: crossfade serah-terima teleskop wormhole -> pass atas (RT ditempel 2x, ?glxf=0 / ?glxfms=N); 24-glsky ?v=56, 13-scope3d ?v=42] [B8: SSAA teleskop di #glwh (kotak kecil 2x tanpa MSAA), glwhaa default mati, ?whtss=N/0; 09-wormhole ?v=64] [B7: 21-bench ?v=11.29zw, perekam fase dive/sektor di autoab] [B6.1b+B6.2: batas sampel bar 200, ?glwd=N jeda glskyWarm] [G6: teks/label ke pass teks GL ?gltxt=0, flash sektor = div CSS ?sfcss=0] [PATCH v189 + G5.1 + G5.2 (glfArc halus) + G5.3 (sisa 2D non-teks ke GL) + ?whbq: warm GL pra-kapsul (glskyWarm), langkah PRE gl/pl, bar dikalibrasi ulang] naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v550'; /* [B13: plafon boot sadar-kemajuan: langkah gl (glskyWarm + warm wormhole) dan HARD_CAP hanya dilepas kalau macet PRE_STALL ms (?prestall=N, default 15000) atau plafon mutlak; WHW_MAX 6000 -> 20000 (?whwmax=N); dump mencatat capHit/bgmErr/sfxErr; ?capw=0 = perilaku v549; 07-boot ?v=197, 09-wormhole ?v=67] [B12: glskyBuild (renderer GLSky + instancing + pf/dp + uji supersample) diiris 5 tahap per giliran THREE_Q, ?glbs=0 = satu blok; 24-glsky ?v=58] [B11: warm planet pra-kapsul diiris per pita + sinkron GPU per pita (blok ±1 dtk di bar ±54% jadi 3-4 task), ?plslice=N (0/1 = satu blok); 17-planet3d ?v=69, 24-glsky ?v=57] [B10.2: cap3d tidak menembak sesudah __bootVis (kapsul muncul di bar 64-66 %), bobot warm wormhole default 3900 ms; 07-boot ?v=196] [B10.1: warm #glwh = tahap ke-5 bar/log boot (bobot ?whwb=N ms, progres nyata WORMHOLE.warmF), ekor bar 99% hilang; 07-boot ?v=195, 09-wormhole ?v=66, i18n ?v=54] [B10: warm #glwh di boot (renderer + program wormhole + material teleskop), ?whwarm=0/1/2; 09-wormhole ?v=65, 07-boot ?v=194] [B9: crossfade serah-terima teleskop wormhole -> pass atas (RT ditempel 2x, ?glxf=0 / ?glxfms=N); 24-glsky ?v=56, 13-scope3d ?v=42] [B8: SSAA teleskop di #glwh (kotak kecil 2x tanpa MSAA), glwhaa default mati, ?whtss=N/0; 09-wormhole ?v=64] [B7: 21-bench ?v=11.29zw, perekam fase dive/sektor di autoab] [B6.1b+B6.2: batas sampel bar 200, ?glwd=N jeda glskyWarm] [G6: teks/label ke pass teks GL ?gltxt=0, flash sektor = div CSS ?sfcss=0] [PATCH v189 + G5.1 + G5.2 (glfArc halus) + G5.3 (sisa 2D non-teks ke GL) + ?whbq: warm GL pra-kapsul (glskyWarm), langkah PRE gl/pl, bar dikalibrasi ulang] naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v4';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -40,9 +40,9 @@ const SHELL = [
   'dumul-js/obs/js/04-render.js?v=174',
   'dumul-js/obs/js/05-sector-ui.js?v=212',
   'dumul-js/obs/js/06-interaction.js?v=135',
-  'dumul-js/obs/js/07-boot.js?v=196',
+  'dumul-js/obs/js/07-boot.js?v=197',
   'dumul-js/obs/js/08-tx-drone.js?v=16',
-  'dumul-js/obs/js/09-wormhole.js?v=66',
+  'dumul-js/obs/js/09-wormhole.js?v=67',
   'dumul-js/obs/js/10-ui-sound.js?v=9',
   'dumul-js/obs/js/11-live-count.js?v=5',
   'dumul-js/obs/js/12-ast3d.js?v=44',
