@@ -7,7 +7,7 @@
    - Opsi A: tiap halaman kirim d.urls (19 Observatory / 5 DUMUL). Satu AUDIO_CACHE bersama; GARG di audio/ root.
      Struktur: audio/obs-audio/ (18), audio/lmr-audio/ (4), audio/glitch-instrumental.opus (handoff).
    Naikkan VERSION tiap deploy besar; naikkan AUDIO_VERSION kalau file .opus diganti isinya. */
-const VERSION = 'v543'; /* [B8: SSAA teleskop di #glwh (kotak kecil 2x tanpa MSAA), glwhaa default mati, ?whtss=N/0; 09-wormhole ?v=64] [B7: 21-bench ?v=11.29zw, perekam fase dive/sektor di autoab] [B6.1b+B6.2: batas sampel bar 200, ?glwd=N jeda glskyWarm] [G6: teks/label ke pass teks GL ?gltxt=0, flash sektor = div CSS ?sfcss=0] [PATCH v189 + G5.1 + G5.2 (glfArc halus) + G5.3 (sisa 2D non-teks ke GL) + ?whbq: warm GL pra-kapsul (glskyWarm), langkah PRE gl/pl, bar dikalibrasi ulang] naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
+const VERSION = 'v544'; /* [B9: crossfade serah-terima teleskop wormhole -> pass atas (RT ditempel 2x, ?glxf=0 / ?glxfms=N); 24-glsky ?v=56, 13-scope3d ?v=42] [B8: SSAA teleskop di #glwh (kotak kecil 2x tanpa MSAA), glwhaa default mati, ?whtss=N/0; 09-wormhole ?v=64] [B7: 21-bench ?v=11.29zw, perekam fase dive/sektor di autoab] [B6.1b+B6.2: batas sampel bar 200, ?glwd=N jeda glskyWarm] [G6: teks/label ke pass teks GL ?gltxt=0, flash sektor = div CSS ?sfcss=0] [PATCH v189 + G5.1 + G5.2 (glfArc halus) + G5.3 (sisa 2D non-teks ke GL) + ?whbq: warm GL pra-kapsul (glskyWarm), langkah PRE gl/pl, bar dikalibrasi ulang] naikkan tiap deploy (node check-sky.js memeriksa ?v= vs SHELL) */
 const AUDIO_VERSION = 'v4';   /* v3: folder obs-audio / lmr-audio + GARG root; precache per-halaman */
 const SHELL_CACHE = `dumul-shell-${VERSION}`;
 const RUNTIME_CACHE = `dumul-runtime-${VERSION}`;
@@ -46,14 +46,14 @@ const SHELL = [
   'dumul-js/obs/js/10-ui-sound.js?v=9',
   'dumul-js/obs/js/11-live-count.js?v=5',
   'dumul-js/obs/js/12-ast3d.js?v=44',
-  'dumul-js/obs/js/13-scope3d.js?v=41',
+  'dumul-js/obs/js/13-scope3d.js?v=42',
   'dumul-js/obs/js/14-drone3d.js?v=21',
   'dumul-js/obs/js/15-portal3d.js?v=62',
   'dumul-js/obs/js/16-sector-menu.js?v=7',
   'dumul-js/obs/js/17-planet3d.js?v=68',
   'dumul-js/obs/js/18-tune3d.js?v=19',
   'dumul-js/obs/js/22-sky-now.js?v=4',
-  'dumul-js/obs/js/24-glsky.js?v=55',
+  'dumul-js/obs/js/24-glsky.js?v=56',
   'dumul-js/obs/lib/three.custom.r186.js?v=2',
   'img/nebula.webp?v=1',
   'img/milky-way.webp?v=3',
