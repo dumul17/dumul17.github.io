@@ -440,7 +440,16 @@ var DUMUL_CHARS=(function(){
         tm=setTimeout(function(){preFin('gl',1);preFin('pl',1);},PRE_MAX_GL);   /* macet: gerbang kapsul dilepas; glskyWarm tetap berhenti sendiri saat Blue (stop) */
         glskyWarm(function(){return WR.entered;},
           function(ok){if(plGlOn())preFin('pl',ok?0:1);},
-          function(ok,why){clearTimeout(tm);preFin('gl',ok?0:1);if(plGlOn())preFin('pl',ok?0:1);});
+          function(ok,why){
+            var fin=function(){clearTimeout(tm);preFin('gl',ok?0:1);if(plGlOn())preFin('pl',ok?0:1);};
+            /* [B10] warm #glwh (wormhole) SESUDAH glskyWarm (SSAA teleskop butuh GLSKY.sa.ok) dan SEBELUM gerbang 'gl' dilepas: dive pertama tidak lagi bayar init renderer + compile program. ?whwarm=0 = mati (v544). Berhenti sendiri saat Blue / WHW_MAX. */
+            try{
+              if(ok&&!WR.entered&&typeof WORMHOLE!=='undefined'&&typeof WORMHOLE.warm==='function'){
+                var w0=performance.now();
+                WORMHOLE.warm(function(){try{window.__whwMs=Math.round(performance.now()-w0);}catch(eWm){}fin();},function(){return WR.entered;});
+              }else fin();
+            }catch(eWh){fin();}
+          });
       }catch(eGw){rel(1);}
     },(typeof GLWD==='number'?GLWD:1200));   /* [B6.2 v541] jeda dari ?glwd=N (ms, 0-3000); default 1200 = perilaku v189 */
   }

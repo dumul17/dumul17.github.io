@@ -809,6 +809,15 @@ function whTssFit(T,rdr,TS,vw,vh){
   }
   return TS.rt;
 }
+/* [B10] mesh tempel SSAA + kamera + warna/viewport sementara; isi PERSIS blok lama di whGlTeleSS. */
+function whTssMk(T,G,TS){
+      TS.u={tMap:{value:G.dummy},uP:{value:new T.Vector2(0,0)},uN:{value:new T.Vector2(1,0)},uUseClip:{value:0},uA:{value:1},uRes:{value:new T.Vector2(1,1)},uUV:{value:new T.Vector4(0,0,1,1)}};
+      TS.q=new T.Mesh(new T.PlaneGeometry(2,2),new T.ShaderMaterial({uniforms:TS.u,vertexShader:WHG_CLIP_VS,fragmentShader:WHG_TSS_FS,transparent:true,depthTest:false,depthWrite:false,
+        blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));   /* premultiplied source-over, sama dgn clipMat */
+      TS.q.frustumCulled=false;TS.qs=new T.Scene();TS.qs.add(TS.q);TS.qc=new T.OrthographicCamera(-1,1,1,-1,-1,1);
+      TS.cam=new T.OrthographicCamera(0,1,1,0,-600,600);TS.cam.position.z=5;
+      TS.cc=new T.Color();TS.vp=new T.Vector4();
+}
 /* hasil: 1 = digambar lewat RT, -1 = kotak di luar layar (tidak ada yang digambar), 0 = pakai jalur lama (langsung / teleRT) */
 function whGlTeleSS(opacity,clip){
   var G=WHG,T=THREE,rdr=G.fullR,pv=G.teleGrp,TS=whTssState(),sa,hf,R,sx,sy,cx,cy,x0,y0,x1,y1,bw,bh,k,m,vw,vh,rt,pr,ac,ca,u,cam,addOn=false;
@@ -829,14 +838,7 @@ function whGlTeleSS(opacity,clip){
     if(!(k>=1.15)){TS.fb++;return 0;}
     vw=Math.round(bw*k);vh=Math.round(bh*k);
     rt=whTssFit(T,rdr,TS,vw,vh);if(!rt)return 0;
-    if(!TS.q){
-      TS.u={tMap:{value:G.dummy},uP:{value:new T.Vector2(0,0)},uN:{value:new T.Vector2(1,0)},uUseClip:{value:0},uA:{value:1},uRes:{value:new T.Vector2(1,1)},uUV:{value:new T.Vector4(0,0,1,1)}};
-      TS.q=new T.Mesh(new T.PlaneGeometry(2,2),new T.ShaderMaterial({uniforms:TS.u,vertexShader:WHG_CLIP_VS,fragmentShader:WHG_TSS_FS,transparent:true,depthTest:false,depthWrite:false,
-        blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));   /* premultiplied source-over, sama dgn clipMat */
-      TS.q.frustumCulled=false;TS.qs=new T.Scene();TS.qs.add(TS.q);TS.qc=new T.OrthographicCamera(-1,1,1,-1,-1,1);
-      TS.cam=new T.OrthographicCamera(0,1,1,0,-600,600);TS.cam.position.z=5;
-      TS.cc=new T.Color();TS.vp=new T.Vector4();
-    }
+    if(!TS.q)whTssMk(T,G,TS);   /* [B10] dipindah ke whTssMk (dipakai juga warm) */
     cam=TS.cam;cam.left=x0/sx;cam.right=(x0+bw)/sx;cam.bottom=y0/sy;cam.top=(y0+bh)/sy;cam.updateProjectionMatrix();
     /* 1) render badan teleskop ke RT sub-viewport (glow aditif: alpha tidak ikut berubah, sama dgn idle) */
     pr=rdr.getRenderTarget();ac=rdr.autoClear;ca=rdr.getClearAlpha();rdr.getClearColor(TS.cc);
@@ -905,6 +907,20 @@ function whGlTeleDraw(opacity,clip){
   }
 }
 /* [PATCH G4.12d] portal tunnel: bake portal3dDraw → texture → quad di #glwh */
+/* [B10] quad portal (ShaderMaterial polos + scene/kamera ortho); isi PERSIS blok lama di whGlPortalDraw, dipisah supaya whWarm bisa membuatnya lebih awal. Butuh G.ptTex sudah ada. */
+function whGlPtMk(T){
+  var G=WHG,mat;
+      /* [FIX portal pudar/abu-abu] MeshBasicMaterial di-encode sRGB lagi oleh renderer (outputColorSpace default) -> piksel gelap/semi-transparan hasil bake jadi abu-abu terang (selubung di mulut, kilau charge jadi cakram datar). Shader polos = nilai bake dipakai apa adanya, sama dgn drawImage 2D. */
+      mat=new T.ShaderMaterial({uniforms:{map:{value:G.ptTex},uOp:{value:1}},
+        vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+        fragmentShader:'precision highp float;uniform sampler2D map;uniform float uOp;varying vec2 vUv;void main(){vec4 c=texture2D(map,vUv);gl_FragColor=vec4(c.rgb,c.a*uOp);}',
+        transparent:true,depthTest:false,depthWrite:false,blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:WHG_GL_SRC_ALPHA,blendDst:WHG_GL_ONE_MINUS_SRC_ALPHA,blendSrcAlpha:WHG_GL_ONE,blendDstAlpha:WHG_GL_ONE_MINUS_SRC_ALPHA});
+      G.ptMat=mat;
+      G.ptMesh=new T.Mesh(new T.PlaneGeometry(1,1),mat);
+      G.ptMesh.frustumCulled=false;
+      if(!G.ptScene){G.ptScene=new T.Scene();G.ptCam=new T.OrthographicCamera(0,1,1,0,-10,10);G.ptCam.position.z=5;}
+      G.ptScene.add(G.ptMesh);
+}
 function whGlPortalDraw(cx,cy,Rp,now,a,opts){
   var G=WHG,T,res,cv,gx,src,mat,mesh,S,ang=0,tm=null,tk,pw,ph,rdr,pr,ac,u,bs;
   if(!G.compOk||!G.fullR||!(Rp>2)||!(a>.01))return false;
@@ -925,18 +941,7 @@ function whGlPortalDraw(cx,cy,Rp,now,a,opts){
       G.ptTex.minFilter=T.LinearFilter;G.ptTex.magFilter=T.LinearFilter;
       G.ptTex.flipY=true;
     }else{G.ptTex.image=cv;G.ptTex.needsUpdate=true;}
-    if(!G.ptMesh){
-      /* [FIX portal pudar/abu-abu] MeshBasicMaterial di-encode sRGB lagi oleh renderer (outputColorSpace default) -> piksel gelap/semi-transparan hasil bake jadi abu-abu terang (selubung di mulut, kilau charge jadi cakram datar). Shader polos = nilai bake dipakai apa adanya, sama dgn drawImage 2D. */
-      mat=new T.ShaderMaterial({uniforms:{map:{value:G.ptTex},uOp:{value:1}},
-        vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-        fragmentShader:'precision highp float;uniform sampler2D map;uniform float uOp;varying vec2 vUv;void main(){vec4 c=texture2D(map,vUv);gl_FragColor=vec4(c.rgb,c.a*uOp);}',
-        transparent:true,depthTest:false,depthWrite:false,blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:WHG_GL_SRC_ALPHA,blendDst:WHG_GL_ONE_MINUS_SRC_ALPHA,blendSrcAlpha:WHG_GL_ONE,blendDstAlpha:WHG_GL_ONE_MINUS_SRC_ALPHA});
-      G.ptMat=mat;
-      G.ptMesh=new T.Mesh(new T.PlaneGeometry(1,1),mat);
-      G.ptMesh.frustumCulled=false;
-      if(!G.ptScene){G.ptScene=new T.Scene();G.ptCam=new T.OrthographicCamera(0,1,1,0,-10,10);G.ptCam.position.z=5;}
-      G.ptScene.add(G.ptMesh);
-    }
+    if(!G.ptMesh)whGlPtMk(T);   /* [B10] pembuatan quad portal dipindah ke whGlPtMk (dipakai juga warm) */
     G.ptMat.uniforms.map.value=G.ptTex;G.ptMat.uniforms.uOp.value=a>1?1:a;
     /* ukuran di layar: portal3dDraw radius Rp = outer; kanvas res mencakup ~2.4*Rp diameter → scale = res/2.4 in CSS px? 
        Kita menggambar di pusat 0,0 dengan Rp dalam px layar di context yang ditranslate res/2 — jadi diameter visual di texture ≈ 2*Rp*scale di mana scale=1 di unit px.
@@ -1030,6 +1035,145 @@ function whGlFlash(al){
     rdr.autoClear=ac;rdr.setRenderTarget(pr);
     return true;
   }catch(e){return false;}
+}
+/* ================= [B10] WARM #glwh DI BOOT =================
+   #glwh = konteks WebGL SENDIRI (bukan GLSky): program, geometri, tekstur, RT-nya tidak terbantu warm GLSky/planet/drone. Tanpa ini semuanya dibuat LAZY di dive pertama:
+   awal dive (renderer + 5 material composite + render pertama = compile fb/inject/composite/streak/hole/mask + compile material teleskop), ujung tunnel/exit (rim, flash, quad portal, tempel SSAA).
+   Di sini dibuat + dikompilasi lewat render 1x1 px (scissor) per langkah, satu langkah per task (bar boot tetap jalan). Dipanggil 07-boot (setelah glskyWarm selesai, karena SSAA butuh GLSKY.sa.ok).
+   Level (?whwarm=N): 0 mati (= v544) | 1 renderer + program milik wormhole | 2 (default) + material teleskop lewat klon Group ke RT SSAA.
+   Hasil: WHW (masuk whCfg.whw di dump bench: st 2 = selesai, 3 = berhenti, ms, steps = [[langkah, ms]]). Program tiap target (layar / RT linear / RT XR-sRGB) diwarm di target YANG SAMA dgn jalur produksinya. */
+var WHW_LVL=2;try{var _mWw=/[?&]whwarm=([0-9])/.exec(location.search);if(_mWw)WHW_LVL=Math.min(2,+_mWw[1]);}catch(eWw){}
+var WHW_MAX=6000;   /* ms: batas total; lewat itu sisa langkah dibuang (dive tetap jalan, sisanya lazy seperti v544) */
+var WHW={lvl:WHW_LVL,st:0,ok:false,ms:0,why:'',err:'',steps:[]};
+function whWarmDraw(r,sc,cam,rt){   /* render 1 px: compile + link + upload buffer/tekstur objek yang tampil; hasil piksel diabaikan */
+  var ac=r.autoClear,pr=r.getRenderTarget(),st=r.getScissorTest(),rs=null,rv=false;
+  r.autoClear=false;
+  if(rt){rs=rt.scissorTest;rt.scissor.set(0,0,1,1);rt.scissorTest=true;}
+  else{r.setScissorTest(true);r.setScissor(0,0,1,1);}
+  try{r.setRenderTarget(rt||null);r.render(sc,cam);}
+  finally{r.setRenderTarget(pr);if(rt)rt.scissorTest=rs;else r.setScissorTest(st);r.autoClear=ac;}
+}
+function whWarm(done,stop){
+  var T0=performance.now(),fin=false,k=0,G=WHG,steps=[],TS=null,tele=null;
+  function end(ok,why){
+    if(fin)return;fin=true;
+    WHW.st=ok?2:3;WHW.ok=!!ok;WHW.why=why||'';WHW.ms=Math.round(performance.now()-T0);
+    try{if(done)done(!!ok,why||'');}catch(eD){}
+  }
+  if(WHW.st!==0){try{if(done)done(WHW.ok,'again');}catch(eA){}return;}
+  WHW.st=1;
+  if(WHW_LVL<1){end(false,'off');return;}
+  try{if(!inited)init();}catch(eI){}
+  if(!cv||!whGlWant()){end(false,'nowant');return;}
+  function stp(n,f){steps.push([n,f]);}
+  stp('ensure',function(){
+    if(typeof resize==='function')resize();
+    if(!(bw>0&&bh>0)||!whGlEnsure(bw,bh))throw new Error('ensure');
+    if(!whGlCompEnsure())throw new Error('comp');
+  });
+  stp('fb',function(){   /* feedback + inject: target RT linear (sama whGlStep) */
+    var r=G.r,rt=G.rtB,si=G.injGeo?G.injGeo.instanceCount:0;
+    if(!r||!rt||!G.scene)return;
+    whWarmDraw(r,G.scene,G.cam,rt);
+    if(G.injGeo&&G.injScene){G.injGeo.instanceCount=1;try{whWarmDraw(r,G.injScene,G.cam,rt);}finally{G.injGeo.instanceCount=si;}}
+  });
+  stp('comp',function(){   /* composite layar: fb + streak + hole + mask, ke layar */
+    var r=G.fullR,v0,v1,v2,v3,ic;
+    if(!r||!G.compScene||!G.stGeo)return;
+    v0=G.compMesh.visible;v1=G.stMesh.visible;v2=G.holeMesh.visible;v3=G.maskMesh?G.maskMesh.visible:true;ic=G.stGeo.instanceCount;
+    G.compMesh.visible=G.stMesh.visible=G.holeMesh.visible=true;if(G.maskMesh)G.maskMesh.visible=true;
+    G.stGeo.instanceCount=1;
+    try{whWarmDraw(r,G.compScene,G.compCam,null);}
+    finally{G.compMesh.visible=v0;G.stMesh.visible=v1;G.holeMesh.visible=v2;if(G.maskMesh)G.maskMesh.visible=v3;G.stGeo.instanceCount=ic;}
+  });
+  stp('rim',function(){   /* rim + flash (ujung tunnel) */
+    var r=G.fullR;
+    if(!r||!whGlOverlayEnsure())return;
+    G.rimMesh.visible=true;G.flashMesh.visible=false;
+    try{whWarmDraw(r,G.ovScene,G.ovCam,null);}catch(e1){G.rimMesh.visible=true;G.flashMesh.visible=true;throw e1;}
+    G.rimMesh.visible=false;G.flashMesh.visible=true;
+    try{whWarmDraw(r,G.ovScene,G.ovCam,null);}finally{G.rimMesh.visible=true;G.flashMesh.visible=true;}
+  });
+  stp('portal',function(){   /* quad portal: program + tekstur kanvas bake (tier 256; tier lebih besar dialokasi ulang oleh whGlPortalDraw seperti biasa) */
+    var r=G.fullR,T=THREE,cp;
+    if(!r)return;
+    if(!G.ptMesh){
+      cp=G.ptCv||(G.ptCv=document.createElement('canvas'));
+      if(cp.width!==256||cp.height!==256){cp.width=256;cp.height=256;}
+      if(!G.ptTex){G.ptTex=new T.CanvasTexture(cp);G.ptTex.minFilter=T.LinearFilter;G.ptTex.magFilter=T.LinearFilter;G.ptTex.flipY=true;}
+      whGlPtMk(T);
+    }
+    G.ptMat.uniforms.map.value=G.ptTex;G.ptMat.uniforms.uOp.value=0;
+    whWarmDraw(r,G.ptScene,G.ptCam,null);
+  });
+  stp('paste',function(){   /* tempel SSAA teleskop: RT kotak (RGBA8 + flag XR/sRGB) + program tempel */
+    var r=G.fullR,T=THREE,sa,rt;
+    if(!(WHG_TSS>0)||!r)return;
+    sa=(typeof GLSKY!=='undefined'&&GLSKY)?GLSKY.sa:null;
+    if(!sa||!sa.tried||!sa.ok)return;   /* sama dgn whGlTeleSS: SSAA tidak jalan = jalur lama, tidak ada yang perlu dihangatkan */
+    TS=whTssState();
+    TS.cap=Math.min((r.capabilities&&r.capabilities.maxTextureSize)||2048,2048);
+    if(!TS.q)whTssMk(T,G,TS);
+    rt=whTssFit(T,r,TS,480,480);
+    TS.hw=0;TS.hh=0;TS.t=0;   /* jangan memengaruhi logika menyusut pelan */
+    if(!rt)return;
+    TS.u.tMap.value=rt.texture;TS.u.uUV.value.set(0,0,1,1);TS.u.uUseClip.value=0;TS.u.uA.value=0;TS.u.uRes.value.set(G.fullW||1,G.fullH||1);
+    whWarmDraw(r,TS.qs,TS.qc,null);
+    TS.u.tMap.value=G.dummy;TS.u.uA.value=1;
+  });
+  if(WHW_LVL>=2){
+    stp('tele0',function(){   /* klon badan teleskop + lampu (jumlah lampu sama dgn tele3dGlEnter: directional di Group, hemisphere di akar scene) */
+      var T=THREE,sc,ws,pv,i,x,ob=[];
+      if(!TS||!TS.rt||!G.teleCam)return;
+      if(typeof SCP3D==='undefined'||SCP3D.state!==2||!SCP3D.root||!SCP3D.sc)return;
+      if(typeof SCP3D_GL!=='undefined'&&(SCP3D_GL.err>=3||SCP3D_GL.act))return;   /* sedang dipakai: jangan ganggu */
+      sc=SCP3D.sc;ws=new T.Scene();pv=new T.Group();
+      pv.add(SCP3D.root.clone(true));
+      for(i=0;i<sc.children.length;i++){
+        x=sc.children[i];
+        if(x.isDirectionalLight)pv.add(x.clone());
+        else if(x.isHemisphereLight)ws.add(x.clone());
+      }
+      ws.add(pv);pv.position.set(W*.5,H*.5,0);pv.scale.set(1,1,1);pv.visible=true;
+      pv.traverse(function(n){if(n.material&&(n.isMesh||n.isPoints||n.isLine||n.isSprite))ob.push(n);});
+      tele={ws:ws,pv:pv,ob:ob,i:0,vis:ob.map(function(n){return n.visible;})};
+      for(i=0;i<ob.length;i++)ob[i].visible=false;
+    });
+  }
+  function runStep(){
+    var t,nm,sl;
+    if(fin)return;
+    if(state!=='idle'){end(false,'busy');return;}
+    try{if(stop&&stop()){end(false,'stop');return;}}catch(eS){}
+    if(performance.now()-T0>WHW_MAX){end(false,'timeout');return;}
+    if(tele){   /* irisan: satu objek teleskop per render ke RT SSAA (target XR/sRGB = jalur produksi), maks ±10 ms per task */
+      t=performance.now();
+      try{
+        while(tele.i<tele.ob.length&&performance.now()-t<10){
+          tele.ob[tele.i].visible=true;
+          whWarmDraw(G.fullR,tele.ws,G.teleCam,TS.rt);
+          tele.ob[tele.i].visible=false;tele.i++;
+        }
+      }catch(eT){WHW.err='tele:'+String(eT&&eT.message||eT).slice(0,60);tele.i=tele.ob.length;}
+      sl=Math.round(performance.now()-t);
+      if(tele.i<tele.ob.length){WHW.steps.push(['tele~',sl]);setTimeout(runStep,0);return;}
+      WHW.steps.push(['tele',sl]);
+      try{for(t=0;t<tele.ob.length;t++)tele.ob[t].visible=tele.vis[t];}catch(eV){}
+      tele=null;
+    }
+    if(k>=steps.length){end(true,'');return;}
+    nm=steps[k][0];t=performance.now();
+    try{steps[k][1]();}
+    catch(e){
+      WHW.err=nm+':'+String(e&&e.message||e).slice(0,60);
+      WHW.steps.push([nm+'!',Math.round(performance.now()-t)]);
+      if(nm==='ensure'){end(false,'ensure');return;}
+      k++;setTimeout(runStep,0);return;
+    }
+    WHW.steps.push([nm,Math.round(performance.now()-t)]);
+    k++;setTimeout(runStep,0);
+  }
+  setTimeout(runStep,0);
 }
 function init(){
   if(inited||!usable())return inited&&ok;
@@ -1700,7 +1844,8 @@ window.WORMHOLE={
   get noPlanet(){return (','+WH_DBG+',').indexOf(',noplanet,')>=0;},
   /* hook debug untuk 19-auto-debug.js (?debug=1&whperf=1): WP/flag di dalam IIFE ini private */
   dbgAttach:function(w){WP=w;},
-  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why,aa:WHG_AA,tss:WHG_TSS,tssN:(WHG.tss?WHG.tss.n:0),tssK:(WHG.tss?+WHG.tss.k.toFixed(2):0),tssFb:(WHG.tss?WHG.tss.fb:0),tssErr:(WHG.tss?WHG.tss.err:0),tssWhy:(WHG.tss?WHG.tss.why:'')};},
+  warm:whWarm,   /* [B10] warm #glwh di boot: WORMHOLE.warm(done(ok,why), stop()) */
+  dbgInfo:function(){return {dpr:dpr,zoom:SKY_ZOOM,ring:WH_RING,step:WH_STEP,nobloom:WH_NOBLOOM,dbg:WH_DBG,smq:(typeof SCP3D_SMQ!=='undefined'?SCP3D_SMQ:''),gl:WHG.ok,glErr:WHG.err,glWhy:WHG.why,aa:WHG_AA,tss:WHG_TSS,tssN:(WHG.tss?WHG.tss.n:0),tssK:(WHG.tss?+WHG.tss.k.toFixed(2):0),tssFb:(WHG.tss?WHG.tss.fb:0),tssErr:(WHG.tss?WHG.tss.err:0),tssWhy:(WHG.tss?WHG.tss.why:''),whw:{lvl:WHW.lvl,st:WHW.st,ok:WHW.ok,ms:WHW.ms,why:WHW.why,err:WHW.err,steps:WHW.steps}};},
   dbgStats:function(){var o={},k,a;for(k in WHS){a=WHS[k];o[k]={n:a.n,js:a.n?Math.round(a.js/a.n*10)/10:0,dt:a.n?Math.round(a.dt/a.n*10)/10:0,max:Math.round(a.max*10)/10,cv:a.cw+'x'+a.ch,dpr:a.dpr};}return o;},
   /* [PATCH G4.12] status feedback GL */
   get gl(){return !!(WHG.ok&&WHG.on);},
