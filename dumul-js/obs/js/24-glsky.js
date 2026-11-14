@@ -69,7 +69,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   /* [G4.9] efek planet di pass planet: plfxOn = A/B ?glplfx=0; pf = {au,ds,dl,db,...} mesh; pfOk = mesh berhasil dibangun; pdn/pln/pbn/pan = jumlah baris dicatat frame ini (di-reset glskyBegin) */
   plfxOn:true,pf:null,pfOk:false,pdn:0,pln:0,pbn:0,pan:0,
   /* [G4.10] PASS DRONE di renderer utama: dbScene (efek di BAWAH drone: trail/tether/kaki/halo/ping) lalu mdScene (Group drone + cincin tahan di ATAS). dpOn = A/B ?gldpass=0 (drone balik ke layer #gldrone); dpOk = mesh efek berhasil dibangun; dpAct = ada yang dijadwalkan frame ini; dbn/dln/dsn/dtn = jumlah blob/garis/titik/garis-atas dicatat frame ini (di-reset glskyBegin); aa = antialias renderer utama (?glaa=1) */
-  dpOn:true,dp:null,dpOk:false,dpErr:0,dpAct:false,dbn:0,dln:0,dsn:0,dtn:0,mdScene:null,dbScene:null,aa:false,
+  dpOn:true,dp:null,dpOk:false,dpErr:0,dpAct:false,dbn:0,dln:0,dsn:0,dtn:0,mdScene:null,dbScene:null,aa:false,xfOn:true,xfMs:260,xfT0:0,xfE:-1,   /* [B9] crossfade serah-terima teleskop #glwh -> pass atas: xfOn = A/B ?glxf=0, xfMs = durasi (?glxfms=N), xfT0 = mulai (0 = tidak aktif), xfE = easing frame ini (-1 = tidak aktif) */
+  
   /* [G4.15] supersample unit kecil. saOn = A/B ?glssaa=0; saK = faktor resolusi RT (2 = 2x2 piksel per piksel layar); saMs = samples MSAA RT (0 = mati); saM / saMd = margin kotak teleskop / drone terhadap radius model; sa = status (ok, test, why, n, px, fr, err, sl). Catatan: ssOn di atas = meteor (?glss=0), BUKAN ini */
   saOn:true,saK:2,saMs:0,saM:1.45,saMd:1.08,saTopN:3,saFresh:false,sa:{ok:false,tried:false,err:0,why:'',test:null,cap:2048,cc:null,cam:null,qs:null,q:null,u:null,sl:[null,null],n:0,px:0,fr:0,hit:0,rd:0},   /* [B4u] default 2 -> 3 (A/B itel 13 Nov: 45.0-45.4 -> 46.1-46.7 fps, r.top 4.6-5.2 -> 3.5-4.0 ms; cek mata N=3 aman, N=4 terasa patah; ?satop=2 = v526) [B4q] saTopN = render RT pass atas tiap N frame, frame lain hanya tempel quad (?satop=N, 1 = mati = perilaku v522); saFresh = paksa render segar (glskySnap) */
   st:{fr:0,ms:0,mx:0,msAvg:0,msMax:0,lost:0,up:0,tex:0}};
@@ -104,6 +105,8 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glplfx=0(&|#|$)/.test(location.search))GLSKY.plfxOn=false;   /* [G4.9] A/B: efek planet tetap 2D di #sky */
     if(/[?&]gldpass=0(&|#|$)/.test(location.search))GLSKY.dpOn=false;   /* [G4.10] A/B: drone tetap di layer #gldrone (G4.7) */
     if(/[?&]glssaa=0(&|#|$)/.test(location.search))GLSKY.saOn=false;   /* [G4.15] A/B: teleskop + drone tanpa supersample (render langsung ke kanvas utama) */
+    if(/[?&]glxf=0(&|#|$)/.test(location.search))GLSKY.xfOn=false;   /* [B9] A/B: serah-terima teleskop wormhole -> pass atas tanpa crossfade (perilaku v543) */
+    var _xfm=/[?&]glxfms=(\d+)/.exec(location.search);if(_xfm)GLSKY.xfMs=Math.max(80,Math.min(800,parseInt(_xfm[1],10)||260));   /* [B9] durasi crossfade ms (default 260) */
     var sk=/[?&]glssk=([0-9.]+)/.exec(location.search),sm=/[?&]glssms=([0-9]+)/.exec(location.search);
     if(sk&&isFinite(parseFloat(sk[1])))GLSKY.saK=Math.max(1.2,Math.min(4,parseFloat(sk[1])));   /* [G4.15] faktor resolusi RT (default 2) */
     if(sm)GLSKY.saMs=Math.min(8,parseInt(sm[1],10)||0);   /* [G4.15] samples MSAA RT (default 0) */
@@ -808,7 +811,7 @@ function glskySnapTop(x,dx,dy,dw,dh){
    bersama texture.colorSpace = sRGB. Hasil: ACES (exposure renderer, drone 1.05) + enkode per fragmen = persis jalur langsung, material toneMapped:false (glow, api, LED) tidak tersentuh, kunci program shader sama dgn jalur langsung (tidak ada kompilasi ganda).
    Blend: RT berisi warna premultiplied + alpha, quad ONE,1-SRCA. Material AdditiveBlending dipatch sementara jadi CustomBlending (SRC_ALPHA,ONE; alpha tidak berubah) selama render RT, supaya glow tetap menambah ke latar dan tidak ikut meredupkan latar lewat alpha.
    Swa-uji sekali (glskySaInit): dua bidang abu-abu .5 (toneMapped false/true) harus terbaca ~188 (enkode sRGB) dan beda (ACES aktif). Gagal / ekstensi tidak ada / galat render = sa.ok=false, jalur langsung. Konteks hilang: glskySaReset. */
-var GLSKY_SA_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uUV;void main(){gl_FragColor=texture2D(uMap,mix(uUV.xy,uUV.zw,vUv));}';
+var GLSKY_SA_FS='precision highp float;varying vec2 vUv;uniform sampler2D uMap;uniform vec4 uUV;uniform float uA;void main(){gl_FragColor=texture2D(uMap,mix(uUV.xy,uUV.zw,vUv))*uA;}';
 var GLSKY_SA_AD=[],GLSKY_SA_SV=[];
 function glskySaAlloc(T,cw,ch){
   var S=GLSKY,r=S.r,pr=r.getRenderTarget(),rt,ta=GLSG.cur?performance.now():0;
@@ -826,7 +829,7 @@ function glskySaInit(T){
   sa.cc=sa.cc||new T.Color();
   if(!sa.q){
     sa.cam=new T.OrthographicCamera(0,1,1,0,-600,600);sa.cam.position.z=5;
-    sa.u={uMap:{value:null},uUV:{value:new T.Vector4(0,0,1,1)}};
+    sa.u={uMap:{value:null},uUV:{value:new T.Vector4(0,0,1,1)},uA:{value:1}};   /* [B9] uA = bobot tempel (premultiplied: semua kanal dikali), default 1 */
     sa.qs=new T.Scene();
     sa.q=new T.Mesh(S.geo,new T.ShaderMaterial({uniforms:sa.u,vertexShader:GLSKY_VS,fragmentShader:GLSKY_SA_FS,transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,
       blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));   /* premultiplied source-over, sama dgn mesh GLSky lain */
@@ -933,14 +936,14 @@ function glskySaAddOff(){
   L.length=0;V.length=0;
 }
 /* [B4q] tempel isi RT (sub-viewport vw x vh) ke kanvas utama di kotak layar `box`. Dipakai glskySaUnit (RT baru dirender) dan glskySaTop (RT lama dipakai ulang). */
-function glskySaPaste(box,vw,vh,rt){
+function glskySaPaste(box,vw,vh,rt,wa){
   var S=GLSKY,sa=S.sa,u=sa.u,sx=S.pw/S.W,sy=S.ph/S.H;
-  u.uMap.value=rt.texture;u.uUV.value.set(0,0,vw/rt.width,vh/rt.height);
+  u.uMap.value=rt.texture;u.uUV.value.set(0,0,vw/rt.width,vh/rt.height);u.uA.value=(wa===undefined)?1:wa;   /* [B9] wa = bobot crossfade 0..1 (tanpa argumen = 1 = perilaku lama) */
   sa.q.position.set((box.x0+box.w*.5)/sx,(box.y0+box.h*.5)/sy,0);sa.q.scale.set(box.w/sx,box.h/sy,1);
   S.r.render(sa.qs,S.tCam);
 }
 /* render scene ke RT (sub-viewport kotak) lalu tempel quad ke kanvas utama. Dipanggil di tengah glskyRenderAll (autoClear sudah false). */
-function glskySaUnit(T,slot,scene,box){
+function glskySaUnit(T,slot,scene,box,wa){
   var S=GLSKY,sa=S.sa,r=S.r,k=box.k,vw=Math.round(box.w*k),vh=Math.round(box.h*k),sx=S.pw/S.W,sy=S.ph/S.H,cam=sa.cam,rt=glskySaFit(T,slot,vw,vh),pr=r.getRenderTarget(),ca,ac=r.autoClear,u=sa.u,tm0=GLSG.cur?performance.now():0,tm1=0;
   cam.left=box.x0/sx;cam.right=(box.x0+box.w)/sx;cam.bottom=box.y0/sy;cam.top=(box.y0+box.h)/sy;cam.updateProjectionMatrix();
   rt.viewport.set(0,0,vw,vh);rt.scissor.set(0,0,vw,vh);rt.scissorTest=true;
@@ -950,13 +953,20 @@ function glskySaUnit(T,slot,scene,box){
   try{r.render(scene,cam);}
   finally{glskySaAddOff();r.setRenderTarget(pr);r.setClearColor(sa.cc,ca);r.autoClear=ac;}
   if(tm0)tm1=performance.now();
-  glskySaPaste(box,vw,vh,rt);
+  if(wa===undefined||wa>=.004)glskySaPaste(box,vw,vh,rt,wa);   /* [B9] wa = bobot crossfade (RT tetap dirender walau ~0: salinan 'di atas planet' memakainya) */
   if(tm0&&GLSG.cur){var tmc=GLSG.cur.tm||(GLSG.cur.tm=[0,0]);tmc[0]+=tm1-tm0;tmc[1]+=performance.now()-tm1;}   /* [B4i] [ms render RT, ms tempel quad] */
   sa.n++;sa.px+=vw*vh;
 }
+/* [B9] CROSSFADE SERAH-TERIMA TELESKOP #glwh -> PASS ATAS. Di terowongan badan teleskop ada di #glwh (z 13, di atas SEMUA lapisan GLSky); begitu keluar ia pindah ke pass atas yang dirender SEBELUM pass planet,
+   jadi glow limb + kolom aurora mulai menimpa badan teleskop = warna kedip/pop kalau keluarnya dekat limb/aurora. Satu Group cuma bisa di satu scene dan klon berbagi material (alpha per salinan mustahil),
+   jadi crossfade dilakukan di level RT supersample: RT teleskop (slot 0) dirender SEKALI, lalu ditempel dua kali: (1) di pass atas dgn bobot e (0->1) = urutan normal, (2) sesudah pass planet/drone dgn bobot 1-e (1->0)
+   = meniru 'di atas semuanya' ala #glwh. Mulai: tele3dGl (13-scope3d.js) saat melepas tgt 3. Hanya jalur kotak tunggal pass atas (kasus umum); jalur langsung / beberapa kotak / ?satop=1 / sa tidak ok = serah-terima instan (v543).
+   glskyXfE: -1 = tidak aktif, selain itu easing smoothstep 0..1 (dihitung sekali per flush di glskyRenderAll). Flag ?glxf=0 mati, ?glxfms=N durasi. */
+function glskyXfE(){var S=GLSKY,p;if(!(S.xfT0>0))return -1;p=(performance.now()-S.xfT0)/S.xfMs;if(p>=1){S.xfT0=0;return -1;}if(p<0)p=0;return p*p*(3-2*p);}
+function glskyXfStart(){var S=GLSKY,sa=S.sa;if(S.xfOn&&S.saOn&&sa&&sa.ok&&sa.err<3)S.xfT0=performance.now();}
 /* pass atas (teleskop + salinan tepi layar): true = sudah digambar lewat RT (atau tidak ada yang tampak); false = pemanggil render tScene langsung */
 function glskySaTop(){
-  var S=GLSKY,sa=S.sa,T=window.THREE,u=S.tUnits,i,j,b,a,c,bx=[],hf,R,done=0;
+  var S=GLSKY,sa=S.sa,T=window.THREE,u=S.tUnits,i,j,b,a,c,bx=[],hf,R,done=0,wt;
   if(!S.saOn||sa.err>=3)return false;
   try{
     if(!sa.tried)glskySaInit(T);
@@ -973,13 +983,14 @@ function glskySaTop(){
     if(bx.length===1&&S.saTopN>1&&!S.saFresh){
       b=bx[0];c=sa.sl[0];
       j=Math.round(b.w*b.k);i=Math.round(b.h*b.k);
-      a=c&&c.c;
+      a=c&&c.c;wt=S.xfE<0?1:S.xfE;   /* [B9] bobot tempel pass atas selama crossfade */
       if(a&&c.rt&&a.rt===c.rt&&a.x0===b.x0&&a.y0===b.y0&&a.w===b.w&&a.h===b.h&&a.vw===j&&a.vh===i&&a.age<S.saTopN-1){
-        a.age++;glskySaPaste(b,j,i,c.rt);sa.n++;sa.px+=j*i;sa.fr++;sa.hit++;
+        a.age++;if(wt>=.004)glskySaPaste(b,j,i,c.rt,wt);sa.n++;sa.px+=j*i;sa.fr++;sa.hit++;
+        sa.xf={b:b,vw:j,vh:i,rt:c.rt};   /* [B9] bahan salinan 'di atas planet' */
         return true;
       }
-      glskySaUnit(T,0,S.tScene,b);sa.rd++;
-      c=sa.sl[0];if(c)c.c={rt:c.rt,x0:b.x0,y0:b.y0,w:b.w,h:b.h,vw:j,vh:i,age:0};
+      glskySaUnit(T,0,S.tScene,b,wt);sa.rd++;
+      c=sa.sl[0];if(c){c.c={rt:c.rt,x0:b.x0,y0:b.y0,w:b.w,h:b.h,vw:j,vh:i,age:0};sa.xf={b:b,vw:j,vh:i,rt:c.rt};}   /* [B9] */
       sa.fr++;
       return true;
     }
@@ -1045,7 +1056,7 @@ function glskySaWarm(wm){
     r.setRenderTarget(pr);
     o.rtMs=Math.round(performance.now()-t1);
     t1=performance.now();
-    sa.u.uMap.value=rt.texture;sa.u.uUV.value.set(0,0,1/rt.width,1/rt.height);
+    sa.u.uMap.value=rt.texture;sa.u.uUV.value.set(0,0,1/rt.width,1/rt.height);sa.u.uA.value=1;
     sa.q.position.set(.5,.5,0);sa.q.scale.set(1,1,1);
     r.autoClear=false;r.setScissorTest(true);r.setScissor(0,0,1,1);
     r.render(sa.qs,S.tCam);
@@ -1268,7 +1279,7 @@ function gtxRect(rgb,al,left,top,w,h){
 }
 function glskyRenderAll(){
   var S=GLSKY,i,top=false,ex,tg;
-  S.sa.n=0;S.sa.px=0;
+  S.sa.n=0;S.sa.px=0;S.sa.xf=null;S.xfE=glskyXfE();   /* [B9] xf = RT teleskop frame ini (diisi glskySaTop, jalur kotak tunggal) */
   glsgScan('main',S.scene);tg=glsgT();S.r.render(S.scene,S.cam);glsgR('r.main',tg);
   for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){top=true;break;}
   if(!top&&!S.pAct&&!S.dpAct&&!S.hAct&&!S.xn)return;
@@ -1283,6 +1294,7 @@ function glskyRenderAll(){
       ex=S.r.toneMappingExposure;S.r.toneMappingExposure=1.05;                /*   exposure drone = renderer 'small' lama */
       try{S.r.clearDepth();glsgScan('dmd',S.mdScene);tg=glsgT();if(!glskySaDrone())S.r.render(S.mdScene,S.tCam);glsgR('r.dmd',tg);}finally{S.r.toneMappingExposure=ex;}   /*   Group drone + cincin tahan (di atas drone); [G4.15] drone lewat RT supersample */
     }
+    if(S.xfE>=0&&S.sa.xf){var _xf=S.sa.xf,_xa=1-S.xfE;if(_xa>=.004)glskySaPaste(_xf.b,_xf.vw,_xf.vh,_xf.rt,_xa);}   /* [B9] salinan teleskop 'di atas planet+drone' (bobot 1-e), memudar ke urutan normal */
     if(S.xn>0&&S.xScene){tg=glsgT();S.r.render(S.xScene,S.cam);glsgR('r.x',tg);}   /* [G6] pass teks: paling atas, kamera utama (y-ke-bawah, px stage) */
   }finally{S.r.autoClear=true;}
   if(S.pAct&&S.pChk){S.pChk=false;try{if(typeof pl3dGlVerify==='function')pl3dGlVerify();}catch(eV){}}   /* diagnosa shader planet, sekali, sesudah render pertama */

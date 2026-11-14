@@ -573,7 +573,7 @@ function tele3dGlSync(i){
 /* pts = [[x,y],...] posisi layar (sudah lensa) tiap salinan; sc = skala; al = alpha; ang = TELESCOPE.ang. true = sudah dijadwalkan ke GL (flush menggambar). */
 function tele3dGl(now,pts,sc,al,ang){
   var S=SCP3D_GL,i,n=pts.length,pv,r,v,ca=Math.cos(ang),sa=Math.sin(ang),yT=GLSKY.tCam.top;
-  if(S.act&&(S.tgt===2||S.tgt===3))tele3dGlLeave(S.tgt);   /* [PATCH G4.12h] tgt 3 (#glwh) juga diserahkan ke pass atas, bukan cuma overlay tgt 2 */   /* serah-terima dari overlay terowongan: lepas di frame yang sama dengan pass atas mengambil alih (flush menggambar sesudahnya) */
+  if(S.act&&(S.tgt===2||S.tgt===3)){var _wg=S.tgt;tele3dGlLeave(S.tgt);if(_wg===3){try{if(typeof glskyXfStart==='function')glskyXfStart();}catch(eXf){}}}   /* [B9] serah-terima dari #glwh: mulai crossfade (24-glsky.js glskyXfE) */   /* [PATCH G4.12h] tgt 3 (#glwh) juga diserahkan ke pass atas, bukan cuma overlay tgt 2 */   /* serah-terima dari overlay terowongan: lepas di frame yang sama dengan pass atas mengambil alih (flush menggambar sesudahnya) */
   if(!S.act)tele3dGlEnter(1);
   if(!S.act)return false;
   SCP3D.last=now;
