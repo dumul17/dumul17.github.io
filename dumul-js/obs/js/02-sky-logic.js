@@ -1074,6 +1074,22 @@ function drawHud(){
   g.stroke();
   }
   var T={tl:'[ LAT 00\u00b000\u2032N ]',tr:'[ LON 000\u00b000\u2032E ]',bl:'[ AZ 000\u00b0 ]',br:'[ EL 00\u00b0 ]'};
+  if(typeof glskyTxtOn==='function'&&glskyTxtOn()){   /* [G6] teks HUD kamera ke pass teks GL (4 sprite statis) */
+    var hf='600 8px "Courier New",monospace',hk='110,229,255',ha2=.18;
+    if(!STG.rot){
+      gtxRot(0,0);
+      gtxText(T.tl,hf,hk,ha2,m+4,t+4,'left','top');gtxText(T.tr,hf,hk,ha2,W-m-4,t+4,'right','top');
+      gtxText(T.bl,hf,hk,ha2,m+4,b-4,'left','bottom');gtxText(T.br,hf,hk,ha2,W-m-4,b-4,'right','bottom');
+    }else{
+      var gcs=[[m,t],[W-m,t],[m,b],[W-m,b]];
+      for(var gi=0;gi<4;gi++){
+        var gsp=v2c(gcs[gi][0],gcs[gi][1]),glf=gsp[0]<STG.iw/2,gtp=gsp[1]<STG.ih/2,gv=c2v(gsp[0]+(glf?4:-4),gsp[1]+(gtp?4:-4));
+        gtxRot(gv[0],gv[1]);
+        gtxText(gtp?(glf?T.tl:T.tr):(glf?T.bl:T.br),hf,hk,ha2,gv[0],gv[1],glf?'left':'right',gtp?'top':'bottom');
+      }
+    }
+    g.restore();return;
+  }
   if(!STG.rot){
     g.textBaseline='top';g.textAlign='left';g.fillText(T.tl,m+4,t+4);
     g.textAlign='right';g.fillText(T.tr,W-m-4,t+4);

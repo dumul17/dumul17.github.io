@@ -310,9 +310,33 @@ function sectStep(now){
     }
   }
 }
+/* [G6] flash masuk/keluar sektor = div CSS #sect-flash (bukan fillRect di #sky): animasi opacity WAAPI sekali per flash (compositor), tanpa tulis style per frame; display:none di luar flash
+   (tidak ada layer layar penuh permanen). Disisipkan tepat sesudah #sky di DOM (di atas kanvas, urutan sama dgn flash lama). ?sfcss=0 = fillRect 2D lama (A/B). Tanpa WAAPI = 2D lama. */
+var SF_CSS=!/[?&]sfcss=0(&|#|$)/.test(location.search),SF_EL=null,SF_T=-1;
+function sectFlashCss(t){
+  var el,a,an;
+  if(SF_T===SECT.flash)return true;   /* flash ini sudah dijalankan */
+  try{
+    el=SF_EL;
+    if(!el){
+      var cv=document.getElementById('sky');
+      if(!cv||!cv.parentNode||!cv.animate&&!document.createElement('div').animate)return false;
+      el=SF_EL=document.createElement('div');el.id='sect-flash';el.setAttribute('aria-hidden','true');
+      cv.parentNode.insertBefore(el,cv.nextSibling);
+    }
+    if(!el.animate)return false;
+    a=.5*(1-t/420);
+    el.style.display='block';
+    an=el.animate([{opacity:a},{opacity:0}],{duration:Math.max(1,420-t),easing:'linear'});
+    an.onfinish=function(){try{if(!el.getAnimations||!el.getAnimations().length)el.style.display='none';}catch(e){el.style.display='none';}};
+    SF_T=SECT.flash;
+    return true;
+  }catch(e){SF_CSS=false;return false;}
+}
 function drawSectFlash(now){
   var t=now-SECT.flash;
   if(SECT.flash&&t<420){
+    if(SF_CSS&&sectFlashCss(t))return;
     g.save();g.globalAlpha=.5*(1-t/420);g.fillStyle='#bff4ff';g.fillRect(0,0,W,H);g.restore();
   }
 }

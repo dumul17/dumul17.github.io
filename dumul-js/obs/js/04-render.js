@@ -824,10 +824,11 @@ function tlHudSprite(l1,l2,l3,rgb){
   sg.fillStyle='rgba('+rgb+', 0.95)';sg.fillText(l1,8,12);
   sg.font='500 7.5px "Courier New", monospace';
   sg.fillStyle='rgba(184, 224, 238, 0.8)';sg.fillText(l2,8,22);sg.fillText(l3,8,31);
+  c.__glv=(c.__glv|0)+1;   /* [G6] kanvas dipakai ulang (isi beda, ukuran bisa sama): texture GL harus dibuat baru */
   TL_HUD.key=key;TL_HUD.pw=pw;TL_HUD.ph=ph;
   return TL_HUD;
 }
-var TL_GL_T=-1;   /* [PATCH G3h] frame terakhir reticle dicatat ke GL (panggilan kedua, sesudah flush, hanya menggambar teks telemetri 2D) */
+var TL_GL_T=-1,TL_GT_T=-1;   /* [G6] TL_GT_T = frame terakhir teks telemetri dicatat ke pass teks GL */   /* [PATCH G3h] frame terakhir reticle dicatat ke GL (panggilan kedua, sesudah flush, hanya menggambar teks telemetri 2D) */
 function drawTargetLock(now){
   if(typeof OBSERVE_MODE!=='undefined'&&OBSERVE_MODE)return;
   if(reduce || SW) return;
@@ -865,7 +866,9 @@ function drawTargetLock(now){
   var rot = now * 0.0006;
 
   /* [PATCH G3h] ?glsky=1: panggilan sebelum flush mencatat reticle ke GL lalu selesai; panggilan sesudah flush lewati reticle, gambar teks saja */
-  if(typeof glskyFxOn==='function'&&glskyFxOn()){glskyLockReticle(x,y,sz,rot,tr.rgb);TL_GL_T=now;return;}
+  var _gtl=false;
+  if(typeof glskyFxOn==='function'&&glskyFxOn()){glskyLockReticle(x,y,sz,rot,tr.rgb);TL_GL_T=now;if(typeof glskyTxtOn==='function'&&glskyTxtOn()){_gtl=true;TL_GT_T=now;}else return;}   /* [G6] teks telemetri ikut dicatat ke pass teks GL di panggilan ini */
+  else if(TL_GT_T===now)return;   /* [G6] teks sudah dicatat ke GL sebelum flush */
   if(TL_GL_T!==now){
   g.save();
   g.translate(x, y);
@@ -893,7 +896,7 @@ function drawTargetLock(now){
 
   // Telemetry HUD Text — panel diukur dari lebar teks asli, dijepit ke area layar yang kelihatan,
   // dan dijauhkan dari reticle (lingkaran + bracket) supaya frame & teks nggak numpuk / kepotong.
-  var _upT=uprBegin(x,y);
+  var _upT=_gtl?false:uprBegin(x,y);
   g.save();
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   var isMobile = (W < 600 || H < 520);
@@ -913,7 +916,8 @@ function drawTargetLock(now){
   var pos = hudPlace(sp0[0], sp0[1], sz * 1.45 + 6, pw, ph, vb, isMobile, !!(s.nx && s.nx > 0), (typeof planetLblLimit === 'function') ? planetLblLimit(HUD_LIMB_GAP) : null);   /* guard limb: panel LOCK tidak tenggelam di balik planet (Spica di sektor Spring) */
   var tx = x + pos[0], ty = y + pos[1];   /* pojok kiri-atas panel */
 
-  g.drawImage(hs.c, tx, ty, hs.c.width / DPR, hs.c.height / DPR);
+  if(_gtl){gtxRot(x,y);gtxImg(hs.c,1,tx,ty,hs.c.width/DPR,hs.c.height/DPR,1);}   /* [G6] panel LOCK ke pass teks GL */
+  else g.drawImage(hs.c, tx, ty, hs.c.width / DPR, hs.c.height / DPR);
 
   g.restore();
   uprEnd(_upT);
@@ -1435,7 +1439,7 @@ function consNameSprite(id){
   for(i=0;i<txt.length;i++){var w=m.measureText(txt[i]).width;ws.push(w);tot+=w;}
   tot+=gap*(txt.length-1);
   var L=Math.ceil(tot)+pad*2,T=Math.ceil(FS*1.2)+pad*2;
-  var c=document.createElement('canvas');c.width=vert?T:L;c.height=vert?L:T;
+  var c=document.createElement('canvas');c.width=vert?T:L;c.height=vert?L:T;c.__glmip=1;   /* [G6] sprite 48px diperkecil banyak di GL: mipmap */
   var x=c.getContext('2d');
   x.font=m.font;x.fillStyle='rgb('+rgb+')';x.textBaseline='middle';x.textAlign='left';
   if(vert){x.translate(T/2,0);x.rotate(Math.PI/2);}else x.translate(0,T/2);
@@ -1468,6 +1472,7 @@ function drawNameBox(id,t1,t2,al,now){
     if(!hit){best=[px,py,r0];break;}
   }
   NAME_R.push(best[2]);
+  if(typeof glskyTxtOn==='function'&&glskyTxtOn()){gtxRot(best[0],best[1]);gtxImg(sp.c,al,best[0]-dw/2,best[1]-dh/2,dw,dh);return;}   /* [G6] sprite nama rasi ke pass teks GL */
   var up=uprBegin(best[0],best[1]),pa=g.globalAlpha;
   g.globalAlpha=pa*al;
   g.drawImage(sp.c,best[0]-dw/2,best[1]-dh/2,dw,dh);
@@ -2034,7 +2039,7 @@ function drawStars(c,age,now){
       /* Audio-trigger labels: each one inherits its own pulse color. */
       /* triggerKey / tr / isPlaying were resolved above so potato audio-focus
          can decide the cheap star path before any gradient work is allocated. */
-      var _upL=uprBegin(x,y);
+      var _gt=(typeof glskyTxtOn==='function')&&glskyTxtOn(),_upL=_gt?(gtxRot(x,y),false):uprBegin(x,y);   /* [G6] _gt: label/bar ke pass teks GL */
       g.font='500 10px "Space Grotesk",system-ui,sans-serif';
       /* Closer gap for edge stars (Antares) so the label hugs the pulse. */
       var gapH=s.specAfter? (r*1.6+4) : (r*3.4+7);
@@ -2051,12 +2056,13 @@ function drawStars(c,age,now){
       var labelX=x+_ft[0], labelY=y+_ft[1];
       var labelAlpha=lblA*(isPlaying?.95:1);
       g.fillStyle=tr?'rgba('+tr.rgb+','+labelAlpha+')':(bandOn?'rgba('+bandCore+','+labelAlpha+')':'rgba(184,198,214,'+labelAlpha+')');
-      g.fillText(nmS,labelX,labelY);
+      var _lcl=tr?tr.rgb:(bandOn?bandCore:'184,198,214'),_tal=_ft[2]==='r'?'right':(_ft[2]==='c'?'center':'left');
+      if(_gt)gtxText(nmS,'500 10px "Space Grotesk",system-ui,sans-serif',_lcl,labelAlpha,labelX,labelY,_tal,'alphabetic');else g.fillText(nmS,labelX,labelY);
       var _spT=(bandOn||gateLbl)?sptOf(s,c.id,k):null;
       if(_spT){   /* tipe spektral di bawah nama (dari STAR_PHYS): filter UV/IR aktif, atau VIS lewat gerbang zoom saat garis OFF */
         g.font='500 8px "Space Grotesk",system-ui,sans-serif';
         g.fillStyle='rgba('+(bandOn?bandCol:'150,170,196')+','+(labelAlpha*.85)+')';
-        g.fillText(_spT,labelX,labelY+10);
+        if(_gt)gtxText(_spT,'500 8px "Space Grotesk",system-ui,sans-serif',(bandOn?bandCol:'150,170,196'),labelAlpha*.85,labelX,labelY+10,_tal,'alphabetic');else g.fillText(_spT,labelX,labelY+10);
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
       }
 
@@ -2080,16 +2086,16 @@ function drawStars(c,age,now){
             ? (labelX-labelW-gapFromText-total)
             : (labelX+labelW+gapFromText);
         }
-        g.save();g.globalCompositeOperation='lighter';
+        if(!_gt){g.save();g.globalCompositeOperation='lighter';}
         for(var bi=0;bi<bars;bi++){
           var wave=.5+.5*Math.sin(tn*.009+bi*1.17+s.ph);
           var center=1-Math.abs((bi-(bars-1)/2)/((bars-1)/2));
           var bhh=2+7.2*wave*(.35+.65*center);
           var ba=(.38+.52*wave)*lblA;
-          g.fillStyle='rgba('+tr.rgb+','+ba+')';
-          g.fillRect(sx+bi*(bw+gap),sy+6-bhh,bw,bhh);
+          if(_gt)gtxRect(tr.rgb,ba,sx+bi*(bw+gap),sy+6-bhh,bw,bhh);
+          else{g.fillStyle='rgba('+tr.rgb+','+ba+')';g.fillRect(sx+bi*(bw+gap),sy+6-bhh,bw,bhh);}
         }
-        g.restore();
+        if(!_gt)g.restore();
       }
       uprEnd(_upL);
     }
@@ -2364,28 +2370,28 @@ function drawPleiades(age,now){
       g.restore();
       }
       if(selected&&age>3.5&&q[2]<.25){ /* label Pleione cuma pas SFX-nya main (di mode apa pun) */
-        var _upP=uprBegin(x,y);
+        var _gtP=(typeof glskyTxtOn==='function')&&glskyTxtOn(),_upP=_gtP?(gtxRot(x,y),false):uprBegin(x,y);   /* [G6] */
         g.font='500 10px "Space Grotesk",system-ui,sans-serif';
         g.textAlign='left';g.fillStyle='rgba('+tr.rgb+','+(hotP?.95:(selected?.78:.42))+')';
         var labelW0=g.measureText('Pleione').width,_bw=(selected?8+7*3.15:0),_pw=labelW0+_bw,_g=r*3.4+7;
         /* kanan bintang -> kiri -> atas -> bawah: yang muat di layar dan kosong (lblFit); batang spektrum ikut dihitung di lebar blok */
         var _pf2=lblFit(now,x,y,_pw+4,12,[[_g,3,'l'],[-_g,3,'r'],[0,-(r*2.2+12),'c'],[0,r*2.2+16,'c']]);
         var labelX=_pf2[2]==='r'?x+_pf2[0]-_pw:(_pf2[2]==='c'?x+_pf2[0]-_pw/2:x+_pf2[0]),labelY=y+_pf2[1];
-        g.fillText('Pleione',labelX,labelY);
+        if(_gtP)gtxText('Pleione','500 10px "Space Grotesk",system-ui,sans-serif',tr.rgb,(hotP?.95:(selected?.78:.42)),labelX,labelY,'left','alphabetic');else g.fillText('Pleione',labelX,labelY);
         if(selected){
           var bars=7,gap=1.8,bw=1.35;
           var gapFromText=8,labelW=g.measureText('Pleione').width;
           var sx=labelX+labelW+gapFromText,sy=labelY-7;
-          g.save();g.globalCompositeOperation='lighter';
+          if(!_gtP){g.save();g.globalCompositeOperation='lighter';}
           for(var bi=0;bi<bars;bi++){
             var wave=.5+.5*Math.sin(tn*.009+bi*1.17+(star.ph||0));
             var center=1-Math.abs((bi-(bars-1)/2)/((bars-1)/2));
             var bhh=2+7.2*wave*(.35+.65*center);
             var ba=.38+.52*wave;
-            g.fillStyle='rgba('+tr.rgb+','+ba+')';
-            g.fillRect(sx+bi*(bw+gap),sy+6-bhh,bw,bhh);
+            if(_gtP)gtxRect(tr.rgb,ba,sx+bi*(bw+gap),sy+6-bhh,bw,bhh);
+            else{g.fillStyle='rgba('+tr.rgb+','+ba+')';g.fillRect(sx+bi*(bw+gap),sy+6-bhh,bw,bhh);}
           }
-          g.restore();
+          if(!_gtP)g.restore();
         }
         uprEnd(_upP);
       }
@@ -2400,7 +2406,7 @@ function drawPleiades(age,now){
       if(PLEIADES._cx===undefined){var an=_li*2.4;ux=Math.cos(an);uy=Math.sin(an);}
       else{ux=x-PLEIADES._cx;uy=y-PLEIADES._cy;var ul=Math.hypot(ux,uy)||1;ux/=ul;uy/=ul;}
       var ala=.8*(alP?1:gFP)*(1-.85*q[2]),spL=plSpt(nmL);
-      var _upD=uprBegin(x,y);
+      var _gtD=(typeof glskyTxtOn==='function')&&glskyTxtOn(),_upD=_gtD?(gtxRot(x,y),false):uprBegin(x,y);   /* [G6] */
       /* label klaster: kandidat arah (menjauh dari pusat klaster, cermin horizontal/vertikal, lalu lebih jauh); lblFit milih yang muat di layar dan kosong */
       g.font='500 10px "Space Grotesk",system-ui,sans-serif';
       var _wN=g.measureText(nmL).width,_wS2=0;
@@ -2418,8 +2424,8 @@ function drawPleiades(age,now){
       }
       g.textAlign=_pf[2]==='r'?'right':'left';
       var tx=x+_pf[0],ty=y+_pf[1];
-      g.fillStyle=bandOn?'rgba('+bandCore+','+ala+')':'rgba(184,198,214,'+ala+')';g.fillText(nmL,tx,ty);
-      if(spL){g.font='500 8px "Space Grotesk",system-ui,sans-serif';g.fillStyle='rgba('+(bandOn?bandCol:'150,170,196')+','+(ala*.85)+')';g.fillText(spL,tx,ty+10);}
+      g.fillStyle=bandOn?'rgba('+bandCore+','+ala+')':'rgba(184,198,214,'+ala+')';if(_gtD)gtxText(nmL,'500 10px "Space Grotesk",system-ui,sans-serif',bandOn?bandCore:'184,198,214',ala,tx,ty,_pf[2]==='r'?'right':'left','alphabetic');else g.fillText(nmL,tx,ty);
+      if(spL){g.font='500 8px "Space Grotesk",system-ui,sans-serif';g.fillStyle='rgba('+(bandOn?bandCol:'150,170,196')+','+(ala*.85)+')';if(_gtD)gtxText(spL,'500 8px "Space Grotesk",system-ui,sans-serif',(bandOn?bandCol:'150,170,196'),ala*.85,tx,ty+10,_pf[2]==='r'?'right':'left','alphabetic');else g.fillText(spL,tx,ty+10);}
       uprEnd(_upD);
     }
     if(_P)plM('lb');

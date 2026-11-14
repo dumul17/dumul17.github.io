@@ -59,6 +59,8 @@ var GLSKY={on:true,lay:true,act:false,err:0,ok:false,init:false,why:'',test:fals
   /* [PATCH G3d] bhShockOn = A/B ?glbhshock=0 */
   /* [G4.18] komet/Konami: cometOn = A/B ?glcomet=0; hScene = pass kepala batu komet; hAct = ada kepala yang digambar frame ini */
   cometOn:true,hScene:null,hAct:false,
+  /* [G6] TEKS/LABEL: pass teks PALING ATAS di renderer utama (xScene + kamera utama y-ke-bawah), dirender sesudah semua pass lain (setara urutan 2D lama: teks di #sky di atas semua isi GL). txtOn = A/B ?gltxt=0; xops/xn = daftar op teks frame ini (di-reset glskyBegin); xmesh = pool mesh quad pass teks */
+  txtOn:true,xScene:null,xmesh:[],xops:[],xn:0,
   units:[],tScene:null,tCam:null,tUnits:[],oR:null,oCv:null,oScene:null,oCam:null,oOk:false,oErr:0,oPw:0,oPh:0,astOn:true,bhShockOn:true,snOn:true,trigOn:true,pleiOn:true,portalOn:true,bhOn:true,
   /* [G4.7] layer drone: kanvas GL ketiga (#gldrone) DI ATAS #sky, anak #stage; dibuat malas saat drone pertama muncul. drOn = A/B ?gldrone=0 */
   drOn:true,dR:null,dCv:null,dScene:null,dCam:null,dOk:false,dErr:0,dPw:0,dPh:0,dShown:false,
@@ -95,6 +97,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     if(/[?&]glsn=0(&|#|$)/.test(location.search))GLSKY.snOn=false;   /* [PATCH G3e] A/B: supernova+belt tetap 2D */
     if(/[?&]gltrig=0(&|#|$)/.test(location.search))GLSKY.trigOn=false;   /* [PATCH G3f] A/B: trigger/ripple/pulse-shock tetap 2D */
     if(/[?&]glfx=0(&|#|$)/.test(location.search))GLSKY.fxOn=false;   /* [PATCH G3h] A/B: efek kecil (avail/dust/focus/lock) tetap 2D */
+    if(/[?&]gltxt=0(&|#|$)/.test(location.search))GLSKY.txtOn=false;   /* [G6] A/B: teks/label tetap 2D di #sky */
     if(/[?&]glplei=0(&|#|$)/.test(location.search))GLSKY.pleiOn=false;   /* [PATCH G3g] A/B: Pleiades bintang tetap 2D */
     if(/[?&]glportal=0(&|#|$)/.test(location.search))GLSKY.portalOn=false;   /* [PATCH G4.2] A/B: portal cincin tetap 2D blit */
     if(/[?&]gldrone=0(&|#|$)/.test(location.search))GLSKY.drOn=false;   /* [G4.7] A/B: drone tetap blit 2D */
@@ -271,6 +274,9 @@ function glskyMW(im,a,tw,th,lw,z,port,rt){
 }
 function glskyLive(c){
   var S=GLSKY,i,k;
+  if(c.__gtx)return true;   /* [G6] sprite teks/label (gtxSprite) */
+  if(typeof NAME_SPR!=='undefined')for(k in NAME_SPR)if(NAME_SPR[k]&&NAME_SPR[k].c===c)return true;   /* [G6] sprite nama rasi */
+  if(typeof TL_HUD!=='undefined'&&TL_HUD&&c===TL_HUD.c)return true;   /* [G6] panel telemetri LOCK */
   if(c===plateDeep||c===bgCanvas||c===gridCanvas)return true;
   if(typeof MW!=='undefined'&&MW.img&&(c===MW.img||c===MW.img.__glc))return true;   /* texture Milky Way: jangan ikut tersapu */
   for(i=0;i<plateDust.length;i++)if(plateDust[i].c===c)return true;
@@ -1172,12 +1178,100 @@ function glskyQuadWarm(r,it,out){
   }catch(e2){}
   out.push([it[0],N,Math.round(performance.now()-t0)]);
 }
+/* ---------- G6: TEKS / LABEL di GL (pass teks paling atas) ----------
+   Dulu: nama rasi (drawNameBox), nama + tipe spektral + bar spektrum bintang (drawStars), label Pleione + katalog Pleiades (drawPleiades), panel telemetri LOCK (drawTargetLock),
+   teks HUD kamera (drawHud) digambar di #sky 2D SETELAH flush GL = di atas semua unit. Sekarang: sprite teks di-bake SEKALI per (font, warna, teks) lalu dipakai sebagai quad bertekstur
+   (glskyXImg) di xScene, dirender sesudah SEMUA pass lain (teleskop, planet, drone) dengan kamera utama => urutan tumpuk sama dgn 2D. Bar spektrum = quad warna polos (glskyXRect, source-over:
+   'lighter' di kanvas transparan sama dgn source-over). Tata letak (lblFit, hudPlace, limb guard, landscape) tetap dihitung JS di tempat asalnya; di sini cuma tempat menggambar.
+   Landscape (STG.rot): uprBegin memutar teks terhadap (x,y); di sini gtxRot(x,y) + gtxPt memutar titik pusat quad dgn rumus yang sama, rot quad = upAng().
+   Ketajaman: sprite di-bake pada DPR, ukuran quad = ukuran kanvas / DPR, kiri-atas dibulatkan ke grid piksel perangkat (portrait). Sprite nama rasi (48px, diperkecil) pakai mipmap (__glmip).
+   Kalau !glskyTxtOn() (di luar jendela rekam / ?gltxt=0 / GL mati) semua pemanggil jatuh ke jalur 2D lama utuh. */
+var GTX={cache:new Map(),ep:0,on:false,th:0,cs:1,sn:0,ox:0,oy:0,rx:0,ry:0,mc:null,max:240,early:false};
+function glskyTxtOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.txtOn&&S.xScene&&S.ok&&S.r&&S.err<3);}
+function glskyXOp(){var S=GLSKY,o=S.xops[S.xn];if(!o)o=S.xops[S.xn]={};o.b=0;o.hi=0;o.uv=null;o.aff=null;S.xn++;return o;}
+function glskyXImg(c,a,cx,cy,w,h,rot){var o=glskyXOp();o.k=1;o.t=c;o.a=a>1?1:a;o.add=0;o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;}
+function glskyXRect(rgb,a,cx,cy,w,h,rot){var o=glskyXOp();o.k=0;o.c=glskyCol(rgb);o.a=a>1?1:a;o.add=0;o.cx=cx;o.cy=cy;o.w=w;o.h=h;o.rot=rot||0;}
+function glskyXMesh(i){
+  var S=GLSKY,T=window.THREE,m;
+  m=new T.Mesh(S.geo,new T.ShaderMaterial({
+    uniforms:{uMap:{value:S.dummy},uC:{value:new T.Vector4(0,0,0,1)},uTex:{value:0},uB:{value:0},uUV:{value:new T.Vector4(0,0,1,1)}},
+    vertexShader:GLSKY_VS_UV,fragmentShader:GLSKY_FS,
+    transparent:true,depthTest:false,depthWrite:false,side:T.DoubleSide,
+    blending:T.CustomBlending,blendEquation:T.AddEquation,blendSrc:T.OneFactor,blendDst:T.OneMinusSrcAlphaFactor}));
+  m.frustumCulled=false;m.renderOrder=i;m.__ro=i;
+  S.xScene.add(m);S.xmesh[i]=m;
+  return m;
+}
+function glskyXApply(){
+  var S=GLSKY,i,m;
+  if(!S.xScene)return;
+  for(i=0;i<S.xn;i++){m=S.xmesh[i]||glskyXMesh(i);glskyApply(m,S.xops[i]);}
+  for(;i<S.xmesh.length;i++)S.xmesh[i].visible=false;
+}
+function gtxReset(){GTX.cache.forEach(function(e){e.c.__gtx=0;});GTX.cache.clear();GTX.ep++;GTX.early=false;}
+try{if(document.fonts&&document.fonts.addEventListener)document.fonts.addEventListener('loadingdone',function(){if(GTX.early)gtxReset();});}catch(eGtF){}   /* sprite yang di-bake sebelum webfont siap di-bake ulang sekali */
+function gtxSprite(txt,font,rgb,base){
+  var key=font+'|'+rgb+'|'+base+'|'+DPR+'|'+txt,e=GTX.cache.get(key),m,fs,tw,pad=2,cw,ch,ay,c,x;
+  if(e)return e;
+  if(GTX.cache.size>=GTX.max)gtxReset();
+  m=GTX.mc||(GTX.mc=document.createElement('canvas').getContext('2d'));
+  m.font=font;tw=m.measureText(txt).width;
+  fs=+((/(\d+(?:\.\d+)?)px/.exec(font)||[0,10])[1]);
+  cw=Math.ceil((tw+pad*2)*DPR);ch=Math.ceil(fs*2.4*DPR);
+  ay=base==='top'?fs*.6:(base==='bottom'?fs*1.8:fs*1.4);ay=Math.round(ay*DPR)/DPR;   /* titik jangkar vertikal di dalam sprite: baseline yang sama dgn g.textBaseline asli */
+  c=document.createElement('canvas');c.width=cw;c.height=ch;c.__gtx=1;
+  x=c.getContext('2d');x.scale(DPR,DPR);x.font=font;x.fillStyle='rgb('+rgb+')';x.textAlign='left';x.textBaseline=base;x.fillText(txt,pad,ay);
+  try{if(font.indexOf('Space Grotesk')>=0&&document.fonts&&document.fonts.check&&!document.fonts.check(font))GTX.early=true;}catch(eGtC){}
+  e={c:c,tw:tw,pad:pad,ay:ay,w:cw/DPR,h:ch/DPR};
+  GTX.cache.set(key,e);
+  return e;
+}
+/* rotasi landscape terhadap (ox,oy), setara uprBegin(ox,oy) */
+function gtxRot(ox,oy){
+  GTX.on=!!STG.rot;
+  if(GTX.on){GTX.th=upAng();GTX.cs=Math.cos(GTX.th);GTX.sn=Math.sin(GTX.th);}else{GTX.th=0;GTX.cs=1;GTX.sn=0;}
+  GTX.ox=ox;GTX.oy=oy;
+}
+function gtxPt(px,py){   /* hasil di GTX.rx/ry */
+  var dx,dy;
+  if(!GTX.on){GTX.rx=px;GTX.ry=py;return;}
+  dx=px-GTX.ox;dy=py-GTX.oy;
+  GTX.rx=GTX.ox+dx*GTX.cs-dy*GTX.sn;GTX.ry=GTX.oy+dx*GTX.sn+dy*GTX.cs;
+}
+/* sprite kanvas jadi (kiri,atas,w,h) di kerangka tegak; snap = bulatkan ke grid piksel perangkat (portrait) */
+function gtxImg(c,al,left,top,w,h,snap){
+  if(!(al>.004))return;
+  if(snap&&!GTX.on){left=Math.round(left*DPR)/DPR;top=Math.round(top*DPR)/DPR;}
+  gtxPt(left+w*.5,top+h*.5);
+  glskyXImg(c,al*g.globalAlpha,GTX.rx,GTX.ry,w,h,GTX.th);
+}
+/* teks: titik jangkar (px,py) dgn g.textAlign=align ('left'|'right'|'center') + g.textBaseline=base ('alphabetic'|'top'|'bottom'); rgb 'r,g,b', al = alpha (sebelum g.globalAlpha) */
+function gtxText(txt,font,rgb,al,px,py,align,base){
+  var e,lx;
+  if(!(al>.004)||!txt)return;
+  e=gtxSprite(txt,font,rgb,base);
+  lx=align==='right'?px-e.tw:(align==='center'?px-e.tw*.5:px);
+  gtxImg(e.c,al,lx-e.pad,py-e.ay,e.w,e.h,1);
+}
+/* kotak warna polos (bar spektrum); snap ke piksel perangkat supaya tepi tidak bergerigi tanpa MSAA */
+function gtxRect(rgb,al,left,top,w,h){
+  var x0,y0,x1,y1,ig=1/DPR;
+  if(!(al>.004))return;
+  if(!GTX.on){
+    x0=Math.round(left*DPR)*ig;x1=Math.max(x0+ig,Math.round((left+w)*DPR)*ig);
+    y0=Math.round(top*DPR)*ig;y1=Math.round((top+h)*DPR)*ig;
+    if(!(y1>y0))y1=y0+ig;
+    left=x0;top=y0;w=x1-x0;h=y1-y0;
+  }
+  gtxPt(left+w*.5,top+h*.5);
+  glskyXRect(rgb,al*g.globalAlpha,GTX.rx,GTX.ry,w,h,GTX.th);
+}
 function glskyRenderAll(){
   var S=GLSKY,i,top=false,ex,tg;
   S.sa.n=0;S.sa.px=0;
   glsgScan('main',S.scene);tg=glsgT();S.r.render(S.scene,S.cam);glsgR('r.main',tg);
   for(i=0;i<S.tUnits.length;i++)if(S.tUnits[i].visible){top=true;break;}
-  if(!top&&!S.pAct&&!S.dpAct&&!S.hAct)return;
+  if(!top&&!S.pAct&&!S.dpAct&&!S.hAct&&!S.xn)return;
   S.r.autoClear=false;
   try{
     if(S.hAct&&S.hScene){S.r.clearDepth();glsgScan('head',S.hScene);tg=glsgT();S.r.render(S.hScene,S.tCam);glsgR('r.head',tg);}   /* [G4.18] pass kepala komet: di atas scene utama, di bawah teleskop (urutan 2D lama: komet digambar sebelum teleskop/planet) */
@@ -1189,6 +1283,7 @@ function glskyRenderAll(){
       ex=S.r.toneMappingExposure;S.r.toneMappingExposure=1.05;                /*   exposure drone = renderer 'small' lama */
       try{S.r.clearDepth();glsgScan('dmd',S.mdScene);tg=glsgT();if(!glskySaDrone())S.r.render(S.mdScene,S.tCam);glsgR('r.dmd',tg);}finally{S.r.toneMappingExposure=ex;}   /*   Group drone + cincin tahan (di atas drone); [G4.15] drone lewat RT supersample */
     }
+    if(S.xn>0&&S.xScene){tg=glsgT();S.r.render(S.xScene,S.cam);glsgR('r.x',tg);}   /* [G6] pass teks: paling atas, kamera utama (y-ke-bawah, px stage) */
   }finally{S.r.autoClear=true;}
   if(S.pAct&&S.pChk){S.pChk=false;try{if(typeof pl3dGlVerify==='function')pl3dGlVerify();}catch(eV){}}   /* diagnosa shader planet, sekali, sesudah render pertama */
 }
@@ -1425,6 +1520,7 @@ function glskyBuild(){
     S.tScene=new T.Scene();S.tUnits=[];
     S.pScene=new T.Scene();   /* [G4.8] pass planet */
     S.hScene=new T.Scene();   /* [G4.18] pass kepala komet (di bawah pass teleskop) */
+    S.xScene=new T.Scene();   /* [G6] pass teks */
     S.dbScene=new T.Scene();S.mdScene=new T.Scene();   /* [G4.10] pass drone: bawah + (drone, atas) */
     S.root=new T.Group();S.scene.add(S.root);
     S.layers=new T.Group();S.root.add(S.layers);
@@ -1729,7 +1825,7 @@ function glskySize(){
    Penggambaran GL sendiri di glskyFlush() (setelah blok latar). */
 function glskyBegin(now,want){
   var S=GLSKY;
-  S.act=false;S.n=0;S.hAct=false;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;S.dpAct=false;S.dbn=0;S.dln=0;S.dsn=0;S.dtn=0;
+  S.act=false;S.n=0;S.xn=0;S.hAct=false;S.pAct=false;S.pdn=0;S.pln=0;S.pbn=0;S.pan=0;S.dpAct=false;S.dbn=0;S.dln=0;S.dsn=0;S.dtn=0;
   if(!S.on||S.err>=3){glskyShow(false);glskyRestorePX();return false;}
   if(!S.init){glskyInit();return false;}
   if(!S.ok||!S.r)return false;
@@ -1951,6 +2047,7 @@ function glskyFlush(){
     if(S.vig>0&&S.want&&S.lay&&!S.test){var vo=glskyOp();vo.k=2;vo.a=S.vig;vo.add=0;vo.cx=W*.5;vo.cy=H*.5;vo.w=W;vo.h=H;vo.rot=0;}   /* vignette: op terakhir => di atas latar GL, di bawah semua yang masih 2D */
     for(i=0;i<S.n;i++){m=S.mesh[i]||glskyMesh(i);glskyApply(m,S.ops[i]);}
     for(;i<S.mesh.length;i++)S.mesh[i].visible=false;
+    glskyXApply();   /* [G6] op teks -> pool mesh pass teks */
     if(GLSG.on){if(!GLSG.gt)glsgGpuInit();glsgGpuPoll();glsgOd();if(S.root)S.root.visible=!GLSG.hide.ast;}   /* [B4v] */
     glsgLap('ops');
     glskyInstFlush();
