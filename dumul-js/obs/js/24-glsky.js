@@ -16,7 +16,8 @@
         glskyFlush dipindah ke SESUDAH loop cons+stars di frame() (05-sector-ui.js) supaya garis & bintang sempat tercatat. Urutan GL: latar -> garis -> bintang. Kedip/napas/LOD/aturan BGM tetap dihitung JS (belum pindah ke shader).
         Garis glow (pass lebar) ditepikan lembut (profil pangkat 1.5); ?glsoft=0 = tepi keras seperti 2D. Bintang di mode kamera & jalur potato audio-focus tetap 2D (di atas garis GL, urutan benar).
         Flag: ?glstars=0 bintang tetap 2D | ?gllines=0 garis tetap 2D | ?glsoft=0 glow garis keras. Konsol: GLSKY.starOn / GLSKY.lineOn / GLSKY.soft.
-        Masih 2D (belum pindah): bintang/rasi/label, BH, planet, drawHud, bandDimDraw (source-over, aman).
+        [diperbarui G4.19] Yang masih 2D saat GL aktif: TEKS/label (nama rasi/bintang, spektrum, telemetri target lock, label drone), drawHud (HUD kamera LAT/LON/AZ/EL), drawSectFlash. Bintang/rasi/BH/planet/bandDim/camLens sudah GL.
+   G4.19: CAMLENS (lensa pembelok cahaya mode kamera, 04-render.js camLensR) ke GL: rongga gelap = inti mesh bintang (glfDot, di atas garis rasi seperti 2D); cincin foton/cincin dalam/orbit Einstein + 2 busur = ruas garis TINGKAT 2 (bl2, di atas mesh bintang supaya cincin dalam .62R tetap di atas rongga seperti urutan 2D). Karena lensa kini di GL, inti bintang ber-lensa balik ke mesh GL (hotfix stacking G4.14b hanya berlaku bila lensa masih 2D). Flag ?gllens=0 A/B | konsol GLSKY.lensOff=true.
    G3c: METEOR ACAK (drawShooting, 04-render.js) pindah ke GL: sprite goresan yang sama (ssSprite) diunggah jadi texture SEKALI lewat glskyImg (source-over), posisi/arah/umur tetap dihitung JS; urutan sama dgn 2D (di bawah garis+bintang GL). Komet/Konami (kepala batu 3D, aurora, 'lighter') dan ?ss=1 tetap 2D. Flag: ?glss=0 meteor tetap 2D | konsol GLSKY.ssOn.
    G2c: tint BGM (ofxDrawTint, constellation.opus 'lighter' biru + collapsars.opus 'multiply' merah) pindah ke GL lewat glskyImg add=1 / add=2; dulu digambar di #sky 2D yang menutup bintang GL dan 'multiply' di kanvas transparan cuma jadi overlay merah, bukan menggelapkan.
    G4.1: BATU BELAKANG (drawAsteroids half=-1, 12-ast3d.js) masuk scene bersama lewat glskyAttach (renderOrder 200). Batu depan tetap 2D (BH masih 2D di atas GL). Flag ?glast=0 A/B. depth:true di renderer supaya mesh 3D bisa depthTest; lapisan 2D-style (latar/bintang/garis) tetap depthTest:false.
@@ -106,6 +107,7 @@ try{window.__glsky=GLSKY;}catch(eG0){}
     var stN=/[?&]satop=(\d+)(&|#|$)/.exec(location.search);if(stN)GLSKY.saTopN=Math.max(1,Math.min(4,parseInt(stN[1],10)||1));   /* [B4q] A/B: ?satop=1 = RT pass atas dirender tiap frame (v522) */
     if(/[?&]glaa=1(&|#|$)/.test(location.search))GLSKY.aa=true;   /* [G4.10] antialias MSAA renderer utama (drone kecil jadi halus; lebih berat) */
     if(/[?&]glplanet=0(&|#|$)/.test(location.search))GLSKY.plOn=false;   /* [G4.8] A/B: planet tetap jalur lama (renderer 'big' + blit) */
+    if(/[?&]gllens=0(&|#|$)/.test(location.search))GLSKY.lensOff=true;   /* [G4.19] A/B: camLens tetap 2D */
     if(/[?&]glbh=0(&|#|$)/.test(location.search))GLSKY.bhOn=false;   /* [PATCH G4.3] A/B: BH body tetap 2D */
     var v=/[?&]glvig=([0-9.]+)/.exec(location.search),dr=/[?&]gldrift=([0-9.]+)/.exec(location.search);
     if(v&&isFinite(parseFloat(v[1])))GLSKY.vig=Math.max(0,Math.min(1,parseFloat(v[1])));
@@ -363,7 +365,7 @@ function glskyInstBuild(T){
   S.ml=GLSKY_T_MESH(T,S.bl,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},5000);   /* renderOrder 5000+ = di atas semua op latar (10+i) dan vignette */
   S.ms=GLSKY_T_MESH(T,S.bs,GLSKY_STAR_VS,GLSKY_STAR_FS,{uS:{value:1}},5001);
   /* [G4.16] mesh garis tingkat 2/3 (portal overview): petir DI ATAS mulut (5100) tapi di bawah cincin (5102); kilau charge + percikan DI ATAS cincin. Mesh garis utama 5000 selalu di bawah semua op hi (5100+). */
-  S.bl2=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],1536);
+  S.bl2=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],3072);   /* [G4.19] 1536 -> 3072: camLens memakai tingkat 2 (~200 ruas per lensa) */
   S.bl3=glskyInstGeo(T,[['iP',4],['iL',4],['iW',2]],1536);
   S.ml2=GLSKY_T_MESH(T,S.bl2,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},5101);
   S.ml3=GLSKY_T_MESH(T,S.bl3,GLSKY_LINE_VS,GLSKY_LINE_FS,{uS:{value:1},uSoft:{value:1}},5103);
@@ -424,6 +426,27 @@ function glfArc(cx,cy,r,a0,a1,w,rgb,al){   /* goresan busur (ekuivalen g.arc + s
 }
 function glfDot(x,y,r,rgb,al){if(al>.004)glskyStar(x,y,0,'0,0,0',0,r,rgb,al);}   /* lingkaran padat (ekuivalen arc + fill) */
 function glfLine(x0,y0,x1,y1,w,rgb,al){if(al>.004)glskySeg(x0,y0,x1,y1,w,glskyCol(rgb),al,0);}
+/* [G4.19] camLens (camLensR, 04-render.js) versi GL. Pemanggil memastikan glskyLensOn(). k = a*az (sudah termasuk fade zoom), br = napas cincin, ang = sudut busur. */
+function glskyLensOn(){var S=GLSKY;return !!(S.act&&S.rec&&S.lay&&S.lineOn&&S.starOn&&S.inst&&S.ok&&S.r&&S.lensOff!==true);}
+function glskyLensArc(cx,cy,r,a0,a1,w,c,al,cap){   /* goresan busur lv 2 (di atas mesh bintang); cap=1: ujung bulat ~ diperpanjang setengah lebar (lineCap round) */
+  var n,i,a,ex=cap?w*.5/r:0,px,py,qx,qy;
+  if(!(al>.004)||!(r>.5))return;
+  a0-=ex;a1+=ex;
+  n=Math.max(10,Math.min(64,Math.ceil(Math.abs(a1-a0)*r/3)));   /* ruas ~3 px (simpangan < .05 px untuk r >= 10) */
+  px=cx+Math.cos(a0)*r;py=cy+Math.sin(a0)*r;
+  for(i=1;i<=n;i++){a=a0+(a1-a0)*i/n;qx=cx+Math.cos(a)*r;qy=cy+Math.sin(a)*r;glskySegL(2,px,py,qx,qy,w,c,al,0);px=qx;py=qy;}
+}
+function glskyLens(x,y,R,rgb,k,br,ang){
+  var S=GLSKY,r2=R*1.42+3,c,T=6.283185307,P=3.1416;
+  if(S.W>0&&(x+r2<0||x-r2>S.W||y+r2<0||y-r2>S.H))return;   /* di luar layar: jangan bangun ~200 ruas (drawStars memanggil camLensR untuk SEMUA bintang bernama terang, 2D dulu cukup dipotong kanvas) */
+  c=glskyCol(rgb);
+  glfDot(x,y,R*.8,'2,6,12',.36*k);                                   /* rongga: cahaya yang dibelokkan menjauh dari inti (mesh bintang, tepat sebelum inti si bintang) */
+  glskyLensArc(x,y,R,0,T,.8,c,.46*k*br,0);                           /* cincin foton */
+  glskyLensArc(x,y,R*.62,0,T,.5,c,.16*k,0);                          /* cincin dalam */
+  glskyLensArc(x,y,R*1.42,0,T,.5,c,.16*k,0);                         /* orbit busur Einstein */
+  glskyLensArc(x,y,R*1.42,ang,ang+1.15,1.1,c,.5*k,1);                /* busur utama */
+  glskyLensArc(x,y,R*1.42,ang+P+.2,ang+P+.65,.8,c,.3*k,1);           /* busur kedua (berseberangan) */
+}
 /* garis putus-putus (g.setLineDash([on,off]) + lineDashOffset): ph = posisi pola di awal garis (px), ext = perpanjangan tiap dash di dua ujung (setengah lebar bila canvas pakai lineCap round).
    mode 0 = mesh garis utama (glskySeg), 1 = pass drone di bawah drone (glskyDpSeg). */
 function glfDash(x0,y0,x1,y1,w,rgb,al,on,off,ph,ext,mode){

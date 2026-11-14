@@ -1847,6 +1847,7 @@ function camLens(x,y,rc,rgb,a,now){camLensR(x,y,rc*3+4,rgb,a,now);}
 function camLensR(x,y,R,rgb,a,now){
   var az=clamp((skyZoom-2.5)/3);if(az<=.01)return;
   var st=reduce||AT.calm,br=st?1:.9+.1*Math.sin(now*.0021+x*.013),ang=st?.6:now*.00032+x*.01,k=a*az;   /* fokus cam: lensa diam */
+  if(typeof glskyLensOn==='function'&&glskyLensOn()){glskyLens(x,y,R,rgb,k,br,ang);return;}   /* [G4.19] ?glsky=1: lensa di GL (rongga di mesh bintang + cincin/busur di garis tingkat 2); ?gllens=0 = 2D */
   g.fillStyle='rgba(2,6,12,'+(.36*k)+')';
   g.beginPath();g.arc(x,y,R*.8,0,6.283);g.fill();                                  /* rongga: cahaya yang dibelokkan menjauh dari inti */
   g.lineWidth=.8;
@@ -1948,9 +1949,9 @@ function drawStars(c,age,now){
       var cc=bandCore||s.rgb,rz=r*camZK();
       /* halo tipis ada saat cam free di zoom ~1x (kayak idle); hilang saat fokus / auto-zoom fit, dan inti jadi lebih terang */
       var hk=hkC;
-      /* camLens tetap 2D. [PATCH G4.14b] bintang ber-lensa: inti 2D di #sky SETELAH lensa (sama stacking ?glsky=0). Tanpa lensa: inti mesh GL. */
+      /* [G4.19] camLens di GL (glskyLensOn): inti tetap mesh GL, urutan rongga -> inti terjaga di mesh bintang. [PATCH G4.14b] kalau lensa MASIH 2D (?gllens=0 / di luar jendela rekam): inti 2D di #sky SETELAH lensa (sama stacking ?glsky=0). */
       var hasLens=false;
-      if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;hasLens=clamp((skyZoom-2.5)/3)>.01;if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}
+      if(s.name&&s.r>=ringR()){var lg=lensOn&&s._lg;hasLens=clamp((skyZoom-2.5)/3)>.01&&!(typeof glskyLensOn==='function'&&glskyLensOn());if(lg){if(!lg.drawn){lg.drawn=true;camLensR(lg.x,lg.y,lg.R,cc,a,now);}}else camLens(x,y,Math.max(.9,rz*.62),cc,a,now);}
       if(gsOn&&!hasLens){
         /* [PATCH G4.14] halo tipis (hk>.02, zoom ~1x) + inti idle putih <-> inti sensor warna + titik panas, semua di mesh bintang GL. Urutan = 2D: halo -> inti idle -> inti sensor -> titik panas. */
         var ik=1-hk,cR,cA;
@@ -2291,7 +2292,7 @@ function drawPleiades(age,now){
     var glP=(typeof glskyPleiOn==='function')&&glskyPleiOn();   /* [PATCH G3g] halo+inti Pleiades di mesh bintang GL; [PATCH G4.14] juga mode kamera */
     /* [PATCH G4.14b] lensa dulu; inti 2D di atas lensa kalau ada lensa; selain itu mesh GL */
     var hasPleiLens=false;
-    if(CAMERA_MODE&&!dim){var plg=plLens&&star._lg;hasPleiLens=clamp((skyZoom-2.5)/3)>.01;if(plg){if(!plg.drawn){plg.drawn=true;camLensR(plg.x,plg.y,plg.R,bandCore||'238,246,255',a,now);}}else camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);}
+    if(CAMERA_MODE&&!dim){var plg=plLens&&star._lg;hasPleiLens=clamp((skyZoom-2.5)/3)>.01&&!(typeof glskyLensOn==='function'&&glskyLensOn());if(plg){if(!plg.drawn){plg.drawn=true;camLensR(plg.x,plg.y,plg.R,bandCore||'238,246,255',a,now);}}else camLens(x,y,Math.max(.9,r*.7*camZK()),bandCore||'238,246,255',a,now);}
     if(glP&&!(CAMERA_MODE&&hasPleiLens)){
       var hK=rAdj*(HALO_IDLE_S+(1-HALO_IDLE_S)*pHF),hA=a*.82*(HALO_IDLE_A+(1-HALO_IDLE_A)*pHF)*pHK;
       var cR,cA;
