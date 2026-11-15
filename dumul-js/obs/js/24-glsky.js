@@ -1166,20 +1166,67 @@ function glskyPdWarm(wm,cb){
     var rg={n:0,tot:0,ms:0,cap:0,why:''},L=[],t0g=performance.now(),i=0,capMs=1500,m;
     o.rg=rg;
     try{
-      if(/[?&]glwrg=0(&|#|$)/.test(location.search)||typeof getRingSprite!=='function'||typeof ringWarmList!=='function'||typeof RW==='undefined'||!RW.on||typeof TRIGGERS==='undefined'){rg.why='off';return fin();}
+      if(/[?&]glwrg=0(&|#|$)/.test(location.search)||typeof getRingSprite!=='function'||typeof ringWarmList!=='function'||typeof RW==='undefined'||!RW.on||typeof TRIGGERS==='undefined'){rg.why='off';return xw();}
       m=/[?&]glwrgms=(\d+)/.exec(location.search);if(m)capMs=+m[1];
       L=ringWarmList();rg.tot=L.length;
-    }catch(e5){rg.why='list:'+String(e5&&e5.message||e5).slice(0,50);return fin();}
+    }catch(e5){rg.why='list:'+String(e5&&e5.message||e5).slice(0,50);return xw();}
     (function step(){
       var t1=performance.now(),it,S,tx;
       if(done)return;
-      if(i>=L.length||t1-t0g>capMs){rg.cap=i<L.length?1:0;rg.ms=Math.round(performance.now()-t0g);return fin();}
+      if(i>=L.length||t1-t0g>capMs){rg.cap=i<L.length?1:0;rg.ms=Math.round(performance.now()-t0g);return xw();}
       try{
         while(i<L.length&&performance.now()-t1<6){
           it=L[i++];S=getRingSprite(it[0],it[1],false);
           if(S&&S.c&&S.c.width>1&&S.c.height>1){tx=glskyTex(S.c);if(tx&&r&&r.initTexture){r.initTexture(tx);rg.n++;}}
         }
       }catch(e6){rg.why=(rg.why?rg.why+'|':'')+String(e6&&e6.message||e6).slice(0,50);}
+      setTimeout(step,0);
+    })();
+  }
+  /* [B20] sprite persisten lain yang texture GL-nya masih dibuat lazy di flush pertama (dump v556: 'skyt:winter' + 'tint:winter' 118 ms, 'bh' + 'star:255,233,216' + 2 '?' 94,7 ms, 1 flush masing-masing).
+     Yang dihangatkan: (1) SKYT semua sektor (sectSkySprite 128x128, entri SKYT dibuat persis seperti sectDrawSky: v:0,spr,spr2); (2) sprite yang SUDAH ada saat warm: STAR_SPRITE_CACHE (+ getStarSprite('255,233,216') warna blob BH), BH.sprite, BH_SHOCK_SPR, GLF_PL, COMET_SPR, NEB.tint (yang sudah ter-bake).
+     TIDAK dicakup: bake tint nebula sektor (async berat, NEBJ), cincin portal (radius tergantung Rin layar), ptmouth (dinamis). Hasil: glseg.w1.pd.x = {n, ms, cap, why, src:{tag:jumlah}}. Batas ?glwxms=N (default 1200). Flag ?glwx=0 = mati (A/B). */
+  function xw(){
+    var x={n:0,ms:0,cap:0,why:'',src:{}},Q=[],t0x=performance.now(),i=0,capX=1200,m,k;
+    o.x=x;
+    function add(tag,c){
+      var j;
+      if(!c||!(c.width>1)||!(c.height>1))return;
+      for(j=0;j<Q.length;j++)if(Q[j][1]===c)return;
+      Q.push([tag,c]);x.src[tag]=(x.src[tag]||0)+1;
+    }
+    try{
+      if(/[?&]glwx=0(&|#|$)/.test(location.search)){x.why='off';return fin();}
+      m=/[?&]glwxms=(\d+)/.exec(location.search);if(m)capX=+m[1];
+      if(typeof SECT!=='undefined'&&SECT.list&&typeof SKYT!=='undefined'&&typeof sectSkySprite==='function'){
+        SECT.list.forEach(function(sc){
+          var t,A;
+          if(!sc||!sc.sky)return;
+          t=SKYT[sc.k]||(SKYT[sc.k]={v:0,spr:null,spr2:null});
+          if(!t.spr)t.spr=sectSkySprite(sc.sky.rgb);
+          add('skyt',t.spr);
+          A=sc.sky.acc;
+          if(A){if(!t.spr2)t.spr2=sectSkySprite(A.rgb);add('skyt',t.spr2);}
+        });
+      }
+      if(typeof getStarSprite==='function'){try{getStarSprite('255,233,216');}catch(eSs){}}
+      if(typeof STAR_SPRITE_CACHE!=='undefined')for(k in STAR_SPRITE_CACHE)if(STAR_SPRITE_CACHE[k])add('star',STAR_SPRITE_CACHE[k].c);
+      if(typeof BH!=='undefined'&&BH)add('bh',BH.sprite);
+      if(typeof BH_SHOCK_SPR!=='undefined'&&BH_SHOCK_SPR){add('bhshock',BH_SHOCK_SPR.c0);add('bhshock',BH_SHOCK_SPR.c1);}
+      if(typeof GLF_PL!=='undefined')add('glfpl',GLF_PL);
+      if(typeof COMET_SPR!=='undefined'&&COMET_SPR)for(k in COMET_SPR)add('comet',COMET_SPR[k]);
+      if(typeof NEB!=='undefined'&&NEB&&NEB.tint)for(k in NEB.tint)add('tint',NEB.tint[k]);
+    }catch(e7){x.why='list:'+String(e7&&e7.message||e7).slice(0,50);return fin();}
+    (function step(){
+      var t1=performance.now(),tx,it;
+      if(done)return;
+      if(i>=Q.length||t1-t0x>capX){x.cap=i<Q.length?1:0;x.ms=Math.round(performance.now()-t0x);return fin();}
+      try{
+        while(i<Q.length&&performance.now()-t1<6){
+          it=Q[i++];tx=glskyTex(it[1]);
+          if(tx&&r&&r.initTexture){r.initTexture(tx);x.n++;}
+        }
+      }catch(e8){x.why=(x.why?x.why+'|':'')+String(e8&&e8.message||e8).slice(0,50);}
       setTimeout(step,0);
     })();
   }
