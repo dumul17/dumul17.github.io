@@ -803,14 +803,16 @@ function portal3dDraw(g,x,y,Rp,now,a,opts){
       var S=2*PT3D_CFG.half*Rp;
       g.imageSmoothingEnabled=true;g.imageSmoothingQuality=opts.lq?'low':'high';   /* v11: opts.lq (wormhole zoom): tekstur 256px di-upscale sampai layar penuh; filter 'high' mahal di GPU sesuai area -> 'low' */
       var _cs=PT3D.ccSn?((PT3D.ccSnN===PT3D.snN&&threeGLSrc(PT3D.gl)===PT3D.gl.sn)?PT3D.gl.sn:null):PT3D.cc;   /* [v53] sumber cache: sn (dibagi) atau cc */
+      pmk('pt.pre');   /* [B21] pisah pt.blit: [pt.gl/pt.copy -> pt.pre] = kerja antara, [pt.pre -> pt.src] = threeGLSrc, [pt.src -> pt.blit] = glskyImg/drawImage (dump v558: pt.blit frame 1 = 47 ms) */
       if(opts.noRing){pmk('pt.blit');}   /* [PATCH G4.2] cincin sudah di GL (portal3dGlRing) */
       else if(opts.glBlit&&typeof glskyImg==='function'){
         /* [PATCH G4.2] billboard ke op GL (koordinat absolut; pemanggil sudah di ruang stage) */
         var _src=((reuse||(opts.alt2&&PT3D.ccOK))&&_cs)?_cs:threeGLSrc(PT3D.gl);
+        pmk('pt.src');
         var _aa=g.globalAlpha>1?1:g.globalAlpha;
         glskyImg(_src,_aa,opts.glX!=null?opts.glX:0,opts.glY!=null?opts.glY:0,S,S,opts.glRot||0,0,1);
         pmk('pt.blit');
-      }else if(!(window.__offB&&window.__offB.pt))g.drawImage(((reuse||(opts.alt2&&PT3D.ccOK))&&_cs)?_cs:threeGLSrc(PT3D.gl),-S/2,-S/2,S,S);pmk('pt.blit');   /* ?off=ptb (21-bench) */
+      }else if(!(window.__offB&&window.__offB.pt)){var _d2=((reuse||(opts.alt2&&PT3D.ccOK))&&_cs)?_cs:threeGLSrc(PT3D.gl);pmk('pt.src');g.drawImage(_d2,-S/2,-S/2,S,S);}pmk('pt.blit');   /* ?off=ptb (21-bench) */
     }catch(e){pt3dFail(e&&e.message||e);r2d();}
   }else r2d();
   if(tm){g.save();g.transform(tm[0],tm[1],tm[2],tm[3],0,0);}
