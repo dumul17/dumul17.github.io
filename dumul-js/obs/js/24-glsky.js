@@ -1139,14 +1139,14 @@ function glskyPdWarm(wm,cb){
     var sn={n:0,colors:0,ms:0,why:''},cols=[],seen={},k,rr,t0s=performance.now(),i=0;
     o.sn=sn;
     try{
-      if(/[?&]glwsn=0(&|#|$)/.test(location.search)||typeof snBake!=='function'||typeof SNFX==='undefined'||!SNFX.on||typeof TRIGGERS==='undefined'){sn.why='off';return fin();}
+      if(/[?&]glwsn=0(&|#|$)/.test(location.search)||typeof snBake!=='function'||typeof SNFX==='undefined'||!SNFX.on||typeof TRIGGERS==='undefined'){sn.why='off';return rgw();}
       for(k in TRIGGERS){rr=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rr&&!seen[rr]){seen[rr]=1;cols.push(rr);}}
       ['110,229,255','255,80,120'].forEach(function(x){if(!seen[x]){seen[x]=1;cols.push(x);}});
-    }catch(e3){sn.why='cols:'+String(e3&&e3.message||e3).slice(0,50);return fin();}
+    }catch(e3){sn.why='cols:'+String(e3&&e3.message||e3).slice(0,50);return rgw();}
     (function step(){
       var S,tx,nm,c;
       if(done)return;
-      if(i>=cols.length){sn.colors=cols.length;sn.ms=Math.round(performance.now()-t0s);return fin();}
+      if(i>=cols.length){sn.colors=cols.length;sn.ms=Math.round(performance.now()-t0s);return rgw();}
       try{
         S=snBake(cols[i++]);
         for(nm in {core:1,ring:1,streak:1,flash:1}){
@@ -1155,6 +1155,31 @@ function glskyPdWarm(wm,cb){
           if(tx&&r&&r.initTexture){r.initTexture(tx);sn.n++;}
         }
       }catch(e4){sn.why=(sn.why?sn.why+'|':'')+String(e4&&e4.message||e4).slice(0,50);}
+      setTimeout(step,0);
+    })();
+  }
+  /* [B19] sprite cincin trigger/ripple (getRingSprite, 04-render.js): kanvasnya sudah di-bake (ringWarmPre + ringWarmStep), tapi TEXTURE GL-nya baru dibuat + di-upload di flush yang pertama menggambarnya.
+     Dump 15 Nov (setelah B18): glseg.ug masih punya 28 grup flush 40-142 ms yang isinya cuma sprite 'ring:...' (tap bintang SFX / masuk sektor), sedangkan 'sn:' sudah hilang dari ug.
+     Di sini daftar yang SAMA dgn ringWarmList (tiap warna TRIGGERS x radius 5,5..16,5 langkah 0,5, glow=false) di-bake bila belum + di-upload sekarang, irisan <=6 ms per giliran, batas total ?glwrgms=N (default 1500 ms; sisa dilewati).
+     Sprite di luar daftar (cincin portal 3,5-6, glow=1, radius >16,5) tetap lazy. Hasil: glseg.w1.pd.rg = {n texture, tot daftar, ms, cap (1 = kena batas), why}. Flag ?glwrg=0 = mati (A/B). */
+  function rgw(){
+    var rg={n:0,tot:0,ms:0,cap:0,why:''},L=[],t0g=performance.now(),i=0,capMs=1500,m;
+    o.rg=rg;
+    try{
+      if(/[?&]glwrg=0(&|#|$)/.test(location.search)||typeof getRingSprite!=='function'||typeof ringWarmList!=='function'||typeof RW==='undefined'||!RW.on||typeof TRIGGERS==='undefined'){rg.why='off';return fin();}
+      m=/[?&]glwrgms=(\d+)/.exec(location.search);if(m)capMs=+m[1];
+      L=ringWarmList();rg.tot=L.length;
+    }catch(e5){rg.why='list:'+String(e5&&e5.message||e5).slice(0,50);return fin();}
+    (function step(){
+      var t1=performance.now(),it,S,tx;
+      if(done)return;
+      if(i>=L.length||t1-t0g>capMs){rg.cap=i<L.length?1:0;rg.ms=Math.round(performance.now()-t0g);return fin();}
+      try{
+        while(i<L.length&&performance.now()-t1<6){
+          it=L[i++];S=getRingSprite(it[0],it[1],false);
+          if(S&&S.c&&S.c.width>1&&S.c.height>1){tx=glskyTex(S.c);if(tx&&r&&r.initTexture){r.initTexture(tx);rg.n++;}}
+        }
+      }catch(e6){rg.why=(rg.why?rg.why+'|':'')+String(e6&&e6.message||e6).slice(0,50);}
       setTimeout(step,0);
     })();
   }
