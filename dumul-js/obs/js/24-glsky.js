@@ -1049,7 +1049,8 @@ function glskySaWarm(wm){
   pr=r.getRenderTarget();sT=r.getScissorTest();sr=r.getScissor(new T.Vector4());ac=r.autoClear;r.getClearColor(sa.cc);ca=r.getClearAlpha();
   try{
     t1=performance.now();
-    rt.viewport.set(0,0,vw,vh);rt.scissor.set(0,0,1,1);rt.scissorTest=true;
+    rt.viewport.set(0,0,vw,vh);rt.scissor.set(0,0,1,1);rt.scissorTest=!GLW.safull;   /* [B22] ?glwsafull=1: render warm ke RT SA PENUH (tanpa scissor 1x1) supaya first-use fragment/RT ikut dibayar pra-kapsul; RT offscreen, tidak ada kedip */
+    if(GLW.safull)o.full=1;
     r.setRenderTarget(rt);r.setClearColor(0x000000,0);r.autoClear=true;
     for(i=0;i<tu.length;i++)glskyWarmOne(r,S.tScene,S.tCam,tu[i]);   /* render ke RT (viewport/scissor RT dipakai three, bukan scissor renderer) */
     try{if(typeof SCP3D!=='undefined'&&SCP3D.state===2&&SCP3D.sc&&SCP3D.sc.parent!==S.tScene){glskyWarmOne(r,SCP3D.sc,S.tCam,null);o.scp=1;}}catch(eSc){}
@@ -1694,7 +1695,7 @@ function glskyInit(){
    Tidak menggambar apa pun ke kanvas GL (tidak ada kedip di bawah layar boot). Berhenti begitu Blue (stop()). Gagal / dilewati -> perilaku lama persis (frame pertama membangun sendiri).
    Flag: ?glwarm=0 = nonaktif (A/B). Hasil: window.__glwarm {st 0 idle|1 jalan|2 selesai|3 gagal/lewat, why, ms{init,cmp,cmpOk|cmpTmo,plBuild,cmpDone,plDraw,end}, pl, plDraw, cmpTmo, n (scene dikompilasi)}. */
 var GLW={on:true,st:0,why:'',ms:{},pl:0,plDraw:0,cmpTmo:0,n:0,r1:true,r1f:false,scpf:true,r1n:0,r1t:[],r1c:[],post:true,sa:null,saOn:true,tx:null,texOn:true,hold:0,seenAt:0,relAt:0,fade:420,holdMax:12000,defer:[],p:{st:0},f:0,pre:true,pdOn:true,pd:null,its:[],instOn:true,inst:[],q:[],qN:12,ring:1,ringMax:65536,rot:0,ptNo:false,uiT:false,pt:{on:true,ok:false,err:0,why:'',ms:4,rt:null,rw:0,al:0,n:0,t:0,mx:0,w:null,cc:null,src:{width:0,height:0,__glpt:1,__gltg:'ptrt'}}};   /* [B4p] pt = cincin portal lewat RT GLSky (?glptrt=0 mati, ?glptms=N samples MSAA RT, default 4); src = pengganti kanvas di op gambar (tanpa upload) */   /* [B4o] ring default 1 (B4n: tidak membantu, lihat log §6.8); ptNo = diagnostik: cincin portal TIDAK digambar (?glptno=1); uiT = diagnostik: waktu upload dinamis diukur terpisah lewat initTexture (?glui=1) */   /* [B4n] ring = jumlah texture bergilir untuk kanvas dinamis kecil (?glring=N, 1 = perilaku lama); ringMax = batas piksel kanvas (w*h) */   /* [B4m] q = hasil warm pool mesh quad [nama, jumlah, ms]; qN = ukuran pool yang dipanaskan (?glwq=N, 0 = mati) */   /* [B4k] pre = SEMUA warm (scp, dr, tex MW, plateDeep+sprite meteor, sa) pra-kapsul (?glwpre=0 = pasca-kapsul seperti B4j/v516); pdOn = warm plateDeep + sprite meteor (?glwpd=0 mati); pd/its = hasil + waktu per item (dump) */   /* [B5] f = progres warm pra-kapsul 0..1 (dibaca 07-boot: bar + baris log "Sentuhan akhir") */   /* [B4] r1 = render pertama per scene di warm (?glwarm1=0 = nonaktif, A/B); r1t = [[kunci,ms]] */
-try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwscpf=0(&|#|$)/.test(location.search))GLW.scpf=false;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;if(/[?&]glwtex=0(&|#|$)/.test(location.search))GLW.texOn=false;if(/[?&]glwpre=0(&|#|$)/.test(location.search))GLW.pre=false;if(/[?&]glwpd=0(&|#|$)/.test(location.search))GLW.pdOn=false;if(/[?&]glwinst=0(&|#|$)/.test(location.search))GLW.instOn=false;var mR=/[?&]glring=(\d+)(&|#|$)/.exec(location.search);if(mR)GLW.ring=Math.max(1,Math.min(4,+mR[1]));if(/[?&]glptno=1(&|#|$)/.test(location.search))GLW.ptNo=true;if(/[?&]glui=1(&|#|$)/.test(location.search))GLW.uiT=true;if(/[?&]glptrt=0(&|#|$)/.test(location.search))GLW.pt.on=false;var mPm=/[?&]glptms=(\d+)(&|#|$)/.exec(location.search);if(mPm)GLW.pt.ms=Math.min(8,+mPm[1]);var mQ=/[?&]glwq=(\d+)(&|#|$)/.exec(location.search);if(mQ)GLW.qN=Math.max(0,Math.min(64,+mQ[1]));var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
+try{if(/[?&]glwarm=0(&|#|$)/.test(location.search))GLW.on=false;if(/[?&]glwarm1=0(&|#|$)/.test(location.search))GLW.r1=false;if(/[?&]glwarm1=f(&|#|$)/.test(location.search))GLW.r1f=true;if(/[?&]glwscpf=0(&|#|$)/.test(location.search))GLW.scpf=false;if(/[?&]glwsafull=1(&|#|$)/.test(location.search))GLW.safull=true;if(/[?&]glwarmpost=0(&|#|$)/.test(location.search))GLW.post=false;if(/[?&]glwsa=0(&|#|$)/.test(location.search))GLW.saOn=false;if(/[?&]glwtex=0(&|#|$)/.test(location.search))GLW.texOn=false;if(/[?&]glwpre=0(&|#|$)/.test(location.search))GLW.pre=false;if(/[?&]glwpd=0(&|#|$)/.test(location.search))GLW.pdOn=false;if(/[?&]glwinst=0(&|#|$)/.test(location.search))GLW.instOn=false;var mR=/[?&]glring=(\d+)(&|#|$)/.exec(location.search);if(mR)GLW.ring=Math.max(1,Math.min(4,+mR[1]));if(/[?&]glptno=1(&|#|$)/.test(location.search))GLW.ptNo=true;if(/[?&]glui=1(&|#|$)/.test(location.search))GLW.uiT=true;if(/[?&]glptrt=0(&|#|$)/.test(location.search))GLW.pt.on=false;var mPm=/[?&]glptms=(\d+)(&|#|$)/.exec(location.search);if(mPm)GLW.pt.ms=Math.min(8,+mPm[1]);var mQ=/[?&]glwq=(\d+)(&|#|$)/.exec(location.search);if(mQ)GLW.qN=Math.max(0,Math.min(64,+mQ[1]));var mF=/[?&]glwfade=(\d+)(&|#|$)/.exec(location.search);if(mF)GLW.fade=Math.max(0,Math.min(3000,+mF[1]));window.__glwarm=GLW;}catch(eGw0){}
 /* [B4h] TAHAN + FADE teleskop. Warm scp/dr dipindah ke SESUDAH kapsul (glskyWarm.postArm), jadi di flush pertama teleskop belum boleh tergambar (first-use scp ±1,3 dtk: 12 sampai 370 ms per anak).
    hold 0 = tidak menahan | 1 = menahan (warm pasca-kapsul belum selesai) | 2 = fade-in (GLW.fade ms, smoothstep) | selesai -> 0.
    Pemakai: 04-render.js drawFloatingTelescopeGl (kalau <=0 teleskop tidak digambar sama sekali, jalur 2D juga dilewati). Pengaman: tahan paling lama GLW.holdMax ms sejak teleskop pertama minta gambar. ?glwarmpost=0 = perilaku B4g (tanpa tahan). */
@@ -1992,6 +1993,7 @@ function glskyBegin(now,want){
 
 /* dipanggil sekali per frame SETELAH blok latar 2D: render daftar op yang dicatat plateBlit/sectDrawSky */
 /* [B0/F0] instrumentasi bench (hanya aktif kalau URL punya ?bench=1; produksi = no-op). Waktu per segmen glskyFlush + tiap r.render, jumlah upload tekstur, draw call, 6 flush pertama, spike >=8 ms. Keluar di dump bench sebagai "glseg" (glskySegOut). */
+var GLSG_HK={};   /* [B22] hook waktu CPU per objek per pass (bench, 6 flush pertama) */
 var GLSG_GK={};   /* [B21] snapshot geometri per pass (hanya bench, 6 flush pertama) */
 var GLSG={on:/[?&]bench=1(&|$)/.test(location.search),s:{},ff:[],fd:[],cur:null,spk:[],t:0,fr:0,upTot:0,upFr:0,upMax:0,calls:0,tris:0,fu:[],pf:{},ua:{},ut:{},mkN:0,mkF:[],ui:{},ug:{},pk:null,pt:0,hide:{},od:{},odF:0,odTot:0,odBig:0,odMx:0,gp:[],gt:null,gqa:false};
 /* [B4v] diagnostik GPU (hanya ?bench=1): glseg.od = overdraw per jenis op (rata-rata per frame: jumlah op, luas / luas layar), glseg.gt = timer query GPU per pass (EXT_disjoint_timer_query_webgl2, null kalau HP tidak punya), ?glhide=a,b = sembunyikan jenis layer untuk A/B diagnostik (BUKAN untuk dipakai):
@@ -2071,6 +2073,38 @@ function glsgGpuPoll(){
     if(GLSG.gp.length>=40){while(GLSG.gp.length>8){try{gl.deleteQuery(GLSG.gp.shift()[1]);}catch(eD){}g.drop++;}}
   }catch(eP){g.why=String(eP&&eP.message||eP).slice(0,60);}
 }
+/* [B22] waktu CPU per objek di dalam r.render pass k (hanya 6 flush pertama, hanya ?bench=1): onBeforeRender -> onAfterRender dipasang sementara di tiap objek scene lalu dikembalikan.
+   Mencakup upload buffer/VAO/first-use program objek itu. Hasil: ffd[i].sc[pass].ot = 8 objek teratas [ms,tipe,nama,tipe geometri,vertex,instance,induk] (>=0,4 ms), .on = jumlah objek dipasangi hook. */
+function glsgHookOn(k,gl0){
+  var hk=[],i,x;
+  try{
+    glsgHookOff(k,null);
+    for(i=0;i<gl0.length;i++){
+      x=gl0[i][2];if(!x||!x.visible)continue;
+      (function(x){
+        var rec={x:x,hb:Object.prototype.hasOwnProperty.call(x,'onBeforeRender'),ha:Object.prototype.hasOwnProperty.call(x,'onAfterRender'),ob:x.onBeforeRender,oa:x.onAfterRender,t:0,ms:0};
+        x.onBeforeRender=function(){rec.t=performance.now();return rec.ob.apply(this,arguments);};
+        x.onAfterRender=function(){var r=rec.oa.apply(this,arguments);rec.ms+=performance.now()-rec.t;return r;};
+        hk.push(rec);
+      })(x);
+    }
+    GLSG_HK[k]=hk;
+  }catch(e){}
+}
+function glsgHookOff(k,ss){
+  var hk=GLSG_HK[k],i,h,x,g,top=[];
+  if(!hk)return;
+  GLSG_HK[k]=null;
+  try{
+    for(i=0;i<hk.length;i++){
+      h=hk[i];x=h.x;
+      if(h.hb)x.onBeforeRender=h.ob;else delete x.onBeforeRender;
+      if(h.ha)x.onAfterRender=h.oa;else delete x.onAfterRender;
+      if(h.ms>=.4){g=x.geometry;top.push([+h.ms.toFixed(1),x.type,String(x.name||'').slice(0,16),g?g.type:'',(g&&g.attributes&&g.attributes.position&&g.attributes.position.count)|0,(g&&g.instanceCount)|0,x.parent&&x.parent.name?String(x.parent.name).slice(0,12):'']);}
+    }
+    if(ss){top.sort(function(a,b){return b[0]-a[0];});ss.ot=top.slice(0,8);ss.on=hk.length;}
+  }catch(e){}
+}
 function glsgR(k,t0){   /* sesudah satu r.render: waktu + draw call/segitiga render itu (info autoReset per render) */
   if(!GLSG.on)return;
   glsgAdd(k,t0);
@@ -2086,11 +2120,14 @@ function glsgR(k,t0){   /* sesudah satu r.render: waktu + draw call/segitiga ren
       var ri2=GLSKY.r.info,dd2=[ri2.memory.geometries-ss.s0[0],ri2.memory.textures-ss.s0[1],(ri2.programs?ri2.programs.length:0)-ss.s0[2]];
       if(dd2[0]||dd2[1]||dd2[2])ss.dr=dd2;
       if(gk&&dd2[0]){
-        var gn=[],q,g2,x2;
-        for(q=0;q<gk.length&&gn.length<12;q++){g2=gk[q][0];if(!gk[q][1]&&g2._listeners&&g2._listeners.dispose){x2=gk[q][2];gn.push([x2.type,String(x2.name||'').slice(0,16),g2.type,(g2.attributes&&g2.attributes.position&&g2.attributes.position.count)|0,g2.instanceCount|0,g2.index?g2.index.count:0,x2.visible?1:0,x2.parent&&x2.parent.name?String(x2.parent.name).slice(0,12):'']);}
+        var gn=[],q,g2,x2,gc=0;   /* [B22] "baru dikenal" = jumlah listener dispose NAIK selama render (tiap renderer menambah 1 listener miliknya). Cek lama (!known && ada listener) salah: geometri yang sudah dikenal renderer legacy ('big'/'small') punya listener walau GLSKY.r belum pernah melihatnya -> gn selalu kosong di dump v559 padahal dr=8/26. */
+        for(q=0;q<gk.length;q++){g2=gk[q][0];if(g2._listeners&&g2._listeners.dispose&&g2._listeners.dispose.length>gk[q][3])gc++;}
+        ss.gc=[gc,gk.length];
+        for(q=0;q<gk.length&&gn.length<12;q++){g2=gk[q][0];if(g2._listeners&&g2._listeners.dispose&&g2._listeners.dispose.length>gk[q][3]){x2=gk[q][2];gn.push([x2.type,String(x2.name||'').slice(0,16),g2.type,(g2.attributes&&g2.attributes.position&&g2.attributes.position.count)|0,g2.instanceCount|0,g2.index?g2.index.count:0,x2.visible?1:0,x2.parent&&x2.parent.name?String(x2.parent.name).slice(0,12):'']);}
         }
         ss.gn=gn;
       }
+      glsgHookOff(sk,ss);
       delete ss.s0;
     }
     GLSG_GK[sk]=null;
@@ -2147,7 +2184,7 @@ function glsgScan(k,sc){
   try{
     P=GLSKY.r.properties;o={m:0,p:0,t:[],g:[],ge:GLSKY.r.info.memory.geometries};
     /* [B21] snapshot sebelum render pass k: semua geometri scene (visible atau tidak) + status "sudah dikenal three" (ada listener dispose), supaya glsgR bisa menamai yang jadi dikenal DI DALAM render itu (ffd[i].sc[k].gn) dan menghitung delta di dalam render saja (ffd[i].sc[k].dr = [geometri, tekstur, program]; beda dgn d yang dihitung sejak akhir pass sebelumnya). */
-    try{var ri0=GLSKY.r.info,gl0=[];sc.traverse(function(x0){var g0=x0.geometry;if(g0&&gl0.length<400)gl0.push([g0,!!(g0._listeners&&g0._listeners.dispose),x0]);});GLSG_GK[k]=gl0;o.s0=[ri0.memory.geometries,ri0.memory.textures,ri0.programs?ri0.programs.length:0];}catch(eGk0){}
+    try{var ri0=GLSKY.r.info,gl0=[];sc.traverse(function(x0){var g0=x0.geometry;if(g0&&gl0.length<400)gl0.push([g0,!!(g0._listeners&&g0._listeners.dispose),x0,(g0._listeners&&g0._listeners.dispose?g0._listeners.dispose.length:0)]);});GLSG_GK[k]=gl0;glsgHookOn(k,gl0);o.s0=[ri0.memory.geometries,ri0.memory.textures,ri0.programs?ri0.programs.length:0];}catch(eGk0){}
     sc.traverseVisible(function(x){
       var mm=x.material,j,c,m,t,im,gg=x.geometry;
       try{if(gg&&!(gg._listeners&&gg._listeners.dispose)&&o.g.length<8)o.g.push([x.type,String(x.name||'').slice(0,16),gg.type,(gg.attributes&&gg.attributes.position&&gg.attributes.position.count)|0,gg.instanceCount|0,gg.index?gg.index.count:0,x.renderOrder|0]);}catch(eGg){}   /* [B4k] geometri yang BELUM dikenal renderer (belum ada listener dispose = belum pernah di-get three): [tipe objek, nama, tipe geometri, jumlah vertex, instanceCount, jumlah index] */
