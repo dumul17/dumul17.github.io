@@ -1629,6 +1629,7 @@ var DK_CSS =
       kind: 'post-boot', url: location.href, qs: location.search, three: (window.THREE && window.THREE.REVISION) || null, at: new Date().toISOString(), nowMs: now(),
       t: { capsule: tc, blue: R.t.blue, entered: te, frame1: R.t.frame1, winStart: PB.t0 != null ? Math.round(PB.t0) : null, winEnd: PB.tEnd, pbMs: PB_MS, closed: PB.tEnd != null },
       bootInfo: window.__bootInfo || null,
+      taps: R.taps, tapLog: R.tapLog, tapToPlay: R.tapToPlay != null ? R.tapToPlay : null, tapKey: R.tapKey || null, playLog: R.playLog, playing: R.playing,   /* v11.29zx: tap/bunyi ikut di bench-post (dulu hanya di snapshot() full-boot, jadi tap bintang SFX tak pernah kebaca). tapLog = [t, ms sejak Blue, SFX meta, SFX playable]; playLog = [key, req, t, lat, readyState, ms sejak Blue] */
       wrapped: PB.wrapped, missing: PB.missing,
       byFn: agg, '_byFn_cols': 'nama, jumlah, totalMs, maxMs, pertama, terakhir (abs ms)',
       plPr: window.__plPr || null,
