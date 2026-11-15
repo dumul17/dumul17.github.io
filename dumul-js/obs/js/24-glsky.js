@@ -1129,8 +1129,34 @@ function glskyPdWarm(wm,cb){
           if(typeof OFX!=='undefined'&&OFX.m0)up('ss1',ssSprite(OFX.m0,OFX.m1));
         }
       }catch(e2){o.why=(o.why?o.why+'|':'')+'ss:'+String(e2&&e2.message||e2).slice(0,60);}
-      fin();
+      snw();
     },20);
+  }
+  /* [B18] sprite supernova (snBake: core/ring/streak/flash per warna): kanvasnya sudah di-bake saat idle (05-sector-ui), tapi TEXTURE GL-nya baru dibuat + di-upload di flush yang pertama menggambarnya
+     = hitch "tap bintang SFX / putar Stellar Signals pertama" (laporan pemilik 15 Nov). Di sini semua warna TRIGGERS di-bake + di-upload sekarang (satu warna per giliran, pra-kapsul), sama pola dgn plateDeep/sprite meteor.
+     Hasil: glseg.w1.pd.sn = {n texture, colors, ms, why}. Flag ?glwsn=0 = mati (A/B). */
+  function snw(){
+    var sn={n:0,colors:0,ms:0,why:''},cols=[],seen={},k,rr,t0s=performance.now(),i=0;
+    o.sn=sn;
+    try{
+      if(/[?&]glwsn=0(&|#|$)/.test(location.search)||typeof snBake!=='function'||typeof SNFX==='undefined'||!SNFX.on||typeof TRIGGERS==='undefined'){sn.why='off';return fin();}
+      for(k in TRIGGERS){rr=TRIGGERS[k]&&TRIGGERS[k].rgb;if(rr&&!seen[rr]){seen[rr]=1;cols.push(rr);}}
+      ['110,229,255','255,80,120'].forEach(function(x){if(!seen[x]){seen[x]=1;cols.push(x);}});
+    }catch(e3){sn.why='cols:'+String(e3&&e3.message||e3).slice(0,50);return fin();}
+    (function step(){
+      var S,tx,nm,c;
+      if(done)return;
+      if(i>=cols.length){sn.colors=cols.length;sn.ms=Math.round(performance.now()-t0s);return fin();}
+      try{
+        S=snBake(cols[i++]);
+        for(nm in {core:1,ring:1,streak:1,flash:1}){
+          c=S&&S[nm];if(!c||c.width<2||c.height<2)continue;
+          tx=glskyTex(c);
+          if(tx&&r&&r.initTexture){r.initTexture(tx);sn.n++;}
+        }
+      }catch(e4){sn.why=(sn.why?sn.why+'|':'')+String(e4&&e4.message||e4).slice(0,50);}
+      setTimeout(step,0);
+    })();
   }
   if(!r){o.why='no-r';return fin();}
   (function wt(){
