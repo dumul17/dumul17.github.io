@@ -34,6 +34,7 @@ var PL3D_CFG={
   bmAdapt:{on:1,ema:55,hold:10000},   /* [v56] hold 15000 -> 10000 (latch Redmi +34 dtk sesudah kapsul terlalu lambat; itel lonjakan ema>=55 terpanjang 6 dtk, margin 4 dtk). [v55] bandMin EFEKTIF adaptif (hanya kalau bandMin < bands): kalau FS.slow dan FS.ema >= ema (ms) TERUS-MENERUS selama hold (ms), pita dikunci = bands (spt Min bands 6) sampai reload (LATCH satu arah: sesudah pita naik, ema turun ke ±45-58 jadi tidak bisa dibedakan lagi dari HP kuat, jadi tidak ada jalan balik). Dasar: Redmi 8A Min bands 1 sektor 7,6 fps / p50 137 ms vs Min bands 6 18,9 fps / p50 51 ms; itel Min bands 1 vs 6 sama (22,8 vs 21,6 fps), ema itel di sektor ±43-47 dgn lonjakan transisi <=10 dtk, Redmi bands 1 >=55 terus 30+ dtk. ?bmad=0 = nonaktif (A/B) */
   rwSlow:450,        /* [v54] batas lebar kanvas render strip (px) saat governor FS.slow; 0 = mati. Lebar render = PW (px CSS) x q, jadi HP DPR rendah dgn layar CSS lebar (mis. 450 px @ DPR 1,6) dulu dapat kanvas ±1,56x lebih besar dari HP 360 px @ DPR 2 (563 vs 450 px; dump 7 Nov Redmi 8A vs itel) padahal sama-sama GPU-bound. q efektif = min(qSlow, max(1, rwSlow / PW)). ?plrw=N = A/B (0 = perilaku lama) */
   qSlow:1.25,        /* (v23: dulu 1,5) skala resolusi saat governor FS.slow (HP lambat): dipakai kalau 0 < qSlow < q. Probe: q 1,5 -> 1 hemat ±18 ms/frame di HP dpr 1,6 (GPU-bound), ±2 ms di HP dpr 2,0. 0 = mati (selalu pakai q) */
+  lightFast:10,    /* [B17] px: cahaya (portal) bergeser >N px sejak refresh terakhir (drag cepat) = boleh refresh tanpa menunggu plafon fps (tiap >=30 ms, praktis dibatasi pita/frame seperti sebelum B16). Orbit pelan (240 dtk/siklus ≈5 px/dtk, ±2,5 px per 500 ms) tidak menembus ambang, jadi tetap hemat. 0 = mati. ?pllf=N */
   fps:2,           /* [B16] default 15 -> 2 (15 Nov: laju refresh nyata <=4,5/dtk karena dibatasi frame/bands; probe sektor fps 4 -> -5,0 ms, fps 2 -> -10,9 ms; pemilik cek Rate 1/s nyaman di 2 device, fps naik). Balik lama: ?plfps=15 atau slider Rate. */
   /* refresh PENUH strip per detik (bukan jumlah render GPU: tiap refresh dipecah jadi `bands` pita, 1 pita per frame, jadi tidak ada lonjakan). Tuner 'Rate' */
   slowAur:1,      /* (TIDAK DIPAKAI LAGI sejak aurora 2 keyframe; jarak keyframe = PL3D_AUR_KF) */
@@ -120,6 +121,7 @@ try{
   try{if(/[?&]bmad=0(?:&|#|$)/.test(location.search))PL3D_CFG.bmAdapt.on=0;}catch(eBm){}
   PL3D_CFG.slowHint={on:1,force:0,key:'dumul_pl_slow',ttl:2592000000};   /* [v57] petunjuk slow: perangkat yang pernah FS.slow langsung memakai q slow sejak awal (tanpa resize + 10 dtk q penuh di sektor pertama). ?plhint=0 = mati (A/B, tidak baca/tulis), ?plhint=1 = paksa nyala tanpa tulis storage */
   try{var _phm=/[?&]plhint=([01])(?:&|#|$)/.exec(location.search);if(_phm){if(_phm[1]==='0')PL3D_CFG.slowHint.on=0;else PL3D_CFG.slowHint.force=1;}}catch(ePh){}   /* [v55] A/B: ?bmad=0 = tanpa latch bandMin adaptif */
+  try{var _plf=/[?&]pllf=(\d+)(&|#|$)/.exec(location.search);if(_plf)PL3D_CFG.lightFast=Math.min(200,parseInt(_plf[1],10)||0);}catch(ePl){}   /* [B17] ?pllf=0 = tanpa jalur cahaya-cepat (perilaku B16) */
   try{var _pfp=/[?&]plfps=(\d+)(&|#|$)/.exec(location.search);if(_pfp)PL3D_CFG.fps=Math.max(1,Math.min(15,parseInt(_pfp[1],10)));}catch(ePf){}   /* [B15] ALAT UKUR A/B (default tidak ada = fps 15): ?plfps=N plafon refresh penuh tanah per dtk. Probe 15 Nov: laju refresh nyata ±4,5/dtk (dibatasi frame/bands), plafon 4 -> 26,4 ms, 2 -> 20,4 ms (default 31,9) */
   var _prw=/[?&]plrw=(\d+)/.exec(location.search);if(_prw)PL3D_CFG.rwSlow=parseInt(_prw[1],10);   /* [v54] A/B: ?plrw=0 = tanpa batas lebar saat FS.slow (perilaku lama), ?plrw=563 dst */
   PL3D_CFG.aurDelay=0;try{var _pad=/[?&]aurdelay=(\d+)/.exec(location.search);if(_pad)PL3D_CFG.aurDelay=Math.min(30000,parseInt(_pad[1],10)||0);}catch(eAd){}   /* [v59] ALAT UKUR A/B (default 0 = mati): ?aurdelay=N = bake + blit aurora planet DITUNDA N ms sesudah entri sektor (SECT.cur && !SECT.busy); selama tunda F.aur=0 (fade-in .6 dtk sesudahnya). Hipotesis: bake aurora (pl.aur/pl.bake/pl.copy, detik 3-6) memicu q.big di punuk detik 4-6. Dump: cfg.pl.aurDelay/aurS0/aurRel. */
@@ -1699,7 +1701,7 @@ function pl3dGlRtUpdate(now,cp){
   animOn=(C.cloud>0&&C.cloudDrift!==0)||(C.cityTw>0&&C.bioA>0&&(C.cityA>0||C.bioSea>0||C.earthK>0));
   lMv=Math.abs(lx-PL3D.gLx)+Math.abs(ly-PL3D.gLy);
   settle=!!PL3D.gWasCh&&!palCh;PL3D.gWasCh=palCh;
-  due=PL3D.dirty||bolt||PL3D.gBoltWas||((rotMov||animOn)&&now-PL3D.gLastR>=1000/C.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.gLastR>=(rotMov?30:1000/C.fps))||settle||((palCh||parCh)&&now-PL3D.gLastR>=1000/C.palFps);
+  due=PL3D.dirty||bolt||PL3D.gBoltWas||((rotMov||animOn)&&now-PL3D.gLastR>=1000/C.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.gLastR>=(rotMov?30:1000/C.fps))||(C.lightFast>0&&lMv>C.lightFast&&now-PL3D.gLastR>=30)||settle||((palCh||parCh)&&now-PL3D.gLastR>=1000/C.palFps);
   nb=Math.max(1,Math.min(8,C.bands|0));
   if(nb>1&&typeof FS!=='undefined'&&FS.slow&&FS.ema>0){   /* pita adaptif: sama dgn jalur lama (bandMin, bmAdapt) */
     bmn=Math.max(1,Math.min(nb,(C.bandMin|0)||nb));bfit=Math.floor(1000/Math.max(1,C.fps)/Math.max(16.7,FS.ema));BA=C.bmAdapt;
@@ -1814,7 +1816,7 @@ function planet3dDraw(now){
       var animOn=(PL3D_CFG.cloud>0&&PL3D_CFG.cloudDrift!==0)||(PL3D_CFG.cityTw>0&&PL3D_CFG.bioA>0&&(PL3D_CFG.cityA>0||PL3D_CFG.bioSea>0||PL3D_CFG.earthK>0));   /* awan / kerlip kota+biolum (P16) */
       var lMv=Math.abs(lx-PL3D.lastLx)+Math.abs(ly-PL3D.lastLy);
       var settle=!!PL3D.wasCh&&!palCh;PL3D.wasCh=palCh;
-      var due=PL3D.dirty||(!still&&(rotMov||animOn)&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
+      var due=PL3D.dirty||(!still&&(rotMov||animOn)&&now-PL3D.lastR>=1000/PL3D_CFG.fps)||(lMv>(rotMov?40:.5)&&now-PL3D.lastR>=(rotMov?30:1000/PL3D_CFG.fps))||(PL3D_CFG.lightFast>0&&lMv>PL3D_CFG.lightFast&&now-PL3D.lastR>=30)||settle||((palCh||parCh)&&now-PL3D.lastR>=1000/PL3D_CFG.palFps);
       var nb=Math.max(1,Math.min(8,PL3D_CFG.bands|0));
       if(nb>1&&typeof FS!=='undefined'&&FS.slow&&FS.ema>0){   /* pita adaptif (CUMA saat governor FS.slow; perangkat kuat / ?fs=0 = pita penuh): satu refresh harus selesai dalam ~1000/fps ms; frame lambat -> pita lebih sedikit (min bandMin) */
         var bmn=Math.max(1,Math.min(nb,(PL3D_CFG.bandMin|0)||nb)),bfit=Math.floor(1000/Math.max(1,PL3D_CFG.fps)/Math.max(16.7,FS.ema));
