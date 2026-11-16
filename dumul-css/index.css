@@ -1628,3 +1628,9 @@ body.sect-in #mp-now-playing{--np-n:2}   /* v12: dulu di body -> style recalc se
 
 /* v23: html.wh-busy (diset 09-wormhole.js selama WORMHOLE/SECT busy): semua animasi HUD dijeda, layar tertutup terowongan jadi tak terlihat. Lanjut dari posisi terakhir setelah selesai. */
 html.wh-busy #terminal .cursor,html.wh-busy .tp-row.ld .tp-t,html.wh-busy #cat-lock::before,html.wh-busy #exit-panel .ex-next.on,html.wh-busy #exit-panel.talk .tl-m,html.wh-busy #exit-panel.talk .tl-glow,html.wh-busy #exit-panel.talk .ex-owl,html.wh-busy #exit-panel.talk .ow-beak,html.wh-busy .mp-track.playing .mp-state,html.wh-busy .mp-track.playing .mp-spec i,html.wh-busy #music-toggle.playing-closed .mp-spec-mini i{animation-play-state:paused!important}
+
+/* [B27] ?bsheen=1: sheen + denyut ujung bar boot aktif kembali (transform/opacity saja, jalan di compositor walau main thread macet). Default MATI: aturan animation:none di atas tetap berlaku tanpa kelas .bsheen. */
+#boot-bar.bsheen #boot-fill::after{animation:bootSheen 1.25s linear infinite}
+#boot-bar.bsheen #boot-fill::before{opacity:.6;animation:bootEdge .7s ease-in-out infinite alternate}
+#boot-screen.off #boot-bar.bsheen #boot-fill::after,#boot-screen.off #boot-bar.bsheen #boot-fill::before{animation:none}
+@media (prefers-reduced-motion:reduce){#boot-bar.bsheen #boot-fill::after,#boot-bar.bsheen #boot-fill::before{animation:none}}
