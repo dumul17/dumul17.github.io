@@ -958,6 +958,7 @@ var DUMUL_CHARS=(function(){
   var pShown=0,pTgt=0,pAt=0,pRaf=0,pV=-1,BAR_TAU=220,BAR_MIN=10;
   /* v155: fill selebar bar + translateX (compositor, tetap meluncur saat main thread macet; lihat index.css .bm). */
   try{document.getElementById('boot-bar').classList.add('bm');}catch(eB){}
+  try{if(/[?&]bsheen=1(&|#|$)/.test(location.search))document.getElementById('boot-bar').classList.add('bsheen');}catch(eBs){}   /* [B27] opt-in: sheen + denyut ujung (compositor) aktif lagi; aturan animation:none di index.css mematikannya secara default */
   /* v158: ghost = segmen TARGET jujur (pTgt) di depan fill; stall = bar macet >1,5 dtk → napas pelan (class .stall, CSS opacity). */
   var ghost=document.getElementById('boot-ghost'),bar=document.getElementById('boot-bar'),gV=-1,mvAt=performance.now(),bsT=0;
   function stallTick(){

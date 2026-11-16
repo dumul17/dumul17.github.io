@@ -1873,6 +1873,9 @@ function glskyWarm(stop,onPl,onDone){
     }
     var qi=0,curW=0,pf=0,dw=0,tw=1,wz;   /* [B4k] bobot ms per item (dump B4j: scp 2200, dr 800, tex 300, sa 150, main 180) -> Wm.f halus, bukan per jumlah item */
     var WTI={main:180,head:20,pl:90,dfx:20,dmd:20,ast:30,scp:2200,dr:800,tex:300,pd:200,sa:150,ptrt:60};
+    /* [B27] bobot item ekor disamakan dgn ms nyata (autoab boot v565, 6 run, itel; log 1.4): pd 719-888, ptrt 440-489, ast 159-204, inst:main 195-241, inst:pl 179-202, main 43-66 (dulu kegedean); sa/scp/dr/tex sudah cocok.
+       Dulu ekor (pd+ptrt+sa ≈ 1,3-1,5 dtk nyata) hanya dapat ±9% irisan bar padahal ±25% waktunya = plateau 77-78% selama 1,5-2 dtk. ?glwti=0 = bobot lama (A/B). */
+    if(!/[?&]glwti=0(&|#|$)/.test(location.search)){WTI.main=55;WTI.ast=180;WTI.pd=800;WTI.ptrt=460;WTI.sa=160;WTI['inst:main']=220;WTI['inst:pl']=190;}
     function wi(n){return WTI[n]||50;}
     tw=0;for(wz=0;wz<q.length;wz++)tw+=wi(q[wz][0]);if(tw<1)tw=1;
     function fPrg(){if(pq)return;var f6=.75+.22*Math.min(1,(dw+pf)/tw);if(f6>Wm.f)Wm.f=f6;}
