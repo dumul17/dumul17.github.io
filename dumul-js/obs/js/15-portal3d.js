@@ -1021,6 +1021,7 @@ function portal3dGlRing(now){
       }
     }
 
+    pmk('g.mouth');   /* [B26] alat ukur: pecah pre.ptr (portal3dGlRing) jadi mulut | petir | cincin | charge | percikan | sisa; pmk no-op di produksi */
     /* --- petir: update + segmen GL (renderOrder garis 5000 = di bawah cincin hi=5100) --- */
     try{
       if(typeof updateAVColor==='function')updateAVColor(now);
@@ -1069,6 +1070,7 @@ function portal3dGlRing(now){
       }
     }catch(eV){}
 
+    pmk('g.bolts');
     /* --- cincin 3D offscreen → texture GL (bukan ke #sky 2D) --- */
     var want=pt3dRes(Rd);if(PT3D.big&&want<PT3D_CFG.resMax)want=PT3D_CFG.resMax;
     var alt=!!(PT3D_CFG.alt&&typeof FS!=='undefined'&&(FS.slow||FS.heavy)&&!(ch>0))||!!ova;
@@ -1100,6 +1102,7 @@ function portal3dGlRing(now){
     else _src.__gldyn=(rendered||!reuse)?1:0;   /* [FIX] kanvas cincin 3D berubah tiap RENDER -> upload ulang; frame reuse (isi sama persis) tidak upload lagi (dulu upload tiap frame) */
     glskyImg(_src,1,px,py,S,S,ang,0,5102,null,_uvr);   /* [G4.16] cincin 5102: di atas mulut (5100) + petir (5101), di bawah kilau charge + percikan (5103) */
 
+    pmk('g.ring');
     /* --- kilau charge di atas cincin --- */
     if(!PXo.ptb&&ch>0){
       var cl=PT3D.cl,ci,a0,a1,rz=PT3D.rz||0,v,rc=glskyCol(ptCol()),nSeg=8,si,t0,t1,p0,p1,rr;
@@ -1116,6 +1119,7 @@ function portal3dGlRing(now){
       }
     }
 
+    pmk('g.chg');
     /* --- percikan di atas cincin (hi texture) --- */
     if(!PXo.ptb&&!(typeof reduce!=='undefined'&&reduce)){   /* [FIX flash] sama dgn 2D (ptSparksDraw: !reduce) */
       try{
@@ -1140,6 +1144,7 @@ function portal3dGlRing(now){
       }catch(eS){}
     }
 
+    pmk('g.spk');
     /* tip denyut idle (petunjuk tap) ikut GL */
     if(!OVSEL.seen&&!op.hid&&!(typeof reduce!=='undefined'&&reduce)&&typeof SECT!=='undefined'&&!SECT.busy&&!SECT.cur){
       var ph=(now%2600)/2600,tipR=Rd*(1.04+.26*ph);
